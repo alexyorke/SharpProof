@@ -551,10 +551,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             if (unwrappedReturnedValue is ILocalReferenceOperation localReference &&
-                TryGetStableMutableObjectInitializerEscape(localReference.Local, returnedValue, semanticModel, out escapeSymbol))
+                TryGetStableMutableObjectLocalEscape(
+                    localReference.Local,
+                    returnedValue,
+                    semanticModel,
+                    out escapeSyntax,
+                    out escapeSymbol,
+                    out catalogSource))
             {
-                escapeSyntax = localReference.Syntax;
-                catalogSource = "fresh_mutable_object_local_return";
                 return true;
             }
 
@@ -606,12 +610,41 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return false;
         }
 
-        private static bool TryGetStableMutableObjectInitializerEscape(
+        private static bool TryGetStableMutableObjectLocalEscape(
             ILocalSymbol localSymbol,
             IOperation returnedValue,
             SemanticModel semanticModel,
-            out ISymbol escapeSymbol)
+            out SyntaxNode escapeSyntax,
+            out ISymbol escapeSymbol,
+            out string catalogSource)
         {
+            return TryGetStableMutableObjectLocalEscape(
+                localSymbol,
+                returnedValue,
+                semanticModel,
+                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                out escapeSyntax,
+                out escapeSymbol,
+                out catalogSource);
+        }
+
+        private static bool TryGetStableMutableObjectLocalEscape(
+            ILocalSymbol localSymbol,
+            IOperation returnedValue,
+            SemanticModel semanticModel,
+            HashSet<ILocalSymbol> visitedLocals,
+            out SyntaxNode escapeSyntax,
+            out ISymbol escapeSymbol,
+            out string catalogSource)
+        {
+            if (!visitedLocals.Add(localSymbol))
+            {
+                escapeSyntax = null!;
+                escapeSymbol = null!;
+                catalogSource = string.Empty;
+                return false;
+            }
+
             var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
                 .Select(reference => reference.GetSyntax())
                 .OfType<VariableDeclaratorSyntax>()
@@ -619,13 +652,17 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var initializerSyntax = declaratorSyntax?.Initializer?.Value;
             if (declaratorSyntax == null || initializerSyntax == null)
             {
+                escapeSyntax = null!;
                 escapeSymbol = null!;
+                catalogSource = string.Empty;
                 return false;
             }
 
             if (HasAssignmentToLocalBetweenDeclarationAndReturn(localSymbol, returnedValue, declaratorSyntax, semanticModel))
             {
+                escapeSyntax = null!;
                 escapeSymbol = null!;
+                catalogSource = string.Empty;
                 return false;
             }
 
@@ -633,11 +670,44 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (initializerOperation is IObjectCreationOperation objectCreationOperation &&
                 IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
             {
+                escapeSyntax = returnedValue.Syntax;
                 escapeSymbol = objectCreationOperation.Constructor ?? (ISymbol)objectCreationOperation.Type!;
+                catalogSource = "fresh_mutable_object_local_return";
                 return true;
             }
 
+            if (initializerOperation != null &&
+                TryFindReturnedInitializerMutableObjectEscape(
+                    initializerOperation,
+                    semanticModel,
+                    out escapeSyntax,
+                    out escapeSymbol,
+                    out var nestedCatalogSource))
+            {
+                catalogSource = nestedCatalogSource switch
+                {
+                    "fresh_mutable_object_constructor_escape" => "fresh_mutable_object_local_constructor_escape",
+                    "fresh_mutable_object_initializer_escape" => "fresh_mutable_object_local_initializer_escape",
+                    _ => "fresh_mutable_object_local_escape"
+                };
+                return true;
+            }
+
+            if (initializerOperation is ILocalReferenceOperation localReference)
+            {
+                return TryGetStableMutableObjectLocalEscape(
+                    localReference.Local,
+                    returnedValue,
+                    semanticModel,
+                    visitedLocals,
+                    out escapeSyntax,
+                    out escapeSymbol,
+                    out catalogSource);
+            }
+
+            escapeSyntax = null!;
             escapeSymbol = null!;
+            catalogSource = string.Empty;
             return false;
         }
 

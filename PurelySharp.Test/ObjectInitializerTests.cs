@@ -298,6 +298,77 @@ public class TestClass
         }
 
         [Test]
+        public async Task FreshMutableObjectEscapesThroughLocalImmutableWrapperConstructor_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public sealed class Holder
+{
+    public readonly Box Value;
+
+    [EnforcePure]
+    public Holder(Box value)
+    {
+        Value = value;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public Holder {|PS0002:TestMethod|}()
+    {
+        var holder = new Holder(new Box());
+        return holder;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task FreshMutableObjectAliasEscapesThroughLocalImmutableWrapperConstructor_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public sealed class Holder
+{
+    public readonly Box Value;
+
+    [EnforcePure]
+    public Holder(Box value)
+    {
+        Value = value;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public Holder {|PS0002:TestMethod|}()
+    {
+        var box = new Box();
+        var holder = new Holder(box);
+        return holder;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task FreshMutableLocalObjectFieldMutation_NoDiagnostic()
         {
             var test = @"
