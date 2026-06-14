@@ -628,8 +628,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
             out ISymbol escapeSymbol,
             out string catalogSource)
         {
-            if (!PurityAnalysisEngine.TryGetSingleReturnedValueFromNestedCallable(
-                    invocationOperation.TargetMethod,
+            if (!PurityAnalysisEngine.TryGetSingleReturnedValueFromInvocation(
+                    invocationOperation,
                     semanticModel,
                     out var returnedOperation,
                     out _,

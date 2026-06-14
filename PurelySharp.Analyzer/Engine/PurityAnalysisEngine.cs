@@ -1600,6 +1600,50 @@ namespace PurelySharp.Analyzer.Engine
             return returnedOperation != null;
         }
 
+        internal static bool TryGetSingleReturnedValueFromInvocation(
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            out IOperation returnedOperation,
+            out SyntaxNode returnedExpressionSyntax,
+            out SemanticModel returnedSemanticModel,
+            PurityAnalysisState? currentState = null)
+        {
+            if (TryGetSingleReturnedValueFromNestedCallable(
+                    invocationOperation.TargetMethod,
+                    semanticModel,
+                    out returnedOperation,
+                    out returnedExpressionSyntax,
+                    out returnedSemanticModel))
+            {
+                return true;
+            }
+
+            if (invocationOperation.TargetMethod.Name == "Invoke" &&
+                invocationOperation.TargetMethod.ContainingType?.TypeKind == TypeKind.Delegate &&
+                invocationOperation.Instance != null)
+            {
+                var potentialTargets = ResolvePotentialTargets(
+                    invocationOperation.Instance,
+                    currentState ?? PurityAnalysisState.Pure,
+                    semanticModel);
+                if (potentialTargets is { IsUnresolved: false } resolvedTargets &&
+                    resolvedTargets.MethodSymbols.Count == 1)
+                {
+                    return TryGetSingleReturnedValueFromNestedCallable(
+                        resolvedTargets.MethodSymbols.Single(),
+                        semanticModel,
+                        out returnedOperation,
+                        out returnedExpressionSyntax,
+                        out returnedSemanticModel);
+                }
+            }
+
+            returnedOperation = null!;
+            returnedExpressionSyntax = null!;
+            returnedSemanticModel = semanticModel;
+            return false;
+        }
+
         private static bool TryGetSingleReturnedExpressionSyntax(
             SyntaxNode callableSyntax,
             out SyntaxNode returnedExpressionSyntax)

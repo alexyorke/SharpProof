@@ -1119,8 +1119,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             if (unwrappedOperation is IInvocationOperation invocationOperation &&
-                PurityAnalysisEngine.TryGetSingleReturnedValueFromNestedCallable(
-                    invocationOperation.TargetMethod,
+                PurityAnalysisEngine.TryGetSingleReturnedValueFromInvocation(
+                    invocationOperation,
                     semanticModel,
                     out var returnedOperation,
                     out _,

@@ -101,6 +101,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             PurityAnalysisEngine.LogDebug($"  [MIR-DEL-S] Potential Target Purity Result: IsPure={targetPurity.IsPure}");
                             if (!targetPurity.IsPure)
                             {
+                                if (CanTreatFreshMutableObjectReturningNestedCallableInvocationAsPure(targetMethod, targetPurity))
+                                {
+                                    PurityAnalysisEngine.LogDebug("  [MIR-DEL-S] --> PURE target deferred to caller return/ownership analysis.");
+                                    continue;
+                                }
+
                                 PurityAnalysisEngine.LogDebug("  [MIR-DEL-S] --> IMPURE target found. Invocation is impure.");
                                 result = targetPurity.WithCallee(targetMethod, invocationOperation.Syntax);
                                 break;
@@ -513,7 +519,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Callee purity result for {methodDisplayString}: IsPure={calleePurity.IsPure}");
 
-            if (CanTreatFreshMutableObjectReturningLocalFunctionInvocationAsPure(originalDefinitionSymbol, calleePurity))
+            if (CanTreatFreshMutableObjectReturningNestedCallableInvocationAsPure(originalDefinitionSymbol, calleePurity))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (deferring fresh mutable local-function return escape analysis to the caller)");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -524,11 +530,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 : calleePurity.WithCallee(originalDefinitionSymbol, invocationOperation.Syntax);
         }
 
-        private static bool CanTreatFreshMutableObjectReturningLocalFunctionInvocationAsPure(
+        private static bool CanTreatFreshMutableObjectReturningNestedCallableInvocationAsPure(
             IMethodSymbol targetMethod,
             PurityAnalysisEngine.PurityAnalysisResult calleePurity)
         {
-            return targetMethod.MethodKind == MethodKind.LocalFunction &&
+            return (targetMethod.MethodKind == MethodKind.LocalFunction ||
+                    targetMethod.MethodKind == MethodKind.AnonymousFunction) &&
                 !calleePurity.IsPure &&
                 string.Equals(calleePurity.Evidence.Category, "mutable_state_escape", StringComparison.Ordinal) &&
                 calleePurity.Evidence.CatalogSource.StartsWith("fresh_mutable_object_", StringComparison.Ordinal);
