@@ -121,6 +121,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: escapeSymbol,
                             catalogSource: catalogSource));
                 }
+                else if (TryFindFreshMutableObjectReturnEscape(
+                             returnOperation.ReturnedValue,
+                             context.SemanticModel,
+                             out var objectEscapeSyntax,
+                             out var objectEscapeSymbol,
+                             out var objectCatalogSource))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes fresh mutable object through '{objectEscapeSyntax}'. Return statement is Impure.");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        objectEscapeSyntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            "mutable_state_escape",
+                            ruleName: nameof(ReturnStatementPurityRule),
+                            operation: returnOperation,
+                            syntaxNode: objectEscapeSyntax,
+                            symbol: objectEscapeSymbol,
+                            catalogSource: objectCatalogSource));
+                }
                 else
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value is pure. Return statement is Pure.");
@@ -446,6 +464,175 @@ namespace PurelySharp.Analyzer.Engine.Rules
             escapeSymbol = null!;
             catalogSource = string.Empty;
             return false;
+        }
+
+        private static bool TryFindFreshMutableObjectReturnEscape(
+            IOperation returnedValue,
+            SemanticModel semanticModel,
+            out SyntaxNode escapeSyntax,
+            out ISymbol escapeSymbol,
+            out string catalogSource)
+        {
+            var unwrappedReturnedValue = PurityAnalysisEngine.SkipImplicitConversions(returnedValue);
+            if (unwrappedReturnedValue is IObjectCreationOperation objectCreationOperation &&
+                IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
+            {
+                escapeSyntax = objectCreationOperation.Syntax;
+                escapeSymbol = objectCreationOperation.Constructor ?? (ISymbol)objectCreationOperation.Type!;
+                catalogSource = "fresh_mutable_object_return";
+                return true;
+            }
+
+            if (unwrappedReturnedValue is ILocalReferenceOperation localReference &&
+                TryGetStableMutableObjectInitializerEscape(localReference.Local, returnedValue, semanticModel, out escapeSymbol))
+            {
+                escapeSyntax = localReference.Syntax;
+                catalogSource = "fresh_mutable_object_local_return";
+                return true;
+            }
+
+            if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
+            {
+                if (TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                {
+                    return TryFindFreshMutableObjectReturnEscape(
+                        conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
+                        semanticModel,
+                        out escapeSyntax,
+                        out escapeSymbol,
+                        out catalogSource);
+                }
+
+                return TryFindFreshMutableObjectReturnEscape(
+                           conditionalOperation.WhenTrue,
+                           semanticModel,
+                           out escapeSyntax,
+                           out escapeSymbol,
+                           out catalogSource) ||
+                       TryFindFreshMutableObjectReturnEscape(
+                           conditionalOperation.WhenFalse,
+                           semanticModel,
+                           out escapeSyntax,
+                           out escapeSymbol,
+                           out catalogSource);
+            }
+
+            if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
+            {
+                return TryFindFreshMutableObjectReturnEscape(
+                           coalesceOperation.Value,
+                           semanticModel,
+                           out escapeSyntax,
+                           out escapeSymbol,
+                           out catalogSource) ||
+                       TryFindFreshMutableObjectReturnEscape(
+                           coalesceOperation.WhenNull,
+                           semanticModel,
+                           out escapeSyntax,
+                           out escapeSymbol,
+                           out catalogSource);
+            }
+
+            escapeSyntax = null!;
+            escapeSymbol = null!;
+            catalogSource = string.Empty;
+            return false;
+        }
+
+        private static bool TryGetStableMutableObjectInitializerEscape(
+            ILocalSymbol localSymbol,
+            IOperation returnedValue,
+            SemanticModel semanticModel,
+            out ISymbol escapeSymbol)
+        {
+            var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
+                .Select(reference => reference.GetSyntax())
+                .OfType<VariableDeclaratorSyntax>()
+                .FirstOrDefault();
+            var initializerSyntax = declaratorSyntax?.Initializer?.Value;
+            if (declaratorSyntax == null || initializerSyntax == null)
+            {
+                escapeSymbol = null!;
+                return false;
+            }
+
+            if (HasAssignmentToLocalBetweenDeclarationAndReturn(localSymbol, returnedValue, declaratorSyntax, semanticModel))
+            {
+                escapeSymbol = null!;
+                return false;
+            }
+
+            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax));
+            if (initializerOperation is IObjectCreationOperation objectCreationOperation &&
+                IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
+            {
+                escapeSymbol = objectCreationOperation.Constructor ?? (ISymbol)objectCreationOperation.Type!;
+                return true;
+            }
+
+            escapeSymbol = null!;
+            return false;
+        }
+
+        private static bool HasAssignmentToLocalBetweenDeclarationAndReturn(
+            ILocalSymbol localSymbol,
+            IOperation returnedValue,
+            VariableDeclaratorSyntax declaratorSyntax,
+            SemanticModel semanticModel)
+        {
+            var containingBlock = returnedValue.Syntax.FirstAncestorOrSelf<BlockSyntax>();
+            if (containingBlock == null)
+            {
+                return false;
+            }
+
+            var start = declaratorSyntax.Span.End;
+            var end = returnedValue.Syntax.SpanStart;
+            if (end <= start)
+            {
+                return false;
+            }
+
+            foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (assignment.SpanStart < start || assignment.SpanStart >= end)
+                {
+                    continue;
+                }
+
+                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left).Symbol;
+                if (SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsFreshMutableEscapingReferenceType(ITypeSymbol? typeSymbol)
+        {
+            if (typeSymbol is not INamedTypeSymbol namedType ||
+                namedType.TypeKind == TypeKind.Delegate ||
+                namedType.IsValueType ||
+                namedType.SpecialType == SpecialType.System_String ||
+                namedType.DeclaringSyntaxReferences.Length == 0)
+            {
+                return false;
+            }
+
+            return namedType.GetMembers().Any(member =>
+                member switch
+                {
+                    IFieldSymbol field => !field.IsStatic &&
+                                          !field.IsReadOnly &&
+                                          field.DeclaredAccessibility != Accessibility.Private,
+                    IPropertySymbol property => !property.IsStatic &&
+                                                property.SetMethod != null &&
+                                                !property.SetMethod.IsInitOnly &&
+                                                property.SetMethod.DeclaredAccessibility != Accessibility.Private,
+                    _ => false
+                });
         }
 
         private static bool IsConstructionWithEscapingParameters(
