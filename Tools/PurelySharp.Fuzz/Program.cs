@@ -1188,6 +1188,15 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: true,
             BuildConservativeDeclarationExpression),
         new ShapeRegistryEntry(
+            "ConservativeDeclarationPattern",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.DeclarationPattern)),
+            ImmutableArray.Create("DeclarationPattern"),
+            ImmutableArray.Create("DeclarationPattern"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildConservativeDeclarationPattern),
+        new ShapeRegistryEntry(
             "ConservativeTypeParameterObjectCreation",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.TypeParameterObjectCreation)),
             ImmutableArray.Create("TypeParameterObjectCreation"),
@@ -1364,14 +1373,34 @@ public sealed class FuzzCaseGenerator
             "ConservativeInterpolatedStringHandler",
             ImmutableArray.Create(
                 RoslynShapeManifest.OperationShapeId(OperationKind.InterpolatedStringHandlerCreation),
+                RoslynShapeManifest.OperationShapeId(OperationKind.InterpolatedStringAddition),
                 RoslynShapeManifest.OperationShapeId(OperationKind.InterpolatedStringAppendLiteral),
-                RoslynShapeManifest.OperationShapeId(OperationKind.InterpolatedStringAppendFormatted)),
-            ImmutableArray.Create("InterpolatedStringHandlerCreation", "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted"),
+                RoslynShapeManifest.OperationShapeId(OperationKind.InterpolatedStringAppendFormatted),
+                RoslynShapeManifest.OperationShapeId(OperationKind.InterpolatedStringHandlerArgumentPlaceholder)),
+            ImmutableArray.Create("InterpolatedStringHandlerCreation", "InterpolatedStringAddition", "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted", "InterpolatedStringHandlerArgumentPlaceholder"),
             ImmutableArray.Create("InterpolatedStringExpression"),
             FuzzExpectation.Conservative(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: false,
             BuildConservativeInterpolatedStringHandler),
+        new ShapeRegistryEntry(
+            "ConservativeAddressOf",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.AddressOf)),
+            ImmutableArray.Create("AddressOf"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: true,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeAddressOf),
+        new ShapeRegistryEntry(
+            "ConservativeInlineArrayAccess",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.InlineArrayAccess)),
+            ImmutableArray.Create("InlineArrayAccess"),
+            ImmutableArray.Create("ElementAccessExpression"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeInlineArrayAccess),
         new ShapeRegistryEntry(
             "ConservativeFunctionPointer",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.FunctionPointerInvocation)),
@@ -2094,6 +2123,19 @@ public class {{className}}
             """);
     }
 
+    private static string BuildConservativeDeclarationPattern(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(object value)
+                {
+                    return value is int number ? number : 0;
+                }
+            """);
+    }
+
     private static string BuildConservativeTypeParameterObjectCreation(int index, Random random, string className)
     {
         return BuildClass(
@@ -2431,7 +2473,7 @@ using PurelySharp.Attributes;
 [InterpolatedStringHandler]
 public ref struct {{className}}Handler
 {
-    public {{className}}Handler(int literalLength, int formattedCount) { }
+    public {{className}}Handler(int literalLength, int formattedCount, int value) { }
     public void AppendLiteral(string value) { }
     public void AppendFormatted<T>(T value) { }
 }
@@ -2441,10 +2483,52 @@ public class {{className}}
     [EnforcePure]
     public void TestMethod(int value)
     {
-        Log($"value={value}");
+        Log(value, $"left={value}" + $"right={value}");
     }
 
-    private void Log({{className}}Handler handler) { }
+    private void Log(int value, [InterpolatedStringHandlerArgument("value")] {{className}}Handler handler) { }
+}
+""";
+    }
+
+    private static string BuildConservativeAddressOf(int index, Random random, string className)
+    {
+        return $$"""
+using PurelySharp.Attributes;
+
+public unsafe class {{className}}
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        int value = 1;
+        int* pointer = &value;
+        return *pointer;
+    }
+}
+""";
+    }
+
+    private static string BuildConservativeInlineArrayAccess(int index, Random random, string className)
+    {
+        return $$"""
+using System.Runtime.CompilerServices;
+using PurelySharp.Attributes;
+
+[InlineArray(4)]
+public struct {{className}}Buffer
+{
+    private int _element0;
+}
+
+public class {{className}}
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        {{className}}Buffer buffer = default;
+        return buffer[0];
+    }
 }
 """;
     }
@@ -2833,6 +2917,7 @@ internal sealed class FuzzRunSummaryBuilder
             .OrderBy(kind => kind, StringComparer.Ordinal)
             .ToImmutableArray();
         var nonActionableUnobservedOperationKinds = ImmutableHashSet.Create(
+            OperationKind.Invalid,
             OperationKind.None,
             OperationKind.UnaryOperator,
             OperationKind.BinaryOperator,
@@ -2858,6 +2943,7 @@ internal sealed class FuzzRunSummaryBuilder
             OperationKind.IsNull,
             OperationKind.CaughtException,
             OperationKind.StaticLocalInitializationSemaphore,
+            OperationKind.InterpolatedStringAppendInvalid,
             Enum.Parse<OperationKind>("CollectionElementInitializer"));
         var actionableUnobservedOperationKinds = Enum.GetValues<OperationKind>()
             .Where(kind => !observedOperationKinds.Contains(kind.ToString()))

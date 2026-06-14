@@ -44,7 +44,7 @@ namespace PurelySharp.Test
                 Assert.That(summary.GeneratorBackedShapeCount, Is.EqualTo(RoslynShapeManifest.GeneratorBackedShapeIds.Length));
                 Assert.That(summary.GeneratorBackedShapesWithRegistryCount, Is.EqualTo(RoslynShapeManifest.GeneratorBackedShapeIds.Length));
                 Assert.That(summary.UnobservedGeneratorBackedShapes, Is.Empty);
-                Assert.That(summary.ActionableUnobservedOperationKinds.Length, Is.LessThanOrEqualTo(summary.UnobservedOperationKinds.Length));
+                Assert.That(summary.ActionableUnobservedOperationKinds, Is.Empty);
                 Assert.That(summary.Parallelism, Is.EqualTo(4));
                 Assert.That(File.Exists(Path.Combine(outputDirectory, "summary.json")), Is.True);
                 Assert.That(File.Exists(Path.Combine(outputDirectory, "coverage.json")), Is.True);
@@ -164,6 +164,9 @@ public class KnownImpureConsoleCase
             Assert.That(families, Does.Contain("ConservativeWithExpression"));
             Assert.That(families, Does.Contain("ConservativeImplicitIndexerReference"));
             Assert.That(families, Does.Contain("ConservativeInterpolatedStringHandler"));
+            Assert.That(families, Does.Contain("ConservativeAddressOf"));
+            Assert.That(families, Does.Contain("ConservativeInlineArrayAccess"));
+            Assert.That(families, Does.Contain("ConservativeDeclarationPattern"));
             Assert.That(families, Does.Contain("ConservativeTryCatch"));
             Assert.That(families, Does.Contain("ConservativeConditionalAccessCoalesce"));
             Assert.That(families, Does.Contain("ConservativeTuple"));
@@ -183,6 +186,10 @@ public class KnownImpureConsoleCase
         {
             var expectedOperationKinds = new[]
             {
+                new FamilyExpectation("ConservativeAddressOf", "AddressOf"),
+                new FamilyExpectation("ConservativeInlineArrayAccess", "InlineArrayAccess"),
+                new FamilyExpectation("ConservativeInterpolatedStringHandler", "InterpolatedStringHandlerCreation", "InterpolatedStringAddition", "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted", "InterpolatedStringHandlerArgumentPlaceholder"),
+                new FamilyExpectation("ConservativeDeclarationPattern", "DeclarationPattern"),
                 new FamilyExpectation("ConservativeTryCatch", "Try", "CatchClause"),
                 new FamilyExpectation("ConservativeConditionalAccessCoalesce", "ConditionalAccess", "Coalesce"),
                 new FamilyExpectation("ConservativeTuple", "Tuple"),

@@ -433,21 +433,23 @@ using System.Runtime.CompilerServices;
 [InterpolatedStringHandler]
 public ref struct PureHandler
 {
-    public PureHandler(int literalLength, int formattedCount) { }
+    public PureHandler(int literalLength, int formattedCount, int value) { }
     public void AppendLiteral(string value) { }
     public void AppendFormatted<T>(T value) { }
 }
 
 public class C
 {
-    public void Log(PureHandler handler) { }
-    public void M(int value) => Log($"value={value}");
+    public void Log(int value, [InterpolatedStringHandlerArgument("value")] PureHandler handler) { }
+    public void M(int value) => Log(value, $"left={value}" + $"right={value}");
 }
 """,
                 allowUnsafe: false,
                 OperationKind.InterpolatedStringHandlerCreation,
+                OperationKind.InterpolatedStringAddition,
                 OperationKind.InterpolatedStringAppendLiteral,
-                OperationKind.InterpolatedStringAppendFormatted);
+                OperationKind.InterpolatedStringAppendFormatted,
+                OperationKind.InterpolatedStringHandlerArgumentPlaceholder);
 
             yield return new OperationCorpusSnippet(
                 "FunctionPointerInvocation",
@@ -477,6 +479,29 @@ public class C
                 allowUnsafe: false,
                 OperationKind.ListPattern,
                 OperationKind.SlicePattern);
+
+            yield return new OperationCorpusSnippet(
+                "InlineArrayAccess",
+                """
+using System.Runtime.CompilerServices;
+
+[InlineArray(4)]
+public struct Buffer
+{
+    private int _element0;
+}
+
+public class C
+{
+    public int M()
+    {
+        Buffer buffer = default;
+        return buffer[0];
+    }
+}
+""",
+                allowUnsafe: false,
+                OperationKind.InlineArrayAccess);
 
             yield return new OperationCorpusSnippet(
                 "ImplicitIndexerReference",
