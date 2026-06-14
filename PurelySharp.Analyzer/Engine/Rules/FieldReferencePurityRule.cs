@@ -290,7 +290,9 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             return operation is IFieldReferenceOperation fieldReference &&
                    fieldReference.Field.IsReadOnly &&
-                   IsOwnedFreshMutableReadonlyFieldReference(fieldReference, observationSyntax, context.SemanticModel);
+                   IsOwnedFreshMutableReadonlyFieldReference(fieldReference, observationSyntax, context.SemanticModel) ||
+                   operation is IPropertyReferenceOperation propertyReference &&
+                   IsOwnedFreshMutableStablePropertyReference(propertyReference, observationSyntax, context.SemanticModel);
         }
 
         private static bool IsOwnedFreshMutableReadonlyFieldReference(
@@ -337,6 +339,73 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 var parameter = argument.Parameter;
                 if (parameter == null ||
                     !ConstructorStoresParameterInField(objectCreationOperation.Constructor, parameter, fieldReferenceOperation.Field, semanticModel))
+                {
+                    continue;
+                }
+
+                if (HasStableFreshMutableObjectValueInOperation(
+                    argument.Value,
+                    observationSyntax,
+                    semanticModel,
+                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsOwnedFreshMutableStablePropertyReference(
+            IPropertyReferenceOperation propertyReferenceOperation,
+            SyntaxNode observationSyntax,
+            SemanticModel semanticModel)
+        {
+            if (propertyReferenceOperation.Property.SetMethod != null &&
+                !propertyReferenceOperation.Property.SetMethod.IsInitOnly)
+            {
+                return false;
+            }
+
+            var instanceOperation = PurityAnalysisEngine.SkipImplicitConversions(propertyReferenceOperation.Instance) ?? propertyReferenceOperation.Instance;
+            if (instanceOperation is not ILocalReferenceOperation localReference ||
+                !TryGetStableLocalObjectCreationInitializer(
+                    localReference.Local,
+                    observationSyntax,
+                    semanticModel,
+                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                    out var objectCreationOperation))
+            {
+                return false;
+            }
+
+            foreach (var assignment in objectCreationOperation.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
+            {
+                if (!SymbolEqualityComparer.Default.Equals(GetReferencedMemberSymbol(assignment.Target), propertyReferenceOperation.Property))
+                {
+                    continue;
+                }
+
+                if (HasStableFreshMutableObjectValueInOperation(
+                    assignment.Value,
+                    observationSyntax,
+                    semanticModel,
+                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)))
+                {
+                    return true;
+                }
+            }
+
+            if (objectCreationOperation.Constructor == null)
+            {
+                return false;
+            }
+
+            foreach (var argument in objectCreationOperation.Arguments)
+            {
+                var parameter = argument.Parameter;
+                if (parameter == null ||
+                    !ConstructorStoresParameterInProperty(objectCreationOperation.Constructor, parameter, propertyReferenceOperation.Property, semanticModel))
                 {
                     continue;
                 }
@@ -422,6 +491,39 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         assignmentOperation.Target is not IFieldReferenceOperation fieldReference ||
                         !SymbolEqualityComparer.Default.Equals(fieldReference.Field, fieldSymbol) ||
                         !IsThisOrImplicitInstance(fieldReference.Instance))
+                    {
+                        continue;
+                    }
+
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ConstructorStoresParameterInProperty(
+            IMethodSymbol constructor,
+            IParameterSymbol parameter,
+            IPropertySymbol propertySymbol,
+            SemanticModel semanticModel)
+        {
+            foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
+            {
+                var constructorSyntax = syntaxReference.GetSyntax();
+                var constructorModel = semanticModel.Compilation.GetSemanticModel(constructorSyntax.SyntaxTree);
+                foreach (var assignment in constructorSyntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+                {
+                    if (constructorModel.GetOperation(assignment) is not ISimpleAssignmentOperation assignmentOperation)
+                    {
+                        continue;
+                    }
+
+                    if (PurityAnalysisEngine.SkipImplicitConversions(assignmentOperation.Value) is not IParameterReferenceOperation parameterReference ||
+                        !SymbolEqualityComparer.Default.Equals(parameterReference.Parameter, parameter) ||
+                        assignmentOperation.Target is not IPropertyReferenceOperation propertyReference ||
+                        !SymbolEqualityComparer.Default.Equals(propertyReference.Property, propertySymbol) ||
+                        !IsThisOrImplicitInstance(propertyReference.Instance))
                     {
                         continue;
                     }
