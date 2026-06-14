@@ -737,6 +737,7 @@ public static class FuzzRunner
             summary.OperationKinds,
             summary.SyntaxKinds,
             summary.UnobservedOperationKinds,
+            summary.ActionableUnobservedOperationKinds,
             summary.FamilyCounts,
             summary.SamplerMode,
             summary.ManifestSurfaceCounts,
@@ -940,6 +941,93 @@ public sealed class FuzzCaseGenerator
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: false,
             BuildExceptionThrowExpressionFormatException),
+        new ShapeRegistryEntry(
+            "ExceptionCaughtInternalThrow",
+            ImmutableArray.Create(
+                RoslynShapeManifest.OperationShapeId(OperationKind.Try),
+                RoslynShapeManifest.OperationShapeId(OperationKind.CatchClause)),
+            ImmutableArray.Create("Try", "CatchClause", "Throw"),
+            ImmutableArray.Create("TryStatement", "CatchClause", "ThrowStatement"),
+            ImpureWithoutExceptionExpectation(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildExceptionCaughtInternalThrow),
+        new ShapeRegistryEntry(
+            "ExceptionDeadBranchThrow",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Throw)),
+            ImmutableArray.Create("Conditional", "Throw"),
+            ImmutableArray.Create("IfStatement", "ThrowStatement"),
+            PureWithoutExceptionExpectation(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildExceptionDeadBranchThrow),
+        new ShapeRegistryEntry(
+            "ExceptionGuardedSafeDivideByZeroExcluded",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Binary)),
+            ImmutableArray.Create("Conditional", "Binary"),
+            ImmutableArray.Create("IfStatement", "DivideExpression"),
+            PureWithoutExceptionExpectation(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildExceptionGuardedSafeDivideByZeroExcluded),
+        new ShapeRegistryEntry(
+            "ExceptionGuardedNullDereferenceExcluded",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.PropertyReference)),
+            ImmutableArray.Create("Conditional", "PropertyReference"),
+            ImmutableArray.Create("IfStatement"),
+            PureWithoutExceptionExpectation(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildExceptionGuardedNullDereferenceExcluded),
+        new ShapeRegistryEntry(
+            "ExceptionDefiniteDivideByZero",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Binary)),
+            ImmutableArray.Create("Binary"),
+            ImmutableArray.Create("DivideExpression"),
+            ExceptionWithOptionalPs0002Expectation(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildExceptionDefiniteDivideByZero),
+        new ShapeRegistryEntry(
+            "ExceptionDefiniteNullReference",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.PropertyReference)),
+            ImmutableArray.Create("PropertyReference"),
+            ImmutableArray.Create("SimpleMemberAccessExpression"),
+            ExceptionWithOptionalPs0002Expectation(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildExceptionDefiniteNullReference),
+        new ShapeRegistryEntry(
+            "ExceptionUsingDisposeThrows",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.UsingDeclaration)),
+            ImmutableArray.Create("UsingDeclaration"),
+            ImmutableArray.Create("LocalDeclarationStatement"),
+            ExceptionWithOptionalPs0002Expectation(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildExceptionUsingDisposeThrows),
+        new ShapeRegistryEntry(
+            "ExceptionInvokedLocalFunctionThrow",
+            ImmutableArray.Create(
+                RoslynShapeManifest.OperationShapeId(OperationKind.LocalFunction),
+                RoslynShapeManifest.OperationShapeId(OperationKind.Throw)),
+            ImmutableArray.Create("LocalFunction", "Throw"),
+            ImmutableArray.Create("LocalFunctionStatement", "ThrowStatement"),
+            ExceptionWithOptionalPs0002Expectation(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildExceptionInvokedLocalFunctionThrow),
+        new ShapeRegistryEntry(
+            "ExceptionInvokedLambdaThrow",
+            ImmutableArray.Create(
+                RoslynShapeManifest.OperationShapeId(OperationKind.AnonymousFunction),
+                RoslynShapeManifest.OperationShapeId(OperationKind.Throw)),
+            ImmutableArray.Create("AnonymousFunction", "Throw"),
+            ImmutableArray.Create("ParenthesizedLambdaExpression", "ThrowExpression"),
+            ExceptionWithOptionalPs0002Expectation(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildExceptionInvokedLambdaThrow),
         new ShapeRegistryEntry(
             "ImpureFieldWrite",
             ImmutableArray.Create(
@@ -1583,6 +1671,162 @@ public sealed class FuzzCaseGenerator
                     return string.IsNullOrWhiteSpace(text)
                         ? throw new FormatException("fuzz")
                         : text.Length;
+                }
+            """);
+    }
+
+    private static string BuildExceptionCaughtInternalThrow(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod()
+                {
+                    try
+                    {
+                        throw new InvalidOperationException("fuzz");
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        return 1;
+                    }
+                }
+            """);
+    }
+
+    private static string BuildExceptionDeadBranchThrow(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod()
+                {
+                    if (false)
+                    {
+                        throw new InvalidOperationException("fuzz");
+                    }
+
+                    return 1;
+                }
+            """);
+    }
+
+    private static string BuildExceptionGuardedSafeDivideByZeroExcluded(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(int divisor)
+                {
+                    if (divisor != 0)
+                    {
+                        return 10 / divisor;
+                    }
+
+                    return 1;
+                }
+            """);
+    }
+
+    private static string BuildExceptionGuardedNullDereferenceExcluded(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(string text)
+                {
+                    if (text == null)
+                    {
+                        return 0;
+                    }
+
+                    return text.Length;
+                }
+            """);
+    }
+
+    private static string BuildExceptionDefiniteDivideByZero(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod()
+                {
+                    var zero = 0;
+                    return 10 / zero;
+                }
+            """);
+    }
+
+    private static string BuildExceptionDefiniteNullReference(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod()
+                {
+                    string text = null;
+                    return text.Length;
+                }
+            """);
+    }
+
+    private static string BuildExceptionUsingDisposeThrows(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                private sealed class ThrowingDisposable : IDisposable
+                {
+                    public void Dispose()
+                    {
+                        throw new ObjectDisposedException("fuzz");
+                    }
+                }
+
+                [EnforcePure]
+                public int TestMethod()
+                {
+                    using var disposable = new ThrowingDisposable();
+                    return 1;
+                }
+            """);
+    }
+
+    private static string BuildExceptionInvokedLocalFunctionThrow(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod()
+                {
+                    int Local()
+                    {
+                        throw new InvalidOperationException("fuzz");
+                    }
+
+                    return Local();
+                }
+            """);
+    }
+
+    private static string BuildExceptionInvokedLambdaThrow(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod()
+                {
+                    Func<int> local = () => throw new FormatException("fuzz");
+                    return local();
                 }
             """);
     }
@@ -2309,6 +2553,51 @@ public class {{className}}
                 PurelySharpDiagnostics.ExceptionSourcesProperty));
     }
 
+    private static FuzzExpectation ImpureWithoutExceptionExpectation()
+    {
+        return new FuzzExpectation(
+            Ps0002ExpectationKind.MustEmit,
+            Ps0010ExpectationKind.MustNotEmit,
+            ImmutableArray.Create(
+                PurelySharpDiagnostics.ImpurityCategoryProperty,
+                PurelySharpDiagnostics.ImpurityRuleProperty,
+                PurelySharpDiagnostics.ImpurityOperationKindProperty),
+            ImmutableArray.Create(
+                PurelySharpDiagnostics.ExceptionTypesProperty,
+                PurelySharpDiagnostics.ExceptionCategoriesProperty,
+                PurelySharpDiagnostics.ExceptionSourcesProperty));
+    }
+
+    private static FuzzExpectation ExceptionWithOptionalPs0002Expectation()
+    {
+        return new FuzzExpectation(
+            Ps0002ExpectationKind.MayEmitConservatively,
+            Ps0010ExpectationKind.MustEmit,
+            ImmutableArray.Create(
+                PurelySharpDiagnostics.ImpurityCategoryProperty,
+                PurelySharpDiagnostics.ImpurityRuleProperty,
+                PurelySharpDiagnostics.ImpurityOperationKindProperty),
+            ImmutableArray.Create(
+                PurelySharpDiagnostics.ExceptionTypesProperty,
+                PurelySharpDiagnostics.ExceptionCategoriesProperty,
+                PurelySharpDiagnostics.ExceptionSourcesProperty));
+    }
+
+    private static FuzzExpectation PureWithoutExceptionExpectation()
+    {
+        return new FuzzExpectation(
+            Ps0002ExpectationKind.MustNotEmit,
+            Ps0010ExpectationKind.MustNotEmit,
+            ImmutableArray.Create(
+                PurelySharpDiagnostics.ImpurityCategoryProperty,
+                PurelySharpDiagnostics.ImpurityRuleProperty,
+                PurelySharpDiagnostics.ImpurityOperationKindProperty),
+            ImmutableArray.Create(
+                PurelySharpDiagnostics.ExceptionTypesProperty,
+                PurelySharpDiagnostics.ExceptionCategoriesProperty,
+                PurelySharpDiagnostics.ExceptionSourcesProperty));
+    }
+
     private static string BuildIntMethodFromExpression(string expression, Random random, string parameterList = "int x")
     {
         return $$"""
@@ -2385,7 +2674,7 @@ public sealed record FuzzFinding(
 
 public sealed record FuzzRunSummary
 {
-    public string SchemaVersion { get; init; } = "1.1";
+    public string SchemaVersion { get; init; } = "1.2";
 
     public int Seed { get; init; }
 
@@ -2433,6 +2722,9 @@ public sealed record FuzzRunSummary
         ImmutableSortedDictionary<string, int>.Empty;
 
     public ImmutableArray<string> UnobservedOperationKinds { get; init; } =
+        ImmutableArray<string>.Empty;
+
+    public ImmutableArray<string> ActionableUnobservedOperationKinds { get; init; } =
         ImmutableArray<string>.Empty;
 
     public string SamplerMode { get; init; } = "";
@@ -2540,6 +2832,47 @@ internal sealed class FuzzRunSummaryBuilder
             .Where(kind => !observedOperationKinds.Contains(kind))
             .OrderBy(kind => kind, StringComparer.Ordinal)
             .ToImmutableArray();
+        var nonActionableUnobservedOperationKinds = ImmutableHashSet.Create(
+            OperationKind.None,
+            OperationKind.UnaryOperator,
+            OperationKind.BinaryOperator,
+            OperationKind.BinaryPattern,
+            OperationKind.Branch,
+            OperationKind.Parenthesized,
+            OperationKind.Empty,
+            OperationKind.FlowAnonymousFunction,
+            OperationKind.Labeled,
+            OperationKind.Loop,
+            OperationKind.MemberInitializer,
+            OperationKind.PropertyInitializer,
+            OperationKind.TranslatedQuery,
+            OperationKind.OmittedArgument,
+            OperationKind.ParameterInitializer,
+            OperationKind.TupleBinary,
+            OperationKind.TupleBinaryOperator,
+            OperationKind.MethodBody,
+            OperationKind.ConstructorBody,
+            OperationKind.Discard,
+            OperationKind.FlowCapture,
+            OperationKind.FlowCaptureReference,
+            OperationKind.IsNull,
+            OperationKind.CaughtException,
+            OperationKind.StaticLocalInitializationSemaphore,
+            Enum.Parse<OperationKind>("CollectionElementInitializer"));
+        var actionableUnobservedOperationKinds = Enum.GetValues<OperationKind>()
+            .Where(kind => !observedOperationKinds.Contains(kind.ToString()))
+            .Where(kind => !nonActionableUnobservedOperationKinds.Contains(kind))
+            .Where(kind =>
+            {
+                var shapeId = RoslynShapeManifest.OperationShapeId(kind);
+                return RoslynShapeManifest.EntriesByShapeId.TryGetValue(shapeId, out var manifestEntry) &&
+                       manifestEntry.Classification != ShapeClassification.ParentHandled &&
+                       manifestEntry.Classification != ShapeClassification.CSharpNotApplicable &&
+                       manifestEntry.Classification != ShapeClassification.SyntaxShadow;
+            })
+            .Select(kind => kind.ToString())
+            .OrderBy(kind => kind, StringComparer.Ordinal)
+            .ToImmutableArray();
         var manifestSurfaceCounts = new SortedDictionary<string, int>(StringComparer.Ordinal)
         {
             [RoslynShapeSurface.OperationKind.ToString()] = RoslynShapeManifest.OperationEntries.Length,
@@ -2586,6 +2919,7 @@ internal sealed class FuzzRunSummaryBuilder
             OperationKinds = _operationKinds.ToImmutableSortedDictionary(StringComparer.Ordinal),
             SyntaxKinds = _syntaxKinds.ToImmutableSortedDictionary(StringComparer.Ordinal),
             UnobservedOperationKinds = unobservedOperationKinds,
+            ActionableUnobservedOperationKinds = actionableUnobservedOperationKinds,
             SamplerMode = _samplerMode,
             ManifestSurfaceCounts = manifestSurfaceCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
             ManifestClassificationCounts = manifestClassificationCounts,

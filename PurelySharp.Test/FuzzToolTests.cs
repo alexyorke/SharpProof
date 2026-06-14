@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using PurelySharp.Analyzer;
 using PurelySharp.Tools.Fuzz;
@@ -30,7 +31,7 @@ namespace PurelySharp.Test
                 });
 
                 Assert.That(summary.CasesAnalyzed, Is.EqualTo(iterations));
-                Assert.That(summary.SchemaVersion, Is.EqualTo("1.1"));
+                Assert.That(summary.SchemaVersion, Is.EqualTo("1.2"));
                 Assert.That(summary.CompilationErrorCount, Is.EqualTo(0));
                 Assert.That(summary.OperationKinds, Is.Not.Empty);
                 Assert.That(summary.SyntaxKinds, Is.Not.Empty);
@@ -43,6 +44,7 @@ namespace PurelySharp.Test
                 Assert.That(summary.GeneratorBackedShapeCount, Is.EqualTo(RoslynShapeManifest.GeneratorBackedShapeIds.Length));
                 Assert.That(summary.GeneratorBackedShapesWithRegistryCount, Is.EqualTo(RoslynShapeManifest.GeneratorBackedShapeIds.Length));
                 Assert.That(summary.UnobservedGeneratorBackedShapes, Is.Empty);
+                Assert.That(summary.ActionableUnobservedOperationKinds.Length, Is.LessThanOrEqualTo(summary.UnobservedOperationKinds.Length));
                 Assert.That(summary.Parallelism, Is.EqualTo(4));
                 Assert.That(File.Exists(Path.Combine(outputDirectory, "summary.json")), Is.True);
                 Assert.That(File.Exists(Path.Combine(outputDirectory, "coverage.json")), Is.True);
@@ -236,7 +238,12 @@ public class KnownImpureConsoleCase
             {
                 "ExceptionDirectThrowInvalidOperation",
                 "ExceptionGuardedThrowArgumentNull",
-                "ExceptionThrowExpressionFormatException"
+                "ExceptionThrowExpressionFormatException",
+                "ExceptionDefiniteDivideByZero",
+                "ExceptionDefiniteNullReference",
+                "ExceptionUsingDisposeThrows",
+                "ExceptionInvokedLocalFunctionThrow",
+                "ExceptionInvokedLambdaThrow"
             };
 
             var generator = new FuzzCaseGenerator(20260614);
@@ -246,17 +253,99 @@ public class KnownImpureConsoleCase
                 var registryEntry = FuzzCaseGenerator.RegistryEntries.Single(entry => entry.Id == family);
                 var fuzzCase = generator.GenerateForRegistryEntry(registryEntry, 0);
                 var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
+                var purityDiagnostics = analysis.Diagnostics
+                    .Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                    .ToArray();
+                var exceptionDiagnostics = analysis.Diagnostics
+                    .Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId)
+                    .ToArray();
 
                 Assert.That(analysis.CompilationErrors, Is.Empty, family);
                 Assert.That(analysis.Findings, Is.Empty, family);
                 Assert.That(
-                    analysis.Diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
-                    Is.True,
-                    family + " missing PS0002");
-                Assert.That(
-                    analysis.Diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId),
-                    Is.True,
+                    exceptionDiagnostics.Length,
+                    Is.GreaterThan(0),
                     family + " missing PS0010");
+                if (registryEntry.Expectation.Ps0002 == Ps0002ExpectationKind.MustEmit)
+                {
+                    Assert.That(
+                        purityDiagnostics.Length,
+                        Is.GreaterThan(0),
+                        family + " missing PS0002");
+                }
+
+                if (purityDiagnostics.Length > 0)
+                {
+                    AssertRequiredProperties(
+                        purityDiagnostics,
+                        family,
+                        PurelySharpDiagnostics.ImpurityCategoryProperty,
+                        PurelySharpDiagnostics.ImpurityRuleProperty,
+                        PurelySharpDiagnostics.ImpurityOperationKindProperty);
+                }
+
+                AssertRequiredProperties(
+                    exceptionDiagnostics,
+                    family,
+                    PurelySharpDiagnostics.ExceptionTypesProperty,
+                    PurelySharpDiagnostics.ExceptionCategoriesProperty,
+                    PurelySharpDiagnostics.ExceptionSourcesProperty);
+            }
+        }
+
+        [Test]
+        public async Task ExceptionNegativeCoverageFamilies_RespectNoEscapeExpectations()
+        {
+            var expectations = new[]
+            {
+                (Family: "ExceptionCaughtInternalThrow", ExpectPs0002: true, ExpectPs0010: false),
+                (Family: "ExceptionDeadBranchThrow", ExpectPs0002: false, ExpectPs0010: false),
+                (Family: "ExceptionGuardedSafeDivideByZeroExcluded", ExpectPs0002: false, ExpectPs0010: false),
+                (Family: "ExceptionGuardedNullDereferenceExcluded", ExpectPs0002: false, ExpectPs0010: false)
+            };
+
+            var generator = new FuzzCaseGenerator(20260614);
+
+            foreach (var expectation in expectations)
+            {
+                var registryEntry = FuzzCaseGenerator.RegistryEntries.Single(entry => entry.Id == expectation.Family);
+                var fuzzCase = generator.GenerateForRegistryEntry(registryEntry, 0);
+                var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
+                var purityDiagnostics = analysis.Diagnostics
+                    .Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                    .ToArray();
+                var exceptionDiagnostics = analysis.Diagnostics
+                    .Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId)
+                    .ToArray();
+
+                Assert.That(analysis.CompilationErrors, Is.Empty, expectation.Family);
+                Assert.That(analysis.Findings, Is.Empty, expectation.Family);
+                Assert.That(
+                    purityDiagnostics.Length > 0,
+                    Is.EqualTo(expectation.ExpectPs0002),
+                    expectation.Family + " PS0002 expectation mismatch");
+                Assert.That(
+                    exceptionDiagnostics.Length > 0,
+                    Is.EqualTo(expectation.ExpectPs0010),
+                    expectation.Family + " PS0010 expectation mismatch");
+            }
+        }
+
+        private static void AssertRequiredProperties(
+            Diagnostic[] diagnostics,
+            string family,
+            params string[] propertyNames)
+        {
+            foreach (var diagnostic in diagnostics)
+            {
+                foreach (var propertyName in propertyNames)
+                {
+                    Assert.That(
+                        diagnostic.Properties.TryGetValue(propertyName, out var value) &&
+                        !string.IsNullOrWhiteSpace(value),
+                        Is.True,
+                        $"{family} missing property {propertyName}");
+                }
             }
         }
 
