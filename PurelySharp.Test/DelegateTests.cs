@@ -431,6 +431,53 @@ public class TestClass
         }
 
         [Test]
+        public async Task LambdaCapturingFreshArrayAndEscaping_Diagnostic()
+        {
+            var testCode = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Func<int> {|PS0002:TestMethod|}()
+    {
+        var values = new int[1];
+        return () => values[0];
+    }
+}
+";
+
+            await VerifyCS.VerifyAnalyzerAsync(testCode);
+        }
+
+        [Test]
+        public async Task LocalFunctionDelegateCapturingFreshArrayAndEscaping_Diagnostic()
+        {
+            var testCode = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Func<int> {|PS0002:TestMethod|}()
+    {
+        var values = new int[1];
+        return Read;
+
+        int Read()
+        {
+            return values[0];
+        }
+    }
+}
+";
+
+            await VerifyCS.VerifyAnalyzerAsync(testCode);
+        }
+
+        [Test]
         public async Task DelegateInvocation_ConstantConditionalDeadImpureTarget_NoDiagnostic()
         {
             var test = @"

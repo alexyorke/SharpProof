@@ -69,6 +69,22 @@ namespace PurelySharp.Analyzer.Engine.Rules
                                 catalogSource: "escaping_closure_mutation"));
                     }
 
+                    if (bodyResult.IsPure &&
+                        IsEscapingDelegateCreation(delegateCreation) &&
+                        TryFindCapturedOwnedLocalArray(anonymousFunction, currentState, out var captureSyntax, out var capturedArrayLocal))
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping lambda captures owned local array '{capturedArrayLocal.Name}'. Treating as impure.");
+                        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                            captureSyntax,
+                            PurityAnalysisEngine.PurityEvidence.Create(
+                                "mutable_state_escape",
+                                nameof(DelegateCreationPurityRule),
+                                delegateCreation,
+                                syntaxNode: captureSyntax,
+                                symbol: capturedArrayLocal,
+                                catalogSource: "escaping_closure_owned_array_capture"));
+                    }
+
                     return bodyResult.IsPure
                         ? PurityAnalysisEngine.PurityAnalysisResult.Pure
                         : bodyResult.WithCallee(lambdaSymbol, delegateCreation.Syntax);
@@ -105,6 +121,22 @@ namespace PurelySharp.Analyzer.Engine.Rules
                                 syntaxNode: mutationSyntax,
                                 symbol: mutatedLocal,
                                 catalogSource: "escaping_closure_mutation"));
+                    }
+
+                    if (bodyResult.IsPure &&
+                        IsEscapingDelegateCreation(delegateCreation) &&
+                        TryFindCapturedOwnedLocalArray(flowAnonymousFunction, currentState, out var captureSyntax, out var capturedArrayLocal))
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping flow lambda captures owned local array '{capturedArrayLocal.Name}'. Treating as impure.");
+                        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                            captureSyntax,
+                            PurityAnalysisEngine.PurityEvidence.Create(
+                                "mutable_state_escape",
+                                nameof(DelegateCreationPurityRule),
+                                delegateCreation,
+                                syntaxNode: captureSyntax,
+                                symbol: capturedArrayLocal,
+                                catalogSource: "escaping_closure_owned_array_capture"));
                     }
 
                     return bodyResult.IsPure
@@ -170,6 +202,22 @@ namespace PurelySharp.Analyzer.Engine.Rules
                                 syntaxNode: mutationSyntax,
                                 symbol: mutatedLocal,
                                 catalogSource: "escaping_closure_mutation"));
+                    }
+
+                    if (IsEscapingDelegateCreation(delegateCreation) &&
+                        targetMethod.MethodKind == MethodKind.LocalFunction &&
+                        TryFindLocalFunctionCapturedOwnedLocalArray(targetMethod, context, currentState, out var captureSyntax, out var capturedArrayLocal))
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping local function delegate captures owned local array '{capturedArrayLocal.Name}'. Treating as impure.");
+                        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                            captureSyntax,
+                            PurityAnalysisEngine.PurityEvidence.Create(
+                                "mutable_state_escape",
+                                nameof(DelegateCreationPurityRule),
+                                delegateCreation,
+                                syntaxNode: captureSyntax,
+                                symbol: capturedArrayLocal,
+                                catalogSource: "escaping_closure_owned_array_capture"));
                     }
                 }
 
@@ -303,6 +351,70 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             mutationSyntax = null!;
             mutatedLocal = null!;
+            return false;
+        }
+
+        private static bool TryFindCapturedOwnedLocalArray(
+            IOperation anonymousFunctionOperation,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out SyntaxNode captureSyntax,
+            out ILocalSymbol capturedLocal)
+        {
+            var lambdaSpan = anonymousFunctionOperation.Syntax.Span;
+            foreach (var operation in anonymousFunctionOperation.DescendantsAndSelf())
+            {
+                if (TryGetCapturedOwnedLocalArray(operation, lambdaSpan, currentState, out capturedLocal))
+                {
+                    captureSyntax = operation.Syntax;
+                    return true;
+                }
+            }
+
+            captureSyntax = null!;
+            capturedLocal = null!;
+            return false;
+        }
+
+        private static bool TryFindLocalFunctionCapturedOwnedLocalArray(
+            IMethodSymbol methodSymbol,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out SyntaxNode captureSyntax,
+            out ILocalSymbol capturedLocal)
+        {
+            foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
+            {
+                var syntax = syntaxReference.GetSyntax(context.CancellationToken);
+                var semanticModel = context.SemanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
+                var operation = semanticModel.GetOperation(syntax, context.CancellationToken);
+                if (operation != null &&
+                    TryFindCapturedOwnedLocalArray(operation, currentState, out captureSyntax, out capturedLocal))
+                {
+                    return true;
+                }
+            }
+
+            captureSyntax = null!;
+            capturedLocal = null!;
+            return false;
+        }
+
+        private static bool TryGetCapturedOwnedLocalArray(
+            IOperation? operation,
+            Microsoft.CodeAnalysis.Text.TextSpan lambdaSpan,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out ILocalSymbol localSymbol)
+        {
+            var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
+            if (unwrappedOperation is ILocalReferenceOperation localReference &&
+                currentState.IsOwnedLocalArraySymbol(localReference.Local) &&
+                IsDeclaredOutsideSpan(localReference.Local, lambdaSpan))
+            {
+                localSymbol = localReference.Local;
+                return true;
+            }
+
+            localSymbol = null!;
             return false;
         }
 
