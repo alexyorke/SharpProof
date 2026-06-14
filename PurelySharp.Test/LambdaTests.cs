@@ -92,6 +92,31 @@ public class TestClass
                                    .WithArguments("TestMethod");
             await VerifyCS.VerifyAnalyzerAsync(test, expected);
         }
+
+        [Test]
+        public async Task EscapingLambdaCapturingFreshMutableObject_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public Func<int> {|PS0002:TestMethod|}()
+    {
+        var box = new Box();
+        return () => box.Value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }
 

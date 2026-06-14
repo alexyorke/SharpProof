@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
+using System;
 using System.Threading.Tasks;
 using PurelySharp.Analyzer;
 using VerifyCS = PurelySharp.Test.CSharpAnalyzerVerifier<
@@ -81,6 +82,36 @@ public class TestClass
                                 .WithSpan(9, 16, 9, 28)
                                 .WithArguments("ImpureMethod");
             await VerifyCS.VerifyAnalyzerAsync(code, expected);
+        }
+
+        [Test]
+        public async Task EscapingLocalFunctionDelegateCapturingFreshMutableObject_Diagnostic()
+        {
+            var code = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public Func<int> {|PS0002:TestMethod|}()
+    {
+        var box = new Box();
+
+        int Local()
+        {
+            return box.Value;
+        }
+
+        return Local;
+    }
+}";
+            await VerifyCS.VerifyAnalyzerAsync(code);
         }
     }
 }

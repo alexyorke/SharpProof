@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using System.Collections.Generic;
@@ -85,6 +86,27 @@ namespace PurelySharp.Analyzer.Engine.Rules
                                 catalogSource: "escaping_closure_owned_array_capture"));
                     }
 
+                    if (bodyResult.IsPure &&
+                        IsEscapingDelegateCreation(delegateCreation) &&
+                        TryFindCapturedFreshMutableObject(
+                            anonymousFunction,
+                            delegateCreation.Syntax,
+                            context.SemanticModel,
+                            out var objectCaptureSyntax,
+                            out var capturedObjectLocal))
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping lambda captures fresh mutable local '{capturedObjectLocal.Name}'. Treating as impure.");
+                        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                            objectCaptureSyntax,
+                            PurityAnalysisEngine.PurityEvidence.Create(
+                                "mutable_state_escape",
+                                nameof(DelegateCreationPurityRule),
+                                delegateCreation,
+                                syntaxNode: objectCaptureSyntax,
+                                symbol: capturedObjectLocal,
+                                catalogSource: "escaping_closure_fresh_mutable_object_capture"));
+                    }
+
                     return bodyResult.IsPure
                         ? PurityAnalysisEngine.PurityAnalysisResult.Pure
                         : bodyResult.WithCallee(lambdaSymbol, delegateCreation.Syntax);
@@ -137,6 +159,27 @@ namespace PurelySharp.Analyzer.Engine.Rules
                                 syntaxNode: captureSyntax,
                                 symbol: capturedArrayLocal,
                                 catalogSource: "escaping_closure_owned_array_capture"));
+                    }
+
+                    if (bodyResult.IsPure &&
+                        IsEscapingDelegateCreation(delegateCreation) &&
+                        TryFindCapturedFreshMutableObject(
+                            flowAnonymousFunction,
+                            delegateCreation.Syntax,
+                            context.SemanticModel,
+                            out var objectCaptureSyntax,
+                            out var capturedObjectLocal))
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping flow lambda captures fresh mutable local '{capturedObjectLocal.Name}'. Treating as impure.");
+                        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                            objectCaptureSyntax,
+                            PurityAnalysisEngine.PurityEvidence.Create(
+                                "mutable_state_escape",
+                                nameof(DelegateCreationPurityRule),
+                                delegateCreation,
+                                syntaxNode: objectCaptureSyntax,
+                                symbol: capturedObjectLocal,
+                                catalogSource: "escaping_closure_fresh_mutable_object_capture"));
                     }
 
                     return bodyResult.IsPure
@@ -218,6 +261,27 @@ namespace PurelySharp.Analyzer.Engine.Rules
                                 syntaxNode: captureSyntax,
                                 symbol: capturedArrayLocal,
                                 catalogSource: "escaping_closure_owned_array_capture"));
+                    }
+
+                    if (IsEscapingDelegateCreation(delegateCreation) &&
+                        targetMethod.MethodKind == MethodKind.LocalFunction &&
+                        TryFindLocalFunctionCapturedFreshMutableObject(
+                            targetMethod,
+                            delegateCreation.Syntax,
+                            context,
+                            out var objectCaptureSyntax,
+                            out var capturedObjectLocal))
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Escaping local function delegate captures fresh mutable local '{capturedObjectLocal.Name}'. Treating as impure.");
+                        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                            objectCaptureSyntax,
+                            PurityAnalysisEngine.PurityEvidence.Create(
+                                "mutable_state_escape",
+                                nameof(DelegateCreationPurityRule),
+                                delegateCreation,
+                                syntaxNode: objectCaptureSyntax,
+                                symbol: capturedObjectLocal,
+                                catalogSource: "escaping_closure_fresh_mutable_object_capture"));
                     }
                 }
 
@@ -416,6 +480,163 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             localSymbol = null!;
             return false;
+        }
+
+        private static bool TryFindCapturedFreshMutableObject(
+            IOperation anonymousFunctionOperation,
+            SyntaxNode delegateCreationSyntax,
+            SemanticModel semanticModel,
+            out SyntaxNode captureSyntax,
+            out ILocalSymbol capturedLocal)
+        {
+            var lambdaSpan = anonymousFunctionOperation.Syntax.Span;
+            foreach (var operation in anonymousFunctionOperation.DescendantsAndSelf())
+            {
+                if (TryGetCapturedFreshMutableObject(
+                    operation,
+                    lambdaSpan,
+                    delegateCreationSyntax,
+                    semanticModel,
+                    out capturedLocal))
+                {
+                    captureSyntax = operation.Syntax;
+                    return true;
+                }
+            }
+
+            captureSyntax = null!;
+            capturedLocal = null!;
+            return false;
+        }
+
+        private static bool TryFindLocalFunctionCapturedFreshMutableObject(
+            IMethodSymbol methodSymbol,
+            SyntaxNode delegateCreationSyntax,
+            PurityAnalysisContext context,
+            out SyntaxNode captureSyntax,
+            out ILocalSymbol capturedLocal)
+        {
+            foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
+            {
+                var syntax = syntaxReference.GetSyntax(context.CancellationToken);
+                var semanticModel = context.SemanticModel.Compilation.GetSemanticModel(syntax.SyntaxTree);
+                var operation = semanticModel.GetOperation(syntax, context.CancellationToken);
+                if (operation != null &&
+                    TryFindCapturedFreshMutableObject(operation, delegateCreationSyntax, semanticModel, out captureSyntax, out capturedLocal))
+                {
+                    return true;
+                }
+            }
+
+            captureSyntax = null!;
+            capturedLocal = null!;
+            return false;
+        }
+
+        private static bool TryGetCapturedFreshMutableObject(
+            IOperation? operation,
+            Microsoft.CodeAnalysis.Text.TextSpan lambdaSpan,
+            SyntaxNode delegateCreationSyntax,
+            SemanticModel semanticModel,
+            out ILocalSymbol localSymbol)
+        {
+            var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
+            if (unwrappedOperation is ILocalReferenceOperation localReference &&
+                IsDeclaredOutsideSpan(localReference.Local, lambdaSpan) &&
+                HasStableFreshMutableObjectInitializer(localReference.Local, delegateCreationSyntax, semanticModel))
+            {
+                localSymbol = localReference.Local;
+                return true;
+            }
+
+            localSymbol = null!;
+            return false;
+        }
+
+        private static bool HasStableFreshMutableObjectInitializer(
+            ILocalSymbol localSymbol,
+            SyntaxNode delegateCreationSyntax,
+            SemanticModel semanticModel)
+        {
+            var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
+                .Select(reference => reference.GetSyntax())
+                .OfType<VariableDeclaratorSyntax>()
+                .FirstOrDefault();
+            var initializerSyntax = declaratorSyntax?.Initializer?.Value;
+            if (declaratorSyntax == null || initializerSyntax == null)
+            {
+                return false;
+            }
+
+            if (HasAssignmentToLocalBetweenDeclarationAndEscape(localSymbol, delegateCreationSyntax, declaratorSyntax, semanticModel))
+            {
+                return false;
+            }
+
+            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax));
+            return initializerOperation is IObjectCreationOperation objectCreationOperation &&
+                   IsFreshMutableEscapingReferenceType(objectCreationOperation.Type);
+        }
+
+        private static bool HasAssignmentToLocalBetweenDeclarationAndEscape(
+            ILocalSymbol localSymbol,
+            SyntaxNode delegateCreationSyntax,
+            VariableDeclaratorSyntax declaratorSyntax,
+            SemanticModel semanticModel)
+        {
+            var containingBlock = delegateCreationSyntax.FirstAncestorOrSelf<BlockSyntax>();
+            if (containingBlock == null)
+            {
+                return false;
+            }
+
+            var start = declaratorSyntax.Span.End;
+            var end = delegateCreationSyntax.SpanStart;
+            if (end <= start)
+            {
+                return false;
+            }
+
+            foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (assignment.SpanStart < start || assignment.SpanStart >= end)
+                {
+                    continue;
+                }
+
+                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left).Symbol;
+                if (SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsFreshMutableEscapingReferenceType(ITypeSymbol? typeSymbol)
+        {
+            if (typeSymbol is not INamedTypeSymbol namedType ||
+                namedType.TypeKind == TypeKind.Delegate ||
+                namedType.IsValueType ||
+                namedType.SpecialType == SpecialType.System_String ||
+                namedType.DeclaringSyntaxReferences.Length == 0)
+            {
+                return false;
+            }
+
+            return namedType.GetMembers().Any(member =>
+                member switch
+                {
+                    IFieldSymbol field => !field.IsStatic &&
+                                          !field.IsReadOnly &&
+                                          field.DeclaredAccessibility != Accessibility.Private,
+                    IPropertySymbol property => !property.IsStatic &&
+                                                property.SetMethod != null &&
+                                                !property.SetMethod.IsInitOnly &&
+                                                property.SetMethod.DeclaredAccessibility != Accessibility.Private,
+                    _ => false
+                });
         }
 
         private static bool IsDeclaredOutsideSpan(ILocalSymbol localSymbol, Microsoft.CodeAnalysis.Text.TextSpan span)

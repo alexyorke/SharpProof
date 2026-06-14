@@ -51,9 +51,10 @@ Execution rule: land these in small green checkpoints, highest-signal items firs
   - [x] direct and aliased fresh-array return escape coverage
   - [x] escaping closure capture of owned local arrays
   - [x] constructor-mediated fresh mutable-object escape coverage
+  - [x] delegate-capture fresh mutable-object escape parity
   - [ ] fresh object ownership beyond arrays
   - [ ] non-escaping local mutation vs escape consistency
-  - [ ] field / delegate-capture object escape parity
+  - [ ] field escape parity for fresh mutable objects
 
 ## P3 - lower-value or guarded work
 
