@@ -242,6 +242,7 @@ public static class FuzzRunner
             options,
             startedUtc,
             index => generator.Next(index),
+            samplerMode: "deterministic_shape_stratified",
             maxIterations,
             deadline,
             cancellationToken);
@@ -259,6 +260,7 @@ public static class FuzzRunner
             options,
             startedUtc,
             index => cases[index],
+            samplerMode: "explicit_cases",
             cases.Length,
             deadline: null,
             cancellationToken);
@@ -268,6 +270,7 @@ public static class FuzzRunner
         FuzzOptions options,
         DateTimeOffset startedUtc,
         Func<int, FuzzCase> createCase,
+        string samplerMode,
         int? maxIterations,
         DateTimeOffset? deadline,
         CancellationToken cancellationToken)
@@ -277,7 +280,7 @@ public static class FuzzRunner
         Directory.CreateDirectory(interestingDirectory);
 
         var stopwatch = Stopwatch.StartNew();
-        var builder = new FuzzRunSummaryBuilder(options, startedUtc);
+        var builder = new FuzzRunSummaryBuilder(options, startedUtc, samplerMode);
         var savedInterestingCases = 0;
         var savedInterestingCaseKeys = new HashSet<string>(StringComparer.Ordinal);
         var savedInterestingCasesByFamily = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -499,8 +502,11 @@ public static class FuzzRunner
         var ps0002Diagnostics = diagnostics
             .Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
             .ToImmutableArray();
+        var ps0010Diagnostics = diagnostics
+            .Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId)
+            .ToImmutableArray();
 
-        if (fuzzCase.Expectation.Kind == FuzzExpectationKind.DefinitelyPure && ps0002Diagnostics.Length > 0)
+        if (fuzzCase.Expectation.Ps0002 == Ps0002ExpectationKind.MustNotEmit && ps0002Diagnostics.Length > 0)
         {
             findings.Add(new FuzzFinding(
                 fuzzCase.Name,
@@ -511,7 +517,7 @@ public static class FuzzRunner
                 ToDiagnosticSignatures(ps0002Diagnostics)));
         }
 
-        if (fuzzCase.Expectation.Kind == FuzzExpectationKind.DefinitelyImpure && ps0002Diagnostics.Length == 0)
+        if (fuzzCase.Expectation.Ps0002 == Ps0002ExpectationKind.MustEmit && ps0002Diagnostics.Length == 0)
         {
             findings.Add(new FuzzFinding(
                 fuzzCase.Name,
@@ -524,9 +530,7 @@ public static class FuzzRunner
 
         foreach (var diagnostic in ps0002Diagnostics)
         {
-            if (MissingProperty(diagnostic, PurelySharpDiagnostics.ImpurityCategoryProperty) ||
-                MissingProperty(diagnostic, PurelySharpDiagnostics.ImpurityRuleProperty) ||
-                MissingProperty(diagnostic, PurelySharpDiagnostics.ImpurityOperationKindProperty))
+            if (MissingAnyRequiredProperties(diagnostic, fuzzCase.Expectation.RequiredPs0002Properties))
             {
                 findings.Add(new FuzzFinding(
                     fuzzCase.Name,
@@ -537,7 +541,7 @@ public static class FuzzRunner
                     ImmutableArray.Create(ToDiagnosticSignature(diagnostic))));
             }
 
-            if (fuzzCase.Expectation.Kind == FuzzExpectationKind.DefinitelyPure &&
+            if (fuzzCase.Expectation.Ps0002 == Ps0002ExpectationKind.MustNotEmit &&
                 diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpurityCategoryProperty, out var category) &&
                 string.Equals(category, "unsupported_operation", StringComparison.Ordinal))
             {
@@ -551,7 +555,59 @@ public static class FuzzRunner
             }
         }
 
+        if (fuzzCase.Expectation.Ps0010 == Ps0010ExpectationKind.MustNotEmit && ps0010Diagnostics.Length > 0)
+        {
+            findings.Add(new FuzzFinding(
+                fuzzCase.Name,
+                fuzzCase.Family,
+                "unexpected_ps0010",
+                "A generated case unexpectedly produced PS0010.",
+                null,
+                ToDiagnosticSignatures(ps0010Diagnostics)));
+        }
+
+        if (fuzzCase.Expectation.Ps0010 == Ps0010ExpectationKind.MustEmit && ps0010Diagnostics.Length == 0)
+        {
+            findings.Add(new FuzzFinding(
+                fuzzCase.Name,
+                fuzzCase.Family,
+                "missing_ps0010",
+                "A generated case expected to produce PS0010 did not do so.",
+                null,
+                ToDiagnosticSignatures(diagnostics)));
+        }
+
+        if (fuzzCase.Expectation.Ps0010 != Ps0010ExpectationKind.Ignore)
+        {
+            foreach (var diagnostic in ps0010Diagnostics)
+            {
+                if (MissingAnyRequiredProperties(diagnostic, fuzzCase.Expectation.RequiredPs0010Properties))
+                {
+                    findings.Add(new FuzzFinding(
+                        fuzzCase.Name,
+                        fuzzCase.Family,
+                        "missing_ps0010_evidence",
+                        "PS0010 did not include stable exception evidence.",
+                        null,
+                        ImmutableArray.Create(ToDiagnosticSignature(diagnostic))));
+                }
+            }
+        }
+
         return findings;
+    }
+
+    private static bool MissingAnyRequiredProperties(Diagnostic diagnostic, ImmutableArray<string> keys)
+    {
+        foreach (var key in keys)
+        {
+            if (MissingProperty(diagnostic, key))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool MissingProperty(Diagnostic diagnostic, string key)
@@ -678,7 +734,14 @@ public static class FuzzRunner
             summary.OperationKinds,
             summary.SyntaxKinds,
             summary.UnobservedOperationKinds,
-            summary.FamilyCounts
+            summary.FamilyCounts,
+            summary.SamplerMode,
+            summary.ManifestSurfaceCounts,
+            summary.ManifestClassificationCounts,
+            summary.GeneratorBackedShapeCount,
+            summary.GeneratorBackedShapesWithRegistryCount,
+            summary.UnobservedGeneratorBackedShapes,
+            summary.PrimaryShapeCounts
         };
 
         return JsonSerializer.Serialize(coverage, JsonOptions);
@@ -747,30 +810,351 @@ public sealed class FuzzCaseGenerator
 {
     private readonly int _seed;
 
-    private static readonly ImmutableArray<CaseFamily> Families = ImmutableArray.Create(
-        new CaseFamily("PureArithmetic", FuzzExpectation.DefinitelyPure(), BuildPureArithmetic),
-        new CaseFamily("PureStringConcat", FuzzExpectation.DefinitelyPure(), BuildPureStringConcat),
-        new CaseFamily("PureListPattern", FuzzExpectation.DefinitelyPure(), BuildPureListPattern),
-        new CaseFamily("PureCollectionExpression", FuzzExpectation.DefinitelyPure(), BuildPureCollectionExpression),
-        new CaseFamily("PureInterpolatedString", FuzzExpectation.DefinitelyPure(), BuildPureInterpolatedString),
-        new CaseFamily("PureUtf8String", FuzzExpectation.DefinitelyPure(), BuildPureUtf8String),
-        new CaseFamily("PureArrayCreation", FuzzExpectation.DefinitelyPure(), BuildPureArrayCreation),
-        new CaseFamily("ImpureConsoleWrite", FuzzExpectation.DefinitelyImpure(), BuildImpureConsoleWrite),
-        new CaseFamily("ImpureDynamicDispatch", FuzzExpectation.DefinitelyImpure(), BuildImpureDynamicDispatch),
-        new CaseFamily("ImpureDelegateInvoke", FuzzExpectation.DefinitelyImpure(), BuildImpureDelegateInvoke),
-        new CaseFamily("ImpureThrowExpression", FuzzExpectation.DefinitelyImpure(), BuildImpureThrowExpression),
-        new CaseFamily("ImpureFieldWrite", FuzzExpectation.DefinitelyImpure(), BuildImpureFieldWrite),
-        new CaseFamily("ImpureAmbientDateTime", FuzzExpectation.DefinitelyImpure(), BuildImpureAmbientDateTime),
-        new CaseFamily("ImpureAwaitTaskDelay", FuzzExpectation.DefinitelyImpure(), BuildImpureAwaitTaskDelay),
-        new CaseFamily("ImpureLockSection", FuzzExpectation.DefinitelyImpure(), BuildImpureLockSection),
-        new CaseFamily("ImpureUsingStandardOutput", FuzzExpectation.DefinitelyImpure(), BuildImpureUsingStandardOutput),
-        new CaseFamily("ConservativeInterfaceGetter", FuzzExpectation.Conservative(), BuildConservativeInterfaceGetter),
-        new CaseFamily("ConservativeSwitchExpression", FuzzExpectation.Conservative(), BuildConservativeSwitchExpression),
-        new CaseFamily("ConservativeRangeSlice", FuzzExpectation.Conservative(), BuildConservativeRangeSlice),
-        new CaseFamily("ConservativeWithExpression", FuzzExpectation.Conservative(), BuildConservativeWithExpression),
-        new CaseFamily("ConservativeImplicitIndexerReference", FuzzExpectation.Conservative(), BuildConservativeImplicitIndexerReference),
-        new CaseFamily("ConservativeInterpolatedStringHandler", FuzzExpectation.Conservative(), BuildConservativeInterpolatedStringHandler),
-        new CaseFamily("ConservativeFunctionPointer", FuzzExpectation.Conservative(), BuildConservativeFunctionPointer));
+    private static readonly ImmutableArray<ShapeRegistryEntry> Registry = ImmutableArray.Create(
+        new ShapeRegistryEntry(
+            "PureArithmetic",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Binary)),
+            ImmutableArray.Create("Binary"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.DefinitelyPure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildPureArithmetic),
+        new ShapeRegistryEntry(
+            "PureStringConcat",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Binary)),
+            ImmutableArray.Create("Binary"),
+            ImmutableArray.Create("AddExpression"),
+            FuzzExpectation.DefinitelyPure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildPureStringConcat),
+        new ShapeRegistryEntry(
+            "PureListPattern",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.ListPattern)),
+            ImmutableArray.Create("ListPattern"),
+            ImmutableArray.Create("ListPattern"),
+            FuzzExpectation.DefinitelyPure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildPureListPattern),
+        new ShapeRegistryEntry(
+            "PureCollectionExpression",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.CollectionExpression)),
+            ImmutableArray.Create("CollectionExpression"),
+            ImmutableArray.Create("CollectionExpression"),
+            FuzzExpectation.DefinitelyPure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildPureCollectionExpression),
+        new ShapeRegistryEntry(
+            "PureInterpolatedString",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.InterpolatedString)),
+            ImmutableArray.Create("InterpolatedString"),
+            ImmutableArray.Create("InterpolatedStringExpression"),
+            FuzzExpectation.DefinitelyPure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildPureInterpolatedString),
+        new ShapeRegistryEntry(
+            "PureUtf8String",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Utf8String)),
+            ImmutableArray.Create("Utf8String"),
+            ImmutableArray.Create("Utf8StringLiteralExpression"),
+            FuzzExpectation.DefinitelyPure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildPureUtf8String),
+        new ShapeRegistryEntry(
+            "PureArrayCreation",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.ArrayCreation)),
+            ImmutableArray.Create("ArrayCreation"),
+            ImmutableArray.Create("ArrayCreationExpression"),
+            FuzzExpectation.DefinitelyPure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildPureArrayCreation),
+        new ShapeRegistryEntry(
+            "ImpureConsoleWrite",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Invocation)),
+            ImmutableArray.Create("Invocation"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.DefinitelyImpure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildImpureConsoleWrite),
+        new ShapeRegistryEntry(
+            "ImpureDynamicDispatch",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.DynamicInvocation)),
+            ImmutableArray.Create("DynamicInvocation"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.DefinitelyImpure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildImpureDynamicDispatch),
+        new ShapeRegistryEntry(
+            "ImpureDelegateInvoke",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Invocation)),
+            ImmutableArray.Create("Invocation"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.DefinitelyImpure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildImpureDelegateInvoke),
+        new ShapeRegistryEntry(
+            "ImpureThrowExpression",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Throw)),
+            ImmutableArray.Create("Throw"),
+            ImmutableArray.Create("ThrowStatement"),
+            FuzzExpectation.DefinitelyImpure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildImpureThrowExpression),
+        new ShapeRegistryEntry(
+            "ImpureFieldWrite",
+            ImmutableArray.Create(
+                RoslynShapeManifest.OperationShapeId(OperationKind.SimpleAssignment),
+                RoslynShapeManifest.OperationShapeId(OperationKind.FieldReference)),
+            ImmutableArray.Create("SimpleAssignment", "FieldReference"),
+            ImmutableArray.Create("SimpleAssignmentExpression"),
+            FuzzExpectation.DefinitelyImpure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildImpureFieldWrite),
+        new ShapeRegistryEntry(
+            "ImpureAmbientDateTime",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.PropertyReference)),
+            ImmutableArray.Create("PropertyReference"),
+            ImmutableArray.Create("SimpleMemberAccessExpression"),
+            FuzzExpectation.DefinitelyImpure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildImpureAmbientDateTime),
+        new ShapeRegistryEntry(
+            "ImpureAwaitTaskDelay",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Await)),
+            ImmutableArray.Create("Await"),
+            ImmutableArray.Create("AwaitExpression"),
+            FuzzExpectation.DefinitelyImpure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildImpureAwaitTaskDelay),
+        new ShapeRegistryEntry(
+            "ImpureLockSection",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Lock)),
+            ImmutableArray.Create("Lock"),
+            ImmutableArray.Create("LockStatement"),
+            FuzzExpectation.DefinitelyImpure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildImpureLockSection),
+        new ShapeRegistryEntry(
+            "ImpureUsingStandardOutput",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.UsingDeclaration)),
+            ImmutableArray.Create("UsingDeclaration"),
+            ImmutableArray.Create("LocalDeclarationStatement"),
+            FuzzExpectation.DefinitelyImpure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildImpureUsingStandardOutput),
+        new ShapeRegistryEntry(
+            "ConservativeTryCatch",
+            ImmutableArray.Create(
+                RoslynShapeManifest.OperationShapeId(OperationKind.Try),
+                RoslynShapeManifest.OperationShapeId(OperationKind.CatchClause)),
+            ImmutableArray.Create("Try", "CatchClause"),
+            ImmutableArray.Create("TryStatement", "CatchClause"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeTryCatch),
+        new ShapeRegistryEntry(
+            "ConservativeConditionalAccessCoalesce",
+            ImmutableArray.Create(
+                RoslynShapeManifest.OperationShapeId(OperationKind.ConditionalAccess),
+                RoslynShapeManifest.OperationShapeId(OperationKind.Coalesce)),
+            ImmutableArray.Create("ConditionalAccess", "Coalesce"),
+            ImmutableArray.Create("ConditionalAccessExpression", "CoalesceExpression"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeConditionalAccessCoalesce),
+        new ShapeRegistryEntry(
+            "ConservativeTuple",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Tuple)),
+            ImmutableArray.Create("Tuple"),
+            ImmutableArray.Create("TupleExpression"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildConservativeTuple),
+        new ShapeRegistryEntry(
+            "ConservativeInterfaceGetter",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.PropertyReference)),
+            ImmutableArray.Create("PropertyReference"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeInterfaceGetter),
+        new ShapeRegistryEntry(
+            "ConservativeRecursivePattern",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.RecursivePattern)),
+            ImmutableArray.Create("RecursivePattern"),
+            ImmutableArray.Create("RecursivePattern"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeRecursivePattern),
+        new ShapeRegistryEntry(
+            "ConservativeSpreadCollectionExpression",
+            ImmutableArray.Create(
+                RoslynShapeManifest.OperationShapeId(OperationKind.CollectionExpression),
+                RoslynShapeManifest.OperationShapeId(OperationKind.Spread)),
+            ImmutableArray.Create("CollectionExpression", "Spread"),
+            ImmutableArray.Create("CollectionExpression"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeSpreadCollectionExpression),
+        new ShapeRegistryEntry(
+            "ConservativeSwitchExpression",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.SwitchExpression)),
+            ImmutableArray.Create("SwitchExpression"),
+            ImmutableArray.Create("SwitchExpression"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeSwitchExpression),
+        new ShapeRegistryEntry(
+            "ConservativeRangeSlice",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Range)),
+            ImmutableArray.Create("Range"),
+            ImmutableArray.Create("RangeExpression"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeRangeSlice),
+        new ShapeRegistryEntry(
+            "ConservativeYieldReturn",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.YieldReturn)),
+            ImmutableArray.Create("YieldReturn"),
+            ImmutableArray.Create("YieldReturnStatement"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeYieldReturn),
+        new ShapeRegistryEntry(
+            "ConservativeWithExpression",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.With)),
+            ImmutableArray.Create("With"),
+            ImmutableArray.Create("WithExpression"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeWithExpression),
+        new ShapeRegistryEntry(
+            "ConservativeAnonymousFunction",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.AnonymousFunction)),
+            ImmutableArray.Create("AnonymousFunction"),
+            ImmutableArray.Create("SimpleLambdaExpression"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeAnonymousFunction),
+        new ShapeRegistryEntry(
+            "ConservativeDelegateCreation",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.DelegateCreation)),
+            ImmutableArray.Create("DelegateCreation"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeDelegateCreation),
+        new ShapeRegistryEntry(
+            "ConservativeImplicitIndexerReference",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.ImplicitIndexerReference)),
+            ImmutableArray.Create("ImplicitIndexerReference"),
+            ImmutableArray.Create("ElementAccessExpression"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeImplicitIndexerReference),
+        new ShapeRegistryEntry(
+            "ConservativeInterpolatedStringHandler",
+            ImmutableArray.Create(
+                RoslynShapeManifest.OperationShapeId(OperationKind.InterpolatedStringHandlerCreation),
+                RoslynShapeManifest.OperationShapeId(OperationKind.InterpolatedStringAppendLiteral),
+                RoslynShapeManifest.OperationShapeId(OperationKind.InterpolatedStringAppendFormatted)),
+            ImmutableArray.Create("InterpolatedStringHandlerCreation", "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted"),
+            ImmutableArray.Create("InterpolatedStringExpression"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeInterpolatedStringHandler),
+        new ShapeRegistryEntry(
+            "ConservativeFunctionPointer",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.FunctionPointerInvocation)),
+            ImmutableArray.Create("FunctionPointerInvocation"),
+            ImmutableArray.Create("FunctionPointerType"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: true,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeFunctionPointer),
+        new ShapeRegistryEntry(
+            "ConservativeNestedLambdaLocalFunction",
+            ImmutableArray.Create(
+                RoslynShapeManifest.OperationShapeId(OperationKind.AnonymousFunction),
+                RoslynShapeManifest.OperationShapeId(OperationKind.LocalFunction)),
+            ImmutableArray.Create("AnonymousFunction", "LocalFunction"),
+            ImmutableArray.Create("SimpleLambdaExpression", "LocalFunctionStatement"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeNestedLambdaLocalFunction),
+        new ShapeRegistryEntry(
+            "ConservativeTuplePatternSwitch",
+            ImmutableArray.Create(
+                RoslynShapeManifest.OperationShapeId(OperationKind.Tuple),
+                RoslynShapeManifest.OperationShapeId(OperationKind.SwitchExpression)),
+            ImmutableArray.Create("Tuple", "SwitchExpression"),
+            ImmutableArray.Create("TupleExpression", "SwitchExpression"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeTuplePatternSwitch),
+        new ShapeRegistryEntry(
+            "ConservativeUsingAwaitDelegateFlow",
+            ImmutableArray.Create(
+                RoslynShapeManifest.OperationShapeId(OperationKind.UsingDeclaration),
+                RoslynShapeManifest.OperationShapeId(OperationKind.Await),
+                RoslynShapeManifest.OperationShapeId(OperationKind.AnonymousFunction)),
+            ImmutableArray.Create("UsingDeclaration", "Await", "AnonymousFunction"),
+            ImmutableArray.Create("LocalDeclarationStatement", "AwaitExpression", "ParenthesizedLambdaExpression"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeUsingAwaitDelegateFlow));
+
+    private static readonly ImmutableSortedDictionary<string, ImmutableArray<ShapeRegistryEntry>> RegistryByPrimaryShape =
+        Registry
+            .SelectMany(
+                registryEntry => registryEntry.PrimaryShapeIds.Select(
+                    shapeId => new KeyValuePair<string, ShapeRegistryEntry>(shapeId, registryEntry)))
+            .GroupBy(pair => pair.Key, StringComparer.Ordinal)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .ToImmutableSortedDictionary(
+                group => group.Key,
+                group => group.Select(pair => pair.Value)
+                    .Distinct()
+                    .OrderBy(registryEntry => registryEntry.Id, StringComparer.Ordinal)
+                    .ToImmutableArray(),
+                StringComparer.Ordinal);
+
+    private static readonly ImmutableArray<string> OrderedGeneratorBackedShapeIds =
+        RegistryByPrimaryShape.Keys.ToImmutableArray();
+
+    public static ImmutableArray<ShapeRegistryEntry> RegistryEntries => Registry;
 
     public FuzzCaseGenerator(int seed)
     {
@@ -779,17 +1163,45 @@ public sealed class FuzzCaseGenerator
 
     public FuzzCase Next(int index)
     {
-        var random = CreateRandom(index);
-        var family = Families[random.Next(Families.Length)];
-        var className = $"FuzzCase{index}_{family.Name}";
-        var source = family.Build(index, random, className);
+        var shapeId = OrderedGeneratorBackedShapeIds[index % OrderedGeneratorBackedShapeIds.Length];
+        var variant = index / OrderedGeneratorBackedShapeIds.Length;
+        return GenerateForShapeCore(shapeId, variant, index);
+    }
+
+    public FuzzCase GenerateForShape(string shapeId, int variant)
+    {
+        var index = HashCode.Combine(shapeId, variant) & int.MaxValue;
+        return GenerateForShapeCore(shapeId, variant, index);
+    }
+
+    private FuzzCase GenerateForShapeCore(string shapeId, int variant, int index)
+    {
+        if (!RegistryByPrimaryShape.TryGetValue(shapeId, out var entries))
+        {
+            throw new ArgumentException($"Unknown generator-backed shape '{shapeId}'.", nameof(shapeId));
+        }
+
+        var entry = entries[variant % entries.Length];
+        var entryVariant = variant / entries.Length;
+        return GenerateForRegistryEntry(entry, index, entryVariant);
+    }
+
+    public FuzzCase GenerateForRegistryEntry(ShapeRegistryEntry registryEntry, int index, int variant = 0)
+    {
+        var random = CreateRandom(HashCode.Combine(index, variant, registryEntry.Id));
+        var className = $"FuzzCase{index}_{registryEntry.Id}_V{variant}";
+        var source = registryEntry.Build(index, random, className);
         return new FuzzCase(
-            Name: $"{index:000000}-{family.Name}",
-            Family: family.Name,
+            Name: $"{index:000000}-{registryEntry.Id}",
+            Family: registryEntry.Id,
             Source: source,
-            AllowUnsafe: source.Contains("unsafe", StringComparison.Ordinal) ||
+            AllowUnsafe: registryEntry.AllowUnsafe ||
+                         source.Contains("unsafe", StringComparison.Ordinal) ||
                          source.Contains("delegate*", StringComparison.Ordinal),
-            Expectation: family.Expectation);
+            Expectation: registryEntry.Expectation,
+            PrimaryShapeIds: registryEntry.PrimaryShapeIds,
+            ExpectedOperationKinds: registryEntry.ExpectedOperationKinds,
+            ExpectedSyntaxKinds: registryEntry.ExpectedSyntaxKinds);
     }
 
     private static string BuildPureArithmetic(int index, Random random, string className)
@@ -798,7 +1210,7 @@ public sealed class FuzzCaseGenerator
         {
             0 => "x + 1",
             1 => "(x * 3) - 7",
-            2 => "Math.Abs(x)",
+            2 => "(x / 2) + 9",
             _ => "unchecked((x << 1) ^ 17)"
         };
 
@@ -809,9 +1221,7 @@ public sealed class FuzzCaseGenerator
 
     private static string BuildPureStringConcat(int index, Random random, string className)
     {
-        var expression = random.Next(2) == 0
-            ? "string.Concat(left, right).Length"
-            : "(left + right).Length";
+        var expression = "(left + right).Length";
 
         return BuildClass(
             className,
@@ -1012,6 +1422,58 @@ public class {{className}}
             """);
     }
 
+    private static string BuildConservativeTryCatch(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(int x)
+                {
+                    try
+                    {
+                        if (x < 0)
+                        {
+                            throw new ArgumentOutOfRangeException(nameof(x));
+                        }
+
+                        return x + 1;
+                    }
+                    catch (ArgumentOutOfRangeException)
+                    {
+                        return 0;
+                    }
+                }
+            """);
+    }
+
+    private static string BuildConservativeConditionalAccessCoalesce(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(string text, string fallback)
+                {
+                    return text?.Trim().Length ?? fallback.Length;
+                }
+            """);
+    }
+
+    private static string BuildConservativeTuple(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(int x)
+                {
+                    var pair = (Left: x, Right: x + 1);
+                    return pair.Left + pair.Right;
+                }
+            """);
+    }
+
     private static string BuildConservativeInterfaceGetter(int index, Random random, string className)
     {
         return $$"""
@@ -1031,6 +1493,42 @@ public class {{className}}
     }
 }
 """;
+    }
+
+    private static string BuildConservativeRecursivePattern(int index, Random random, string className)
+    {
+        return $$"""
+using PurelySharp.Attributes;
+
+public sealed class {{className}}Node
+{
+    public {{className}}Node? Next { get; set; }
+    public int Value { get; set; }
+}
+
+public class {{className}}
+{
+    [EnforcePure]
+    public int TestMethod({{className}}Node node)
+    {
+        return node is { Next: { Value: > 0 } } ? 1 : 0;
+    }
+}
+""";
+    }
+
+    private static string BuildConservativeSpreadCollectionExpression(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(int[] values)
+                {
+                    int[] copy = [0, .. values, 9];
+                    return copy.Length;
+                }
+            """);
     }
 
     private static string BuildConservativeSwitchExpression(int index, Random random, string className)
@@ -1064,6 +1562,24 @@ public class {{className}}
             """);
     }
 
+    private static string BuildConservativeYieldReturn(int index, Random random, string className)
+    {
+        return $$"""
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class {{className}}
+{
+    [EnforcePure]
+    public IEnumerable<int> TestMethod(int x)
+    {
+        yield return x + 1;
+        yield break;
+    }
+}
+""";
+    }
+
     private static string BuildConservativeWithExpression(int index, Random random, string className)
     {
         return $$"""
@@ -1082,6 +1598,39 @@ public class {{className}}
     }
 }
 """;
+    }
+
+    private static string BuildConservativeAnonymousFunction(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(int x)
+                {
+                    Func<int, int> project = static value => value + 1;
+                    return project(x);
+                }
+            """);
+    }
+
+    private static string BuildConservativeDelegateCreation(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(int x)
+                {
+                    Func<int, int> project = Project;
+                    return project(x);
+                }
+
+                private static int Project(int value)
+                {
+                    return value + 1;
+                }
+            """);
     }
 
     private static string BuildConservativeImplicitIndexerReference(int index, Random random, string className)
@@ -1151,6 +1700,74 @@ public unsafe class {{className}}
 """;
     }
 
+    private static string BuildConservativeNestedLambdaLocalFunction(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(int x)
+                {
+                    int Outer(int seed)
+                    {
+                        Func<int, int> addSeed = value =>
+                        {
+                            Func<int, int> inner = local => local + seed;
+                            return inner(value);
+                        };
+
+                        return addSeed(x);
+                    }
+
+                    return Outer(1);
+                }
+            """);
+    }
+
+    private static string BuildConservativeTuplePatternSwitch(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(int x, int y)
+                {
+                    var pair = (x, y);
+                    return pair switch
+                    {
+                        (> 0, > 0) => 1,
+                        (0, _) => 0,
+                        _ => -1
+                    };
+                }
+            """);
+    }
+
+    private static string BuildConservativeUsingAwaitDelegateFlow(int index, Random random, string className)
+    {
+        return $$"""
+using System;
+using System.Threading.Tasks;
+using PurelySharp.Attributes;
+
+public class {{className}}
+{
+    [EnforcePure]
+    public async Task<int> TestMethod()
+    {
+        using var stream = Console.OpenStandardOutput();
+        Func<Task<int>> factory = async () =>
+        {
+            await Task.Delay(1);
+            return stream.CanWrite ? 1 : 0;
+        };
+
+        return await factory();
+    }
+}
+""";
+    }
+
     private Random CreateRandom(int index)
     {
         return new Random(HashCode.Combine(_seed, index, 0x51ED270B));
@@ -1199,11 +1816,6 @@ public class {{className}}
             Environment.NewLine,
             text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Select(line => line.Length == 0 ? line : padding + line));
     }
-
-    private sealed record CaseFamily(
-        string Name,
-        FuzzExpectation Expectation,
-        Func<int, Random, string, string> Build);
 }
 
 public sealed record FuzzCase(
@@ -1211,32 +1823,10 @@ public sealed record FuzzCase(
     string Family,
     string Source,
     bool AllowUnsafe,
-    FuzzExpectation Expectation);
-
-public sealed record FuzzExpectation(FuzzExpectationKind Kind)
-{
-    public static FuzzExpectation DefinitelyPure()
-    {
-        return new FuzzExpectation(FuzzExpectationKind.DefinitelyPure);
-    }
-
-    public static FuzzExpectation DefinitelyImpure()
-    {
-        return new FuzzExpectation(FuzzExpectationKind.DefinitelyImpure);
-    }
-
-    public static FuzzExpectation Conservative()
-    {
-        return new FuzzExpectation(FuzzExpectationKind.Conservative);
-    }
-}
-
-public enum FuzzExpectationKind
-{
-    DefinitelyPure,
-    DefinitelyImpure,
-    Conservative
-}
+    FuzzExpectation Expectation,
+    ImmutableArray<string> PrimaryShapeIds = default,
+    ImmutableArray<string> ExpectedOperationKinds = default,
+    ImmutableArray<string> ExpectedSyntaxKinds = default);
 
 public sealed record FuzzCaseAnalysis(
     FuzzCase Case,
@@ -1259,7 +1849,7 @@ public sealed record FuzzFinding(
 
 public sealed record FuzzRunSummary
 {
-    public string SchemaVersion { get; init; } = "1.0";
+    public string SchemaVersion { get; init; } = "1.1";
 
     public int Seed { get; init; }
 
@@ -1309,6 +1899,24 @@ public sealed record FuzzRunSummary
     public ImmutableArray<string> UnobservedOperationKinds { get; init; } =
         ImmutableArray<string>.Empty;
 
+    public string SamplerMode { get; init; } = "";
+
+    public ImmutableSortedDictionary<string, int> ManifestSurfaceCounts { get; init; } =
+        ImmutableSortedDictionary<string, int>.Empty;
+
+    public ImmutableSortedDictionary<string, int> ManifestClassificationCounts { get; init; } =
+        ImmutableSortedDictionary<string, int>.Empty;
+
+    public int GeneratorBackedShapeCount { get; init; }
+
+    public int GeneratorBackedShapesWithRegistryCount { get; init; }
+
+    public ImmutableArray<string> UnobservedGeneratorBackedShapes { get; init; } =
+        ImmutableArray<string>.Empty;
+
+    public ImmutableSortedDictionary<string, int> PrimaryShapeCounts { get; init; } =
+        ImmutableSortedDictionary<string, int>.Empty;
+
     public ImmutableArray<FuzzFinding> Findings { get; init; } =
         ImmutableArray<FuzzFinding>.Empty;
 }
@@ -1317,9 +1925,11 @@ internal sealed class FuzzRunSummaryBuilder
 {
     private readonly FuzzOptions _options;
     private readonly DateTimeOffset _startedUtc;
+    private readonly string _samplerMode;
     private readonly SortedDictionary<string, int> _familyCounts = new(StringComparer.Ordinal);
     private readonly SortedDictionary<string, int> _operationKinds = new(StringComparer.Ordinal);
     private readonly SortedDictionary<string, int> _syntaxKinds = new(StringComparer.Ordinal);
+    private readonly SortedDictionary<string, int> _primaryShapeCounts = new(StringComparer.Ordinal);
     private readonly ImmutableArray<FuzzFinding>.Builder _findings = ImmutableArray.CreateBuilder<FuzzFinding>();
     private readonly Dictionary<string, int> _findingIndices = new(StringComparer.Ordinal);
 
@@ -1329,10 +1939,11 @@ internal sealed class FuzzRunSummaryBuilder
     private int _ps0009Count;
     private int _ps0010Count;
 
-    public FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset startedUtc)
+    public FuzzRunSummaryBuilder(FuzzOptions options, DateTimeOffset startedUtc, string samplerMode)
     {
         _options = options;
         _startedUtc = startedUtc;
+        _samplerMode = samplerMode;
     }
 
     public int CasesAnalyzed { get; private set; }
@@ -1343,6 +1954,13 @@ internal sealed class FuzzRunSummaryBuilder
         Increment(_familyCounts, analysis.Case.Family);
         AddAll(_operationKinds, analysis.OperationKinds);
         AddAll(_syntaxKinds, analysis.SyntaxKinds);
+        if (!analysis.Case.PrimaryShapeIds.IsDefaultOrEmpty)
+        {
+            foreach (var shapeId in analysis.Case.PrimaryShapeIds)
+            {
+                Increment(_primaryShapeCounts, shapeId);
+            }
+        }
         _compilationErrorCount += analysis.CompilationErrors.Length > 0 ? 1 : 0;
         foreach (var finding in analysis.Findings)
         {
@@ -1386,6 +2004,27 @@ internal sealed class FuzzRunSummaryBuilder
             .Where(kind => !observedOperationKinds.Contains(kind))
             .OrderBy(kind => kind, StringComparer.Ordinal)
             .ToImmutableArray();
+        var manifestSurfaceCounts = new SortedDictionary<string, int>(StringComparer.Ordinal)
+        {
+            [RoslynShapeSurface.OperationKind.ToString()] = RoslynShapeManifest.OperationEntries.Length,
+            [RoslynShapeSurface.SyntaxKind.ToString()] = RoslynShapeManifest.SyntaxEntries.Length,
+            ["AnalyzerActionSurface"] = RoslynShapeManifest.ActionSurfaceEntries.Length
+        };
+        var manifestClassificationCounts = RoslynShapeManifest.EntriesByShapeId.Values
+            .GroupBy(entry => entry.Classification.ToString(), StringComparer.Ordinal)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .ToImmutableSortedDictionary(
+                group => group.Key,
+                group => group.Count(),
+                StringComparer.Ordinal);
+        var registryCoveredShapeIds = FuzzCaseGenerator.RegistryEntries
+            .SelectMany(entry => entry.PrimaryShapeIds)
+            .Distinct(StringComparer.Ordinal)
+            .ToImmutableHashSet(StringComparer.Ordinal);
+        var unobservedGeneratorBackedShapes = RoslynShapeManifest.GeneratorBackedShapeIds
+            .Where(shapeId => !_primaryShapeCounts.ContainsKey(shapeId))
+            .OrderBy(shapeId => shapeId, StringComparer.Ordinal)
+            .ToImmutableArray();
 
         return new FuzzRunSummary
         {
@@ -1411,6 +2050,13 @@ internal sealed class FuzzRunSummaryBuilder
             OperationKinds = _operationKinds.ToImmutableSortedDictionary(StringComparer.Ordinal),
             SyntaxKinds = _syntaxKinds.ToImmutableSortedDictionary(StringComparer.Ordinal),
             UnobservedOperationKinds = unobservedOperationKinds,
+            SamplerMode = _samplerMode,
+            ManifestSurfaceCounts = manifestSurfaceCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
+            ManifestClassificationCounts = manifestClassificationCounts,
+            GeneratorBackedShapeCount = RoslynShapeManifest.GeneratorBackedShapeIds.Length,
+            GeneratorBackedShapesWithRegistryCount = registryCoveredShapeIds.Count,
+            UnobservedGeneratorBackedShapes = unobservedGeneratorBackedShapes,
+            PrimaryShapeCounts = _primaryShapeCounts.ToImmutableSortedDictionary(StringComparer.Ordinal),
             Findings = findings
         };
     }

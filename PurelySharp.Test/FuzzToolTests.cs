@@ -29,10 +29,19 @@ namespace PurelySharp.Test
                 });
 
                 Assert.That(summary.CasesAnalyzed, Is.EqualTo(40));
+                Assert.That(summary.SchemaVersion, Is.EqualTo("1.1"));
                 Assert.That(summary.CompilationErrorCount, Is.EqualTo(0));
                 Assert.That(summary.OperationKinds, Is.Not.Empty);
                 Assert.That(summary.SyntaxKinds, Is.Not.Empty);
                 Assert.That(summary.FamilyCounts, Is.Not.Empty);
+                Assert.That(summary.PrimaryShapeCounts, Is.Not.Empty);
+                Assert.That(summary.SamplerMode, Is.EqualTo("deterministic_shape_stratified"));
+                Assert.That(summary.ManifestSurfaceCounts.ContainsKey("OperationKind"), Is.True);
+                Assert.That(summary.ManifestSurfaceCounts.ContainsKey("SyntaxKind"), Is.True);
+                Assert.That(summary.ManifestSurfaceCounts.ContainsKey("AnalyzerActionSurface"), Is.True);
+                Assert.That(summary.GeneratorBackedShapeCount, Is.EqualTo(RoslynShapeManifest.GeneratorBackedShapeIds.Length));
+                Assert.That(summary.GeneratorBackedShapesWithRegistryCount, Is.EqualTo(RoslynShapeManifest.GeneratorBackedShapeIds.Length));
+                Assert.That(summary.UnobservedGeneratorBackedShapes, Is.Empty);
                 Assert.That(summary.Parallelism, Is.EqualTo(4));
                 Assert.That(File.Exists(Path.Combine(outputDirectory, "summary.json")), Is.True);
                 Assert.That(File.Exists(Path.Combine(outputDirectory, "coverage.json")), Is.True);
@@ -125,9 +134,20 @@ public class KnownImpureConsoleCase
         public void FuzzCaseGenerator_DeterministicSample_IncludesExpandedFamilies()
         {
             var generator = new FuzzCaseGenerator(20260614);
-            var families = Enumerable.Range(0, 400)
-                .Select(index => generator.Next(index).Family)
+            var generatedCases = Enumerable.Range(0, 1200)
+                .Select(index => generator.Next(index))
+                .ToArray();
+            var families = generatedCases
+                .Select(fuzzCase => fuzzCase.Family)
                 .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            var primaryShapes = generatedCases
+                .SelectMany(fuzzCase => fuzzCase.PrimaryShapeIds.IsDefaultOrEmpty ? Enumerable.Empty<string>() : fuzzCase.PrimaryShapeIds)
+                .Distinct(StringComparer.Ordinal)
+                .ToImmutableHashSet(StringComparer.Ordinal);
+            var missingShapes = RoslynShapeManifest.GeneratorBackedShapeIds
+                .Where(shapeId => !primaryShapes.Contains(shapeId))
+                .OrderBy(shapeId => shapeId, StringComparer.Ordinal)
                 .ToArray();
 
             Assert.That(families, Does.Contain("ImpureAwaitTaskDelay"));
@@ -141,6 +161,71 @@ public class KnownImpureConsoleCase
             Assert.That(families, Does.Contain("ConservativeWithExpression"));
             Assert.That(families, Does.Contain("ConservativeImplicitIndexerReference"));
             Assert.That(families, Does.Contain("ConservativeInterpolatedStringHandler"));
+            Assert.That(families, Does.Contain("ConservativeTryCatch"));
+            Assert.That(families, Does.Contain("ConservativeConditionalAccessCoalesce"));
+            Assert.That(families, Does.Contain("ConservativeTuple"));
+            Assert.That(families, Does.Contain("ConservativeRecursivePattern"));
+            Assert.That(families, Does.Contain("ConservativeSpreadCollectionExpression"));
+            Assert.That(families, Does.Contain("ConservativeYieldReturn"));
+            Assert.That(families, Does.Contain("ConservativeAnonymousFunction"));
+            Assert.That(families, Does.Contain("ConservativeDelegateCreation"));
+            Assert.That(families, Does.Contain("ConservativeNestedLambdaLocalFunction"));
+            Assert.That(families, Does.Contain("ConservativeTuplePatternSwitch"));
+            Assert.That(families, Does.Contain("ConservativeUsingAwaitDelegateFlow"));
+            Assert.That(missingShapes, Is.Empty);
+        }
+
+        [Test]
+        public async Task ExpandedCoverageFamilies_Compile_AndEmitExpectedOperationKinds()
+        {
+            var expectedOperationKinds = new[]
+            {
+                new FamilyExpectation("ConservativeTryCatch", "Try", "CatchClause"),
+                new FamilyExpectation("ConservativeConditionalAccessCoalesce", "ConditionalAccess", "Coalesce"),
+                new FamilyExpectation("ConservativeTuple", "Tuple"),
+                new FamilyExpectation("ConservativeRecursivePattern", "RecursivePattern"),
+                new FamilyExpectation("ConservativeSpreadCollectionExpression", "Spread"),
+                new FamilyExpectation("ConservativeYieldReturn", "YieldReturn"),
+                new FamilyExpectation("ConservativeAnonymousFunction", "AnonymousFunction"),
+                new FamilyExpectation("ConservativeDelegateCreation", "DelegateCreation"),
+                new FamilyExpectation("ConservativeNestedLambdaLocalFunction", "AnonymousFunction", "LocalFunction"),
+                new FamilyExpectation("ConservativeTuplePatternSwitch", "Tuple", "SwitchExpression"),
+                new FamilyExpectation("ConservativeUsingAwaitDelegateFlow", "UsingDeclaration", "Await", "AnonymousFunction")
+            };
+
+            var generator = new FuzzCaseGenerator(20260614);
+            var generatedCasesByFamily = expectedOperationKinds.ToDictionary(
+                expectation => expectation.Family,
+                _ => (FuzzCase?)null,
+                StringComparer.Ordinal);
+
+            for (var index = 0; index < 8000 && generatedCasesByFamily.Values.Any(fuzzCase => fuzzCase is null); index++)
+            {
+                var fuzzCase = generator.Next(index);
+                if (generatedCasesByFamily.ContainsKey(fuzzCase.Family) && generatedCasesByFamily[fuzzCase.Family] is null)
+                {
+                    generatedCasesByFamily[fuzzCase.Family] = fuzzCase;
+                }
+            }
+
+            Assert.That(generatedCasesByFamily.Values.All(fuzzCase => fuzzCase is not null), Is.True);
+
+            foreach (var expectation in expectedOperationKinds)
+            {
+                var fuzzCase = generatedCasesByFamily[expectation.Family];
+                Assert.That(fuzzCase, Is.Not.Null, expectation.Family);
+
+                var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase!);
+
+                Assert.That(analysis.CompilationErrors, Is.Empty, expectation.Family);
+                foreach (var operationKind in expectation.OperationKinds)
+                {
+                    Assert.That(
+                        analysis.OperationKinds.ContainsKey(operationKind),
+                        Is.True,
+                        $"{expectation.Family} missing {operationKind}");
+                }
+            }
         }
 
         private static string CreateOutputDirectory()
@@ -159,5 +244,7 @@ public class KnownImpureConsoleCase
                 Directory.Delete(outputDirectory, recursive: true);
             }
         }
+
+        private sealed record FamilyExpectation(string Family, params string[] OperationKinds);
     }
 }

@@ -16,6 +16,7 @@ using NUnit.Framework;
 using PurelySharp.Analyzer;
 using PurelySharp.Attributes;
 using PurelySharp.Tools.CorpusReport;
+using PurelySharp.Tools.Fuzz;
 
 namespace PurelySharp.Test
 {
@@ -28,9 +29,11 @@ namespace PurelySharp.Test
         [Test]
         public void AllOperationKindsHaveCoverageDecision()
         {
-            var decisions = GetCompleteOperationKindCoverageDecisions();
+            var operationShapeIds = RoslynShapeManifest.OperationEntries
+                .Select(entry => entry.ShapeId)
+                .ToImmutableHashSet(StringComparer.Ordinal);
             var missing = Enum.GetValues<OperationKind>()
-                .Where(kind => !decisions.ContainsKey(kind))
+                .Where(kind => !operationShapeIds.Contains(RoslynShapeManifest.OperationShapeId(kind)))
                 .Select(kind => kind.ToString())
                 .OrderBy(name => name, StringComparer.Ordinal)
                 .ToArray();
@@ -71,7 +74,7 @@ namespace PurelySharp.Test
         [Test]
         public void AnalyzerActionSurfaceCoverageTests()
         {
-            var surfaces = AnalyzerActionSurfaceManifest.ToImmutableDictionary(surface => surface.Name, StringComparer.Ordinal);
+            var surfaces = RoslynShapeManifest.ActionSurfaceEntries.ToImmutableDictionary(surface => surface.Name, StringComparer.Ordinal);
             var expectedSurfaces = new[]
             {
                 "CompilationStart",
@@ -86,9 +89,9 @@ namespace PurelySharp.Test
             };
 
             Assert.That(surfaces.Keys, Is.EquivalentTo(expectedSurfaces));
-            Assert.That(surfaces["CompilationStart"].Decision, Is.EqualTo(AnalyzerActionSurfaceDecision.Used));
-            Assert.That(surfaces["SyntaxNode"].Decision, Is.EqualTo(AnalyzerActionSurfaceDecision.Used));
-            Assert.That(surfaces["Operation"].Decision, Is.EqualTo(AnalyzerActionSurfaceDecision.NotUsed));
+            Assert.That(surfaces["CompilationStart"].Decision.ToString(), Is.EqualTo("Used"));
+            Assert.That(surfaces["SyntaxNode"].Decision.ToString(), Is.EqualTo("Used"));
+            Assert.That(surfaces["Operation"].Decision.ToString(), Is.EqualTo("NotUsed"));
             Assert.That(surfaces.Values.Select(surface => surface.Rationale), Has.All.Not.Empty);
         }
 
