@@ -205,6 +205,123 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task AnonymousMethodFactoryReturningFreshMutableObjectUsedLocally_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        Func<Box> factory = delegate { return new Box(); };
+        var box = factory();
+        box.Value = 1;
+        return box.Value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task AnonymousMethodFactoryReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public Box {|PS0002:TestMethod|}()
+    {
+        Func<Box> factory = delegate { return new Box(); };
+        return factory();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task MethodGroupFactoryReturningFreshMutableObjectUsedLocally_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        Func<Box> factory = CreateBox;
+        var box = factory();
+        box.Value = 1;
+        return box.Value;
+    }
+
+    private static Box CreateBox()
+    {
+        return new Box();
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedId)
+                .WithSpan(13, 16, 13, 26)
+                .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
+        public async Task MethodGroupFactoryReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public Box {|PS0002:TestMethod|}()
+    {
+        Func<Box> factory = CreateBox;
+        return factory();
+    }
+
+    private static Box CreateBox()
+    {
+        return new Box();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }
 
