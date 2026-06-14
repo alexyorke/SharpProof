@@ -6,6 +6,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
+using PurelySharp.Analyzer.Engine;
 
 namespace PurelySharp.Analyzer
 {
@@ -86,6 +88,11 @@ namespace PurelySharp.Analyzer
             var exceptionEvidence = new ExceptionEvidenceSet();
             foreach (var throwNode in GetThrowNodes(methodNode))
             {
+                if (IsInStaticallyUnreachableBranch(throwNode, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
                 var exceptionType = GetThrownExceptionType(throwNode, semanticModel, cancellationToken);
                 if (IsCaughtWithinMethod(throwNode, exceptionType, methodNode, semanticModel, cancellationToken))
                 {
@@ -100,6 +107,11 @@ namespace PurelySharp.Analyzer
 
             foreach (var invocation in GetInvocationNodes(methodNode))
             {
+                if (IsInStaticallyUnreachableBranch(invocation, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
                 if (!(semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol invokedMethod))
                 {
                     continue;
@@ -118,6 +130,11 @@ namespace PurelySharp.Analyzer
 
             foreach (var creation in GetObjectCreationNodes(methodNode))
             {
+                if (IsInStaticallyUnreachableBranch(creation, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
                 if (!(semanticModel.GetSymbolInfo(creation, cancellationToken).Symbol is IMethodSymbol constructorSymbol))
                 {
                     continue;
@@ -136,6 +153,11 @@ namespace PurelySharp.Analyzer
 
             foreach (var propertyAccess in GetPropertyAccessNodes(methodNode, semanticModel, cancellationToken))
             {
+                if (IsInStaticallyUnreachableBranch(propertyAccess, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
                 if (!(semanticModel.GetSymbolInfo(propertyAccess, cancellationToken).Symbol is IPropertySymbol propertySymbol) ||
                     propertySymbol.GetMethod == null)
                 {
@@ -153,8 +175,126 @@ namespace PurelySharp.Analyzer
                     visitedMethods);
             }
 
+            foreach (var propertyWrite in GetPropertyWriteNodes(methodNode, semanticModel, cancellationToken))
+            {
+                if (IsInStaticallyUnreachableBranch(propertyWrite, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                if (!TryGetPropertySetterMethod(propertyWrite, semanticModel, cancellationToken, out var setterMethod))
+                {
+                    continue;
+                }
+
+                AddUncaughtCalleeExceptions(
+                    exceptionEvidence,
+                    propertyWrite,
+                    setterMethod,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
+                    exceptionSummaryCatalog,
+                    visitedMethods);
+            }
+
+            foreach (var usingDisposeNode in GetUsingDisposeNodes(methodNode, semanticModel, cancellationToken))
+            {
+                if (IsInStaticallyUnreachableBranch(usingDisposeNode.CallSite, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddUncaughtCalleeExceptions(
+                    exceptionEvidence,
+                    usingDisposeNode.CallSite,
+                    usingDisposeNode.Method,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
+                    exceptionSummaryCatalog,
+                    visitedMethods);
+            }
+
+            foreach (var forEachRuntimeNode in GetForEachRuntimeMethodNodes(methodNode, semanticModel, cancellationToken))
+            {
+                if (IsInStaticallyUnreachableBranch(forEachRuntimeNode.CallSite, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddUncaughtCalleeExceptions(
+                    exceptionEvidence,
+                    forEachRuntimeNode.CallSite,
+                    forEachRuntimeNode.Method,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
+                    exceptionSummaryCatalog,
+                    visitedMethods);
+            }
+
+            foreach (var operatorNode in GetOperatorAndConversionNodes(methodNode, semanticModel, cancellationToken))
+            {
+                if (IsInStaticallyUnreachableBranch(operatorNode.CallSite, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddUncaughtCalleeExceptions(
+                    exceptionEvidence,
+                    operatorNode.CallSite,
+                    operatorNode.Method,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
+                    exceptionSummaryCatalog,
+                    visitedMethods);
+            }
+
+            foreach (var delegateInvocationNode in GetLocalDelegateTargetInvocationNodes(methodNode, semanticModel, cancellationToken))
+            {
+                if (IsInStaticallyUnreachableBranch(delegateInvocationNode.CallSite, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddUncaughtCalleeExceptions(
+                    exceptionEvidence,
+                    delegateInvocationNode.CallSite,
+                    delegateInvocationNode.Method,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
+                    exceptionSummaryCatalog,
+                    visitedMethods);
+            }
+
+            foreach (var handlerConstructorNode in GetInterpolatedStringHandlerConstructorNodes(methodNode, semanticModel, cancellationToken))
+            {
+                if (IsInStaticallyUnreachableBranch(handlerConstructorNode.CallSite, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddUncaughtCalleeExceptions(
+                    exceptionEvidence,
+                    handlerConstructorNode.CallSite,
+                    handlerConstructorNode.Method,
+                    methodNode,
+                    semanticModel,
+                    cancellationToken,
+                    exceptionSummaryCatalog,
+                    visitedMethods);
+            }
+
             foreach (var divideByZeroNode in GetDefiniteDivideByZeroNodes(methodNode, semanticModel, cancellationToken))
             {
+                if (IsInStaticallyUnreachableBranch(divideByZeroNode, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
                 var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.DivideByZeroException");
                 if (IsCaughtWithinMethod(divideByZeroNode, exceptionType, methodNode, semanticModel, cancellationToken))
                 {
@@ -166,6 +306,11 @@ namespace PurelySharp.Analyzer
 
             foreach (var nullDereferenceNode in GetDefiniteNullDereferenceNodes(methodNode, semanticModel, cancellationToken))
             {
+                if (IsInStaticallyUnreachableBranch(nullDereferenceNode, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
                 var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.NullReferenceException");
                 if (IsCaughtWithinMethod(nullDereferenceNode, exceptionType, methodNode, semanticModel, cancellationToken))
                 {
@@ -327,6 +472,21 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        private static IEnumerable<SyntaxNode> GetPropertyWriteNodes(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            foreach (var node in methodNode.DescendantNodes(
+                         descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate)))
+            {
+                if (TryGetPropertySetterMethod(node, semanticModel, cancellationToken, out _))
+                {
+                    yield return node;
+                }
+            }
+        }
+
         private static bool IsWriteOnlyTarget(SyntaxNode node)
         {
             return node.Parent is AssignmentExpressionSyntax assignment &&
@@ -335,14 +495,7 @@ namespace PurelySharp.Analyzer
 
         private static bool IsNestedCallableBoundary(SyntaxNode node)
         {
-            return node is MethodDeclarationSyntax ||
-                node is ConstructorDeclarationSyntax ||
-                node is OperatorDeclarationSyntax ||
-                node is AccessorDeclarationSyntax ||
-                node is LocalFunctionStatementSyntax ||
-                node is ParenthesizedLambdaExpressionSyntax ||
-                node is SimpleLambdaExpressionSyntax ||
-                node is AnonymousMethodExpressionSyntax;
+            return ExecutionVisibility.IsNestedCallableBoundary(node);
         }
 
         private static ITypeSymbol? GetThrownExceptionType(
@@ -432,6 +585,7 @@ namespace PurelySharp.Analyzer
         {
             var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
             return (constantValue.HasValue && IsIntegralOrDecimalZero(constantValue.Value)) ||
+                IsKnownByPriorAssignment(expression, useNode, semanticModel, cancellationToken, PathFactKind.Zero) ||
                 IsKnownByDominatingIf(expression, useNode, semanticModel, cancellationToken, PathFactKind.Zero);
         }
 
@@ -481,7 +635,8 @@ namespace PurelySharp.Analyzer
                 return IsReferenceType(defaultType);
             }
 
-            return IsKnownByDominatingIf(expression, useNode, semanticModel, cancellationToken, PathFactKind.Null);
+            return IsKnownByPriorAssignment(expression, useNode, semanticModel, cancellationToken, PathFactKind.Null) ||
+                IsKnownByDominatingIf(expression, useNode, semanticModel, cancellationToken, PathFactKind.Null);
         }
 
         private static bool IsKnownByDominatingIf(
@@ -516,6 +671,85 @@ namespace PurelySharp.Analyzer
             }
 
             return IsKnownByPrecedingGuardIf(symbol, useNode, semanticModel, cancellationToken, factKind);
+        }
+
+        private static bool IsKnownByPriorAssignment(
+            ExpressionSyntax expression,
+            SyntaxNode useNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            PathFactKind factKind)
+        {
+            var symbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
+            if (symbol == null)
+            {
+                return false;
+            }
+
+            var containingStatement = useNode
+                .AncestorsAndSelf()
+                .OfType<StatementSyntax>()
+                .FirstOrDefault(statement => statement.Parent is BlockSyntax);
+            if (containingStatement?.Parent is not BlockSyntax block)
+            {
+                return false;
+            }
+
+            var matchedAssignment = false;
+            foreach (var statement in block.Statements)
+            {
+                if (ReferenceEquals(statement, containingStatement))
+                {
+                    break;
+                }
+
+                foreach (var candidate in statement.DescendantNodesAndSelf(
+                             descendIntoChildren: node => !IsNestedCallableBoundary(node)))
+                {
+                    if (candidate is AssignmentExpressionSyntax assignment &&
+                        ExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken))
+                    {
+                        if (!ExpressionMatchesFact(assignment.Right, factKind, semanticModel, cancellationToken))
+                        {
+                            return false;
+                        }
+
+                        matchedAssignment = true;
+                    }
+                    else if (candidate is VariableDeclaratorSyntax declarator &&
+                             declarator.Initializer != null &&
+                             semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol &&
+                             SymbolEqualityComparer.Default.Equals(localSymbol.OriginalDefinition, symbol))
+                    {
+                        if (!ExpressionMatchesFact(declarator.Initializer.Value, factKind, semanticModel, cancellationToken))
+                        {
+                            return false;
+                        }
+
+                        matchedAssignment = true;
+                    }
+                    else if (candidate is PrefixUnaryExpressionSyntax prefixUnary &&
+                             (prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) || prefixUnary.IsKind(SyntaxKind.PreDecrementExpression)) &&
+                             ExpressionMatchesSymbol(prefixUnary.Operand, symbol, semanticModel, cancellationToken))
+                    {
+                        return false;
+                    }
+                    else if (candidate is PostfixUnaryExpressionSyntax postfixUnary &&
+                             (postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) || postfixUnary.IsKind(SyntaxKind.PostDecrementExpression)) &&
+                             ExpressionMatchesSymbol(postfixUnary.Operand, symbol, semanticModel, cancellationToken))
+                    {
+                        return false;
+                    }
+                    else if (candidate is ArgumentSyntax argument &&
+                             !argument.RefKindKeyword.IsKind(SyntaxKind.None) &&
+                             ExpressionMatchesSymbol(argument.Expression, symbol, semanticModel, cancellationToken))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return matchedAssignment;
         }
 
         private static bool IsKnownByPrecedingGuardIf(
@@ -860,7 +1094,7 @@ namespace PurelySharp.Analyzer
                 yield return exception;
             }
 
-            if (!exceptionSummaryCatalog.TryGetExceptions(invokedMethod, out var summaryExceptions))
+            if (!exceptionSummaryCatalog.TryGetExceptions(invokedMethod, compilation, out var summaryExceptions))
             {
                 yield break;
             }
@@ -915,6 +1149,14 @@ namespace PurelySharp.Analyzer
             return false;
         }
 
+        private static bool IsInStaticallyUnreachableBranch(
+            SyntaxNode node,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            return ExecutionVisibility.IsInStaticallyUnreachableBranch(node, semanticModel, cancellationToken);
+        }
+
         private static bool CatchesException(
             CatchClauseSyntax catchClause,
             ITypeSymbol? exceptionType,
@@ -923,7 +1165,15 @@ namespace PurelySharp.Analyzer
         {
             if (catchClause.Filter != null)
             {
-                return false;
+                if (ExecutionVisibility.IsConditionAlwaysFalse(catchClause.Filter.FilterExpression, semanticModel, cancellationToken))
+                {
+                    return false;
+                }
+
+                if (!ExecutionVisibility.IsConditionAlwaysTrue(catchClause.Filter.FilterExpression, semanticModel, cancellationToken))
+                {
+                    return false;
+                }
             }
 
             if (catchClause.Declaration == null)
@@ -951,6 +1201,419 @@ namespace PurelySharp.Analyzer
             }
 
             return false;
+        }
+
+        private static bool TryGetPropertySetterMethod(
+            SyntaxNode node,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out IMethodSymbol? setterMethod)
+        {
+            setterMethod = null;
+            if (!IsWriteOnlyTarget(node))
+            {
+                return false;
+            }
+
+            if (semanticModel.GetSymbolInfo(node, cancellationToken).Symbol is not IPropertySymbol propertySymbol ||
+                propertySymbol.SetMethod == null)
+            {
+                return false;
+            }
+
+            setterMethod = propertySymbol.SetMethod;
+            return true;
+        }
+
+        private static IEnumerable<MethodCallCandidate> GetUsingDisposeNodes(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            foreach (var usingStatement in methodNode.DescendantNodes(
+                         descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate))
+                         .OfType<UsingStatementSyntax>())
+            {
+                var resourceType = GetUsingStatementResourceType(usingStatement, semanticModel, cancellationToken);
+                if (resourceType == null)
+                {
+                    continue;
+                }
+
+                foreach (var disposeMethod in GetDisposableMethods(resourceType))
+                {
+                    yield return new MethodCallCandidate(usingStatement, disposeMethod);
+                }
+            }
+
+            foreach (var usingDeclaration in methodNode.DescendantNodes(
+                         descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate))
+                         .OfType<LocalDeclarationStatementSyntax>()
+                         .Where(statement => !statement.UsingKeyword.IsKind(SyntaxKind.None)))
+            {
+                foreach (var variable in usingDeclaration.Declaration.Variables)
+                {
+                    var resourceType = GetUsingDeclarationVariableType(variable, semanticModel, cancellationToken);
+                    if (resourceType == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var disposeMethod in GetDisposableMethods(resourceType))
+                    {
+                        yield return new MethodCallCandidate(usingDeclaration, disposeMethod);
+                    }
+                }
+            }
+        }
+
+        private static ITypeSymbol? GetUsingStatementResourceType(
+            UsingStatementSyntax usingStatement,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            if (usingStatement.Expression != null)
+            {
+                return semanticModel.GetTypeInfo(usingStatement.Expression, cancellationToken).ConvertedType;
+            }
+
+            if (usingStatement.Declaration == null)
+            {
+                return null;
+            }
+
+            foreach (var variable in usingStatement.Declaration.Variables)
+            {
+                var type = GetUsingDeclarationVariableType(variable, semanticModel, cancellationToken);
+                if (type != null)
+                {
+                    return type;
+                }
+            }
+
+            return semanticModel.GetTypeInfo(usingStatement.Declaration.Type, cancellationToken).Type;
+        }
+
+        private static ITypeSymbol? GetUsingDeclarationVariableType(
+            VariableDeclaratorSyntax variable,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            if (semanticModel.GetDeclaredSymbol(variable, cancellationToken) is ILocalSymbol localSymbol)
+            {
+                return localSymbol.Type;
+            }
+
+            return variable.Initializer == null
+                ? null
+                : semanticModel.GetTypeInfo(variable.Initializer.Value, cancellationToken).ConvertedType;
+        }
+
+        private static IEnumerable<MethodCallCandidate> GetForEachRuntimeMethodNodes(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            foreach (var forEachStatement in methodNode.DescendantNodes(
+                         descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate))
+                         .OfType<ForEachStatementSyntax>())
+            {
+                var collectionType = semanticModel.GetTypeInfo(forEachStatement.Expression, cancellationToken).ConvertedType;
+                if (collectionType == null)
+                {
+                    continue;
+                }
+
+                var enumeratorMethod = FindGetEnumeratorMethod(collectionType);
+                if (enumeratorMethod == null)
+                {
+                    continue;
+                }
+
+                yield return new MethodCallCandidate(forEachStatement.Expression, enumeratorMethod);
+
+                var enumeratorType = enumeratorMethod.ReturnType;
+                if (FindParameterlessMethod(enumeratorType, "MoveNext") is { } moveNextMethod)
+                {
+                    yield return new MethodCallCandidate(forEachStatement, moveNextMethod);
+                }
+
+                if (FindPropertyGetter(enumeratorType, "Current") is { } currentGetter)
+                {
+                    yield return new MethodCallCandidate(forEachStatement, currentGetter);
+                }
+
+                foreach (var disposeMethod in GetDisposableMethods(enumeratorType))
+                {
+                    yield return new MethodCallCandidate(forEachStatement, disposeMethod);
+                }
+            }
+        }
+
+        private static IMethodSymbol? FindGetEnumeratorMethod(ITypeSymbol collectionType)
+        {
+            return collectionType
+                .GetMembers("GetEnumerator")
+                .OfType<IMethodSymbol>()
+                .FirstOrDefault(method => method.Parameters.Length == 0);
+        }
+
+        private static IMethodSymbol? FindParameterlessMethod(ITypeSymbol typeSymbol, string methodName)
+        {
+            return typeSymbol
+                .GetMembers(methodName)
+                .OfType<IMethodSymbol>()
+                .FirstOrDefault(method => method.Parameters.Length == 0);
+        }
+
+        private static IMethodSymbol? FindPropertyGetter(ITypeSymbol typeSymbol, string propertyName)
+        {
+            return typeSymbol
+                .GetMembers(propertyName)
+                .OfType<IPropertySymbol>()
+                .Select(property => property.GetMethod)
+                .FirstOrDefault(method => method != null);
+        }
+
+        private static IEnumerable<IMethodSymbol> GetDisposableMethods(ITypeSymbol typeSymbol)
+        {
+            foreach (var method in typeSymbol
+                         .GetMembers("Dispose")
+                         .OfType<IMethodSymbol>()
+                         .Where(candidate => candidate.Parameters.Length == 0))
+            {
+                yield return method;
+            }
+
+            foreach (var method in typeSymbol
+                         .GetMembers("DisposeAsync")
+                         .OfType<IMethodSymbol>()
+                         .Where(candidate => candidate.Parameters.Length == 0))
+            {
+                yield return method;
+            }
+        }
+
+        private static IEnumerable<MethodCallCandidate> GetOperatorAndConversionNodes(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var rootOperation = GetMethodBodyRootOperation(methodNode, semanticModel, cancellationToken);
+            if (rootOperation == null)
+            {
+                yield break;
+            }
+
+            foreach (var operation in ExecutionVisibility.VisibleDescendants(rootOperation))
+            {
+                if (TryGetOperatorOrConversionMethod(operation, out var method))
+                {
+                    var key = method.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat) +
+                        "@" +
+                        operation.Syntax.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                        ":" +
+                        operation.Syntax.Span.End.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    if (seen.Add(key))
+                    {
+                        yield return new MethodCallCandidate(operation.Syntax, method);
+                    }
+                }
+            }
+        }
+
+        private static bool TryGetOperatorOrConversionMethod(
+            IOperation operation,
+            out IMethodSymbol? method)
+        {
+            method = null;
+            switch (operation)
+            {
+                case IBinaryOperation binaryOperation when binaryOperation.OperatorMethod != null:
+                    method = binaryOperation.OperatorMethod;
+                    return true;
+                case IUnaryOperation unaryOperation when unaryOperation.OperatorMethod != null:
+                    method = unaryOperation.OperatorMethod;
+                    return true;
+                case IConversionOperation conversionOperation
+                    when conversionOperation.Conversion.IsUserDefined && conversionOperation.Conversion.MethodSymbol != null:
+                    method = conversionOperation.Conversion.MethodSymbol;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static IOperation? GetMethodBodyRootOperation(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            return methodNode switch
+            {
+                MethodDeclarationSyntax methodDeclaration when methodDeclaration.Body != null =>
+                    semanticModel.GetOperation(methodDeclaration.Body, cancellationToken),
+                MethodDeclarationSyntax methodDeclaration when methodDeclaration.ExpressionBody != null =>
+                    semanticModel.GetOperation(methodDeclaration.ExpressionBody.Expression, cancellationToken),
+                ConstructorDeclarationSyntax constructorDeclaration when constructorDeclaration.Body != null =>
+                    semanticModel.GetOperation(constructorDeclaration.Body, cancellationToken),
+                ConstructorDeclarationSyntax constructorDeclaration when constructorDeclaration.ExpressionBody != null =>
+                    semanticModel.GetOperation(constructorDeclaration.ExpressionBody.Expression, cancellationToken),
+                OperatorDeclarationSyntax operatorDeclaration when operatorDeclaration.Body != null =>
+                    semanticModel.GetOperation(operatorDeclaration.Body, cancellationToken),
+                OperatorDeclarationSyntax operatorDeclaration when operatorDeclaration.ExpressionBody != null =>
+                    semanticModel.GetOperation(operatorDeclaration.ExpressionBody.Expression, cancellationToken),
+                AccessorDeclarationSyntax accessorDeclaration when accessorDeclaration.Body != null =>
+                    semanticModel.GetOperation(accessorDeclaration.Body, cancellationToken),
+                AccessorDeclarationSyntax accessorDeclaration when accessorDeclaration.ExpressionBody != null =>
+                    semanticModel.GetOperation(accessorDeclaration.ExpressionBody.Expression, cancellationToken),
+                LocalFunctionStatementSyntax localFunction when localFunction.Body != null =>
+                    semanticModel.GetOperation(localFunction.Body, cancellationToken),
+                LocalFunctionStatementSyntax localFunction when localFunction.ExpressionBody != null =>
+                    semanticModel.GetOperation(localFunction.ExpressionBody.Expression, cancellationToken),
+                _ => semanticModel.GetOperation(methodNode, cancellationToken)
+            };
+        }
+
+        private static IEnumerable<MethodCallCandidate> GetLocalDelegateTargetInvocationNodes(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var knownTargets = new Dictionary<ISymbol, IMethodSymbol>(SymbolEqualityComparer.Default);
+            foreach (var node in methodNode.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate)))
+            {
+                UpdateKnownDelegateTargets(node, semanticModel, cancellationToken, knownTargets);
+                if (node is not InvocationExpressionSyntax invocation)
+                {
+                    continue;
+                }
+
+                if (semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol directMethod &&
+                    directMethod.MethodKind != MethodKind.DelegateInvoke)
+                {
+                    continue;
+                }
+
+                if (TryResolveDelegateTarget(invocation, semanticModel, cancellationToken, knownTargets, out var targetMethod))
+                {
+                    yield return new MethodCallCandidate(invocation, targetMethod);
+                }
+            }
+        }
+
+        private static void UpdateKnownDelegateTargets(
+            SyntaxNode node,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            IDictionary<ISymbol, IMethodSymbol> knownTargets)
+        {
+            if (node is LocalDeclarationStatementSyntax localDeclaration)
+            {
+                foreach (var variable in localDeclaration.Declaration.Variables)
+                {
+                    if (semanticModel.GetDeclaredSymbol(variable, cancellationToken) is not ILocalSymbol localSymbol)
+                    {
+                        continue;
+                    }
+
+                    if (variable.Initializer?.Value is ExpressionSyntax initializer &&
+                        semanticModel.GetSymbolInfo(initializer, cancellationToken).Symbol is IMethodSymbol targetMethod)
+                    {
+                        knownTargets[localSymbol.OriginalDefinition] = targetMethod;
+                    }
+                }
+            }
+            else if (node is AssignmentExpressionSyntax assignment &&
+                     TryGetInvokedLocalSymbol(assignment.Left, semanticModel, cancellationToken, out var localSymbol))
+            {
+                if (assignment.Right is ExpressionSyntax rightExpression &&
+                    semanticModel.GetSymbolInfo(rightExpression, cancellationToken).Symbol is IMethodSymbol targetMethod)
+                {
+                    knownTargets[localSymbol] = targetMethod;
+                }
+                else
+                {
+                    knownTargets.Remove(localSymbol);
+                }
+            }
+        }
+
+        private static bool TryResolveDelegateTarget(
+            InvocationExpressionSyntax invocation,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            IReadOnlyDictionary<ISymbol, IMethodSymbol> knownTargets,
+            out IMethodSymbol? targetMethod)
+        {
+            targetMethod = null;
+            if (!TryGetInvokedLocalSymbol(invocation.Expression, semanticModel, cancellationToken, out var localSymbol))
+            {
+                return false;
+            }
+
+            return knownTargets.TryGetValue(localSymbol, out targetMethod);
+        }
+
+        private static bool TryGetInvokedLocalSymbol(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out ISymbol? localSymbol)
+        {
+            localSymbol = null;
+            var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
+            if (symbol is not ILocalSymbol and not IParameterSymbol)
+            {
+                return false;
+            }
+
+            localSymbol = symbol.OriginalDefinition;
+            return true;
+        }
+
+        private static IEnumerable<MethodCallCandidate> GetInterpolatedStringHandlerConstructorNodes(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            foreach (var interpolatedString in methodNode.DescendantNodes(
+                         descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate))
+                         .OfType<InterpolatedStringExpressionSyntax>())
+            {
+                var typeInfo = semanticModel.GetTypeInfo(interpolatedString, cancellationToken);
+                var handlerType = typeInfo.ConvertedType ?? typeInfo.Type;
+                if (handlerType == null || !HasInterpolatedStringHandlerAttribute(handlerType))
+                {
+                    continue;
+                }
+
+                var constructor = FindInterpolatedStringHandlerConstructor(handlerType);
+                if (constructor == null)
+                {
+                    continue;
+                }
+
+                yield return new MethodCallCandidate(interpolatedString, constructor);
+            }
+        }
+
+        private static bool HasInterpolatedStringHandlerAttribute(ITypeSymbol typeSymbol)
+        {
+            return typeSymbol.GetAttributes().Any(attribute =>
+                attribute.AttributeClass?.ToDisplayString() == "System.Runtime.CompilerServices.InterpolatedStringHandlerAttribute");
+        }
+
+        private static IMethodSymbol? FindInterpolatedStringHandlerConstructor(ITypeSymbol typeSymbol)
+        {
+            return typeSymbol
+                .GetMembers()
+                .OfType<IMethodSymbol>()
+                .Where(method => method.MethodKind == MethodKind.Constructor)
+                .OrderBy(method => method.Parameters.Length)
+                .FirstOrDefault();
         }
 
         private static Location? GetIdentifierLocation(SyntaxNode node)
@@ -989,6 +1652,19 @@ namespace PurelySharp.Analyzer
             public string Category { get; }
 
             public string Source { get; }
+        }
+
+        private sealed class MethodCallCandidate
+        {
+            public MethodCallCandidate(SyntaxNode callSite, IMethodSymbol method)
+            {
+                CallSite = callSite;
+                Method = method;
+            }
+
+            public SyntaxNode CallSite { get; }
+
+            public IMethodSymbol Method { get; }
         }
 
         private sealed class ExceptionEvidenceSet

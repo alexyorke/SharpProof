@@ -1,9 +1,13 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
+using System.Security.Cryptography;
+using System.Text.Json;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -13,23 +17,30 @@ namespace PurelySharp.Analyzer
     internal sealed class ExceptionSummaryCatalog
     {
         private const string SummaryFileName = "PurelySharp.EffectSummary.json";
-        private static readonly Regex SymbolRegex = new Regex(@"""Symbol""\s*:\s*""(?<value>(?:\\.|[^""])*)""", RegexOptions.Singleline | RegexOptions.CultureInvariant);
-        private static readonly Regex ExceptionArrayRegex = new Regex(@"""(?<name>ThrownExceptionTypes|TransitiveThrownExceptionTypes)""\s*:\s*\[(?<values>.*?)\]", RegexOptions.Singleline | RegexOptions.CultureInvariant);
-        private static readonly Regex JsonStringRegex = new Regex(@"""(?<value>(?:\\.|[^""])*)""", RegexOptions.Singleline | RegexOptions.CultureInvariant);
+        private static readonly SymbolDisplayFormat EffectSummaryContainingTypeFormat = new SymbolDisplayFormat(
+            typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+            genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
+            miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
+        private static readonly SymbolDisplayFormat EffectSummaryParameterTypeFormat = new SymbolDisplayFormat(
+            genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
+            miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
 
         public static readonly ExceptionSummaryCatalog Empty = new ExceptionSummaryCatalog(
-            ImmutableDictionary<string, ImmutableArray<string>>.Empty);
+            ImmutableDictionary<string, ImmutableArray<SummaryEntry>>.Empty);
 
-        private readonly ImmutableDictionary<string, ImmutableArray<string>> _exceptionsBySymbol;
+        private static readonly ConcurrentDictionary<string, ActualAssemblyIdentity?> AssemblyIdentityCache =
+            new ConcurrentDictionary<string, ActualAssemblyIdentity?>(StringComparer.OrdinalIgnoreCase);
 
-        private ExceptionSummaryCatalog(ImmutableDictionary<string, ImmutableArray<string>> exceptionsBySymbol)
+        private readonly ImmutableDictionary<string, ImmutableArray<SummaryEntry>> _entriesBySymbol;
+
+        private ExceptionSummaryCatalog(ImmutableDictionary<string, ImmutableArray<SummaryEntry>> entriesBySymbol)
         {
-            _exceptionsBySymbol = exceptionsBySymbol;
+            _entriesBySymbol = entriesBySymbol;
         }
 
         public static ExceptionSummaryCatalog FromOptions(AnalyzerOptions options, CancellationToken cancellationToken)
         {
-            var summaries = new Dictionary<string, SortedSet<string>>(StringComparer.Ordinal);
+            var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
             foreach (var additionalFile in options.AdditionalFiles)
             {
                 if (!IsSummaryFile(additionalFile.Path))
@@ -45,88 +56,138 @@ namespace PurelySharp.Analyzer
 
                 foreach (var entry in ParseEntries(text!))
                 {
-                    if (!summaries.TryGetValue(entry.Symbol, out var exceptions))
+                    if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
                     {
-                        exceptions = new SortedSet<string>(StringComparer.Ordinal);
-                        summaries.Add(entry.Symbol, exceptions);
+                        builder = ImmutableArray.CreateBuilder<SummaryEntry>();
+                        entriesBySymbol.Add(entry.Symbol, builder);
                     }
 
-                    foreach (var exceptionType in entry.ExceptionTypes)
-                    {
-                        exceptions.Add(exceptionType);
-                    }
+                    builder.Add(entry);
                 }
             }
 
-            if (summaries.Count == 0)
+            if (entriesBySymbol.Count == 0)
             {
                 return Empty;
             }
 
-            return new ExceptionSummaryCatalog(summaries.ToImmutableDictionary(
+            return new ExceptionSummaryCatalog(entriesBySymbol.ToImmutableDictionary(
                 item => item.Key,
-                item => item.Value.ToImmutableArray(),
+                item => item.Value.ToImmutable(),
                 StringComparer.Ordinal));
         }
 
         public bool TryGetExceptions(IMethodSymbol methodSymbol, out ImmutableArray<string> exceptionTypes)
         {
+            return TryGetExceptions(methodSymbol, compilation: null, out exceptionTypes);
+        }
+
+        public bool TryGetExceptions(
+            IMethodSymbol methodSymbol,
+            Compilation? compilation,
+            out ImmutableArray<string> exceptionTypes)
+        {
+            var matchedExceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+            var actualAssemblyIdentity = compilation is null
+                ? null
+                : TryResolveActualAssemblyIdentity(methodSymbol, compilation);
+
             foreach (var key in GetSymbolKeys(methodSymbol))
             {
-                if (_exceptionsBySymbol.TryGetValue(key, out exceptionTypes) &&
-                    !exceptionTypes.IsDefaultOrEmpty)
+                if (!_entriesBySymbol.TryGetValue(key, out var entries))
                 {
-                    return true;
+                    continue;
+                }
+
+                foreach (var entry in entries)
+                {
+                    if (!entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity))
+                    {
+                        continue;
+                    }
+
+                    matchedExceptionTypes.UnionWith(entry.ExceptionTypes);
                 }
             }
 
-            exceptionTypes = ImmutableArray<string>.Empty;
-            return false;
+            if (matchedExceptionTypes.Count == 0)
+            {
+                exceptionTypes = ImmutableArray<string>.Empty;
+                return false;
+            }
+
+            exceptionTypes = matchedExceptionTypes.ToImmutableArray();
+            return true;
         }
 
         private static bool IsSummaryFile(string path)
         {
-            var fileName = System.IO.Path.GetFileName(path);
+            var fileName = Path.GetFileName(path);
             return string.Equals(fileName, SummaryFileName, StringComparison.OrdinalIgnoreCase) ||
                 fileName.EndsWith("." + SummaryFileName, StringComparison.OrdinalIgnoreCase);
         }
 
         private static IEnumerable<SummaryEntry> ParseEntries(string json)
         {
-            foreach (var objectBody in EnumerateObjectBodies(json))
+            using var document = JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty("Assemblies", out var assembliesElement) ||
+                assembliesElement.ValueKind != JsonValueKind.Array)
             {
-                if (ContainsUnquotedBrace(objectBody))
+                yield break;
+            }
+
+            foreach (var assemblyElement in assembliesElement.EnumerateArray())
+            {
+                var assemblyIdentity = SummaryAssemblyIdentity.FromJson(assemblyElement);
+                if (!assemblyElement.TryGetProperty("Methods", out var methodsElement) ||
+                    methodsElement.ValueKind != JsonValueKind.Array)
                 {
                     continue;
                 }
 
-                var symbolMatch = SymbolRegex.Match(objectBody);
-                if (!symbolMatch.Success)
+                foreach (var methodElement in methodsElement.EnumerateArray())
                 {
-                    continue;
-                }
-
-                var exceptionTypes = new SortedSet<string>(StringComparer.Ordinal);
-                foreach (Match arrayMatch in ExceptionArrayRegex.Matches(objectBody))
-                {
-                    foreach (Match stringMatch in JsonStringRegex.Matches(arrayMatch.Groups["values"].Value))
+                    var symbol = CompatibilityHelpers.GetTrimmedStringProperty(methodElement, "Symbol");
+                    if (symbol == null)
                     {
-                        var value = UnescapeJsonString(stringMatch.Groups["value"].Value).Trim();
-                        if (value.Length > 0)
-                        {
-                            exceptionTypes.Add(value);
-                        }
+                        continue;
                     }
-                }
 
-                if (exceptionTypes.Count == 0)
+                    var exceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+                    AddExceptionTypes(exceptionTypes, methodElement, "ThrownExceptionTypes");
+                    AddExceptionTypes(exceptionTypes, methodElement, "TransitiveThrownExceptionTypes");
+                    if (exceptionTypes.Count == 0)
+                    {
+                        continue;
+                    }
+                    yield return new SummaryEntry(symbol, exceptionTypes.ToImmutableArray(), assemblyIdentity);
+                }
+            }
+        }
+
+        private static void AddExceptionTypes(
+            ImmutableSortedSet<string>.Builder exceptionTypes,
+            JsonElement methodElement,
+            string propertyName)
+        {
+            if (!methodElement.TryGetProperty(propertyName, out var valuesElement) ||
+                valuesElement.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            foreach (var valueElement in valuesElement.EnumerateArray())
+            {
+                if (valueElement.ValueKind != JsonValueKind.String)
                 {
                     continue;
                 }
 
-                yield return new SummaryEntry(
-                    UnescapeJsonString(symbolMatch.Groups["value"].Value),
-                    exceptionTypes.ToImmutableArray());
+                var value = valueElement.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    exceptionTypes.Add(value.Trim());
+                }
             }
         }
 
@@ -135,6 +196,7 @@ namespace PurelySharp.Analyzer
             var keys = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
             AddSymbolKey(keys, methodSymbol.OriginalDefinition.ToDisplayString());
             AddSymbolKey(keys, methodSymbol.ToDisplayString());
+            AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol.OriginalDefinition));
             AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol));
 
             if (methodSymbol.IsGenericMethod)
@@ -143,261 +205,180 @@ namespace PurelySharp.Analyzer
                 AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol.ConstructedFrom));
             }
 
-            foreach (var key in keys)
+            return keys;
+        }
+
+        private static void AddSymbolKey(ImmutableHashSet<string>.Builder keys, string? value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
             {
-                yield return key;
+                keys.Add(value.Trim());
             }
         }
 
-        private static void AddSymbolKey(ImmutableHashSet<string>.Builder keys, string? key)
+        private static string CreateEffectSummaryKey(IMethodSymbol methodSymbol)
         {
-            if (!string.IsNullOrWhiteSpace(key))
-            {
-                keys.Add(key!);
-            }
+            var containingTypeName = methodSymbol.ContainingType.ToDisplayString(EffectSummaryContainingTypeFormat);
+            var methodName = methodSymbol.MethodKind == MethodKind.Constructor
+                ? ".ctor"
+                : methodSymbol.Name;
+            var parameterList = string.Join(
+                ", ",
+                methodSymbol.Parameters.Select(parameter => parameter.Type.ToDisplayString(EffectSummaryParameterTypeFormat)));
+            return containingTypeName + "." + methodName + "(" + parameterList + ")";
         }
 
-        private static string? CreateEffectSummaryKey(IMethodSymbol methodSymbol)
+        private static ActualAssemblyIdentity? TryResolveActualAssemblyIdentity(
+            IMethodSymbol methodSymbol,
+            Compilation compilation)
         {
-            var containingType = methodSymbol.ContainingType?.OriginalDefinition.ToDisplayString();
-            if (string.IsNullOrWhiteSpace(containingType))
+            if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
             {
                 return null;
             }
 
-            var methodName = methodSymbol.MethodKind == MethodKind.Constructor
-                ? ".ctor"
-                : methodSymbol.MetadataName;
-            var parameters = string.Join(", ", methodSymbol.Parameters.Select(CreateEffectParameterName));
-            return $"{containingType}.{methodName}({parameters})";
-        }
-
-        private static string CreateEffectParameterName(IParameterSymbol parameter)
-        {
-            var typeName = CreateEffectTypeName(parameter.Type);
-            return parameter.RefKind == RefKind.None ? typeName : "ref " + typeName;
-        }
-
-        private static string CreateEffectTypeName(ITypeSymbol typeSymbol)
-        {
-            if (typeSymbol is IArrayTypeSymbol arrayType)
+            foreach (var reference in compilation.References.OfType<PortableExecutableReference>())
             {
-                var rank = Math.Max(arrayType.Rank, 1);
-                return $"{CreateEffectTypeName(arrayType.ElementType)}[{new string(',', rank - 1)}]";
-            }
-
-            if (typeSymbol is ITypeParameterSymbol typeParameter)
-            {
-                return typeParameter.TypeParameterKind == TypeParameterKind.Method
-                    ? "!!" + typeParameter.Ordinal
-                    : "!" + typeParameter.Ordinal;
-            }
-
-            switch (typeSymbol.SpecialType)
-            {
-                case SpecialType.System_Boolean:
-                    return "bool";
-                case SpecialType.System_Byte:
-                    return "byte";
-                case SpecialType.System_Char:
-                    return "char";
-                case SpecialType.System_Double:
-                    return "double";
-                case SpecialType.System_Int16:
-                    return "short";
-                case SpecialType.System_Int32:
-                    return "int";
-                case SpecialType.System_Int64:
-                    return "long";
-                case SpecialType.System_IntPtr:
-                    return "nint";
-                case SpecialType.System_Object:
-                    return "object";
-                case SpecialType.System_SByte:
-                    return "sbyte";
-                case SpecialType.System_Single:
-                    return "float";
-                case SpecialType.System_String:
-                    return "string";
-                case SpecialType.System_UInt16:
-                    return "ushort";
-                case SpecialType.System_UInt32:
-                    return "uint";
-                case SpecialType.System_UInt64:
-                    return "ulong";
-                case SpecialType.System_UIntPtr:
-                    return "nuint";
-                case SpecialType.System_Void:
-                    return "void";
-            }
-
-            if (typeSymbol is INamedTypeSymbol namedType && namedType.IsGenericType)
-            {
-                var typeName = namedType.OriginalDefinition.ToDisplayString();
-                var tickIndex = typeName.IndexOf('`');
-                if (tickIndex >= 0)
+                var assemblySymbol = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
+                if (assemblySymbol == null ||
+                    !SymbolEqualityComparer.Default.Equals(assemblySymbol, methodSymbol.ContainingAssembly))
                 {
-                    typeName = typeName.Substring(0, tickIndex);
-                }
-
-                return $"{typeName}<{string.Join(", ", namedType.TypeArguments.Select(CreateEffectTypeName))}>";
-            }
-
-            return typeSymbol.OriginalDefinition.ToDisplayString();
-        }
-
-        private static IEnumerable<string> EnumerateObjectBodies(string json)
-        {
-            var objectStarts = new Stack<int>();
-            var inString = false;
-            var escaped = false;
-
-            for (var i = 0; i < json.Length; i++)
-            {
-                var ch = json[i];
-                if (inString)
-                {
-                    if (escaped)
-                    {
-                        escaped = false;
-                    }
-                    else if (ch == '\\')
-                    {
-                        escaped = true;
-                    }
-                    else if (ch == '"')
-                    {
-                        inString = false;
-                    }
-
                     continue;
                 }
 
-                if (ch == '"')
+                var referencePath = reference.FilePath;
+                if (string.IsNullOrWhiteSpace(referencePath) || !File.Exists(referencePath))
                 {
-                    inString = true;
-                }
-                else if (ch == '{')
-                {
-                    objectStarts.Push(i + 1);
-                }
-                else if (ch == '}' && objectStarts.Count > 0)
-                {
-                    var start = objectStarts.Pop();
-                    yield return json.Substring(start, i - start);
-                }
-            }
-        }
-
-        private static bool ContainsUnquotedBrace(string value)
-        {
-            var inString = false;
-            var escaped = false;
-
-            foreach (var ch in value)
-            {
-                if (inString)
-                {
-                    if (escaped)
-                    {
-                        escaped = false;
-                    }
-                    else if (ch == '\\')
-                    {
-                        escaped = true;
-                    }
-                    else if (ch == '"')
-                    {
-                        inString = false;
-                    }
-
-                    continue;
+                    return null;
                 }
 
-                if (ch == '"')
-                {
-                    inString = true;
-                }
-                else if (ch == '{' || ch == '}')
-                {
-                    return true;
-                }
+                return AssemblyIdentityCache.GetOrAdd(referencePath, static path => ActualAssemblyIdentity.FromFile(path));
             }
 
-            return false;
-        }
-
-        private static string UnescapeJsonString(string value)
-        {
-            var builder = new StringBuilder(value.Length);
-            for (var i = 0; i < value.Length; i++)
-            {
-                var ch = value[i];
-                if (ch != '\\' || i + 1 >= value.Length)
-                {
-                    builder.Append(ch);
-                    continue;
-                }
-
-                i++;
-                switch (value[i])
-                {
-                    case '"':
-                        builder.Append('"');
-                        break;
-                    case '\\':
-                        builder.Append('\\');
-                        break;
-                    case '/':
-                        builder.Append('/');
-                        break;
-                    case 'b':
-                        builder.Append('\b');
-                        break;
-                    case 'f':
-                        builder.Append('\f');
-                        break;
-                    case 'n':
-                        builder.Append('\n');
-                        break;
-                    case 'r':
-                        builder.Append('\r');
-                        break;
-                    case 't':
-                        builder.Append('\t');
-                        break;
-                    case 'u':
-                        if (i + 4 < value.Length &&
-                            int.TryParse(
-                                value.Substring(i + 1, 4),
-                                System.Globalization.NumberStyles.HexNumber,
-                                System.Globalization.CultureInfo.InvariantCulture,
-                                out var codePoint))
-                        {
-                            builder.Append((char)codePoint);
-                            i += 4;
-                        }
-                        break;
-                    default:
-                        builder.Append(value[i]);
-                        break;
-                }
-            }
-
-            return builder.ToString();
+            return null;
         }
 
         private sealed class SummaryEntry
         {
-            public SummaryEntry(string symbol, ImmutableArray<string> exceptionTypes)
+            public SummaryEntry(
+                string symbol,
+                ImmutableArray<string> exceptionTypes,
+                SummaryAssemblyIdentity? assemblyIdentity)
             {
                 Symbol = symbol;
                 ExceptionTypes = exceptionTypes;
+                AssemblyIdentity = assemblyIdentity;
             }
 
             public string Symbol { get; }
 
             public ImmutableArray<string> ExceptionTypes { get; }
+
+            public SummaryAssemblyIdentity? AssemblyIdentity { get; }
+
+            public bool IsTrustedFor(IMethodSymbol methodSymbol, ActualAssemblyIdentity? actualAssemblyIdentity)
+            {
+                if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
+                {
+                    return false;
+                }
+
+                return AssemblyIdentity != null &&
+                    AssemblyIdentity.IsComplete &&
+                    actualAssemblyIdentity != null &&
+                    AssemblyIdentity.Matches(actualAssemblyIdentity);
+            }
+        }
+
+        private sealed class SummaryAssemblyIdentity
+        {
+            public SummaryAssemblyIdentity(
+                string? assemblyName,
+                string? assemblySha256,
+                string? moduleVersionId)
+            {
+                AssemblyName = assemblyName;
+                AssemblySha256 = assemblySha256;
+                ModuleVersionId = moduleVersionId;
+            }
+
+            public string? AssemblyName { get; }
+
+            public string? AssemblySha256 { get; }
+
+            public string? ModuleVersionId { get; }
+
+            public bool IsComplete =>
+                !string.IsNullOrWhiteSpace(AssemblyName) &&
+                !string.IsNullOrWhiteSpace(AssemblySha256) &&
+                !string.IsNullOrWhiteSpace(ModuleVersionId);
+
+            public bool Matches(ActualAssemblyIdentity actualAssemblyIdentity)
+            {
+                return string.Equals(AssemblyName, actualAssemblyIdentity.AssemblyName, StringComparison.Ordinal) &&
+                    string.Equals(AssemblySha256, actualAssemblyIdentity.AssemblySha256, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(ModuleVersionId, actualAssemblyIdentity.ModuleVersionId, StringComparison.OrdinalIgnoreCase);
+            }
+
+            public static SummaryAssemblyIdentity? FromJson(JsonElement assemblyElement)
+            {
+                var assemblyName = CompatibilityHelpers.GetTrimmedStringProperty(assemblyElement, "AssemblyName");
+                var assemblySha256 = CompatibilityHelpers.GetTrimmedStringProperty(assemblyElement, "AssemblySha256");
+                var moduleVersionId = CompatibilityHelpers.GetTrimmedStringProperty(assemblyElement, "ModuleVersionId");
+                if (string.IsNullOrWhiteSpace(assemblyName) &&
+                    string.IsNullOrWhiteSpace(assemblySha256) &&
+                    string.IsNullOrWhiteSpace(moduleVersionId))
+                {
+                    return null;
+                }
+
+                return new SummaryAssemblyIdentity(
+                    assemblyName?.Trim(),
+                    assemblySha256?.Trim(),
+                    moduleVersionId?.Trim());
+            }
+        }
+
+        private sealed class ActualAssemblyIdentity
+        {
+            public ActualAssemblyIdentity(string assemblyName, string assemblySha256, string moduleVersionId)
+            {
+                AssemblyName = assemblyName;
+                AssemblySha256 = assemblySha256;
+                ModuleVersionId = moduleVersionId;
+            }
+
+            public string AssemblyName { get; }
+
+            public string AssemblySha256 { get; }
+
+            public string ModuleVersionId { get; }
+
+            public static ActualAssemblyIdentity? FromFile(string path)
+            {
+                using var stream = File.OpenRead(path);
+                using var peReader = new PEReader(stream);
+                if (!peReader.HasMetadata)
+                {
+                    return null;
+                }
+
+                var metadataReader = peReader.GetMetadataReader();
+                var assemblyName = metadataReader.IsAssembly
+                    ? metadataReader.GetString(metadataReader.GetAssemblyDefinition().Name)
+                    : Path.GetFileNameWithoutExtension(path);
+                var moduleVersionId = metadataReader.GetGuid(metadataReader.GetModuleDefinition().Mvid).ToString("D");
+                var assemblySha256 = ComputeSha256(path);
+
+                return new ActualAssemblyIdentity(assemblyName, assemblySha256, moduleVersionId);
+            }
+
+            private static string ComputeSha256(string path)
+            {
+                using var stream = File.OpenRead(path);
+                using var sha256 = SHA256.Create();
+                return CompatibilityHelpers.ToLowerHex(sha256.ComputeHash(stream));
+            }
         }
     }
 }

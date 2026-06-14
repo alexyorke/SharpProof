@@ -25,6 +25,21 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             IOperation target = delegateCreation.Target;
 
+            if (!IsEscapingDelegateCreation(delegateCreation))
+            {
+                if (target is IMethodReferenceOperation nonEscapingMethodReference &&
+                    nonEscapingMethodReference.Instance != null)
+                {
+                    var instanceResult = PurityAnalysisEngine.CheckSingleOperation(nonEscapingMethodReference.Instance, context, currentState);
+                    if (!instanceResult.IsPure)
+                    {
+                        return instanceResult;
+                    }
+                }
+
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             if (target is IAnonymousFunctionOperation anonymousFunction)
             {
                 PurityAnalysisEngine.LogDebug($"    [DelegateCreationRule] Found AnonymousFunctionOperation. Analyzing its body.");
@@ -177,6 +192,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return parent is IReturnOperation ||
+                parent is IArgumentOperation ||
                 parent is IAssignmentOperation assignment && IsNonLocalAssignmentTarget(assignment.Target) ||
                 parent is IVariableInitializerOperation variableInitializer &&
                 variableInitializer.Parent is IVariableDeclaratorOperation variableDeclarator &&

@@ -102,7 +102,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             if (!targetPurity.IsPure)
                             {
                                 PurityAnalysisEngine.LogDebug("  [MIR-DEL-S] --> IMPURE target found. Invocation is impure.");
-                                result = targetPurity;
+                                result = targetPurity.WithCallee(targetMethod, invocationOperation.Syntax);
                                 break;
                             }
                         }

@@ -2,6 +2,9 @@ using System;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -1139,6 +1142,7 @@ public class TestClass
     public void TestMethod()
     {
         Action action = ImpureTarget;
+        action();
     }
 }");
 
@@ -1565,20 +1569,11 @@ public class TestClass
                 ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
-                    @"{
-  ""SchemaVersion"": 1,
-  ""Assemblies"": [
-    {
-      ""Methods"": [
-        {
-          ""Symbol"": ""System.ArgumentNullException.ThrowIfNull(object, string)"",
-          ""ThrownExceptionTypes"": [],
-          ""TransitiveThrownExceptionTypes"": [""System.ArgumentNullException""]
-        }
-      ]
-    }
-  ]
-}")));
+                    CreateEffectSummaryJson(
+                        typeof(ArgumentNullException).Assembly.Location,
+                        "System.ArgumentNullException.ThrowIfNull(object, string)",
+                        Array.Empty<string>(),
+                        "System.ArgumentNullException"))));
 
             var diagnostic = SingleDiagnostic(diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(), PurelySharpDiagnostics.ExceptionSummaryId);
 
@@ -1610,20 +1605,11 @@ public class TestClass
                 ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
-                    @"{
-  ""SchemaVersion"": 1,
-  ""Assemblies"": [
-    {
-      ""Methods"": [
-        {
-          ""Symbol"": ""System.ArgumentNullException.ThrowIfNull(object, string)"",
-          ""ThrownExceptionTypes"": [],
-          ""TransitiveThrownExceptionTypes"": [""System.ArgumentNullException""]
-        }
-      ]
-    }
-  ]
-}")));
+                    CreateEffectSummaryJson(
+                        typeof(ArgumentNullException).Assembly.Location,
+                        "System.ArgumentNullException.ThrowIfNull(object, string)",
+                        Array.Empty<string>(),
+                        "System.ArgumentNullException"))));
 
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
@@ -1644,20 +1630,10 @@ public class TestClass
                 ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
-                    @"{
-  ""SchemaVersion"": 1,
-  ""Assemblies"": [
-    {
-      ""Methods"": [
-        {
-          ""Symbol"": ""System.Uri..ctor(string)"",
-          ""ThrownExceptionTypes"": [""System.UriFormatException""],
-          ""TransitiveThrownExceptionTypes"": []
-        }
-      ]
-    }
-  ]
-}")));
+                    CreateEffectSummaryJson(
+                        typeof(Uri).Assembly.Location,
+                        "System.Uri..ctor(string)",
+                        new[] { "System.UriFormatException" }))));
 
             var diagnostic = SingleDiagnostic(diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(), PurelySharpDiagnostics.ExceptionSummaryId);
 
@@ -1681,20 +1657,10 @@ public class TestClass
                 ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
-                    @"{
-  ""SchemaVersion"": 1,
-  ""Assemblies"": [
-    {
-      ""Methods"": [
-        {
-          ""Symbol"": ""System.Environment.get_CurrentDirectory()"",
-          ""ThrownExceptionTypes"": [""System.InvalidOperationException""],
-          ""TransitiveThrownExceptionTypes"": []
-        }
-      ]
-    }
-  ]
-}")));
+                    CreateEffectSummaryJson(
+                        typeof(Environment).Assembly.Location,
+                        "System.Environment.get_CurrentDirectory()",
+                        new[] { "System.InvalidOperationException" }))));
 
             var diagnostic = SingleDiagnostic(diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(), PurelySharpDiagnostics.ExceptionSummaryId);
 
@@ -2016,6 +1982,71 @@ public class TestClass
             return diagnostics.Single(d => d.Id == diagnosticId);
         }
 
+        private static string CreateEffectSummaryJson(
+            string assemblyPath,
+            string symbol,
+            string[] thrownExceptionTypes,
+            params string[] transitiveThrownExceptionTypes)
+        {
+            var identity = GetAssemblyIdentity(assemblyPath);
+            return $$"""
+{
+  "SchemaVersion": 1,
+  "Assemblies": [
+    {
+      "AssemblyName": "{{identity.AssemblyName}}",
+      "AssemblyPath": "runtime",
+      "AssemblySha256": "{{identity.AssemblySha256}}",
+      "ModuleVersionId": "{{identity.ModuleVersionId}}",
+      "MethodCount": 1,
+      "EmittedMethodCount": 1,
+      "Methods": [
+        {
+          "Symbol": "{{symbol}}",
+          "MetadataToken": "0x06000001",
+          "RelativeVirtualAddress": 0,
+          "MethodBodySha256": null,
+          "CacheKey": "diagnostic-evidence-test",
+          "Effects": [],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": {{FormatJsonArray(thrownExceptionTypes)}},
+          "TransitiveThrownExceptionTypes": {{FormatJsonArray(transitiveThrownExceptionTypes)}},
+          "Calls": [],
+          "Fields": []
+        }
+      ]
+    }
+  ]
+}
+""";
+        }
+
+        private static string FormatJsonArray(params string[] values)
+        {
+            if (values.Length == 0)
+            {
+                return "[]";
+            }
+
+            return "[\"" + string.Join("\", \"", values) + "\"]";
+        }
+
+        private static AssemblyIdentity GetAssemblyIdentity(string assemblyPath)
+        {
+            using var stream = File.OpenRead(assemblyPath);
+            using var peReader = new PEReader(stream);
+            var metadataReader = peReader.GetMetadataReader();
+            var assemblyName = metadataReader.IsAssembly
+                ? metadataReader.GetString(metadataReader.GetAssemblyDefinition().Name)
+                : Path.GetFileNameWithoutExtension(assemblyPath);
+            var moduleVersionId = metadataReader.GetGuid(metadataReader.GetModuleDefinition().Mvid).ToString("D");
+            stream.Position = 0;
+            using var sha256 = SHA256.Create();
+            var assemblySha256 = Convert.ToHexString(sha256.ComputeHash(stream)).ToLowerInvariant();
+            return new AssemblyIdentity(assemblyName, assemblySha256, moduleVersionId);
+        }
+
         private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
             string source,
             ImmutableDictionary<string, string>? globalOptions = null,
@@ -2121,5 +2152,7 @@ public class TestClass
                 return SourceText.From(_text);
             }
         }
+
+        private sealed record AssemblyIdentity(string AssemblyName, string AssemblySha256, string ModuleVersionId);
     }
 }

@@ -907,7 +907,7 @@ namespace PurelySharp.Analyzer.Engine
                             null,
                             ownedLocalArraySymbols: mergedOwnedLocalArraysFromCfg,
                             localConcreteTypes: mergedLocalConcreteTypesFromCfg);
-                        foreach (var returnOp in methodBodyIOperation.DescendantsAndSelf().OfType<IReturnOperation>())
+                        foreach (var returnOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<IReturnOperation>())
                         {
                             if (returnOp.ReturnedValue != null)
                             {
@@ -923,7 +923,7 @@ namespace PurelySharp.Analyzer.Engine
                         LogDebug($"{indent}  Post-CFG: ReturnOperations check complete (result still pure).");
 
                         LogDebug($"{indent}  Post-CFG: Checking UsingOperations for implicit Dispose purity...");
-                        foreach (var usingOp in methodBodyIOperation.DescendantsAndSelf().Where(op => op.Kind == OperationKind.Using || op.Kind == OperationKind.UsingDeclaration))
+                        foreach (var usingOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).Where(op => op.Kind == OperationKind.Using || op.Kind == OperationKind.UsingDeclaration))
                         {
                             var usingResult = CheckSingleOperation(usingOp, postCfgContext, postCfgReturnState);
                             if (!usingResult.IsPure)
@@ -936,7 +936,7 @@ namespace PurelySharp.Analyzer.Engine
                         LogDebug($"{indent}  Post-CFG: UsingOperations check complete (result still pure).");
 
                         LogDebug($"{indent}  Post-CFG: Checking ForEach enumerator runtime purity...");
-                        foreach (var forEachOp in methodBodyIOperation.DescendantsAndSelf().OfType<IForEachLoopOperation>())
+                        foreach (var forEachOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<IForEachLoopOperation>())
                         {
                             var forEachResult = LoopPurityRule.CheckForEachEnumeratorPurity(forEachOp.Collection, postCfgContext);
                             if (!forEachResult.IsPure)
@@ -958,7 +958,7 @@ namespace PurelySharp.Analyzer.Engine
 
 
                         LogDebug($"{indent}  Post-CFG: Checking ThrowOperations...");
-                        foreach (var firstThrowOp in methodBodyIOperation.DescendantsAndSelf().OfType<IThrowOperation>())
+                        foreach (var firstThrowOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<IThrowOperation>())
                         {
                             if (IsInStaticallyUnreachableBranch(firstThrowOp.Syntax, semanticModel))
                             {
@@ -992,7 +992,7 @@ namespace PurelySharp.Analyzer.Engine
 
 
                         LogDebug($"{indent}  Post-CFG: Checking Unreachable Code (Try, Catch)...");
-                        foreach (var tryOp in methodBodyIOperation.DescendantsAndSelf().OfType<ITryOperation>())
+                        foreach (var tryOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<ITryOperation>())
                         {
                             foreach (var catchClause in tryOp.Catches)
                             {
@@ -1017,7 +1017,7 @@ namespace PurelySharp.Analyzer.Engine
                         LogDebug($"{indent}  Post-CFG: Skipping local function declarations; invoked local functions are checked through callee purity.");
 
                         LogDebug($"{indent}  Post-CFG: Checking Known Impure Invocations...");
-                        foreach (var invocationOp in methodBodyIOperation.DescendantsAndSelf().OfType<IInvocationOperation>())
+                        foreach (var invocationOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<IInvocationOperation>())
                         {
                             if (IsInStaticallyUnreachableBranch(invocationOp.Syntax, semanticModel))
                             {
@@ -1060,7 +1060,7 @@ namespace PurelySharp.Analyzer.Engine
 
 
                         LogDebug($"{indent}  Post-CFG: Checking Checked Operations...");
-                        foreach (var operation in methodBodyIOperation.DescendantsAndSelf())
+                        foreach (var operation in ExecutionVisibility.VisibleDescendants(methodBodyIOperation))
                         {
                             bool isChecked = false;
                             IMethodSymbol? operatorMethod = null;
@@ -1483,13 +1483,8 @@ namespace PurelySharp.Analyzer.Engine
                 null);
 
             var currentState = PurityAnalysisState.Pure;
-            foreach (var operation in rootOperation.DescendantsAndSelf())
+            foreach (var operation in ExecutionVisibility.VisibleDescendants(rootOperation))
             {
-                if (IsNestedFunctionDescendant(operation, rootOperation))
-                {
-                    continue;
-                }
-
                 if (operation is IFlowCaptureOperation flowCaptureOperation)
                 {
                     var valueResult = CheckSingleOperation(flowCaptureOperation.Value, context, currentState);
@@ -1604,8 +1599,13 @@ namespace PurelySharp.Analyzer.Engine
             return false;
         }
 
-    private static bool IsInStaticallyUnreachableBranch(SyntaxNode syntaxNode, SemanticModel semanticModel)
-    {
+        private static bool IsInStaticallyUnreachableBranch(SyntaxNode syntaxNode, SemanticModel semanticModel)
+        {
+            if (ExecutionVisibility.IsInStaticallyUnreachableBranch(syntaxNode, semanticModel))
+            {
+                return true;
+            }
+
             foreach (var ancestor in syntaxNode.Ancestors())
             {
                 if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.IfStatementSyntax ifStatementSyntax)

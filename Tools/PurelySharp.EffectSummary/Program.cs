@@ -384,7 +384,7 @@ internal static class AssemblyEffectSummarizer
             if (il is not null)
             {
                 methodBodySha256 = ComputeSha256(il);
-                AnalyzeIl(reader, il, effects, calls, fields, thrownExceptionTypes);
+                AnalyzeIl(reader, il, body.ExceptionRegions, effects, calls, fields, thrownExceptionTypes);
             }
         }
 
@@ -557,6 +557,7 @@ internal static class AssemblyEffectSummarizer
     private static void AnalyzeIl(
         MetadataReader reader,
         byte[] il,
+        ImmutableArray<ExceptionRegion> exceptionRegions,
         SortedSet<string> effects,
         SortedSet<string> calls,
         SortedSet<string> fields,
@@ -657,9 +658,13 @@ internal static class AssemblyEffectSummarizer
             else if (opCode == OpCodes.Throw || opCode == OpCodes.Rethrow)
             {
                 effects.Add("throws");
-                if (lastConstructedExceptionType != null)
+                var thrownExceptionType = opCode == OpCodes.Rethrow
+                    ? GetEnclosingCatchExceptionType(reader, exceptionRegions, instructionOffset)
+                    : lastConstructedExceptionType;
+                if (thrownExceptionType != null &&
+                    IsEscapingThrow(reader, exceptionRegions, instructionOffset, thrownExceptionType))
                 {
-                    thrownExceptionTypes.Add(lastConstructedExceptionType);
+                    thrownExceptionTypes.Add(thrownExceptionType);
                 }
             }
             else if (IsIndirectWrite(opCode))
@@ -801,6 +806,172 @@ internal static class AssemblyEffectSummarizer
 
         var typeName = constructorSymbol.Substring(0, ctorIndex);
         return typeName.EndsWith("Exception", StringComparison.Ordinal) ? typeName : null;
+    }
+
+    private static bool IsEscapingThrow(
+        MetadataReader reader,
+        ImmutableArray<ExceptionRegion> exceptionRegions,
+        int instructionOffset,
+        string thrownExceptionType)
+    {
+        foreach (var exceptionRegion in exceptionRegions)
+        {
+            if (exceptionRegion.Kind != ExceptionRegionKind.Catch ||
+                !ContainsOffset(exceptionRegion.TryOffset, exceptionRegion.TryLength, instructionOffset))
+            {
+                continue;
+            }
+
+            var catchExceptionType = GetCatchExceptionType(reader, exceptionRegion);
+            if (CatchHandlesException(reader, thrownExceptionType, catchExceptionType))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string? GetEnclosingCatchExceptionType(
+        MetadataReader reader,
+        ImmutableArray<ExceptionRegion> exceptionRegions,
+        int instructionOffset)
+    {
+        string? catchExceptionType = null;
+        var smallestHandlerLength = int.MaxValue;
+        foreach (var exceptionRegion in exceptionRegions)
+        {
+            if (exceptionRegion.Kind != ExceptionRegionKind.Catch ||
+                !ContainsOffset(exceptionRegion.HandlerOffset, exceptionRegion.HandlerLength, instructionOffset))
+            {
+                continue;
+            }
+
+            var currentCatchExceptionType = GetCatchExceptionType(reader, exceptionRegion);
+            if (currentCatchExceptionType == null || exceptionRegion.HandlerLength >= smallestHandlerLength)
+            {
+                continue;
+            }
+
+            catchExceptionType = currentCatchExceptionType;
+            smallestHandlerLength = exceptionRegion.HandlerLength;
+        }
+
+        return catchExceptionType;
+    }
+
+    private static bool ContainsOffset(int startOffset, int length, int instructionOffset)
+    {
+        return instructionOffset >= startOffset && instructionOffset < startOffset + length;
+    }
+
+    private static string? GetCatchExceptionType(MetadataReader reader, ExceptionRegion exceptionRegion)
+    {
+        if (exceptionRegion.Kind != ExceptionRegionKind.Catch)
+        {
+            return null;
+        }
+
+        if (exceptionRegion.CatchType.IsNil)
+        {
+            return "System.Exception";
+        }
+
+        return GetEntityTypeName(reader, exceptionRegion.CatchType);
+    }
+
+    private static string? GetEntityTypeName(MetadataReader reader, EntityHandle handle)
+    {
+            return handle.Kind switch
+            {
+                HandleKind.TypeDefinition => GetExceptionTypeDefinitionName(reader, (TypeDefinitionHandle)handle),
+                HandleKind.TypeReference => GetExceptionTypeReferenceName(reader, (TypeReferenceHandle)handle),
+                _ => null
+            };
+        }
+
+    private static string GetExceptionTypeDefinitionName(MetadataReader reader, TypeDefinitionHandle handle)
+    {
+        var definition = reader.GetTypeDefinition(handle);
+        return GetQualifiedTypeName(
+            reader.GetString(definition.Namespace),
+            reader.GetString(definition.Name));
+    }
+
+    private static string GetExceptionTypeReferenceName(MetadataReader reader, TypeReferenceHandle handle)
+    {
+        var reference = reader.GetTypeReference(handle);
+        return GetQualifiedTypeName(
+            reader.GetString(reference.Namespace),
+            reader.GetString(reference.Name));
+    }
+
+    private static string GetQualifiedTypeName(string typeNamespace, string typeName)
+    {
+        return string.IsNullOrWhiteSpace(typeNamespace)
+            ? typeName
+            : typeNamespace + "." + typeName;
+    }
+
+    private static bool CatchHandlesException(
+        MetadataReader reader,
+        string thrownExceptionType,
+        string? catchExceptionType)
+    {
+        if (string.IsNullOrWhiteSpace(catchExceptionType))
+        {
+            return false;
+        }
+
+        if (string.Equals(catchExceptionType, "System.Exception", StringComparison.Ordinal) ||
+            string.Equals(catchExceptionType, "System.Object", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (string.Equals(thrownExceptionType, catchExceptionType, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return IsDefinedTypeDerivedFrom(reader, thrownExceptionType, catchExceptionType);
+    }
+
+    private static bool IsDefinedTypeDerivedFrom(
+        MetadataReader reader,
+        string thrownExceptionType,
+        string catchExceptionType)
+    {
+        var currentType = thrownExceptionType;
+        var visitedTypes = new HashSet<string>(StringComparer.Ordinal);
+        while (visitedTypes.Add(currentType))
+        {
+            var definitionHandle = reader.TypeDefinitions
+                .FirstOrDefault(handle => string.Equals(
+                    GetExceptionTypeDefinitionName(reader, handle),
+                    currentType,
+                    StringComparison.Ordinal));
+            if (definitionHandle.IsNil)
+            {
+                return false;
+            }
+
+            var definition = reader.GetTypeDefinition(definitionHandle);
+            var baseType = GetEntityTypeName(reader, definition.BaseType);
+            if (string.IsNullOrWhiteSpace(baseType))
+            {
+                return false;
+            }
+
+            if (string.Equals(baseType, catchExceptionType, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            currentType = baseType;
+        }
+
+        return false;
     }
 
     private static OpCode ReadOpCode(byte[] il, ref int offset)
