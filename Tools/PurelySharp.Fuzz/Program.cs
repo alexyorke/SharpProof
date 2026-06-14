@@ -1016,6 +1016,33 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: false,
             BuildConservativeUsingStatement),
         new ShapeRegistryEntry(
+            "ConservativeCompoundAssignment",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.CompoundAssignment)),
+            ImmutableArray.Create("CompoundAssignment"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildConservativeCompoundAssignment),
+        new ShapeRegistryEntry(
+            "ConservativeCoalesceAssignment",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.CoalesceAssignment)),
+            ImmutableArray.Create("CoalesceAssignment"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildConservativeCoalesceAssignment),
+        new ShapeRegistryEntry(
+            "ConservativeDeconstructionAssignment",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.DeconstructionAssignment)),
+            ImmutableArray.Create("DeconstructionAssignment"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildConservativeDeconstructionAssignment),
+        new ShapeRegistryEntry(
             "ConservativeTuple",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Tuple)),
             ImmutableArray.Create("Tuple"),
@@ -1556,6 +1583,51 @@ public class {{className}}
                     {
                         return 1;
                     }
+                }
+            """);
+    }
+
+    private static string BuildConservativeCompoundAssignment(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(int x)
+                {
+                    var value = x;
+                    value += 2;
+                    return value;
+                }
+            """);
+    }
+
+    private static string BuildConservativeCoalesceAssignment(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public string TestMethod(string value)
+                {
+                    value ??= "fallback";
+                    return value;
+                }
+            """);
+    }
+
+    private static string BuildConservativeDeconstructionAssignment(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(int x, int y)
+                {
+                    var left = x;
+                    var right = y;
+                    (left, right) = (right, left);
+                    return left - right;
                 }
             """);
     }

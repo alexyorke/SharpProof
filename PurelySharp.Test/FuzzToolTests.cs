@@ -16,11 +16,12 @@ namespace PurelySharp.Test
         public async Task FuzzRunner_SmokeRun_WritesSummaryAndCoverageArtifacts()
         {
             var outputDirectory = CreateOutputDirectory();
+            var iterations = Math.Max(40, RoslynShapeManifest.GeneratorBackedShapeIds.Length + 2);
             try
             {
                 var summary = await FuzzRunner.RunAsync(new FuzzOptions
                 {
-                    Iterations = 40,
+                    Iterations = iterations,
                     Seed = 20260614,
                     OutputDirectory = outputDirectory,
                     CheckpointEvery = 5,
@@ -28,7 +29,7 @@ namespace PurelySharp.Test
                     Quiet = true
                 });
 
-                Assert.That(summary.CasesAnalyzed, Is.EqualTo(40));
+                Assert.That(summary.CasesAnalyzed, Is.EqualTo(iterations));
                 Assert.That(summary.SchemaVersion, Is.EqualTo("1.1"));
                 Assert.That(summary.CompilationErrorCount, Is.EqualTo(0));
                 Assert.That(summary.OperationKinds, Is.Not.Empty);
