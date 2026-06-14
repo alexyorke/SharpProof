@@ -168,6 +168,56 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ConfiguredKnownPureMethodOverridesConfiguredImpureType()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(int value)
+    {
+        return Math.Abs(value);
+    }
+}",
+                ImmutableDictionary<string, string>.Empty
+                    .Add("purelysharp_known_impure_types", "System.Math")
+                    .Add("purelysharp_known_pure_methods", "System.Math.Abs(int)"));
+
+            Assert.That(
+                diagnostics.Any(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Configured pure member should override a configured impure type for the same member.");
+        }
+
+        [Test]
+        public async Task Ps0002_ConfiguredKnownPurePropertyOverridesConfiguredImpureNamespace()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Net;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public IPAddress TestMethod()
+    {
+        return IPAddress.Loopback;
+    }
+}",
+                ImmutableDictionary<string, string>.Empty
+                    .Add("purelysharp_known_impure_namespaces", "System.Net")
+                    .Add("purelysharp_known_pure_methods", "System.Net.IPAddress.Loopback.get"));
+
+            Assert.That(
+                diagnostics.Any(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Configured pure property should override a configured impure namespace for the same member.");
+        }
+
+        [Test]
         public async Task Ps0002_ImpureCallee_IncludesCalleeChain()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
