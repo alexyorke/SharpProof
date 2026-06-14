@@ -229,6 +229,37 @@ public class KnownImpureConsoleCase
             }
         }
 
+        [Test]
+        public async Task ExceptionCoverageFamilies_EmitPs0002_And_Ps0010()
+        {
+            var families = new[]
+            {
+                "ExceptionDirectThrowInvalidOperation",
+                "ExceptionGuardedThrowArgumentNull",
+                "ExceptionThrowExpressionFormatException"
+            };
+
+            var generator = new FuzzCaseGenerator(20260614);
+
+            foreach (var family in families)
+            {
+                var registryEntry = FuzzCaseGenerator.RegistryEntries.Single(entry => entry.Id == family);
+                var fuzzCase = generator.GenerateForRegistryEntry(registryEntry, 0);
+                var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
+
+                Assert.That(analysis.CompilationErrors, Is.Empty, family);
+                Assert.That(analysis.Findings, Is.Empty, family);
+                Assert.That(
+                    analysis.Diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                    Is.True,
+                    family + " missing PS0002");
+                Assert.That(
+                    analysis.Diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId),
+                    Is.True,
+                    family + " missing PS0010");
+            }
+        }
+
         private static string CreateOutputDirectory()
         {
             var outputDirectory = Path.Combine(
