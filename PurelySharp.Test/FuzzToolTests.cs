@@ -160,6 +160,7 @@ public class KnownImpureConsoleCase
             Assert.That(families, Does.Contain("PureUtf8String"));
             Assert.That(families, Does.Contain("PureArrayCreation"));
             Assert.That(families, Does.Contain("PureNestedOwnershipChain"));
+            Assert.That(families, Does.Contain("ImpureOwnershipEscapeChain"));
             Assert.That(families, Does.Contain("ConservativeSwitchExpression"));
             Assert.That(families, Does.Contain("ConservativeRangeSlice"));
             Assert.That(families, Does.Contain("ConservativeWithExpression"));
@@ -202,7 +203,8 @@ public class KnownImpureConsoleCase
                 new FamilyExpectation("ConservativeNestedLambdaLocalFunction", "AnonymousFunction", "LocalFunction"),
                 new FamilyExpectation("ConservativeTuplePatternSwitch", "Tuple", "SwitchExpression"),
                 new FamilyExpectation("ConservativeUsingAwaitDelegateFlow", "UsingDeclaration", "Await", "AnonymousFunction"),
-                new FamilyExpectation("PureNestedOwnershipChain", "PropertyReference", "SimpleAssignment", "ObjectCreation")
+                new FamilyExpectation("PureNestedOwnershipChain", "PropertyReference", "SimpleAssignment", "ObjectCreation"),
+                new FamilyExpectation("ImpureOwnershipEscapeChain", "ObjectCreation", "PropertyReference", "Return")
             };
 
             var generator = new FuzzCaseGenerator(20260614);
@@ -256,6 +258,21 @@ public class KnownImpureConsoleCase
             Assert.That(
                 analysis.Diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId),
                 Is.False);
+        }
+
+        [Test]
+        public async Task ImpureOwnershipCoverageFamily_EmitsPs0002()
+        {
+            var generator = new FuzzCaseGenerator(20260614);
+            var registryEntry = FuzzCaseGenerator.RegistryEntries.Single(entry => entry.Id == "ImpureOwnershipEscapeChain");
+            var fuzzCase = generator.GenerateForRegistryEntry(registryEntry, 0);
+            var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
+
+            Assert.That(analysis.CompilationErrors, Is.Empty);
+            Assert.That(analysis.Findings, Is.Empty);
+            Assert.That(
+                analysis.Diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.True);
         }
 
         [Test]

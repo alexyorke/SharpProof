@@ -888,6 +888,15 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: true,
             BuildPureNestedOwnershipChain),
         new ShapeRegistryEntry(
+            "ImpureOwnershipEscapeChain",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.ObjectCreation)),
+            ImmutableArray.Create("ObjectCreation", "PropertyReference", "Return"),
+            ImmutableArray.Create("ObjectCreationExpression"),
+            FuzzExpectation.DefinitelyImpure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildImpureOwnershipEscapeChain),
+        new ShapeRegistryEntry(
             "ImpureConsoleWrite",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Invocation)),
             ImmutableArray.Create("Invocation"),
@@ -1618,6 +1627,37 @@ public class {{className}}
         var outer = new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
         outer.Value.Value.Value = 1;
         return outer.Value.Value.Value;
+    }
+}
+""";
+    }
+
+    private static string BuildImpureOwnershipEscapeChain(int index, Random random, string className)
+    {
+        return $$"""
+using PurelySharp.Attributes;
+
+public sealed class {{className}}Box
+{
+    public int Value;
+}
+
+public sealed class {{className}}Middle
+{
+    public {{className}}Box Value { get; init; }
+}
+
+public sealed class {{className}}Outer
+{
+    public {{className}}Middle Value { get; init; }
+}
+
+public class {{className}}
+{
+    [EnforcePure]
+    public {{className}}Outer TestMethod()
+    {
+        return new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
     }
 }
 """;
