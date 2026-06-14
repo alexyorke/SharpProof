@@ -582,6 +582,83 @@ public class TestClass
         }
 
         [Test]
+        public async Task OwnedFreshDeepMutableObjectFieldMutationThroughInitOnlyWrapperChain_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public sealed class Middle
+{
+    public Box Value { get; init; }
+}
+
+public sealed class Outer
+{
+    public Middle Value { get; init; }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        var outer = new Outer { Value = new Middle { Value = new Box() } };
+        outer.Value.Value.Value = 1;
+        return outer.Value.Value.Value;
+    }
+}";
+
+            var expectedMiddleGetter = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
+            var expectedOuterGetter = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0004).WithSpan(16, 19, 16, 24).WithArguments("get_Value");
+
+            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedMiddleGetter, expectedOuterGetter });
+        }
+
+        [Test]
+        public async Task OwnedFreshDeepMutableObjectFieldMutationThroughAliasedInitOnlyWrapperChain_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public sealed class Middle
+{
+    public Box Value { get; init; }
+}
+
+public sealed class Outer
+{
+    public Middle Value { get; init; }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        var middle = new Middle { Value = new Box() };
+        var outer = new Outer { Value = middle };
+        outer.Value.Value.Value = 1;
+        return outer.Value.Value.Value;
+    }
+}";
+
+            var expectedMiddleGetter = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
+            var expectedOuterGetter = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0004).WithSpan(16, 19, 16, 24).WithArguments("get_Value");
+
+            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedMiddleGetter, expectedOuterGetter });
+        }
+
+        [Test]
         public async Task AliasedFreshMutableLocalObjectFieldMutation_NoDiagnostic()
         {
             var test = @"
