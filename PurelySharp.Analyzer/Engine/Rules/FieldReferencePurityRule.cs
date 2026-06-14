@@ -158,6 +158,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Instance is a by-value value-type receiver ({unwrappedInstance.Kind}). Read is Pure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                     }
+                    if (fieldSymbol.IsReadOnly &&
+                        IsOwnedFreshMutableReadonlyFieldReference(fieldReferenceOperation, fieldReferenceOperation.Syntax, context.SemanticModel))
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Readonly field '{fieldSymbol.Name}' on stable local wrapper carries an owned fresh mutable object. Read is Pure.");
+                        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                    }
                     if (IsOwnedFreshMutableObjectReference(instanceOperation, fieldReferenceOperation.Syntax, context))
                     {
                         PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Instance field '{fieldSymbol.Name}' on fresh local object receiver. Read is Pure.");
@@ -273,12 +279,176 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return IsOwnedFreshMutableObjectReference(conversionOperation.Operand, observationSyntax, context);
             }
 
-            return operation is ILocalReferenceOperation localReference &&
-                   HasStableFreshMutableObjectValue(
-                       localReference.Local,
-                       observationSyntax,
-                       context.SemanticModel,
-                       new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
+            if (operation is ILocalReferenceOperation localReference)
+            {
+                return HasStableFreshMutableObjectValue(
+                    localReference.Local,
+                    observationSyntax,
+                    context.SemanticModel,
+                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
+            }
+
+            return operation is IFieldReferenceOperation fieldReference &&
+                   fieldReference.Field.IsReadOnly &&
+                   IsOwnedFreshMutableReadonlyFieldReference(fieldReference, observationSyntax, context.SemanticModel);
+        }
+
+        private static bool IsOwnedFreshMutableReadonlyFieldReference(
+            IFieldReferenceOperation fieldReferenceOperation,
+            SyntaxNode observationSyntax,
+            SemanticModel semanticModel)
+        {
+            var instanceOperation = PurityAnalysisEngine.SkipImplicitConversions(fieldReferenceOperation.Instance) ?? fieldReferenceOperation.Instance;
+            if (instanceOperation is not ILocalReferenceOperation localReference ||
+                !TryGetStableLocalObjectCreationInitializer(
+                    localReference.Local,
+                    observationSyntax,
+                    semanticModel,
+                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                    out var objectCreationOperation))
+            {
+                return false;
+            }
+
+            foreach (var assignment in objectCreationOperation.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
+            {
+                if (!SymbolEqualityComparer.Default.Equals(GetReferencedMemberSymbol(assignment.Target), fieldReferenceOperation.Field))
+                {
+                    continue;
+                }
+
+                if (HasStableFreshMutableObjectValueInOperation(
+                    assignment.Value,
+                    observationSyntax,
+                    semanticModel,
+                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)))
+                {
+                    return true;
+                }
+            }
+
+            if (objectCreationOperation.Constructor == null)
+            {
+                return false;
+            }
+
+            foreach (var argument in objectCreationOperation.Arguments)
+            {
+                var parameter = argument.Parameter;
+                if (parameter == null ||
+                    !ConstructorStoresParameterInField(objectCreationOperation.Constructor, parameter, fieldReferenceOperation.Field, semanticModel))
+                {
+                    continue;
+                }
+
+                if (HasStableFreshMutableObjectValueInOperation(
+                    argument.Value,
+                    observationSyntax,
+                    semanticModel,
+                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryGetStableLocalObjectCreationInitializer(
+            ILocalSymbol localSymbol,
+            SyntaxNode observationSyntax,
+            SemanticModel semanticModel,
+            HashSet<ILocalSymbol> visitedLocals,
+            out IObjectCreationOperation objectCreationOperation)
+        {
+            if (!visitedLocals.Add(localSymbol))
+            {
+                objectCreationOperation = null!;
+                return false;
+            }
+
+            var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
+                .Select(reference => reference.GetSyntax())
+                .OfType<VariableDeclaratorSyntax>()
+                .FirstOrDefault();
+            var initializerSyntax = declaratorSyntax?.Initializer?.Value;
+            if (declaratorSyntax == null || initializerSyntax == null ||
+                HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, observationSyntax, declaratorSyntax, semanticModel))
+            {
+                objectCreationOperation = null!;
+                return false;
+            }
+
+            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax));
+            if (initializerOperation is IObjectCreationOperation directObjectCreation)
+            {
+                objectCreationOperation = directObjectCreation;
+                return true;
+            }
+
+            if (initializerOperation is ILocalReferenceOperation localReference)
+            {
+                return TryGetStableLocalObjectCreationInitializer(
+                    localReference.Local,
+                    initializerSyntax,
+                    semanticModel,
+                    visitedLocals,
+                    out objectCreationOperation);
+            }
+
+            objectCreationOperation = null!;
+            return false;
+        }
+
+        private static bool ConstructorStoresParameterInField(
+            IMethodSymbol constructor,
+            IParameterSymbol parameter,
+            IFieldSymbol fieldSymbol,
+            SemanticModel semanticModel)
+        {
+            foreach (var syntaxReference in constructor.DeclaringSyntaxReferences)
+            {
+                var constructorSyntax = syntaxReference.GetSyntax();
+                var constructorModel = semanticModel.Compilation.GetSemanticModel(constructorSyntax.SyntaxTree);
+                foreach (var assignment in constructorSyntax.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+                {
+                    if (constructorModel.GetOperation(assignment) is not ISimpleAssignmentOperation assignmentOperation)
+                    {
+                        continue;
+                    }
+
+                    if (PurityAnalysisEngine.SkipImplicitConversions(assignmentOperation.Value) is not IParameterReferenceOperation parameterReference ||
+                        !SymbolEqualityComparer.Default.Equals(parameterReference.Parameter, parameter) ||
+                        assignmentOperation.Target is not IFieldReferenceOperation fieldReference ||
+                        !SymbolEqualityComparer.Default.Equals(fieldReference.Field, fieldSymbol) ||
+                        !IsThisOrImplicitInstance(fieldReference.Instance))
+                    {
+                        continue;
+                    }
+
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static ISymbol? GetReferencedMemberSymbol(IOperation? operation)
+        {
+            var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
+            return unwrappedOperation switch
+            {
+                IFieldReferenceOperation fieldReference => fieldReference.Field,
+                IPropertyReferenceOperation propertyReference => propertyReference.Property,
+                _ => null
+            };
+        }
+
+        private static bool IsThisOrImplicitInstance(IOperation? operation)
+        {
+            return operation == null ||
+                   operation is IInstanceReferenceOperation instanceReference &&
+                   instanceReference.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance;
         }
 
         private static bool HasStableFreshMutableObjectValue(

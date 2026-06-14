@@ -459,6 +459,42 @@ public class TestClass
         }
 
         [Test]
+        public async Task OwnedFreshNestedMutableObjectFieldMutationThroughReadonlyWrapper_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public sealed class Holder
+{
+    public readonly Box Value;
+
+    [EnforcePure]
+    public Holder(Box value)
+    {
+        Value = value;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        var holder = new Holder(new Box());
+        holder.Value.Value = 1;
+        return holder.Value.Value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task AliasedFreshMutableLocalObjectFieldMutation_NoDiagnostic()
         {
             var test = @"
