@@ -980,6 +980,42 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: false,
             BuildConservativeConditionalAccessCoalesce),
         new ShapeRegistryEntry(
+            "ConservativeIsTypeCheck",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.IsType)),
+            ImmutableArray.Create("IsType"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildConservativeIsTypeCheck),
+        new ShapeRegistryEntry(
+            "ConservativeNegatedPattern",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.NegatedPattern)),
+            ImmutableArray.Create("NegatedPattern"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildConservativeNegatedPattern),
+        new ShapeRegistryEntry(
+            "ConservativeSwitchStatement",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Switch)),
+            ImmutableArray.Create("Switch", "SwitchCase"),
+            ImmutableArray.Create("SwitchStatement"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeSwitchStatement),
+        new ShapeRegistryEntry(
+            "ConservativeUsingStatement",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Using)),
+            ImmutableArray.Create("Using"),
+            ImmutableArray.Create("UsingStatement"),
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeUsingStatement),
+        new ShapeRegistryEntry(
             "ConservativeTuple",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Tuple)),
             ImmutableArray.Create("Tuple"),
@@ -1456,6 +1492,70 @@ public class {{className}}
                 public int TestMethod(string text, string fallback)
                 {
                     return text?.Trim().Length ?? fallback.Length;
+                }
+            """);
+    }
+
+    private static string BuildConservativeIsTypeCheck(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(object value)
+                {
+                    return value is string ? 1 : 0;
+                }
+            """);
+    }
+
+    private static string BuildConservativeNegatedPattern(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(object value)
+                {
+                    return value is not int ? 1 : 0;
+                }
+            """);
+    }
+
+    private static string BuildConservativeSwitchStatement(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(int value)
+                {
+                    switch (value)
+                    {
+                        case 0:
+                            return 0;
+                        case 1:
+                        case 2:
+                            return 1;
+                        default:
+                            return value;
+                    }
+                }
+            """);
+    }
+
+    private static string BuildConservativeUsingStatement(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod()
+                {
+                    using (var writer = new System.IO.StringWriter())
+                    {
+                        return 1;
+                    }
                 }
             """);
     }
