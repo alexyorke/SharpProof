@@ -296,5 +296,56 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedGetValue, expectedTestMethod });
         }
+
+        [Test]
+        public async Task FreshMutableLocalObjectFieldMutation_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        var box = new Box();
+        box.Value = 1;
+        return box.Value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task AliasedFreshMutableLocalObjectFieldMutation_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        var box = new Box();
+        var alias = box;
+        alias.Value = 1;
+        return box.Value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

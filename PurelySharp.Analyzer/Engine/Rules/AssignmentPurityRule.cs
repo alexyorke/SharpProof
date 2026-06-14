@@ -580,6 +580,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         PurityAnalysisEngine.LogDebug($" Assignment Target: FieldReference '{fieldRefOp.Field.Name}' on by-value local value-type receiver - Allowed (Target is Pure)");
                         return true;
                     }
+                    if (IsOwnedFreshMutableObjectReference(fieldRefOp.Instance, fieldRefOp.Syntax, context))
+                    {
+                        PurityAnalysisEngine.LogDebug($" Assignment Target: FieldReference '{fieldRefOp.Field.Name}' on fresh local object receiver - Allowed (Target is Pure)");
+                        return true;
+                    }
                     PurityAnalysisEngine.LogDebug($" Assignment Target: FieldReference '{fieldRefOp.Field.Name}' (Non-Static, Non-Constructor 'this.Field') - Impure Target");
                     return false;
 
@@ -630,6 +635,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
 
 
+                    if (IsOwnedFreshMutableObjectReference(propRefOp.Instance, propRefOp.Syntax, context))
+                    {
+                        PurityAnalysisEngine.LogDebug(" Assignment Target: PropertyReference on fresh local object receiver - Allowed (Target is Pure)");
+                        return true;
+                    }
+
                     PurityAnalysisEngine.LogDebug($" Assignment Target: PropertyReference on local/param for non-init prop ('{propRefOp.Instance?.Syntax}') - Impure Target by IsAssignmentTargetPure rule.");
                     return false;
 
@@ -659,6 +670,181 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             return operation is ILocalReferenceOperation localReference &&
                    currentState.IsOwnedLocalArraySymbol(localReference.Local);
+        }
+
+        private static bool IsOwnedFreshMutableObjectReference(
+            IOperation? operation,
+            SyntaxNode observationSyntax,
+            PurityAnalysisContext context)
+        {
+            if (operation is IConversionOperation conversionOperation && conversionOperation.Operand != null)
+            {
+                return IsOwnedFreshMutableObjectReference(conversionOperation.Operand, observationSyntax, context);
+            }
+
+            return operation is ILocalReferenceOperation localReference &&
+                   HasStableFreshMutableObjectValue(
+                       localReference.Local,
+                       observationSyntax,
+                       context.SemanticModel,
+                       new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default));
+        }
+
+        private static bool HasStableFreshMutableObjectValue(
+            ILocalSymbol localSymbol,
+            SyntaxNode observationSyntax,
+            SemanticModel semanticModel,
+            HashSet<ILocalSymbol> visitedLocals)
+        {
+            if (!visitedLocals.Add(localSymbol))
+            {
+                return false;
+            }
+
+            var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
+                .Select(reference => reference.GetSyntax())
+                .OfType<VariableDeclaratorSyntax>()
+                .FirstOrDefault();
+            var initializerSyntax = declaratorSyntax?.Initializer?.Value;
+            if (declaratorSyntax == null || initializerSyntax == null)
+            {
+                return false;
+            }
+
+            if (HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, observationSyntax, declaratorSyntax, semanticModel))
+            {
+                return false;
+            }
+
+            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax));
+            if (initializerOperation is IObjectCreationOperation objectCreationOperation &&
+                IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
+            {
+                return true;
+            }
+
+            if (initializerOperation is ILocalReferenceOperation localReference)
+            {
+                return HasStableFreshMutableObjectValue(localReference.Local, initializerSyntax, semanticModel, visitedLocals);
+            }
+
+            if (initializerOperation is IConditionalOperation conditionalOperation)
+            {
+                if (TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                {
+                    return HasStableFreshMutableObjectValueInOperation(
+                        conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
+                        initializerSyntax,
+                        semanticModel,
+                        visitedLocals);
+                }
+
+                return HasStableFreshMutableObjectValueInOperation(conditionalOperation.WhenTrue, initializerSyntax, semanticModel, visitedLocals) ||
+                       HasStableFreshMutableObjectValueInOperation(conditionalOperation.WhenFalse, initializerSyntax, semanticModel, visitedLocals);
+            }
+
+            if (initializerOperation is ICoalesceOperation coalesceOperation)
+            {
+                return HasStableFreshMutableObjectValueInOperation(coalesceOperation.Value, initializerSyntax, semanticModel, visitedLocals) ||
+                       HasStableFreshMutableObjectValueInOperation(coalesceOperation.WhenNull, initializerSyntax, semanticModel, visitedLocals);
+            }
+
+            return false;
+        }
+
+        private static bool HasStableFreshMutableObjectValueInOperation(
+            IOperation operation,
+            SyntaxNode observationSyntax,
+            SemanticModel semanticModel,
+            HashSet<ILocalSymbol> visitedLocals)
+        {
+            var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
+            if (unwrappedOperation is IObjectCreationOperation objectCreationOperation &&
+                IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
+            {
+                return true;
+            }
+
+            if (unwrappedOperation is ILocalReferenceOperation localReference)
+            {
+                return HasStableFreshMutableObjectValue(localReference.Local, observationSyntax, semanticModel, visitedLocals);
+            }
+
+            return false;
+        }
+
+        private static bool HasAssignmentToLocalBetweenDeclarationAndObservation(
+            ILocalSymbol localSymbol,
+            SyntaxNode observationSyntax,
+            VariableDeclaratorSyntax declaratorSyntax,
+            SemanticModel semanticModel)
+        {
+            var containingBlock = observationSyntax.FirstAncestorOrSelf<BlockSyntax>();
+            if (containingBlock == null)
+            {
+                return false;
+            }
+
+            var start = declaratorSyntax.Span.End;
+            var end = observationSyntax.SpanStart;
+            if (end <= start)
+            {
+                return false;
+            }
+
+            foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (assignment.SpanStart < start || assignment.SpanStart >= end)
+                {
+                    continue;
+                }
+
+                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left).Symbol;
+                if (SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryGetConstantCondition(IConditionalOperation conditionalOperation, out bool conditionValue)
+        {
+            var constantValue = conditionalOperation.Condition.ConstantValue;
+            if (constantValue.HasValue && constantValue.Value is bool boolValue)
+            {
+                conditionValue = boolValue;
+                return true;
+            }
+
+            conditionValue = false;
+            return false;
+        }
+
+        private static bool IsFreshMutableEscapingReferenceType(ITypeSymbol? typeSymbol)
+        {
+            if (typeSymbol is not INamedTypeSymbol namedType ||
+                namedType.TypeKind == TypeKind.Delegate ||
+                namedType.IsValueType ||
+                namedType.SpecialType == SpecialType.System_String ||
+                namedType.DeclaringSyntaxReferences.Length == 0)
+            {
+                return false;
+            }
+
+            return namedType.GetMembers().Any(member =>
+                member switch
+                {
+                    IFieldSymbol field => !field.IsStatic &&
+                                          !field.IsReadOnly &&
+                                          field.DeclaredAccessibility != Accessibility.Private,
+                    IPropertySymbol property => !property.IsStatic &&
+                                                property.SetMethod != null &&
+                                                !property.SetMethod.IsInitOnly &&
+                                                property.SetMethod.DeclaredAccessibility != Accessibility.Private,
+                    _ => false
+                });
         }
 
         private static bool IsRefLocalAliasToExternallyVisibleStorage(
