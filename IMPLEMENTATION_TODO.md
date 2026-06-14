@@ -24,17 +24,19 @@ Execution rule: land these in small green checkpoints, highest-signal items firs
 ## P1 - semantic proof and durability
 
 - [x] 06. Add test-only SMT-backed exact path tests in `PurelySharp.Test`.
-- [ ] 07. Promote semantic metamorphic test suites for purity and exception behavior.
+- [x] 07. Promote semantic metamorphic test suites for purity and exception behavior.
   - [x] invoked local-function wrapper coverage
   - [x] invoked lambda wrapper coverage
   - [x] unused nested-callable suppression coverage
   - [x] dead-branch elimination coverage
   - [x] exact-catch suppression coverage
-  - [ ] temp-local wrapper parity
-  - [ ] conditional-expression parity
-  - [ ] base-catch / filter / rethrow wrapper parity
-- [ ] 08. Add effect-summary end-to-end fixture tests with small compiled assemblies.
-- [ ] 09. Tighten effect-summary trust rules:
+  - [x] temp-local wrapper parity
+  - [x] conditional-expression parity
+  - [x] base-catch suppression parity
+  - [x] rethrow wrapper parity
+  - [x] filter wrapper parity
+- [x] 08. Add effect-summary end-to-end fixture tests with small compiled assemblies.
+- [x] 09. Tighten effect-summary trust rules:
   - require full identity match
   - reject incomplete identity entries
 
@@ -48,9 +50,10 @@ Execution rule: land these in small green checkpoints, highest-signal items firs
   - [x] direct and aliased fresh mutable-object return escape coverage
   - [x] direct and aliased fresh-array return escape coverage
   - [x] escaping closure capture of owned local arrays
+  - [x] constructor-mediated fresh mutable-object escape coverage
   - [ ] fresh object ownership beyond arrays
   - [ ] non-escaping local mutation vs escape consistency
-  - [ ] constructor / field / delegate-capture object escape parity
+  - [ ] field / delegate-capture object escape parity
 
 ## P3 - lower-value or guarded work
 

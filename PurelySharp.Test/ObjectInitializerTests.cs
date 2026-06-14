@@ -221,5 +221,80 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task FreshMutableObjectEscapesThroughImmutableWrapperConstructor_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public sealed class Holder
+{
+    public Box Value { get; }
+
+    [EnforcePure]
+    public Holder(Box value)
+    {
+        Value = value;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public Holder TestMethod()
+    {
+        return new Holder(new Box());
+    }
+}";
+
+            var expectedGetValue = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
+            var expectedTestMethod = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0002).WithSpan(23, 19, 23, 29).WithArguments("TestMethod");
+
+            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedGetValue, expectedTestMethod });
+        }
+
+        [Test]
+        public async Task FreshMutableObjectAliasEscapesThroughImmutableWrapperConstructor_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public sealed class Holder
+{
+    public Box Value { get; }
+
+    [EnforcePure]
+    public Holder(Box value)
+    {
+        Value = value;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public Holder TestMethod()
+    {
+        var box = new Box();
+        return new Holder(box);
+    }
+}";
+
+            var expectedGetValue = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
+            var expectedTestMethod = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0002).WithSpan(23, 19, 23, 29).WithArguments("TestMethod");
+
+            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedGetValue, expectedTestMethod });
+        }
     }
 }

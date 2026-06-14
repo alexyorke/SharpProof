@@ -121,6 +121,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: escapeSymbol,
                             catalogSource: catalogSource));
                 }
+                else if (TryFindReturnedInitializerMutableObjectEscape(
+                             returnOperation.ReturnedValue,
+                             context.SemanticModel,
+                             out var nestedObjectEscapeSyntax,
+                             out var nestedObjectEscapeSymbol,
+                             out var nestedObjectCatalogSource))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned initializer escapes fresh mutable object through '{nestedObjectEscapeSyntax}'. Return statement is Impure.");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        nestedObjectEscapeSyntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            "mutable_state_escape",
+                            ruleName: nameof(ReturnStatementPurityRule),
+                            operation: returnOperation,
+                            syntaxNode: nestedObjectEscapeSyntax,
+                            symbol: nestedObjectEscapeSymbol,
+                            catalogSource: nestedObjectCatalogSource));
+                }
                 else if (TryFindFreshMutableObjectReturnEscape(
                              returnOperation.ReturnedValue,
                              context.SemanticModel,
@@ -455,6 +473,55 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         escapeSyntax = argument.Value.Syntax;
                         escapeSymbol = factoryMethod;
                         catalogSource = "array_factory_constructor_escape";
+                        return true;
+                    }
+                }
+            }
+
+            escapeSyntax = null!;
+            escapeSymbol = null!;
+            catalogSource = string.Empty;
+            return false;
+        }
+
+        private static bool TryFindReturnedInitializerMutableObjectEscape(
+            IOperation returnedValue,
+            SemanticModel semanticModel,
+            out SyntaxNode escapeSyntax,
+            out ISymbol escapeSymbol,
+            out string catalogSource)
+        {
+            foreach (var assignment in returnedValue.DescendantsAndSelf().OfType<ISimpleAssignmentOperation>())
+            {
+                if (TryFindFreshMutableObjectReturnEscape(
+                    assignment.Value,
+                    semanticModel,
+                    out escapeSyntax,
+                    out escapeSymbol,
+                    out _))
+                {
+                    catalogSource = "fresh_mutable_object_initializer_escape";
+                    return true;
+                }
+            }
+
+            foreach (var objectCreation in returnedValue.DescendantsAndSelf().OfType<IObjectCreationOperation>())
+            {
+                if (!IsConstructionWithEscapingParameters(objectCreation, semanticModel))
+                {
+                    continue;
+                }
+
+                foreach (var argument in objectCreation.Arguments)
+                {
+                    if (TryFindFreshMutableObjectReturnEscape(
+                        argument.Value,
+                        semanticModel,
+                        out escapeSyntax,
+                        out escapeSymbol,
+                        out _))
+                    {
+                        catalogSource = "fresh_mutable_object_constructor_escape";
                         return true;
                     }
                 }
