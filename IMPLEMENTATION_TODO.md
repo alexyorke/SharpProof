@@ -52,6 +52,7 @@ Execution rule: land these in small green checkpoints, highest-signal items firs
   - [x] escaping closure capture of owned local arrays
   - [x] constructor-mediated fresh mutable-object escape coverage
   - [x] stable local immutable-wrapper constructor escape parity
+  - [x] stable local init-only wrapper initializer parity
   - [x] delegate-capture fresh mutable-object escape parity
   - [ ] fresh object ownership beyond arrays
   - [x] non-escaping direct and aliased fresh local object field-mutation consistency
