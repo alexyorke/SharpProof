@@ -159,6 +159,7 @@ public class KnownImpureConsoleCase
             Assert.That(families, Does.Contain("PureInterpolatedString"));
             Assert.That(families, Does.Contain("PureUtf8String"));
             Assert.That(families, Does.Contain("PureArrayCreation"));
+            Assert.That(families, Does.Contain("PureNestedOwnershipChain"));
             Assert.That(families, Does.Contain("ConservativeSwitchExpression"));
             Assert.That(families, Does.Contain("ConservativeRangeSlice"));
             Assert.That(families, Does.Contain("ConservativeWithExpression"));
@@ -200,7 +201,8 @@ public class KnownImpureConsoleCase
                 new FamilyExpectation("ConservativeDelegateCreation", "DelegateCreation"),
                 new FamilyExpectation("ConservativeNestedLambdaLocalFunction", "AnonymousFunction", "LocalFunction"),
                 new FamilyExpectation("ConservativeTuplePatternSwitch", "Tuple", "SwitchExpression"),
-                new FamilyExpectation("ConservativeUsingAwaitDelegateFlow", "UsingDeclaration", "Await", "AnonymousFunction")
+                new FamilyExpectation("ConservativeUsingAwaitDelegateFlow", "UsingDeclaration", "Await", "AnonymousFunction"),
+                new FamilyExpectation("PureNestedOwnershipChain", "PropertyReference", "SimpleAssignment", "ObjectCreation")
             };
 
             var generator = new FuzzCaseGenerator(20260614);
@@ -236,6 +238,24 @@ public class KnownImpureConsoleCase
                         $"{expectation.Family} missing {operationKind}");
                 }
             }
+        }
+
+        [Test]
+        public async Task PureOwnershipCoverageFamily_RemainsDiagnosticFree()
+        {
+            var generator = new FuzzCaseGenerator(20260614);
+            var registryEntry = FuzzCaseGenerator.RegistryEntries.Single(entry => entry.Id == "PureNestedOwnershipChain");
+            var fuzzCase = generator.GenerateForRegistryEntry(registryEntry, 0);
+            var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
+
+            Assert.That(analysis.CompilationErrors, Is.Empty);
+            Assert.That(analysis.Findings, Is.Empty);
+            Assert.That(
+                analysis.Diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False);
+            Assert.That(
+                analysis.Diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId),
+                Is.False);
         }
 
         [Test]

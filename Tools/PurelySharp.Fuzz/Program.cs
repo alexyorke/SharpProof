@@ -879,6 +879,15 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: true,
             BuildPureArrayCreation),
         new ShapeRegistryEntry(
+            "PureNestedOwnershipChain",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.PropertyReference)),
+            ImmutableArray.Create("PropertyReference", "SimpleAssignment", "ObjectCreation"),
+            ImmutableArray.Create("SimpleMemberAccessExpression", "SimpleAssignmentExpression"),
+            FuzzExpectation.DefinitelyPure(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildPureNestedOwnershipChain),
+        new ShapeRegistryEntry(
             "ImpureConsoleWrite",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Invocation)),
             ImmutableArray.Create("Invocation"),
@@ -1579,6 +1588,39 @@ public sealed class FuzzCaseGenerator
                     return values[1];
                 }
             """);
+    }
+
+    private static string BuildPureNestedOwnershipChain(int index, Random random, string className)
+    {
+        return $$"""
+using PurelySharp.Attributes;
+
+public sealed class {{className}}Box
+{
+    public int Value;
+}
+
+public sealed class {{className}}Middle
+{
+    public {{className}}Box Value { get; init; }
+}
+
+public sealed class {{className}}Outer
+{
+    public {{className}}Middle Value { get; init; }
+}
+
+public class {{className}}
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        var outer = new {{className}}Outer { Value = new {{className}}Middle { Value = new {{className}}Box() } };
+        outer.Value.Value.Value = 1;
+        return outer.Value.Value.Value;
+    }
+}
+""";
     }
 
     private static string BuildPureListPattern(int index, Random random, string className)

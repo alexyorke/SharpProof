@@ -65,5 +65,6 @@ Execution rule: land these in small green checkpoints, highest-signal items firs
 ## P3 - lower-value or guarded work
 
 - [ ] 15. Add more random fuzz families only where they expand semantic coverage rather than raw counts.
+  - [x] nested ownership-chain pure family coverage
 - [ ] 16. Revisit broad catalog whitelisting only with proof-quality evidence and conflict tests.
 - [ ] 17. Keep live-analyzer Z3 integration out of the default path; if explored at all, make it a bounded opt-in experiment with strict fallbacks.
