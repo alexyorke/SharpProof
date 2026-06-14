@@ -54,6 +54,7 @@ Execution rule: land these in small green checkpoints, highest-signal items firs
   - [x] stable local immutable-wrapper constructor escape parity
   - [x] stable local init-only wrapper initializer parity
   - [x] delegate-capture fresh mutable-object escape parity
+  - [x] nested local-function fresh mutable-object factory local-use parity
   - [ ] fresh object ownership beyond arrays
   - [x] one-step readonly-wrapper field ownership flow
   - [x] one-step getter-wrapper property ownership flow

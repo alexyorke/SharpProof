@@ -113,5 +113,156 @@ public class TestClass
 }";
             await VerifyCS.VerifyAnalyzerAsync(code);
         }
+
+        [Test]
+        public async Task LocalFunctionReturningFreshMutableObjectUsedLocally_NoDiagnostic()
+        {
+            var code = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        Box CreateBox()
+        {
+            return new Box();
+        }
+
+        var box = CreateBox();
+        box.Value = 1;
+        return box.Value;
+    }
+}";
+            await VerifyCS.VerifyAnalyzerAsync(code);
+        }
+
+        [Test]
+        public async Task LocalFunctionReturningFreshMutableObjectInitializedButUnused_NoDiagnostic()
+        {
+            var code = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        Box CreateBox()
+        {
+            return new Box();
+        }
+
+        var box = CreateBox();
+        return 0;
+    }
+}";
+            await VerifyCS.VerifyAnalyzerAsync(code);
+        }
+
+        [Test]
+        public async Task LocalFunctionReturningFreshMutableObjectMutatedButNotRead_NoDiagnostic()
+        {
+            var code = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        Box CreateBox()
+        {
+            return new Box();
+        }
+
+        var box = CreateBox();
+        box.Value = 1;
+        return 0;
+    }
+}";
+            await VerifyCS.VerifyAnalyzerAsync(code);
+        }
+
+        [Test]
+        public async Task LocalFunctionReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
+        {
+            var code = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public Box {|PS0002:TestMethod|}()
+    {
+        Box CreateBox()
+        {
+            return new Box();
+        }
+
+        return CreateBox();
+    }
+}";
+            await VerifyCS.VerifyAnalyzerAsync(code);
+        }
+
+        [Test]
+        public async Task LocalFunctionReturningFreshMutableObjectEscapesThroughWrapper_Diagnostic()
+        {
+            var code = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public sealed class Holder
+{
+    public readonly Box Value;
+
+    [EnforcePure]
+    public Holder(Box value)
+    {
+        Value = value;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public Holder {|PS0002:TestMethod|}()
+    {
+        Box CreateBox()
+        {
+            return new Box();
+        }
+
+        return new Holder(CreateBox());
+    }
+}";
+            await VerifyCS.VerifyAnalyzerAsync(code);
+        }
     }
 }

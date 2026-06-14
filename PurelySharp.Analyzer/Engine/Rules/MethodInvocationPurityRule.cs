@@ -513,9 +513,25 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Callee purity result for {methodDisplayString}: IsPure={calleePurity.IsPure}");
 
+            if (CanTreatFreshMutableObjectReturningLocalFunctionInvocationAsPure(originalDefinitionSymbol, calleePurity))
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (deferring fresh mutable local-function return escape analysis to the caller)");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             return calleePurity.IsPure
                 ? PurityAnalysisEngine.PurityAnalysisResult.Pure
                 : calleePurity.WithCallee(originalDefinitionSymbol, invocationOperation.Syntax);
+        }
+
+        private static bool CanTreatFreshMutableObjectReturningLocalFunctionInvocationAsPure(
+            IMethodSymbol targetMethod,
+            PurityAnalysisEngine.PurityAnalysisResult calleePurity)
+        {
+            return targetMethod.MethodKind == MethodKind.LocalFunction &&
+                !calleePurity.IsPure &&
+                string.Equals(calleePurity.Evidence.Category, "mutable_state_escape", StringComparison.Ordinal) &&
+                calleePurity.Evidence.CatalogSource.StartsWith("fresh_mutable_object_", StringComparison.Ordinal);
         }
 
         private static bool IsUntrustedMetadataOnlyMethod(IMethodSymbol methodSymbol)

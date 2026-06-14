@@ -665,7 +665,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                        HasStableFreshMutableObjectValueInOperation(coalesceOperation.WhenNull, initializerSyntax, semanticModel, visitedLocals);
             }
 
-            return false;
+            return initializerOperation != null &&
+                   HasStableFreshMutableObjectValueInOperation(
+                       initializerOperation,
+                       initializerSyntax,
+                       semanticModel,
+                       visitedLocals);
         }
 
         private static bool HasStableFreshMutableObjectValueInOperation(
@@ -708,6 +713,21 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (unwrappedOperation is ILocalReferenceOperation localReference)
             {
                 return HasStableFreshMutableObjectValue(localReference.Local, observationSyntax, semanticModel, visitedLocals);
+            }
+
+            if (unwrappedOperation is IInvocationOperation invocationOperation &&
+                PurityAnalysisEngine.TryGetSingleReturnedValueFromNestedCallable(
+                    invocationOperation.TargetMethod,
+                    semanticModel,
+                    out var returnedOperation,
+                    out _,
+                    out var returnedSemanticModel))
+            {
+                return HasStableFreshMutableObjectValueInOperation(
+                    returnedOperation,
+                    observationSyntax,
+                    returnedSemanticModel,
+                    visitedLocals);
             }
 
             return false;

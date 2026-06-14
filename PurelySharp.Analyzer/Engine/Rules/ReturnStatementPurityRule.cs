@@ -550,6 +550,17 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return true;
             }
 
+            if (unwrappedReturnedValue is IInvocationOperation invocationOperation &&
+                TryFindNestedCallableFreshMutableObjectReturnEscape(
+                    invocationOperation,
+                    semanticModel,
+                    out escapeSyntax,
+                    out escapeSymbol,
+                    out catalogSource))
+            {
+                return true;
+            }
+
             if (unwrappedReturnedValue is ILocalReferenceOperation localReference &&
                 TryGetStableMutableObjectLocalEscape(
                     localReference.Local,
@@ -608,6 +619,38 @@ namespace PurelySharp.Analyzer.Engine.Rules
             escapeSymbol = null!;
             catalogSource = string.Empty;
             return false;
+        }
+
+        private static bool TryFindNestedCallableFreshMutableObjectReturnEscape(
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            out SyntaxNode escapeSyntax,
+            out ISymbol escapeSymbol,
+            out string catalogSource)
+        {
+            if (!PurityAnalysisEngine.TryGetSingleReturnedValueFromNestedCallable(
+                    invocationOperation.TargetMethod,
+                    semanticModel,
+                    out var returnedOperation,
+                    out _,
+                    out var returnedSemanticModel) ||
+                !TryFindFreshMutableObjectReturnEscape(
+                    returnedOperation,
+                    returnedSemanticModel,
+                    out escapeSyntax,
+                    out escapeSymbol,
+                    out var nestedCatalogSource))
+            {
+                escapeSyntax = null!;
+                escapeSymbol = null!;
+                catalogSource = string.Empty;
+                return false;
+            }
+
+            catalogSource = nestedCatalogSource.StartsWith("fresh_mutable_object_", StringComparison.Ordinal)
+                ? "fresh_mutable_object_nested_callable_return"
+                : nestedCatalogSource;
+            return true;
         }
 
         private static bool TryGetStableMutableObjectLocalEscape(

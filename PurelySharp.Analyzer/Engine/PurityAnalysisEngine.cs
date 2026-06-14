@@ -1568,6 +1568,97 @@ namespace PurelySharp.Analyzer.Engine
             }
         }
 
+        internal static bool TryGetSingleReturnedValueFromNestedCallable(
+            IMethodSymbol methodSymbol,
+            SemanticModel semanticModel,
+            out IOperation returnedOperation,
+            out SyntaxNode returnedExpressionSyntax,
+            out SemanticModel returnedSemanticModel)
+        {
+            returnedOperation = null!;
+            returnedExpressionSyntax = null!;
+            returnedSemanticModel = semanticModel;
+
+            if (methodSymbol == null ||
+                (methodSymbol.MethodKind != MethodKind.LocalFunction &&
+                 methodSymbol.MethodKind != MethodKind.AnonymousFunction))
+            {
+                return false;
+            }
+
+            var callableSyntax = methodSymbol.DeclaringSyntaxReferences
+                .Select(reference => reference.GetSyntax())
+                .FirstOrDefault();
+            if (callableSyntax == null ||
+                !TryGetSingleReturnedExpressionSyntax(callableSyntax, out returnedExpressionSyntax))
+            {
+                return false;
+            }
+
+            returnedSemanticModel = semanticModel.Compilation.GetSemanticModel(callableSyntax.SyntaxTree);
+            returnedOperation = SkipImplicitConversions(returnedSemanticModel.GetOperation(returnedExpressionSyntax));
+            return returnedOperation != null;
+        }
+
+        private static bool TryGetSingleReturnedExpressionSyntax(
+            SyntaxNode callableSyntax,
+            out SyntaxNode returnedExpressionSyntax)
+        {
+            switch (callableSyntax)
+            {
+                case Microsoft.CodeAnalysis.CSharp.Syntax.LocalFunctionStatementSyntax localFunctionStatementSyntax
+                    when localFunctionStatementSyntax.ExpressionBody?.Expression != null:
+                    returnedExpressionSyntax = localFunctionStatementSyntax.ExpressionBody.Expression;
+                    return true;
+                case Microsoft.CodeAnalysis.CSharp.Syntax.LocalFunctionStatementSyntax localFunctionStatementSyntax
+                    when localFunctionStatementSyntax.Body != null:
+                    return TryGetSingleReturnedExpressionSyntaxFromBody(localFunctionStatementSyntax.Body, out returnedExpressionSyntax);
+                case Microsoft.CodeAnalysis.CSharp.Syntax.SimpleLambdaExpressionSyntax simpleLambdaExpressionSyntax:
+                    return TryGetSingleReturnedExpressionSyntaxFromBody(simpleLambdaExpressionSyntax.Body, out returnedExpressionSyntax);
+                case Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedLambdaExpressionSyntax parenthesizedLambdaExpressionSyntax:
+                    return TryGetSingleReturnedExpressionSyntaxFromBody(parenthesizedLambdaExpressionSyntax.Body, out returnedExpressionSyntax);
+                case Microsoft.CodeAnalysis.CSharp.Syntax.AnonymousMethodExpressionSyntax anonymousMethodExpressionSyntax
+                    when anonymousMethodExpressionSyntax.Block != null:
+                    return TryGetSingleReturnedExpressionSyntaxFromBody(anonymousMethodExpressionSyntax.Block, out returnedExpressionSyntax);
+                default:
+                    returnedExpressionSyntax = null!;
+                    return false;
+            }
+        }
+
+        private static bool TryGetSingleReturnedExpressionSyntaxFromBody(
+            SyntaxNode bodySyntax,
+            out SyntaxNode returnedExpressionSyntax)
+        {
+            if (bodySyntax is Microsoft.CodeAnalysis.CSharp.Syntax.ExpressionSyntax expressionSyntax)
+            {
+                returnedExpressionSyntax = expressionSyntax;
+                return true;
+            }
+
+            if (bodySyntax is not Microsoft.CodeAnalysis.CSharp.Syntax.BlockSyntax blockSyntax)
+            {
+                returnedExpressionSyntax = null!;
+                return false;
+            }
+
+            var directReturns = blockSyntax
+                .DescendantNodes(static node =>
+                    node is not Microsoft.CodeAnalysis.CSharp.Syntax.LocalFunctionStatementSyntax &&
+                    node is not Microsoft.CodeAnalysis.CSharp.Syntax.AnonymousFunctionExpressionSyntax)
+                .OfType<Microsoft.CodeAnalysis.CSharp.Syntax.ReturnStatementSyntax>()
+                .Where(returnStatement => returnStatement.Expression != null)
+                .ToArray();
+            if (directReturns.Length != 1)
+            {
+                returnedExpressionSyntax = null!;
+                return false;
+            }
+
+            returnedExpressionSyntax = directReturns[0].Expression!;
+            return true;
+        }
+
         private static bool ShouldAnalyzeExplicitConditionBranchValue(SyntaxNode branchValueSyntax)
         {
             foreach (var ancestor in branchValueSyntax.AncestorsAndSelf())
