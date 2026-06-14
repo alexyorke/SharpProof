@@ -533,6 +533,55 @@ public class TestClass
         }
 
         [Test]
+        public async Task OwnedFreshDeepMutableObjectFieldMutationThroughMixedConstructorWrappers_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public sealed class Middle
+{
+    public Box Value { get; }
+
+    [EnforcePure]
+    public Middle(Box value)
+    {
+        Value = value;
+    }
+}
+
+public sealed class Outer
+{
+    public readonly Middle Value;
+
+    [EnforcePure]
+    public Outer(Middle value)
+    {
+        Value = value;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        var outer = new Outer(new Middle(new Box()));
+        outer.Value.Value.Value = 1;
+        return outer.Value.Value.Value;
+    }
+}";
+
+            var expectedGetValue = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
+
+            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue);
+        }
+
+        [Test]
         public async Task AliasedFreshMutableLocalObjectFieldMutation_NoDiagnostic()
         {
             var test = @"

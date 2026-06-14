@@ -57,6 +57,7 @@ Execution rule: land these in small green checkpoints, highest-signal items firs
   - [ ] fresh object ownership beyond arrays
   - [x] one-step readonly-wrapper field ownership flow
   - [x] one-step getter-wrapper property ownership flow
+  - [x] constructor-based multi-step wrapper ownership flow
   - [x] non-escaping direct and aliased fresh local object field-mutation consistency
   - [ ] deeper multi-step ownership parity
 
