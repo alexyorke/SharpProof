@@ -60,7 +60,7 @@ Execution rule: land these in small green checkpoints, highest-signal items firs
   - [x] constructor-based multi-step wrapper ownership flow
   - [x] init-only multi-step wrapper ownership coverage
   - [x] non-escaping direct and aliased fresh local object field-mutation consistency
-  - [ ] deeper multi-step ownership parity
+  - [x] deeper multi-step ownership parity
 
 ## P3 - lower-value or guarded work
 
