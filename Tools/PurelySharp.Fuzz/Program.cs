@@ -1043,6 +1043,51 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: true,
             BuildConservativeDeconstructionAssignment),
         new ShapeRegistryEntry(
+            "ConservativeIncrement",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Increment)),
+            ImmutableArray.Create("Increment"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildConservativeIncrement),
+        new ShapeRegistryEntry(
+            "ConservativeDecrement",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Decrement)),
+            ImmutableArray.Create("Decrement"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildConservativeDecrement),
+        new ShapeRegistryEntry(
+            "ConservativeDeclarationExpression",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.DeclarationExpression)),
+            ImmutableArray.Create("DeclarationExpression"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildConservativeDeclarationExpression),
+        new ShapeRegistryEntry(
+            "ConservativeTypeParameterObjectCreation",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.TypeParameterObjectCreation)),
+            ImmutableArray.Create("TypeParameterObjectCreation"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: true,
+            BuildConservativeTypeParameterObjectCreation),
+        new ShapeRegistryEntry(
+            "ConservativeEventAssignment",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.EventAssignment)),
+            ImmutableArray.Create("EventAssignment", "EventReference"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeEventAssignment),
+        new ShapeRegistryEntry(
             "ConservativeTuple",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Tuple)),
             ImmutableArray.Create("Tuple"),
@@ -1630,6 +1675,90 @@ public class {{className}}
                     return left - right;
                 }
             """);
+    }
+
+    private static string BuildConservativeIncrement(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(int x)
+                {
+                    var value = x;
+                    value++;
+                    return value;
+                }
+            """);
+    }
+
+    private static string BuildConservativeDecrement(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(int x)
+                {
+                    var value = x;
+                    value--;
+                    return value;
+                }
+            """);
+    }
+
+    private static string BuildConservativeDeclarationExpression(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public int TestMethod(string text)
+                {
+                    return int.TryParse(text, out var value) ? value : 0;
+                }
+            """);
+    }
+
+    private static string BuildConservativeTypeParameterObjectCreation(int index, Random random, string className)
+    {
+        return BuildClass(
+            className,
+            """
+                [EnforcePure]
+                public T TestMethod<T>() where T : new()
+                {
+                    return new T();
+                }
+            """);
+    }
+
+    private static string BuildConservativeEventAssignment(int index, Random random, string className)
+    {
+        return $$"""
+using System;
+using PurelySharp.Attributes;
+
+public sealed class {{className}}Source
+{
+    public event EventHandler Changed
+    {
+        add { }
+        remove { }
+    }
+}
+
+public class {{className}}
+{
+    [EnforcePure]
+    public void TestMethod({{className}}Source source)
+    {
+        source.Changed += Handle;
+    }
+
+    private static void Handle(object sender, EventArgs args) { }
+}
+""";
     }
 
     private static string BuildConservativeTuple(int index, Random random, string className)
