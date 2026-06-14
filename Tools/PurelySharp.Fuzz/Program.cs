@@ -1163,6 +1163,15 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: false,
             BuildConservativeDynamicIndexerAccess),
         new ShapeRegistryEntry(
+            "ConservativeDynamicObjectCreation",
+            ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.DynamicObjectCreation)),
+            ImmutableArray.Create("DynamicObjectCreation"),
+            ImmutableArray<string>.Empty,
+            FuzzExpectation.Conservative(),
+            AllowUnsafe: false,
+            AllowEffectPreservingWrappers: false,
+            BuildConservativeDynamicObjectCreation),
+        new ShapeRegistryEntry(
             "ConservativeTuple",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.Tuple)),
             ImmutableArray.Create("Tuple"),
@@ -1946,6 +1955,30 @@ public class {{className}}
                     return values[0];
                 }
             """);
+    }
+
+    private static string BuildConservativeDynamicObjectCreation(int index, Random random, string className)
+    {
+        return $$"""
+using PurelySharp.Attributes;
+
+public sealed class {{className}}Widget
+{
+    public {{className}}Widget(int value)
+    {
+    }
+}
+
+public class {{className}}
+{
+    [EnforcePure]
+    public int TestMethod(dynamic value)
+    {
+        var widget = new {{className}}Widget(value);
+        return 1;
+    }
+}
+""";
     }
 
     private static string BuildConservativeTuple(int index, Random random, string className)

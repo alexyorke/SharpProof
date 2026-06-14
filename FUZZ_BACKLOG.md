@@ -13,11 +13,10 @@
   - `using` / `Dispose()` exception propagation
   - nested local-function and lambda throw propagation
 - Add direct-shape generators only for shapes that prove they emit in Roslyn:
-  - `DynamicObjectCreation`
+  - `InlineArrayAccess`
+- Keep initializer-shape work scoped to cases that can prove a direct emit before promotion:
   - `MemberInitializer`
   - `PropertyInitializer`
-  - `InlineArrayAccess`
-  - `TypeOf`
 - Keep reclassifying lowered/internal operation kinds out of the "worth generating" bucket:
   - `FlowCapture`
   - `FlowCaptureReference`
