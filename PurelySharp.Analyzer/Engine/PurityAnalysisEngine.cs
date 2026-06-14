@@ -1580,8 +1580,7 @@ namespace PurelySharp.Analyzer.Engine
             returnedSemanticModel = semanticModel;
 
             if (methodSymbol == null ||
-                (methodSymbol.MethodKind != MethodKind.LocalFunction &&
-                 methodSymbol.MethodKind != MethodKind.AnonymousFunction))
+                !CanExtractSingleReturnedValue(methodSymbol))
             {
                 return false;
             }
@@ -1598,6 +1597,15 @@ namespace PurelySharp.Analyzer.Engine
             returnedSemanticModel = semanticModel.Compilation.GetSemanticModel(callableSyntax.SyntaxTree);
             returnedOperation = SkipImplicitConversions(returnedSemanticModel.GetOperation(returnedExpressionSyntax));
             return returnedOperation != null;
+        }
+
+        private static bool CanExtractSingleReturnedValue(IMethodSymbol methodSymbol)
+        {
+            return methodSymbol.MethodKind == MethodKind.LocalFunction ||
+                methodSymbol.MethodKind == MethodKind.AnonymousFunction ||
+                methodSymbol.MethodKind == MethodKind.Ordinary ||
+                methodSymbol.MethodKind == MethodKind.StaticConstructor ||
+                methodSymbol.MethodKind == MethodKind.Constructor;
         }
 
         internal static bool TryGetSingleReturnedValueFromInvocation(
@@ -1657,6 +1665,13 @@ namespace PurelySharp.Analyzer.Engine
                 case Microsoft.CodeAnalysis.CSharp.Syntax.LocalFunctionStatementSyntax localFunctionStatementSyntax
                     when localFunctionStatementSyntax.Body != null:
                     return TryGetSingleReturnedExpressionSyntaxFromBody(localFunctionStatementSyntax.Body, out returnedExpressionSyntax);
+                case Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax methodDeclarationSyntax
+                    when methodDeclarationSyntax.ExpressionBody?.Expression != null:
+                    returnedExpressionSyntax = methodDeclarationSyntax.ExpressionBody.Expression;
+                    return true;
+                case Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax methodDeclarationSyntax
+                    when methodDeclarationSyntax.Body != null:
+                    return TryGetSingleReturnedExpressionSyntaxFromBody(methodDeclarationSyntax.Body, out returnedExpressionSyntax);
                 case Microsoft.CodeAnalysis.CSharp.Syntax.SimpleLambdaExpressionSyntax simpleLambdaExpressionSyntax:
                     return TryGetSingleReturnedExpressionSyntaxFromBody(simpleLambdaExpressionSyntax.Body, out returnedExpressionSyntax);
                 case Microsoft.CodeAnalysis.CSharp.Syntax.ParenthesizedLambdaExpressionSyntax parenthesizedLambdaExpressionSyntax:

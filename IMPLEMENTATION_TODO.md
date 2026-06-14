@@ -57,7 +57,8 @@ Execution rule: land these in small green checkpoints, highest-signal items firs
   - [x] nested local-function fresh mutable-object factory local-use parity
   - [x] nested lambda/delegate fresh mutable-object factory local-use parity
   - [x] anonymous-method factory coverage
-  - [ ] method-group factory flow still inherits the broader ordinary-method ownership limit
+  - [x] ordinary source-method fresh mutable-object factory local-use parity
+  - [x] method-group factory local-use parity
   - [ ] fresh object ownership beyond arrays
   - [x] one-step readonly-wrapper field ownership flow
   - [x] one-step getter-wrapper property ownership flow

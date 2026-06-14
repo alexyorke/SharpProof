@@ -287,10 +287,7 @@ public class TestClass
     }
 }";
 
-            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedId)
-                .WithSpan(13, 16, 13, 26)
-                .WithArguments("TestMethod");
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+            await VerifyCS.VerifyAnalyzerAsync(test);
         }
 
         [Test]
@@ -312,6 +309,103 @@ public class TestClass
     {
         Func<Box> factory = CreateBox;
         return factory();
+    }
+
+    private static Box CreateBox()
+    {
+        return new Box();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task OrdinaryFactoryMethodReturningFreshMutableObjectUsedLocally_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        var box = CreateBox();
+        box.Value = 1;
+        return box.Value;
+    }
+
+    private static Box CreateBox()
+    {
+        return new Box();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task OrdinaryFactoryMethodReturningFreshMutableObjectReturnedFromContainingMethod_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public Box {|PS0002:TestMethod|}()
+    {
+        return CreateBox();
+    }
+
+    private static Box CreateBox()
+    {
+        return new Box();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task OrdinaryFactoryMethodReturningFreshMutableObjectEscapesThroughWrapper_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public sealed class Holder
+{
+    public readonly Box Value;
+
+    [EnforcePure]
+    public Holder(Box value)
+    {
+        Value = value;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public Holder {|PS0002:TestMethod|}()
+    {
+        return new Holder(CreateBox());
     }
 
     private static Box CreateBox()

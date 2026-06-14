@@ -535,7 +535,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
             PurityAnalysisEngine.PurityAnalysisResult calleePurity)
         {
             return (targetMethod.MethodKind == MethodKind.LocalFunction ||
-                    targetMethod.MethodKind == MethodKind.AnonymousFunction) &&
+                    targetMethod.MethodKind == MethodKind.AnonymousFunction ||
+                    targetMethod.MethodKind == MethodKind.Ordinary) &&
                 !calleePurity.IsPure &&
                 string.Equals(calleePurity.Evidence.Category, "mutable_state_escape", StringComparison.Ordinal) &&
                 calleePurity.Evidence.CatalogSource.StartsWith("fresh_mutable_object_", StringComparison.Ordinal);
