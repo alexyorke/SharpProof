@@ -137,7 +137,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             foreach (var local in declaredLocals)
             {
                 var localWasReassigned = WasLocalReassignedBeforeUsing(local, operation, context.SemanticModel);
-                var disposeReceiverType = ResolveDisposeReceiverType(local, operation, context.SemanticModel, isAwaitUsing);
+                var disposeReceiverType = ResolveDisposeReceiverType(local, operation, context.SemanticModel, currentState, isAwaitUsing);
                 if (disposeReceiverType == null)
                 {
                     PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Local '{local.Name}' has no resolvable Dispose receiver type. Skipping Dispose check.");
@@ -273,8 +273,16 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return locals;
         }
 
-        private ITypeSymbol? ResolveDisposeReceiverType(ILocalSymbol local, IOperation usingOperation, SemanticModel semanticModel, bool isAwaitUsing)
+        private ITypeSymbol? ResolveDisposeReceiverType(ILocalSymbol local, IOperation usingOperation, SemanticModel semanticModel, PurityAnalysisEngine.PurityAnalysisState currentState, bool isAwaitUsing)
         {
+            if (!HasDeclaratorInitializer(local) &&
+                currentState.LocalConcreteTypes.TryGetValue(local, out var concreteType) &&
+                FindDisposalMethod(concreteType, semanticModel.Compilation, isAwaitUsing) != null)
+            {
+                PurityAnalysisEngine.LogDebug($" UsingStatementPurityRule: Local '{local.Name}' Dispose receiver resolved from tracked concrete type {concreteType.Name}.");
+                return concreteType;
+            }
+
             var initializerType = TryGetStableObjectCreationInitializerType(local, usingOperation, semanticModel);
             if (initializerType != null && FindDisposalMethod(initializerType, semanticModel.Compilation, isAwaitUsing) != null)
             {
@@ -333,6 +341,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return unwrappedInitializer is IObjectCreationOperation objectCreationOperation
                 ? objectCreationOperation.Type
                 : null;
+        }
+
+        private static bool HasDeclaratorInitializer(ILocalSymbol local)
+        {
+            return local.DeclaringSyntaxReferences
+                .Select(reference => reference.GetSyntax())
+                .OfType<VariableDeclaratorSyntax>()
+                .Any(declarator => declarator.Initializer != null);
         }
 
         private bool WasLocalReassignedBeforeUsing(ILocalSymbol local, IOperation usingOperation, SemanticModel semanticModel)

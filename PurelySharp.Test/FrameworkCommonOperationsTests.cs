@@ -130,6 +130,36 @@ public class TestClass
         }
 
         [Test]
+        public async Task PureMethod_ReadVirtualPropertyThroughStableConcreteLocal_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public abstract class BaseValue
+{
+    public abstract int Value { get; }
+}
+
+public sealed class PureValue : BaseValue
+{
+    public override int Value => 42;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int ReadValue()
+    {
+        BaseValue value;
+        value = new PureValue();
+        return value.Value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task PureMethod_ReadConfigurationManagerAppSettings_Diagnostic()
         {
             var test = @"

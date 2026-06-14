@@ -351,6 +351,86 @@ public class TestClass
         }
 
         [Test]
+        public async Task DelegateReassignedAcrossPureTargetsOnBranches_NoDiagnostic()
+        {
+            var testCode = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public static int PureTarget1()
+    {
+        return 1;
+    }
+
+    [EnforcePure]
+    public static int PureTarget2()
+    {
+        return 2;
+    }
+
+    [EnforcePure]
+    public int TestMethod(bool flag)
+    {
+        Func<int> action = PureTarget1;
+        if (flag)
+        {
+            action = PureTarget2;
+        }
+
+        return action();
+    }
+}
+";
+
+            await VerifyCS.VerifyAnalyzerAsync(testCode);
+        }
+
+        [Test]
+        public async Task DelegateAssignedDistinctPureTargetsPerBranch_NoDiagnostic()
+        {
+            var testCode = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public static int PureTarget1()
+    {
+        return 1;
+    }
+
+    [EnforcePure]
+    public static int PureTarget2()
+    {
+        return 2;
+    }
+
+    [EnforcePure]
+    public int TestMethod(bool flag)
+    {
+        Func<int> action;
+        if (flag)
+        {
+            action = PureTarget1;
+        }
+        else
+        {
+            action = PureTarget2;
+        }
+
+        return action();
+    }
+}
+";
+
+            await VerifyCS.VerifyAnalyzerAsync(testCode);
+        }
+
+        [Test]
         public async Task DelegateInvocation_ConstantConditionalDeadImpureTarget_NoDiagnostic()
         {
             var test = @"

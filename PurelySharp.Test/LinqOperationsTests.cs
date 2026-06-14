@@ -165,6 +165,93 @@ public class TestClass
         }
 
         [Test]
+        public async Task LinqInterfaceLocalAssignedAfterDeclaration_WithPureEnumerator_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using PurelySharp.Attributes;
+
+public sealed class PureSequence : IEnumerable<int>
+{
+    public IEnumerator<int> GetEnumerator() => new Enumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    private sealed class Enumerator : IEnumerator<int>
+    {
+        public int Current => 0;
+        object IEnumerator.Current => Current;
+        public bool MoveNext() => false;
+        public void Reset() { }
+        public void Dispose() { }
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public IEnumerable<int> TestMethod()
+    {
+        IEnumerable<int> numbers;
+        numbers = new PureSequence();
+        return numbers.Select(x => x);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task LinqInterfaceLocalAssignedAfterDeclaration_WithImpureEnumerator_Diagnostic()
+        {
+            var test = @"
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using PurelySharp.Attributes;
+
+public static class GlobalState
+{
+    public static int Count;
+}
+
+public sealed class ImpureSequence : IEnumerable<int>
+{
+    public IEnumerator<int> GetEnumerator() => new Enumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    private sealed class Enumerator : IEnumerator<int>
+    {
+        public int Current => 0;
+        object IEnumerator.Current => Current;
+
+        public bool MoveNext()
+        {
+            GlobalState.Count++;
+            return false;
+        }
+
+        public void Reset() { }
+        public void Dispose() { }
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public IEnumerable<int> {|PS0002:TestMethod|}()
+    {
+        IEnumerable<int> numbers;
+        numbers = new ImpureSequence();
+        return numbers.Select(x => x);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task LinqSourceWithImpureMoveNext_Diagnostic()
         {
             var test = @"

@@ -177,7 +177,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         return sourceResult;
                     }
 
-                    var sourceEnumeratorResult = CheckLinqSourceEnumeratorPurity(sourceArgument.Value, context);
+                    var sourceEnumeratorResult = CheckLinqSourceEnumeratorPurity(sourceArgument.Value, context, currentState);
                     if (!sourceEnumeratorResult.IsPure)
                     {
                         PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (LINQ source GetEnumerator was impure)");
@@ -229,7 +229,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         return comparerResult;
                     }
 
-                    var enumerableArgumentResult = CheckLinqSourceEnumeratorPurity(argument.Value, context);
+                    var enumerableArgumentResult = CheckLinqSourceEnumeratorPurity(argument.Value, context, currentState);
                     if (!enumerableArgumentResult.IsPure)
                     {
                         PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (LINQ enumerable argument GetEnumerator was impure)");
@@ -411,7 +411,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return comparerDispatchResult;
             }
 
-            if (TryCheckCollectionEqualityDispatchPurity(invocationOperation, context, out var collectionEqualityDispatchResult))
+            if (TryCheckCollectionEqualityDispatchPurity(invocationOperation, context, currentState, out var collectionEqualityDispatchResult))
             {
                 return collectionEqualityDispatchResult;
             }
@@ -867,6 +867,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static bool TryCheckCollectionEqualityDispatchPurity(
             IInvocationOperation invocationOperation,
             PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
             out PurityAnalysisEngine.PurityAnalysisResult result)
         {
             result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -887,7 +888,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (IsHashSetRelationMethod(methodSymbol) &&
                 invocationOperation.Arguments.Length > 0)
             {
-                result = CheckLinqSourceEnumeratorPurity(invocationOperation.Arguments[0].Value, context);
+                result = CheckLinqSourceEnumeratorPurity(invocationOperation.Arguments[0].Value, context, currentState);
                 if (!result.IsPure)
                 {
                     return true;
@@ -2771,15 +2772,19 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckLinqSourceEnumeratorPurity(
             IOperation sourceOperation,
-            PurityAnalysisContext context)
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState)
         {
             var unwrappedSource = PurityAnalysisEngine.SkipImplicitConversions(sourceOperation) ?? sourceOperation;
-            if (unwrappedSource.Type == null)
+            var sourceType = PurityAnalysisEngine.TryResolveKnownConcreteType(unwrappedSource, currentState, out var concreteType)
+                ? (ITypeSymbol)concreteType
+                : unwrappedSource.Type;
+            if (sourceType == null)
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            foreach (var getEnumerator in EnumerateSourceGetEnumeratorImplementations(unwrappedSource.Type))
+            foreach (var getEnumerator in EnumerateSourceGetEnumeratorImplementations(sourceType))
             {
                 var enumeratorPurity = PurityAnalysisEngine.GetCalleePurity(getEnumerator.OriginalDefinition, context);
                 if (!enumeratorPurity.IsPure)
@@ -2789,7 +2794,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
                 var runtimePurity = CheckLinqEnumeratorRuntimeMemberPurity(
                     getEnumerator,
-                    unwrappedSource.Type,
+                    sourceType,
                     context,
                     unwrappedSource.Syntax);
                 if (!runtimePurity.IsPure)
