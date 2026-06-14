@@ -32,6 +32,17 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void Oracle_DisjunctiveNonZeroGuard_ImpliesNotZero()
+        {
+            var context = AnalyzerTestHost.CreateConditionImplicationContext("int divisor", "divisor < 0 || divisor > 0", "divisor != 0");
+            using var oracle = new SmtPathOracle();
+
+            Assert.That(
+                oracle.Implies(context.PathCondition, context.Conclusion, context.SemanticModel, TimeSpan.FromMilliseconds(50)),
+                Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public async Task Ps0002_ContradictoryGuardedImpureCall_DoesNotReport()
         {
             Assert.That(
@@ -176,6 +187,26 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_DisjunctiveGuardExcludesZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (divisor < 0 || divisor > 0)
+        {
+            return value / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_GuardImpliesNullReceiver_ReportsNullReference()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"
@@ -210,6 +241,26 @@ public class TestClass
     public int TestMethod(string value)
     {
         if (value != null)
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_NegatedGuardExcludesNullReceiver_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        if (!(value == null))
         {
             return value.Length;
         }
