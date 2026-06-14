@@ -218,6 +218,30 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ConfiguredKnownPureGenericMethodOverridesConfiguredImpureType()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int[] TestMethod()
+    {
+        return Array.Empty<int>();
+    }
+}",
+                ImmutableDictionary<string, string>.Empty
+                    .Add("purelysharp_known_impure_types", "System.Array")
+                    .Add("purelysharp_known_pure_methods", "System.Array.Empty<T>()"));
+
+            Assert.That(
+                diagnostics.Any(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Configured pure generic method should override a configured impure type for the same member.");
+        }
+
         public async Task Ps0002_ImpureCallee_IncludesCalleeChain()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
