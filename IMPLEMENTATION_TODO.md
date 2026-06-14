@@ -25,6 +25,14 @@ Execution rule: land these in small green checkpoints, highest-signal items firs
 
 - [x] 06. Add test-only SMT-backed exact path tests in `PurelySharp.Test`.
 - [ ] 07. Promote semantic metamorphic test suites for purity and exception behavior.
+  - [x] invoked local-function wrapper coverage
+  - [x] invoked lambda wrapper coverage
+  - [x] unused nested-callable suppression coverage
+  - [x] dead-branch elimination coverage
+  - [x] exact-catch suppression coverage
+  - [ ] temp-local wrapper parity
+  - [ ] conditional-expression parity
+  - [ ] base-catch / filter / rethrow wrapper parity
 - [ ] 08. Add effect-summary end-to-end fixture tests with small compiled assemblies.
 - [ ] 09. Tighten effect-summary trust rules:
   - require full identity match
@@ -37,6 +45,7 @@ Execution rule: land these in small green checkpoints, highest-signal items firs
 - [x] 12. Tighten virtual / interface property getter dispatch analysis.
 - [x] 13. Improve LINQ source enumeration effect analysis.
 - [ ] 14. Finish the remaining fresh ownership backlog with narrower scope:
+  - [x] direct and aliased fresh mutable-object return escape coverage
   - [x] direct and aliased fresh-array return escape coverage
   - [x] escaping closure capture of owned local arrays
   - [ ] fresh object ownership beyond arrays
