@@ -105,6 +105,49 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_WithWrongSymbol_IsIgnored()
+        {
+            var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                CreateLibraryCallSource(),
+                CreateEffectSummaryJson(
+                    coreLib.AssemblyName,
+                    coreLib.AssemblySha256,
+                    coreLib.ModuleVersionId,
+                    symbol: "System.ArgumentNullException.ThrowIfNull(object)"));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_EffectSummary_MergesAcrossMultipleSummaryFiles()
+        {
+            var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                CreateLibraryCallSource(),
+                ("PurelySharp.EffectSummary.json",
+                    CreateEffectSummaryJson(
+                        coreLib.AssemblyName,
+                        coreLib.AssemblySha256,
+                        coreLib.ModuleVersionId,
+                        thrownExceptionTypesJson: """[ "System.InvalidOperationException" ]""",
+                        transitiveThrownExceptionTypesJson: "[]")),
+                ("runtime.PurelySharp.EffectSummary.json",
+                    CreateEffectSummaryJson(
+                        coreLib.AssemblyName,
+                        coreLib.AssemblySha256,
+                        coreLib.ModuleVersionId,
+                        thrownExceptionTypesJson: "[]",
+                        transitiveThrownExceptionTypesJson: """[ "System.ArgumentNullException" ]""")));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(
+                diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty],
+                Is.EqualTo("System.ArgumentNullException;System.InvalidOperationException"));
+        }
+
+        [Test]
         public void ExceptionSummaryCatalog_RepeatedMetadataQueriesReuseAssemblyIdentityCache()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
@@ -186,6 +229,7 @@ public class TestClass
             string assemblyName,
             string assemblySha256,
             string moduleVersionId,
+            string symbol = "System.ArgumentNullException.ThrowIfNull(object, string)",
             string? thrownExceptionTypesJson = null,
             string? transitiveThrownExceptionTypesJson = null)
         {
@@ -204,7 +248,7 @@ public class TestClass
       "EmittedMethodCount": 1,
       "Methods": [
         {
-          "Symbol": "System.ArgumentNullException.ThrowIfNull(object, string)",
+          "Symbol": "{{symbol}}",
           "MetadataToken": "0x06000001",
           "RelativeVirtualAddress": 0,
           "MethodBodySha256": null,
@@ -280,6 +324,15 @@ public class TestClass
             string effectSummaryJson,
             string additionalFilePath = "PurelySharp.EffectSummary.json")
         {
+            return await GetAnalyzerDiagnosticsAsync(
+                source,
+                (additionalFilePath, effectSummaryJson));
+        }
+
+        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
+            string source,
+            params (string Path, string Text)[] effectSummaryFiles)
+        {
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var compilation = CSharpCompilation.Create(
                 "ExceptionSummaryCatalogValidationTests",
@@ -288,7 +341,9 @@ public class TestClass
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             var analyzerOptions = new AnalyzerOptions(
-                ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(additionalFilePath, effectSummaryJson)),
+                effectSummaryFiles
+                    .Select(file => (AdditionalText)new InMemoryAdditionalText(file.Path, file.Text))
+                    .ToImmutableArray(),
                 new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty.Add(
                     "purelysharp_report_exceptions",
                     "true")));

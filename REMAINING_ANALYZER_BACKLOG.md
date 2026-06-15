@@ -12,7 +12,7 @@ design docs such as `docs/effect-summary.md` are not backlog files.
 
 ## Current repo truth
 
-- Last confirmed full `PurelySharp.Test` baseline: `2090/2090` green.
+- Last confirmed full `PurelySharp.Test` baseline: `2092/2092` green.
 - The analyzer already has:
   - explainable `PS0002` evidence properties
   - `PS0010` exception reporting and effect-summary tooling
@@ -108,6 +108,8 @@ Remaining:
   aligned. Current boundary coverage now explicitly locks:
   - exact filename and suffixed `*.PurelySharp.EffectSummary.json` discovery
   - direct plus transitive exception-type union
+  - multi-file summary merge for the same trusted symbol
+  - wrong-symbol rows being ignored
   - malformed method rows being ignored
 - Reduce conservative unknown-external-call fallbacks only when a trusted
   per-member summary exists.
