@@ -12,7 +12,7 @@ design docs such as `docs/effect-summary.md` are not backlog files.
 
 ## Current repo truth
 
-- Last confirmed full `PurelySharp.Test` baseline: `2085/2085` green.
+- Last confirmed full `PurelySharp.Test` baseline: `2087/2087` green.
 - The analyzer already has:
   - explainable `PS0002` evidence properties
   - `PS0010` exception reporting and effect-summary tooling
@@ -38,9 +38,11 @@ Evidence:
 Current repo evidence:
 - `SHA256.HashData(byte[])` and `MD5.HashData(byte[])` are cataloged as
   known pure members and as reviewed trusted fresh-array producers.
+- `Convert.FromBase64String(string)` and `Guid.ToByteArray()` are also now
+  in the reviewed trusted fresh-array subset.
 - Signature validation exists in `ConstantsTests`.
-- Direct and stable-local returns of those reviewed `HashData` results now
-  pass.
+- Direct and stable-local returns of those reviewed `HashData`,
+  `Convert.FromBase64String`, and `Guid.ToByteArray` results now pass.
 - The broader conservative policy still remains for other returned array
   producers such as `BitConverter.GetBytes`, `string.Split`, `Encoding.GetBytes`,
   `ToArray`, and direct fresh array returns.

@@ -10,7 +10,7 @@ namespace PurelySharp.Test
     public class ConvertTests
     {
         [Test]
-        public async Task ConvertFromBase64String_Diagnostic()
+        public async Task ConvertFromBase64String_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -19,7 +19,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public byte[] {|PS0002:TestMethod|}(string value)
+    public byte[] TestMethod(string value)
     {
         return Convert.FromBase64String(value);
     }
@@ -42,6 +42,26 @@ public class TestClass
     {
         var bytes = Convert.FromBase64String(value);
         return bytes.Length;
+    }
+            }";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConvertFromBase64String_LocalReturned_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(string value)
+    {
+        var bytes = Convert.FromBase64String(value);
+        return bytes;
     }
 }";
 

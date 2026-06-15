@@ -165,7 +165,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task GuidToByteArrayReturnedArray_Diagnostic()
+        public async Task GuidToByteArrayReturnedArray_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -174,9 +174,29 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public byte[] {|PS0002:TestMethod|}(Guid value)
+    public byte[] TestMethod(Guid value)
     {
         return value.ToByteArray();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task GuidToByteArrayLocalReturned_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(Guid value)
+    {
+        var bytes = value.ToByteArray();
+        return bytes;
     }
 }";
 
