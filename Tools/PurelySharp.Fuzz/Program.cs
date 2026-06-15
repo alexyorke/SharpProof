@@ -1161,14 +1161,14 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: true,
             BuildConservativeCompoundAssignment),
         new ShapeRegistryEntry(
-            "ConservativeCoalesceAssignment",
+            "PureCoalesceAssignment",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.CoalesceAssignment)),
             ImmutableArray.Create("CoalesceAssignment"),
             ImmutableArray<string>.Empty,
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: true,
-            BuildConservativeCoalesceAssignment),
+            BuildPureCoalesceAssignment),
         new ShapeRegistryEntry(
             "ConservativeDeconstructionAssignment",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.DeconstructionAssignment)),
@@ -1233,14 +1233,14 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: false,
             BuildConservativeEventAssignment),
         new ShapeRegistryEntry(
-            "ConservativeAnonymousObjectCreation",
+            "PureAnonymousObjectCreation",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.AnonymousObjectCreation)),
             ImmutableArray.Create("AnonymousObjectCreation"),
             ImmutableArray<string>.Empty,
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: true,
-            BuildConservativeAnonymousObjectCreation),
+            BuildPureAnonymousObjectCreation),
         new ShapeRegistryEntry(
             "ConservativeDefaultValue",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.DefaultValue)),
@@ -1379,14 +1379,14 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: false,
             BuildConservativeDelegateCreation),
         new ShapeRegistryEntry(
-            "ConservativeImplicitIndexerReference",
+            "PureImplicitIndexerReference",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.ImplicitIndexerReference)),
             ImmutableArray.Create("ImplicitIndexerReference"),
             ImmutableArray.Create("ElementAccessExpression"),
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: false,
-            BuildConservativeImplicitIndexerReference),
+            BuildPureImplicitIndexerReference),
         new ShapeRegistryEntry(
             "ConservativeInterpolatedStringHandler",
             ImmutableArray.Create(
@@ -1411,14 +1411,14 @@ public sealed class FuzzCaseGenerator
             AllowEffectPreservingWrappers: false,
             BuildConservativeAddressOf),
         new ShapeRegistryEntry(
-            "ConservativeInlineArrayAccess",
+            "PureInlineArrayAccess",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.InlineArrayAccess)),
             ImmutableArray.Create("InlineArrayAccess"),
             ImmutableArray.Create("ElementAccessExpression"),
-            FuzzExpectation.Conservative(),
+            FuzzExpectation.DefinitelyPure(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: false,
-            BuildConservativeInlineArrayAccess),
+            BuildPureInlineArrayAccess),
         new ShapeRegistryEntry(
             "ConservativeFunctionPointer",
             ImmutableArray.Create(RoslynShapeManifest.OperationShapeId(OperationKind.FunctionPointerInvocation)),
@@ -2132,7 +2132,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeCoalesceAssignment(int index, Random random, string className)
+    private static string BuildPureCoalesceAssignment(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2259,7 +2259,7 @@ public class {{className}}
 """;
     }
 
-    private static string BuildConservativeAnonymousObjectCreation(int index, Random random, string className)
+    private static string BuildPureAnonymousObjectCreation(int index, Random random, string className)
     {
         return BuildClass(
             className,
@@ -2522,7 +2522,7 @@ public class {{className}}
             """);
     }
 
-    private static string BuildConservativeImplicitIndexerReference(int index, Random random, string className)
+    private static string BuildPureImplicitIndexerReference(int index, Random random, string className)
     {
         return $$"""
 using System;
@@ -2591,7 +2591,7 @@ public unsafe class {{className}}
 """;
     }
 
-    private static string BuildConservativeInlineArrayAccess(int index, Random random, string className)
+    private static string BuildPureInlineArrayAccess(int index, Random random, string className)
     {
         return $$"""
 using System.Runtime.CompilerServices;

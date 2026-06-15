@@ -37,6 +37,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value is IMPURE. Return statement is Impure.");
                     return valueResult;
                 }
+                else if (IsAllowedTrustedArrayReturn(
+                             returnOperation.ReturnedValue,
+                             context.SemanticModel,
+                             out var trustedArrayReturnSymbol))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value flows from trusted array-return source '{trustedArrayReturnSymbol.ToDisplayString()}'. Return statement is Pure.");
+                    return valueResult;
+                }
                 else if (IsKnownPureArrayFactoryReturn(returnOperation.ReturnedValue, out var factoryMethod))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes mutable array from known-pure factory '{factoryMethod.ToDisplayString()}'. Return statement is Impure.");
@@ -198,6 +206,139 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             factoryMethod = null!;
             return false;
+        }
+
+        private static bool IsAllowedTrustedArrayReturn(
+            IOperation? returnedValue,
+            SemanticModel semanticModel,
+            out IMethodSymbol methodSymbol)
+        {
+            return IsAllowedTrustedArrayReturn(
+                returnedValue,
+                semanticModel,
+                new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                out methodSymbol);
+        }
+
+        private static bool IsAllowedTrustedArrayReturn(
+            IOperation? returnedValue,
+            SemanticModel semanticModel,
+            HashSet<ILocalSymbol> visitedLocals,
+            out IMethodSymbol methodSymbol)
+        {
+            var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
+            if (unwrappedReturnedValue is IInvocationOperation invocationOperation &&
+                invocationOperation.Type is IArrayTypeSymbol)
+            {
+                var originalDefinition = invocationOperation.TargetMethod.OriginalDefinition;
+                if (IsArrayEmptyFactory(originalDefinition) ||
+                    PurityAnalysisEngine.IsKnownFreshOwnedArrayReturningMember(originalDefinition))
+                {
+                    methodSymbol = originalDefinition;
+                    return true;
+                }
+            }
+
+            if (unwrappedReturnedValue is ILocalReferenceOperation localReference &&
+                TryGetStableAllowedTrustedArrayLocalReturn(
+                    localReference.Local,
+                    returnedValue!,
+                    semanticModel,
+                    visitedLocals,
+                    out methodSymbol))
+            {
+                return true;
+            }
+
+            if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
+            {
+                if (TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                {
+                    return IsAllowedTrustedArrayReturn(
+                        conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
+                        semanticModel,
+                        visitedLocals,
+                        out methodSymbol);
+                }
+
+                if (IsAllowedTrustedArrayReturn(
+                        conditionalOperation.WhenTrue,
+                        semanticModel,
+                        visitedLocals,
+                        out methodSymbol) &&
+                    IsAllowedTrustedArrayReturn(
+                        conditionalOperation.WhenFalse,
+                        semanticModel,
+                        new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
+                        out _))
+                {
+                    return true;
+                }
+            }
+
+            if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
+            {
+                if (IsAllowedTrustedArrayReturn(
+                        coalesceOperation.Value,
+                        semanticModel,
+                        visitedLocals,
+                        out methodSymbol) &&
+                    IsAllowedTrustedArrayReturn(
+                        coalesceOperation.WhenNull,
+                        semanticModel,
+                        new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
+                        out _))
+                {
+                    return true;
+                }
+            }
+
+            methodSymbol = null!;
+            return false;
+        }
+
+        private static bool TryGetStableAllowedTrustedArrayLocalReturn(
+            ILocalSymbol localSymbol,
+            IOperation returnedValue,
+            SemanticModel semanticModel,
+            HashSet<ILocalSymbol> visitedLocals,
+            out IMethodSymbol methodSymbol)
+        {
+            if (!visitedLocals.Add(localSymbol))
+            {
+                methodSymbol = null!;
+                return false;
+            }
+
+            var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
+                .Select(reference => reference.GetSyntax())
+                .OfType<VariableDeclaratorSyntax>()
+                .FirstOrDefault();
+            var initializerSyntax = declaratorSyntax?.Initializer?.Value;
+            if (declaratorSyntax == null || initializerSyntax == null)
+            {
+                methodSymbol = null!;
+                return false;
+            }
+
+            if (HasAssignmentToLocalBetweenDeclarationAndReturn(localSymbol, returnedValue, declaratorSyntax, semanticModel))
+            {
+                methodSymbol = null!;
+                return false;
+            }
+
+            var initializerOperation = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(semanticModel.GetOperation(initializerSyntax));
+            if (initializerOperation == null)
+            {
+                methodSymbol = null!;
+                return false;
+            }
+
+            return IsAllowedTrustedArrayReturn(
+                initializerOperation,
+                semanticModel,
+                visitedLocals,
+                out methodSymbol);
         }
 
         private static bool IsPureArrayReturningInvocationReturn(

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
@@ -57,6 +58,59 @@ namespace PurelySharp.Test
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
 
+        [Test]
+        public void ExceptionSummaryCatalog_RepeatedMetadataQueriesReuseAssemblyIdentityCache()
+        {
+            var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
+            var compilation = CreateLibraryCallCompilation();
+            var methodSymbol = compilation.GetTypeByMetadataName(typeof(ArgumentNullException).FullName!)!
+                .GetMembers("ThrowIfNull")
+                .OfType<IMethodSymbol>()
+                .Single(method =>
+                    method.Parameters.Length == 2 &&
+                    method.Parameters[0].Type.SpecialType == SpecialType.System_Object &&
+                    method.Parameters[1].Type.SpecialType == SpecialType.System_String);
+
+            var analyzerOptions = new AnalyzerOptions(
+                ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
+                    "PurelySharp.EffectSummary.json",
+                    CreateEffectSummaryJson(coreLib.AssemblyName, coreLib.AssemblySha256, coreLib.ModuleVersionId))),
+                new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
+
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.ExceptionSummaryCatalog", throwOnError: true)!;
+            var fromOptionsMethod = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetExceptionsMethod = catalogType.GetMethods(BindingFlags.Instance | BindingFlags.Public)
+                .Single(method => method.Name == "TryGetExceptions" &&
+                    method.GetParameters().Length == 3 &&
+                    method.GetParameters()[1].ParameterType == typeof(Compilation));
+            var assemblyIdentityCacheField = catalogType.GetField("AssemblyIdentityCache", BindingFlags.Static | BindingFlags.NonPublic)!;
+            var assemblyIdentityCache = assemblyIdentityCacheField.GetValue(null)!;
+            assemblyIdentityCache.GetType().GetMethod("Clear")!.Invoke(assemblyIdentityCache, null);
+
+            try
+            {
+                var catalog = fromOptionsMethod.Invoke(null, new object?[] { analyzerOptions, default(System.Threading.CancellationToken) })!;
+
+                var firstArgs = new object?[] { methodSymbol, compilation, null };
+                Assert.That((bool)tryGetExceptionsMethod.Invoke(catalog, firstArgs)!, Is.True);
+                var firstExceptions = (ImmutableArray<string>)firstArgs[2]!;
+
+                Assert.That(firstExceptions.ToArray(), Is.EqualTo(new[] { "System.ArgumentNullException" }));
+                Assert.That(GetCount(assemblyIdentityCache), Is.EqualTo(1));
+
+                var secondArgs = new object?[] { methodSymbol, compilation, null };
+                Assert.That((bool)tryGetExceptionsMethod.Invoke(catalog, secondArgs)!, Is.True);
+                var secondExceptions = (ImmutableArray<string>)secondArgs[2]!;
+
+                Assert.That(secondExceptions.ToArray(), Is.EqualTo(new[] { "System.ArgumentNullException" }));
+                Assert.That(GetCount(assemblyIdentityCache), Is.EqualTo(1));
+            }
+            finally
+            {
+                assemblyIdentityCache.GetType().GetMethod("Clear")!.Invoke(assemblyIdentityCache, null);
+            }
+        }
+
         private static string CreateLibraryCallSource()
         {
             return """
@@ -70,6 +124,16 @@ public class TestClass
     }
 }
 """;
+        }
+
+        private static CSharpCompilation CreateLibraryCallCompilation()
+        {
+            var syntaxTree = CSharpSyntaxTree.ParseText(CreateLibraryCallSource(), new CSharpParseOptions(LanguageVersion.Preview));
+            return CSharpCompilation.Create(
+                "ExceptionSummaryCatalogValidationTests",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         }
 
         private static string CreateEffectSummaryJson(string assemblyName, string assemblySha256, string moduleVersionId)
@@ -168,6 +232,11 @@ public class TestClass
         }
 
         private sealed record AssemblyIdentity(string AssemblyName, string AssemblySha256, string ModuleVersionId);
+
+        private static int GetCount(object instance)
+        {
+            return (int)instance.GetType().GetProperty("Count")!.GetValue(instance)!;
+        }
 
         private sealed class InMemoryAdditionalText : AdditionalText
         {

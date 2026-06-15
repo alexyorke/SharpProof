@@ -348,5 +348,81 @@ public class WorkerHost
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task ReadonlyAbstractField_ConcreteInitializerCanBePure()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public abstract class Worker
+{
+    [EnforcePure]
+    public abstract int Compute(int value);
+}
+
+public sealed class PureWorker : Worker
+{
+    [EnforcePure]
+    public override int Compute(int value) => value + 1;
+}
+
+public class WorkerHost
+{
+    private readonly Worker _worker = new PureWorker();
+
+    [EnforcePure]
+    public int Process(int value)
+    {
+        return _worker.Compute(value);
+    }
+}
+";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task MutableAbstractField_InitializerRemainsConservative()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public abstract class Worker
+{
+    [EnforcePure]
+    public abstract int Compute(int value);
+}
+
+public sealed class PureWorker : Worker
+{
+    [EnforcePure]
+    public override int Compute(int value) => value + 1;
+}
+
+public sealed class ImpureWorker : Worker
+{
+    [EnforcePure]
+    public override int {|PS0002:Compute|}(int value)
+    {
+        System.Console.WriteLine(value);
+        return value;
+    }
+}
+
+public class WorkerHost
+{
+    private Worker _worker = new PureWorker();
+
+    [EnforcePure]
+    public int {|PS0002:Process|}(int value)
+    {
+        return _worker.Compute(value);
+    }
+}
+";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

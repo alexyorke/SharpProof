@@ -106,7 +106,7 @@ public static class GeometryUtils
         }
 
         [Test]
-        public async Task FileScopedNamespace_WithMultipleClasses_MixedPurity_Diagnostic()
+        public async Task FileScopedNamespace_WithMultipleClasses_PureMethods_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -136,7 +136,6 @@ public class MathUtils
     [EnforcePure]
     public int Factorial(int n)
     {
-        // Recursive self-calls remain conservatively flagged here.
         if (n <= 1) return 1;
         return n * Factorial(n - 1);
     }
@@ -154,10 +153,7 @@ public static class Extensions
 }";
 
 
-            var expected = new[] {
-                VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule).WithSpan(27, 16, 27, 25).WithArguments("Factorial")
-            };
-            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+            await VerifyCS.VerifyAnalyzerAsync(test);
         }
 
         [Test]

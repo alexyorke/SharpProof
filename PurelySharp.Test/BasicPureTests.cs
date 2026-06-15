@@ -32,6 +32,94 @@ public class TestClass
         }
 
         [Test]
+        public async Task AnonymousObjectCreation_WithPureInitializers_ShouldBePure()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int Project(int x)
+    {
+        var item = new { Value = x, Next = x + 1 };
+        return item.Value + item.Next;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task AnonymousObjectCreation_WithImpureInitializer_ReportsPS0002()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int Project()
+    {
+        var item = new { Now = DateTime.Now };
+        return item.Now.Day;
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedId)
+                .WithSpan(8, 16, 8, 23)
+                .WithArguments("Project");
+
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
+        public async Task CoalesceAssignment_WithPureFallback_ShouldBePure()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int Normalize(string input)
+    {
+        string value = input;
+        value ??= ""fallback"";
+        return value.Length;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task CoalesceAssignment_WithImpureFallback_ReportsPS0002()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string Normalize(string input)
+    {
+        string value = input;
+        value ??= DateTime.Now.ToString();
+        return value;
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedId)
+                .WithSpan(8, 19, 8, 28)
+                .WithArguments("Normalize");
+
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
         public async Task Method_WithBothEnforcePureAndPure_ReportsPS0005()
         {
             var test = @"

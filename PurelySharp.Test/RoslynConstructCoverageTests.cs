@@ -373,7 +373,6 @@ public class TestClass
                 [OperationKind.BinaryOperator] = ParentHandled("Legacy/operator-only shape; current C# executable binary expressions use Binary."),
                 [OperationKind.Parenthesized] = ParentHandled("Parentheses are transparent and analyzed through their contained operation."),
                 [OperationKind.ConditionalAccessInstance] = ParentHandled("Analyzed as part of the containing conditional-access operation."),
-                [OperationKind.AnonymousObjectCreation] = Conservative("Anonymous object allocation is not yet classified by a dedicated purity rule."),
                 [OperationKind.MemberInitializer] = ParentHandled("Analyzed through object or collection initializer handling."),
                 [OperationKindValue("CollectionElementInitializer")] = ParentHandled("Analyzed through object or collection initializer handling."),
                 [OperationKind.TranslatedQuery] = ParentHandled("Query syntax is analyzed through translated invocation and expression operations."),
@@ -394,7 +393,6 @@ public class TestClass
                 [OperationKind.IsNull] = ParentHandled("Null checks are covered through binary/null-pattern handling."),
                 [OperationKind.CaughtException] = ParentHandled("Caught exception values are covered by catch-clause and local-reference handling."),
                 [OperationKind.StaticLocalInitializationSemaphore] = ParentHandled("Compiler-generated synchronization around static local initialization."),
-                [OperationKind.CoalesceAssignment] = Conservative("Compound null-coalescing assignment is not yet classified by a dedicated rule."),
                 [OperationKind.ReDim] = NotApplicable("Visual Basic-only array resizing operation."),
                 [OperationKind.ReDimClause] = NotApplicable("Visual Basic-only array resizing clause."),
                 [OperationKind.SwitchExpressionArm] = ParentHandled("Switch expression arms are covered by switch-expression handling."),
@@ -405,9 +403,8 @@ public class TestClass
                 [OperationKind.InterpolatedStringAppendInvalid] = Conservative("Invalid handler append shape is not a purity proof target."),
                 [OperationKind.InterpolatedStringHandlerArgumentPlaceholder] = Conservative("Handler argument placeholders are tied to custom handler execution."),
                 [OperationKind.FunctionPointerInvocation] = Conservative("Unsafe function pointer invocation remains conservative."),
-                [OperationKind.ImplicitIndexerReference] = Conservative("Index/range lowering through implicit indexers may call user code."),
                 [OperationKind.Attribute] = SyntaxOnly("Attribute analysis is handled by declaration/syntax placement checks."),
-                [OperationKind.InlineArrayAccess] = Conservative("Inline-array access is not yet classified by a dedicated rule.")
+                
             }.ToImmutableDictionary();
 #pragma warning restore CS0619
 

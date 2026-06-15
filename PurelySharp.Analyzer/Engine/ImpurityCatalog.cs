@@ -146,6 +146,27 @@ namespace PurelySharp.Analyzer.Engine
 			return isKnownPure;
 		}
 
+		public static bool IsKnownFreshOwnedArrayReturningMember(ISymbol symbol)
+		{
+			if (symbol == null)
+			{
+				return false;
+			}
+
+			string signature = symbol.OriginalDefinition.ToDisplayString();
+			if (Constants.KnownFreshOwnedArrayReturningMembers.Contains(signature))
+			{
+				return true;
+			}
+
+			if (symbol is IMethodSymbol methodSymbol && methodSymbol.IsGenericMethod)
+			{
+				return Constants.KnownFreshOwnedArrayReturningMembers.Contains(methodSymbol.ConstructedFrom.ToDisplayString());
+			}
+
+			return false;
+		}
+
 		private static bool IsConfiguredKnownPureMember(ISymbol symbol)
 		{
 			string signature = symbol.OriginalDefinition.ToDisplayString();

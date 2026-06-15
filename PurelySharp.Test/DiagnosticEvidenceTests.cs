@@ -674,7 +674,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task Ps0002_RecursivePurityConservativeDiagnostic_IncludesStructuredEvidence()
+        public async Task Ps0002_MutualRecursivePurityConservativeDiagnostic_IncludesStructuredEvidence()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using PurelySharp.Attributes;
@@ -689,7 +689,17 @@ public class TestClass
             return n;
         }
 
-        return Fibonacci(n - 1) + Fibonacci(n - 2);
+        return Bounce(n - 1) + Bounce(n - 2);
+    }
+
+    private int Bounce(int n)
+    {
+        if (n <= 1)
+        {
+            return n;
+        }
+
+        return Fibonacci(n);
     }
 }");
 
@@ -702,14 +712,23 @@ public class TestClass
         }
 
         [Test]
-        public async Task Ps0002_ImplicitIndexerUnsupportedOperation_IncludesStructuredEvidence()
+        public async Task Ps0002_ImplicitIndexerWithImpureLengthGetter_PreservesRealCalleeEvidence()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
 using PurelySharp.Attributes;
 
 public sealed class Bag
 {
-    public int Length => 3;
+    public int Length
+    {
+        get
+        {
+            Console.WriteLine(""length"");
+            return 3;
+        }
+    }
+
     public int this[int index] => index + 10;
 }
 
@@ -724,9 +743,11 @@ public sealed class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("unsupported_operation"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("UnsupportedOperation"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityOperationKindProperty], Is.EqualTo("ImplicitIndexerReference"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityOperationKindProperty], Is.EqualTo("Invocation"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.WriteLine"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCalleeChainProperty], Does.Contain("Bag.Length.get"));
         }
 
         [Test]

@@ -264,7 +264,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     : invocationOperation.Instance != null
                         && !IsBaseReference(invocationOperation.Instance)))
             {
-                var knownReceiverType = GetTrackedLocalReceiverType(invocationOperation.Instance, currentState) ??
+                var exactReceiverType = GetTrackedLocalReceiverType(invocationOperation.Instance, currentState);
+                var hasExactReceiverType = exactReceiverType != null;
+                var knownReceiverType = exactReceiverType ??
+                    GetStableInitializerReceiverType(invocationOperation.Instance, context, currentState) ??
                     GetKnownReceiverType(invocationOperation.Instance);
                 if (knownReceiverType == null)
                 {
@@ -275,7 +278,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 var dispatchResult = CheckDispatchedInvocationPurity(
                     invocationOperation,
                     context,
-                    knownReceiverType);
+                    knownReceiverType,
+                    hasExactReceiverType);
                 if (!dispatchResult.IsPure)
                 {
                     return dispatchResult;
@@ -515,6 +519,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Performing purity check for: {methodDisplayString}");
 
+            if (SymbolEqualityComparer.Default.Equals(
+                    originalDefinitionSymbol,
+                    context.ContainingMethodSymbol.OriginalDefinition))
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] Direct self-recursive invocation is purity-neutral.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             var calleePurity = PurityAnalysisEngine.GetCalleePurity(originalDefinitionSymbol, context);
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Callee purity result for {methodDisplayString}: IsPure={calleePurity.IsPure}");
@@ -704,6 +716,27 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 : null;
         }
 
+        private static INamedTypeSymbol? GetStableInitializerReceiverType(
+            IOperation? invocationInstance,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState)
+        {
+            var normalizedInstance = NormalizeReceiverOperation(invocationInstance);
+            if (normalizedInstance is not IFieldReferenceOperation fieldReference ||
+                !fieldReference.Field.IsReadOnly ||
+                !TryGetReceiverInitializerOperation(fieldReference, context, out var initializerOperation))
+            {
+                return null;
+            }
+
+            if (PurityAnalysisEngine.TryResolveKnownConcreteType(initializerOperation, currentState, out var concreteType))
+            {
+                return concreteType;
+            }
+
+            return GetKnownReceiverType(initializerOperation);
+        }
+
         private static bool IsCompilerGeneratedArrayForeachInvocation(
             IInvocationOperation invocationOperation,
             PurityAnalysisContext context)
@@ -750,7 +783,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static PurityAnalysisEngine.PurityAnalysisResult CheckDispatchedInvocationPurity(
             IInvocationOperation invocationOperation,
             PurityAnalysisContext context,
-            INamedTypeSymbol? knownReceiverType)
+            INamedTypeSymbol? knownReceiverType,
+            bool hasExactReceiverType)
         {
             var invokedMethodSymbol = invocationOperation.TargetMethod;
             if (invokedMethodSymbol == null)
@@ -762,11 +796,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 invokedMethodSymbol,
                 context.SemanticModel,
                 knownReceiverType,
-                invocationOperation.Instance)
+                invocationOperation.Instance,
+                hasExactReceiverType)
                 .Where(method => !method.IsAbstract && !method.IsExtern)
                 .ToImmutableHashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
 
-            if (CanHaveExternalDispatchTargets(invokedMethodSymbol, invocationOperation, knownReceiverType))
+            if (CanHaveExternalDispatchTargets(invokedMethodSymbol, invocationOperation, knownReceiverType, hasExactReceiverType))
             {
                 var isTypeParameterReceiver = invocationOperation.Instance?.Type?.TypeKind == TypeKind.TypeParameter;
                 var hasConcreteImplementationCandidate =
@@ -796,6 +831,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
             foreach (var candidateMethod in candidateMethods)
             {
                 PurityAnalysisEngine.LogDebug($"  [MIR]   Evaluating dispatch candidate: {candidateMethod.ToDisplayString()}");
+                if (SymbolEqualityComparer.Default.Equals(
+                        candidateMethod.OriginalDefinition,
+                        context.ContainingMethodSymbol.OriginalDefinition))
+                {
+                    PurityAnalysisEngine.LogDebug("  [MIR]   Direct self-recursive dispatch candidate is purity-neutral.");
+                    continue;
+                }
+
                 var candidatePurity = PurityAnalysisEngine.GetCalleePurity(candidateMethod, context);
                 if (!candidatePurity.IsPure)
                 {
@@ -2125,14 +2168,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static bool CanHaveExternalDispatchTargets(
             IMethodSymbol methodSymbol,
             IInvocationOperation invocationOperation,
-            INamedTypeSymbol? knownReceiverType)
+            INamedTypeSymbol? knownReceiverType,
+            bool hasExactReceiverType)
         {
             if (methodSymbol.ContainingType?.TypeKind == TypeKind.Interface)
             {
                 return CanHaveExternalInterfaceImplementations(
                     methodSymbol.ContainingType,
                     invocationOperation.Instance,
-                    knownReceiverType);
+                    knownReceiverType,
+                    hasExactReceiverType);
+            }
+
+            if (hasExactReceiverType &&
+                knownReceiverType != null &&
+                (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition, methodSymbol.ContainingType?.OriginalDefinition) ||
+                 DerivesFrom(knownReceiverType, methodSymbol.ContainingType)))
+            {
+                return false;
             }
 
             return CanHaveExternalOverrides(methodSymbol, knownReceiverType);
@@ -2141,7 +2194,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static bool CanHaveExternalInterfaceImplementations(
             INamedTypeSymbol interfaceSymbol,
             IOperation? invocationInstance,
-            INamedTypeSymbol? knownReceiverType)
+            INamedTypeSymbol? knownReceiverType,
+            bool hasExactReceiverType)
         {
             if (!CanInterfaceHaveExternalImplementations(interfaceSymbol))
             {
@@ -2152,6 +2206,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (concreteReceiverType == null)
             {
                 return true;
+            }
+
+            if (hasExactReceiverType)
+            {
+                return false;
             }
 
             if (IsAllocationOnlyInterfaceReceiver(invocationInstance))
@@ -2448,7 +2507,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IMethodSymbol invokedMethodSymbol,
             SemanticModel semanticModel,
             INamedTypeSymbol? knownReceiverType,
-            IOperation? invocationInstance)
+            IOperation? invocationInstance,
+            bool hasExactReceiverType)
         {
             var compilation = semanticModel.Compilation;
             var target = invokedMethodSymbol.OriginalDefinition;
@@ -2461,6 +2521,21 @@ namespace PurelySharp.Analyzer.Engine.Rules
             {
                 if (knownReceiverType != null && ImplementsInterface(knownReceiverType, target.ContainingType))
                 {
+                    if (hasExactReceiverType)
+                    {
+                        var exactImplementation = knownReceiverType.FindImplementationForInterfaceMember(interfaceImplementationTarget) as IMethodSymbol;
+                        if (exactImplementation != null)
+                        {
+                            targets.Add(exactImplementation.OriginalDefinition);
+                        }
+                        else if (!target.IsAbstract || HasMethodBody(target))
+                        {
+                            targets.Add(target.OriginalDefinition);
+                        }
+
+                        return targets;
+                    }
+
                     if (IsAllocationOnlyInterfaceReceiver(invocationInstance))
                     {
                         var implementation = knownReceiverType.FindImplementationForInterfaceMember(interfaceImplementationTarget) as IMethodSymbol;
@@ -2567,6 +2642,20 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 var baseType = target.ContainingType;
                 if (baseType != null)
                 {
+                    if (hasExactReceiverType &&
+                        knownReceiverType != null &&
+                        (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition, baseType.OriginalDefinition) ||
+                         DerivesFrom(knownReceiverType, baseType)))
+                    {
+                        var exactReceiverTarget = ResolveDispatchTargetForSealedReceiver(target, knownReceiverType);
+                        if (exactReceiverTarget != null)
+                        {
+                            targets.Add(exactReceiverTarget.OriginalDefinition);
+                        }
+
+                        return targets;
+                    }
+
                     if (knownReceiverType != null &&
                         knownReceiverType.IsSealed &&
                         (SymbolEqualityComparer.Default.Equals(knownReceiverType.OriginalDefinition, baseType.OriginalDefinition) ||

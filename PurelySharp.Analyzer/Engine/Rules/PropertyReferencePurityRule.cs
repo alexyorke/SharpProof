@@ -961,7 +961,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var candidates = ResolvePotentialGetterTargets(
                 propertyReferenceOperation.Property,
                 context.SemanticModel,
-                knownReceiverType);
+                knownReceiverType,
+                hasExactReceiverType);
 
             if (candidates.IsDefaultOrEmpty)
             {
@@ -1059,10 +1060,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static ImmutableArray<IMethodSymbol> ResolvePotentialGetterTargets(
             IPropertySymbol propertySymbol,
             SemanticModel semanticModel,
-            INamedTypeSymbol? knownReceiverType)
+            INamedTypeSymbol? knownReceiverType,
+            bool hasExactReceiverType)
         {
             var targets = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
             var targetProperty = propertySymbol.OriginalDefinition;
+
+            if (knownReceiverType != null && hasExactReceiverType)
+            {
+                AddGetterForReceiverType(knownReceiverType, targetProperty, targets);
+                if (targets.Count == 0 &&
+                    targetProperty.GetMethod != null &&
+                    !targetProperty.GetMethod.IsAbstract)
+                {
+                    targets.Add(targetProperty.GetMethod.OriginalDefinition);
+                }
+
+                return targets.ToImmutableArray();
+            }
 
             if (knownReceiverType != null &&
                 (knownReceiverType.TypeKind == TypeKind.Struct || knownReceiverType.IsSealed))

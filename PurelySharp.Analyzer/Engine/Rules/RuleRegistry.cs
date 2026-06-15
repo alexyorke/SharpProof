@@ -28,10 +28,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
 				
 				// Object/Array creation and initialization
 				new ObjectCreationPurityRule(),
+				new AnonymousObjectCreationPurityRule(),
 				new ObjectOrCollectionInitializerPurityRule(),
 				new ArrayCreationPurityRule(),
 				new ArrayInitializerPurityRule(),
 				new ArrayElementReferencePurityRule(),
+				new InlineArrayAccessPurityRule(),
 				new CollectionExpressionPurityRule(),
 				new SpreadOperationPurityRule(),
 				
@@ -42,6 +44,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 				new ConditionalAccessPurityRule(),
 				new ConditionalOperationPurityRule(),
 				new RangeOperationPurityRule(),
+				new ImplicitIndexerReferencePurityRule(),
 				new ConversionPurityRule(),
 				new DefaultValuePurityRule(),
 				new InterpolatedStringPurityRule(),

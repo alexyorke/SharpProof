@@ -102,7 +102,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task RecursivePureMethod_Diagnostic()
+        public async Task RecursivePureMethod_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -113,7 +113,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public int {|PS0002:Fibonacci|}(int n)
+    public int Fibonacci(int n)
     {
         if (n <= 1) return n;
         return Fibonacci(n - 1) + Fibonacci(n - 2);
@@ -125,5 +125,3 @@ public class TestClass
         }
     }
 }
-
-

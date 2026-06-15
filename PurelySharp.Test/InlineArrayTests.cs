@@ -85,5 +85,84 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task InlineArrayRead_NoDiagnostic()
+        {
+            var test = @"
+using System.Runtime.CompilerServices;
+using PurelySharp.Attributes;
+
+[InlineArray(4)]
+public struct Buffer
+{
+    private int _element0;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int ReadInlineArray()
+    {
+        Buffer buffer = default;
+        return buffer[0];
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task InlineArrayWriteToLocal_NoDiagnostic()
+        {
+            var test = @"
+using System.Runtime.CompilerServices;
+using PurelySharp.Attributes;
+
+[InlineArray(4)]
+public struct Buffer
+{
+    private int _element0;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public void WriteInlineArray()
+    {
+        Buffer buffer = default;
+        buffer[0] = 42;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task InlineArrayAccessWithImpureIndex_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.Runtime.CompilerServices;
+using PurelySharp.Attributes;
+
+[InlineArray(32)]
+public struct Buffer
+{
+    private int _element0;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:ReadInlineArray|}()
+    {
+        Buffer buffer = default;
+        return buffer[DateTime.Now.Day];
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

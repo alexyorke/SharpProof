@@ -97,18 +97,14 @@ public static class RoslynShapeManifest
     private static readonly ImmutableHashSet<OperationKind> ConservativeOperationKinds =
         ImmutableHashSet.Create(
             OperationKind.Invalid,
-            OperationKind.AnonymousObjectCreation,
             OperationKind.AddressOf,
-            OperationKind.CoalesceAssignment,
             OperationKind.InterpolatedStringHandlerCreation,
             OperationKind.InterpolatedStringAddition,
             OperationKind.InterpolatedStringAppendLiteral,
             OperationKind.InterpolatedStringAppendFormatted,
             OperationKind.InterpolatedStringAppendInvalid,
             OperationKind.InterpolatedStringHandlerArgumentPlaceholder,
-            OperationKind.FunctionPointerInvocation,
-            OperationKind.ImplicitIndexerReference,
-            OperationKind.InlineArrayAccess);
+            OperationKind.FunctionPointerInvocation);
 
     private static readonly ImmutableHashSet<string> SyntaxShadowKindNames =
         ImmutableHashSet.Create(

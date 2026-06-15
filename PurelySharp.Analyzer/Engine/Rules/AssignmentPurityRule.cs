@@ -11,7 +11,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
     internal class AssignmentPurityRule : IPurityRule
     {
-        public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.SimpleAssignment, OperationKind.CompoundAssignment, OperationKind.Increment, OperationKind.Decrement);
+        public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.SimpleAssignment, OperationKind.CompoundAssignment, OperationKind.CoalesceAssignment, OperationKind.Increment, OperationKind.Decrement);
 
         public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
         {
@@ -53,6 +53,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            targetOperation = NormalizeAssignmentTargetOperation(targetOperation, context);
 
             if (valueOperation != null)
             {
@@ -655,10 +656,45 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     PurityAnalysisEngine.LogDebug(" Assignment Target: ArrayElementReference - Impure Target");
                     return false;
 
+                case OperationKind.InlineArrayAccess:
+                    if (targetOperation is IInlineArrayAccessOperation inlineArrayAccess &&
+                        IsPureInlineArrayTarget(inlineArrayAccess, context))
+                    {
+                        PurityAnalysisEngine.LogDebug(" Assignment Target: InlineArrayAccess on local/by-value storage - Pure Target");
+                        return true;
+                    }
+
+                    PurityAnalysisEngine.LogDebug(" Assignment Target: InlineArrayAccess - Impure Target");
+                    return false;
+
                 default:
                     PurityAnalysisEngine.LogDebug($" Assignment Target: Unhandled Kind {targetOperation.Kind} - Assuming Impure Target");
                     return false;
             }
+        }
+
+        private static bool IsPureInlineArrayTarget(
+            IInlineArrayAccessOperation inlineArrayAccessOperation,
+            PurityAnalysisContext context)
+        {
+            var instance = inlineArrayAccessOperation.Instance;
+            if (instance == null)
+            {
+                return false;
+            }
+
+            if (instance is ILocalReferenceOperation)
+            {
+                return true;
+            }
+
+            if (instance is IParameterReferenceOperation parameterReference)
+            {
+                return parameterReference.Parameter.RefKind is not (RefKind.Ref or RefKind.Out or RefKind.In or RefKind.RefReadOnly);
+            }
+
+            return instance is IFieldReferenceOperation fieldReference &&
+                   IsPureLocalValueTypeFieldRefTarget(fieldReference);
         }
 
         private static bool IsOwnedLocalArrayReference(IOperation operation, PurityAnalysisEngine.PurityAnalysisState currentState)
@@ -1435,6 +1471,22 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
                 _ => null
             };
+        }
+
+        private static IOperation NormalizeAssignmentTargetOperation(
+            IOperation targetOperation,
+            PurityAnalysisContext context)
+        {
+            if (targetOperation is not Microsoft.CodeAnalysis.FlowAnalysis.IFlowCaptureReferenceOperation ||
+                targetOperation.Syntax == null)
+            {
+                return targetOperation;
+            }
+
+            var reboundOperation = context.SemanticModel.GetOperation(targetOperation.Syntax, context.CancellationToken);
+            return reboundOperation is not null and not Microsoft.CodeAnalysis.FlowAnalysis.IFlowCaptureReferenceOperation
+                ? reboundOperation
+                : targetOperation;
         }
     }
 }

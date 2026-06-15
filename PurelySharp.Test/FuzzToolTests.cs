@@ -164,10 +164,10 @@ public class KnownImpureConsoleCase
             Assert.That(families, Does.Contain("ConservativeSwitchExpression"));
             Assert.That(families, Does.Contain("ConservativeRangeSlice"));
             Assert.That(families, Does.Contain("ConservativeWithExpression"));
-            Assert.That(families, Does.Contain("ConservativeImplicitIndexerReference"));
+            Assert.That(families, Does.Contain("PureImplicitIndexerReference"));
             Assert.That(families, Does.Contain("ConservativeInterpolatedStringHandler"));
             Assert.That(families, Does.Contain("ConservativeAddressOf"));
-            Assert.That(families, Does.Contain("ConservativeInlineArrayAccess"));
+            Assert.That(families, Does.Contain("PureInlineArrayAccess"));
             Assert.That(families, Does.Contain("ConservativeDeclarationPattern"));
             Assert.That(families, Does.Contain("ConservativeTryCatch"));
             Assert.That(families, Does.Contain("ConservativeConditionalAccessCoalesce"));
@@ -189,7 +189,7 @@ public class KnownImpureConsoleCase
             var expectedOperationKinds = new[]
             {
                 new FamilyExpectation("ConservativeAddressOf", "AddressOf"),
-                new FamilyExpectation("ConservativeInlineArrayAccess", "InlineArrayAccess"),
+                new FamilyExpectation("PureInlineArrayAccess", "InlineArrayAccess"),
                 new FamilyExpectation("ConservativeInterpolatedStringHandler", "InterpolatedStringHandlerCreation", "InterpolatedStringAddition", "InterpolatedStringAppendLiteral", "InterpolatedStringAppendFormatted", "InterpolatedStringHandlerArgumentPlaceholder"),
                 new FamilyExpectation("ConservativeDeclarationPattern", "DeclarationPattern"),
                 new FamilyExpectation("ConservativeTryCatch", "Try", "CatchClause"),

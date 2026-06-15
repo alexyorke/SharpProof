@@ -109,6 +109,121 @@ public class C
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task ImplicitIndexerReference_WithPureLengthAndIndexer_IsPure()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Bag
+{
+    public int Length => 3;
+    public int this[int index] => index + 10;
+}
+
+public sealed class C
+{
+    [EnforcePure]
+    public int Last(Bag bag)
+    {
+        return bag[^1];
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ImplicitIndexerReference_WithImpureLengthGetter_ReportsPS0002()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Bag
+{
+    public int Length
+    {
+        get
+        {
+            Console.WriteLine(""length"");
+            return 3;
+        }
+    }
+
+    public int this[int index] => index + 10;
+}
+
+public sealed class C
+{
+    [EnforcePure]
+    public int {|PS0002:Last|}(Bag bag)
+    {
+        return bag[^1];
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ImplicitIndexerReference_WithImpureIndexerGetter_ReportsPS0002()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Bag
+{
+    public int Length => 3;
+
+    public int this[int index]
+    {
+        get
+        {
+            Console.WriteLine(index);
+            return index + 10;
+        }
+    }
+}
+
+public sealed class C
+{
+    [EnforcePure]
+    public int {|PS0002:Last|}(Bag bag)
+    {
+        return bag[^1];
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ImplicitRangeIndexer_WithPureSliceMethod_IsPure()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Buffer
+{
+    public int Length => 8;
+    [EnforcePure]
+    public int Slice(int start, int length) => start + length;
+}
+
+public sealed class C
+{
+    [EnforcePure]
+    public int Middle(Buffer buffer)
+    {
+        return buffer[1..^1];
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }
 
