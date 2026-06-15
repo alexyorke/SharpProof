@@ -209,6 +209,135 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_MetadataConstructorSummary_MatchesCall()
+        {
+            const string boundarySource = """
+using System;
+
+public sealed class ConstructorBoundary
+{
+    public ConstructorBoundary(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException();
+        }
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("ConstructorBoundarySummary", boundarySource);
+            var boundaryCompilation = CSharpCompilation.Create(
+                "ConstructorBoundaryInspection",
+                Array.Empty<SyntaxTree>(),
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(fixture.AssemblyPath)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var boundaryType = boundaryCompilation.GetTypeByMetadataName("ConstructorBoundary")!;
+            var constructorSymbol = boundaryType.InstanceConstructors.Single(ctor => ctor.Parameters.Length == 1);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+public class TestClass
+{
+    public ConstructorBoundary TestMethod(string value)
+    {
+        return new ConstructorBoundary(value);
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreateEffectSummaryJson(
+                            identity.AssemblyName,
+                            identity.AssemblySha256,
+                            identity.ModuleVersionId,
+                            symbol: constructorSymbol.OriginalDefinition.ToDisplayString(),
+                            thrownExceptionTypesJson: """[ "System.InvalidOperationException" ]""",
+                            transitiveThrownExceptionTypesJson: "[]"))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+        }
+
+        [Test]
+        public async Task Ps0010_EffectSummary_MetadataPropertyGetterSummary_MatchesCall()
+        {
+            const string boundarySource = """
+using System;
+
+public sealed class PropertyBoundary
+{
+    public PropertyBoundary(string value)
+    {
+        Value = value;
+    }
+
+    public string Value { get; }
+
+    public string DangerousValue
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Value))
+            {
+                throw new InvalidOperationException();
+            }
+
+            return Value;
+        }
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("PropertyBoundarySummary", boundarySource);
+            var boundaryCompilation = CSharpCompilation.Create(
+                "PropertyBoundaryInspection",
+                Array.Empty<SyntaxTree>(),
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(fixture.AssemblyPath)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var boundaryType = boundaryCompilation.GetTypeByMetadataName("PropertyBoundary")!;
+            var getterSymbol = boundaryType.GetMembers("DangerousValue")
+                .OfType<IPropertySymbol>()
+                .Single()
+                .GetMethod!;
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+public class TestClass
+{
+    public string TestMethod(PropertyBoundary boundary)
+    {
+        return boundary.DangerousValue;
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreateEffectSummaryJson(
+                            identity.AssemblyName,
+                            identity.AssemblySha256,
+                            identity.ModuleVersionId,
+                            symbol: getterSymbol.OriginalDefinition.ToDisplayString(),
+                            thrownExceptionTypesJson: """[ "System.InvalidOperationException" ]""",
+                            transitiveThrownExceptionTypesJson: "[]"))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+        }
+
+        [Test]
         public void ExceptionSummaryCatalog_RepeatedMetadataQueriesReuseAssemblyIdentityCache()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);

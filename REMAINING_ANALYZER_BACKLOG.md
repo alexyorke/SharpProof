@@ -27,7 +27,7 @@ Not backlog files:
     same-concrete conditional, `??`, or `if`/`else` merges
   - explicit rules for anonymous object creation, inline array access, and
     implicit indexer reference
-- Last confirmed full `PurelySharp.Test` baseline: `2099/2099` green.
+- Last confirmed full `PurelySharp.Test` baseline: `2101/2101` green.
 
 ## Immediate next actions
 
@@ -58,6 +58,8 @@ Current state:
   - malformed rows being ignored
 - Boundary coverage now also locks generic metadata method summary matching on
   constructed calls.
+- Metadata fixture coverage now also locks constructor and property-getter
+  summary matching through trusted assembly identity.
 
 Remaining:
 
