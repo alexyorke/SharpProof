@@ -182,6 +182,7 @@ public static class RecentCatalogSignatureSamples
         _ = Convert.FromBase64String(text);
         _ = Convert.FromHexString(text);
         _ = BitConverter.GetBytes(1);
+        _ = BitConverter.GetBytes(1f);
         _ = BitConverter.GetBytes(1L);
         _ = text.ToCharArray();
         _ = BitOperations.IsPow2(1);
@@ -249,6 +250,8 @@ public static class RecentCatalogSignatureSamples
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "Convert.FromHexString(text)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1)"), expectedPure: true, expectedImpure: false);
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1)")));
+            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1f)"), expectedPure: true, expectedImpure: false);
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1f)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1L)"), expectedPure: true, expectedImpure: false);
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1L)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "text.ToCharArray()"), expectedPure: true, expectedImpure: false);

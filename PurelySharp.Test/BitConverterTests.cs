@@ -127,5 +127,65 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task BitConverterGetBytesFloat_ReturnedArray_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(float value)
+    {
+        return BitConverter.GetBytes(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task BitConverterGetBytesFloat_LocalReturnedArray_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(float value)
+    {
+        var bytes = BitConverter.GetBytes(value);
+        return bytes;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task BitConverterGetBytesFloat_ConditionalReturnedArray_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(bool useLeft, float value)
+    {
+        return useLeft
+            ? BitConverter.GetBytes(value)
+            : BitConverter.GetBytes(value + 1);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

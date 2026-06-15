@@ -1043,6 +1043,7 @@ public static class Constants
     public static readonly HashSet<string> KnownFreshOwnedArrayReturningMembers = new HashSet<string>(StringComparer.Ordinal)
     {
         "System.BitConverter.GetBytes(int)",
+        "System.BitConverter.GetBytes(float)",
         "System.BitConverter.GetBytes(double)",
         "System.BitConverter.GetBytes(long)",
         "System.Convert.FromBase64String(string)",
@@ -1073,6 +1074,7 @@ public static class Constants
 
 
         "System.BitConverter.GetBytes(int)",
+        "System.BitConverter.GetBytes(float)",
         "System.BitConverter.GetBytes(double)",
         "System.BitConverter.GetBytes(long)",
         "System.BitConverter.ToInt32(byte[], int)",
