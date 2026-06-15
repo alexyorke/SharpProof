@@ -46,7 +46,7 @@ Execution rule: land these in small green checkpoints, highest-signal items firs
 - [x] 11. Add `using(existingLocal)` implicit `Dispose()` analysis.
 - [x] 12. Tighten virtual / interface property getter dispatch analysis.
 - [x] 13. Improve LINQ source enumeration effect analysis.
-- [ ] 14. Finish the remaining fresh ownership backlog with narrower scope:
+- [x] 14. Finish the remaining fresh ownership backlog with narrower scope:
   - [x] direct and aliased fresh mutable-object return escape coverage
   - [x] direct and aliased fresh-array return escape coverage
   - [x] escaping closure capture of owned local arrays
@@ -59,7 +59,7 @@ Execution rule: land these in small green checkpoints, highest-signal items firs
   - [x] anonymous-method factory coverage
   - [x] ordinary source-method fresh mutable-object factory local-use parity
   - [x] method-group factory local-use parity
-  - [ ] fresh object ownership beyond arrays
+  - [x] fresh object ownership beyond arrays
   - [x] one-step readonly-wrapper field ownership flow
   - [x] one-step getter-wrapper property ownership flow
   - [x] constructor-based multi-step wrapper ownership flow
@@ -69,8 +69,8 @@ Execution rule: land these in small green checkpoints, highest-signal items firs
 
 ## P3 - lower-value or guarded work
 
-- [ ] 15. Add more random fuzz families only where they expand semantic coverage rather than raw counts.
+- [x] 15. Add more random fuzz families only where they expand semantic coverage rather than raw counts.
   - [x] nested ownership-chain pure family coverage
   - [x] nested ownership-chain impure escape family coverage
-- [ ] 16. Revisit broad catalog whitelisting only with proof-quality evidence and conflict tests.
-- [ ] 17. Keep live-analyzer Z3 integration out of the default path; if explored at all, make it a bounded opt-in experiment with strict fallbacks.
+- [x] 16. Revisit broad catalog whitelisting only with proof-quality evidence and conflict tests.
+- [x] 17. Keep live-analyzer Z3 integration out of the default path; if explored at all, make it a bounded opt-in experiment with strict fallbacks.

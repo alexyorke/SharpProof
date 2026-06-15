@@ -580,6 +580,47 @@ public class TestClass
         }
 
         [Test]
+        public async Task OwnedFreshNestedMutableObjectFieldMutationThroughSourceFactoryReadonlyWrapper_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public sealed class Holder
+{
+    public readonly Box Value;
+
+    [EnforcePure]
+    public Holder(Box value)
+    {
+        Value = value;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        var holder = CreateHolder();
+        holder.Value.Value = 1;
+        return holder.Value.Value;
+    }
+
+    private static Holder CreateHolder()
+    {
+        return new Holder(new Box());
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task OwnedFreshNestedMutableObjectFieldMutationThroughGetterWrapper_NoDiagnostic()
         {
             var test = @"
@@ -615,6 +656,58 @@ public class TestClass
             var expectedGetValue = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0004).WithSpan(11, 16, 11, 21).WithArguments("get_Value");
 
             await VerifyCS.VerifyAnalyzerAsync(test, expectedGetValue);
+        }
+
+        [Test]
+        public async Task OwnedFreshDeepMutableObjectFieldMutationThroughSourceFactoryReadonlyWrapperChain_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class Box
+{
+    public int Value;
+}
+
+public sealed class Middle
+{
+    public readonly Box Value;
+
+    [EnforcePure]
+    public Middle(Box value)
+    {
+        Value = value;
+    }
+}
+
+public sealed class Outer
+{
+    public readonly Middle Value;
+
+    [EnforcePure]
+    public Outer(Middle value)
+    {
+        Value = value;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        var outer = CreateOuter();
+        outer.Value.Value.Value = 1;
+        return outer.Value.Value.Value;
+    }
+
+    private static Outer CreateOuter()
+    {
+        return new Outer(new Middle(new Box()));
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
         }
 
         [Test]

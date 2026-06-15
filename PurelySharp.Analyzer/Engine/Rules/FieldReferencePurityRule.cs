@@ -461,6 +461,20 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         visitedLocals,
                         out objectCreationOperation);
 
+                case IInvocationOperation invocationOperation
+                    when PurityAnalysisEngine.TryGetSingleReturnedValueFromInvocation(
+                        invocationOperation,
+                        semanticModel,
+                        out var returnedOperation,
+                        out _,
+                        out var returnedSemanticModel):
+                    return TryResolveStableObjectCreationInitializer(
+                        returnedOperation,
+                        observationSyntax,
+                        returnedSemanticModel,
+                        visitedLocals,
+                        out objectCreationOperation);
+
                 case IFieldReferenceOperation fieldReference when fieldReference.Field.IsReadOnly &&
                                                                   TryGetStableAssignedValue(fieldReference, observationSyntax, semanticModel, visitedLocals, out var fieldValue):
                     return TryResolveStableObjectCreationInitializer(fieldValue, observationSyntax, semanticModel, visitedLocals, out objectCreationOperation);
@@ -514,6 +528,22 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     localReference.Local,
                     initializerSyntax,
                     semanticModel,
+                    visitedLocals,
+                    out objectCreationOperation);
+            }
+
+            if (initializerOperation is IInvocationOperation invocationOperation &&
+                PurityAnalysisEngine.TryGetSingleReturnedValueFromInvocation(
+                    invocationOperation,
+                    semanticModel,
+                    out var returnedOperation,
+                    out _,
+                    out var returnedSemanticModel))
+            {
+                return TryResolveStableObjectCreationInitializer(
+                    returnedOperation,
+                    initializerSyntax,
+                    returnedSemanticModel,
                     visitedLocals,
                     out objectCreationOperation);
             }
