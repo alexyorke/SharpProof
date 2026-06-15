@@ -67,5 +67,54 @@ namespace PurelySharp.Test
             Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
             Assert.That(result.Reason, Is.EqualTo("impurity_reachable"));
         }
+
+        [Test]
+        public void PurityProof_NullReceiverCondition_IsProvablyImpure()
+        {
+            using var search = new PurityProofSearch();
+            var s = new SmtVariable("s", SmtValueKind.Reference);
+            var sIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, s, new SmtNullConstant());
+
+            var result = search.ClassifyNullDereference(
+                new[] { sIsNull },
+                sIsNull,
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+            Assert.That(result.Reason, Is.EqualTo("null_dereference_reachable"));
+        }
+
+        [Test]
+        public void PurityProof_NonZeroGuard_MakesDivideByZeroProvablyPure()
+        {
+            using var search = new PurityProofSearch();
+            var divisor = new SmtVariable("divisor", SmtValueKind.Int);
+            var divisorNotZero = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, divisor, new SmtIntegerConstant(0));
+            var divisorIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, divisor, new SmtIntegerConstant(0));
+
+            var result = search.ClassifyDivideByZero(
+                new[] { divisorNotZero },
+                divisorIsZero,
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.Reason, Is.EqualTo("divide_by_zero_unreachable"));
+        }
+
+        [Test]
+        public void PurityProof_ReachableImpureCall_IsProvablyImpure()
+        {
+            using var search = new PurityProofSearch();
+            var x = new SmtVariable("x", SmtValueKind.Int);
+            var xIsNonNegative = new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(0));
+
+            var result = search.ClassifyImpureCallReachability(
+                new[] { xIsNonNegative },
+                xIsNonNegative,
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+            Assert.That(result.Reason, Is.EqualTo("impure_call_reachable"));
+        }
     }
 }

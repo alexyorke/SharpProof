@@ -29,6 +29,76 @@ namespace SearchLib.Purity
             SmtFormula impurityCondition,
             TimeSpan timeout)
         {
+            return ClassifyCore(
+                pathConditions,
+                impurityCondition,
+                timeout,
+                pureReason: "impurity_unreachable",
+                impureReason: "impurity_reachable",
+                unknownReason: "impurity_feasibility_unknown");
+        }
+
+        public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout)
+        {
+            return query.Hazard.Kind switch
+            {
+                PurityHazardKind.ImpureCallReachability => ClassifyImpureCallReachability(query.PathConditions, query.Hazard.TriggerCondition, timeout),
+                PurityHazardKind.NullDereference => ClassifyNullDereference(query.PathConditions, query.Hazard.TriggerCondition, timeout),
+                PurityHazardKind.DivideByZero => ClassifyDivideByZero(query.PathConditions, query.Hazard.TriggerCondition, timeout),
+                _ => new PurityProofResult(PurityProofOutcome.Unknown, Feasibility.Unknown, Feasibility.Unknown, "unsupported_hazard_kind"),
+            };
+        }
+
+        public PurityProofResult ClassifyImpureCallReachability(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula callReachabilityCondition,
+            TimeSpan timeout)
+        {
+            return ClassifyCore(
+                pathConditions,
+                callReachabilityCondition,
+                timeout,
+                pureReason: "impure_call_unreachable",
+                impureReason: "impure_call_reachable",
+                unknownReason: "impure_call_feasibility_unknown");
+        }
+
+        public PurityProofResult ClassifyNullDereference(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula receiverIsNullCondition,
+            TimeSpan timeout)
+        {
+            return ClassifyCore(
+                pathConditions,
+                receiverIsNullCondition,
+                timeout,
+                pureReason: "null_dereference_unreachable",
+                impureReason: "null_dereference_reachable",
+                unknownReason: "null_dereference_feasibility_unknown");
+        }
+
+        public PurityProofResult ClassifyDivideByZero(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula divisorIsZeroCondition,
+            TimeSpan timeout)
+        {
+            return ClassifyCore(
+                pathConditions,
+                divisorIsZeroCondition,
+                timeout,
+                pureReason: "divide_by_zero_unreachable",
+                impureReason: "divide_by_zero_reachable",
+                unknownReason: "divide_by_zero_feasibility_unknown");
+        }
+
+        private PurityProofResult ClassifyCore(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula impurityCondition,
+            TimeSpan timeout,
+            string pureReason,
+            string impureReason,
+            string unknownReason)
+        {
             var normalizedPathConditions = pathConditions.ToArray();
             var pathFeasibility = _solver.IsSatisfiable(normalizedPathConditions, timeout);
             if (pathFeasibility == Feasibility.Unsatisfiable)
@@ -57,17 +127,17 @@ namespace SearchLib.Purity
                     PurityProofOutcome.ProvablyPure,
                     pathFeasibility,
                     impurityFeasibility,
-                    "impurity_unreachable"),
+                    pureReason),
                 Feasibility.Satisfiable => new PurityProofResult(
                     PurityProofOutcome.ProvablyImpure,
                     pathFeasibility,
                     impurityFeasibility,
-                    "impurity_reachable"),
+                    impureReason),
                 _ => new PurityProofResult(
                     PurityProofOutcome.Unknown,
                     pathFeasibility,
                     impurityFeasibility,
-                    "impurity_feasibility_unknown"),
+                    unknownReason),
             };
         }
 
