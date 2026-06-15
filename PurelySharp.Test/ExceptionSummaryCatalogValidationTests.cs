@@ -621,6 +621,206 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_EffectSummary_WithTrustedGeneratedPureConstructorClassification_SuppressesUnknownExternalCall()
+        {
+            const string boundarySource = """
+public sealed class PureConstructorBoundary
+{
+    public PureConstructorBoundary(int value)
+    {
+        Value = value;
+    }
+
+    public int Value { get; }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("GeneratedPureConstructorBoundary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public PureConstructorBoundary TestMethod(int value)
+    {
+        return new PureConstructorBoundary(value);
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "PureConstructorBoundary..ctor(int)",
+                            "pure",
+                            """[]""",
+                            "PureConstructorBoundary.PureConstructorBoundary(int)"))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_EffectSummary_WithTrustedGeneratedImpureConstructorClassification_ReportsImpurity()
+        {
+            const string boundarySource = """
+public sealed class ImpureConstructorBoundary
+{
+    private static int _state;
+
+    public ImpureConstructorBoundary(int value)
+    {
+        _state += value;
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("GeneratedImpureConstructorBoundary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public ImpureConstructorBoundary TestMethod(int value)
+    {
+        return new ImpureConstructorBoundary(value);
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "ImpureConstructorBoundary..ctor(int)",
+                            "impure",
+                            """[ "global_state_write" ]""",
+                            "ImpureConstructorBoundary.ImpureConstructorBoundary(int)"))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+        }
+
+        [Test]
+        public async Task Ps0002_EffectSummary_WithTrustedGeneratedPureGetterClassification_SuppressesUnknownExternalCall()
+        {
+            const string boundarySource = """
+public sealed class PureGetterBoundary
+{
+    public PureGetterBoundary(int value)
+    {
+        Value = value;
+    }
+
+    public int Value { get; }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("GeneratedPureGetterBoundary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(PureGetterBoundary value)
+    {
+        return value.Value;
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "PureGetterBoundary.get_Value()",
+                            "pure",
+                            """[]""",
+                            "PureGetterBoundary.Value.get"))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_EffectSummary_WithTrustedGeneratedImpureGetterClassification_ReportsImpurity()
+        {
+            const string boundarySource = """
+public sealed class ImpureGetterBoundary
+{
+    private static int _state;
+
+    public int Value
+    {
+        get
+        {
+            _state++;
+            return _state;
+        }
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("GeneratedImpureGetterBoundary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(ImpureGetterBoundary value)
+    {
+        return value.Value;
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "ImpureGetterBoundary.get_Value()",
+                            "impure",
+                            """[ "global_state_write" ]""",
+                            "ImpureGetterBoundary.Value.get"))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+        }
+
+        [Test]
         public void ExceptionSummaryCatalog_RepeatedMetadataQueriesReuseAssemblyIdentityCache()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
@@ -798,6 +998,29 @@ public class TestClass
             return $$"""
 {
   "SchemaVersion": 2,
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 1,
+    "Entries": [
+      {
+        "Symbol": "{{symbol}}",
+        "ExactSymbolKey": "{{methodIdentity.ExactSymbolKey}}",
+        "CacheKey": "validation-test",
+        "AssemblyName": "{{assemblyIdentity.AssemblyName}}",
+        "AssemblyPath": "{{assemblyIdentity.AssemblyPath.Replace("\\", "\\\\")}}",
+        "AssemblySha256": "{{assemblyIdentity.AssemblySha256}}",
+        "ModuleVersionId": "{{assemblyIdentity.ModuleVersionId}}",
+        "MetadataToken": "{{methodIdentity.MetadataToken}}",
+        "MethodBodySha256": {{FormatJsonStringOrNull(methodIdentity.MethodBodySha256)}},
+        "Classification": "{{classification}}",
+        "Categories": {{categoriesJson}},
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none"
+      }
+    ]
+  },
   "Assemblies": [
     {
       "AssemblyName": "{{assemblyIdentity.AssemblyName}}",
@@ -809,6 +1032,7 @@ public class TestClass
       "Methods": [
         {
           "Symbol": "{{symbol}}",
+          "ExactSymbolKey": "{{methodIdentity.ExactSymbolKey}}",
           "MetadataToken": "{{methodIdentity.MetadataToken}}",
           "RelativeVirtualAddress": 0,
           "MethodBodySha256": {{FormatJsonStringOrNull(methodIdentity.MethodBodySha256)}},
@@ -864,7 +1088,10 @@ public class TestClass
                     }
                 }
 
-                return new MethodIdentity($"0x{MetadataTokens.GetToken(handle):X8}", methodBodySha256);
+                return new MethodIdentity(
+                    $"0x{MetadataTokens.GetToken(handle):X8}",
+                    methodBodySha256,
+                    GetMethodExactSymbolKey(metadataReader, handle));
             }
 
             throw new AssertionException("Method symbol did not resolve in assembly: " + symbol);
@@ -892,6 +1119,15 @@ public class TestClass
             var typeName = GetTypeName(reader, definition.GetDeclaringType());
             var methodName = reader.GetString(definition.Name);
             var signature = DecodeMethodSignature(reader, definition);
+            return typeName + "." + methodName + signature;
+        }
+
+        private static string GetMethodExactSymbolKey(MetadataReader reader, MethodDefinitionHandle handle)
+        {
+            var definition = reader.GetMethodDefinition(handle);
+            var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
+            var methodName = reader.GetString(definition.Name);
+            var signature = DecodeExactMethodSignature(reader, definition);
             return typeName + "." + methodName + signature;
         }
 
@@ -933,6 +1169,44 @@ public class TestClass
             {
                 return "(?)";
             }
+        }
+
+        private static string DecodeExactMethodSignature(MetadataReader reader, MethodDefinition definition)
+        {
+            try
+            {
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
+                return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
+            }
+            catch (BadImageFormatException)
+            {
+                return "(?)->?";
+            }
+        }
+
+        private static string NormalizeExactTypeName(string typeName)
+        {
+            return typeName switch
+            {
+                "System.Boolean" => "bool",
+                "System.Byte" => "byte",
+                "System.Char" => "char",
+                "System.Double" => "double",
+                "System.Int16" => "short",
+                "System.Int32" => "int",
+                "System.Int64" => "long",
+                "System.IntPtr" => "nint",
+                "System.Object" => "object",
+                "System.SByte" => "sbyte",
+                "System.Single" => "float",
+                "System.String" => "string",
+                "System.UInt16" => "ushort",
+                "System.UInt32" => "uint",
+                "System.UInt64" => "ulong",
+                "System.UIntPtr" => "nuint",
+                "System.Void" => "void",
+                _ => typeName
+            };
         }
 
         private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
@@ -1155,7 +1429,7 @@ public class TestClass
         }
 
         private sealed record AssemblyIdentity(string AssemblyPath, string AssemblyName, string AssemblySha256, string ModuleVersionId);
-        private sealed record MethodIdentity(string MetadataToken, string? MethodBodySha256);
+        private sealed record MethodIdentity(string MetadataToken, string? MethodBodySha256, string ExactSymbolKey);
 
         private static string FormatJsonStringOrNull(string? value)
         {

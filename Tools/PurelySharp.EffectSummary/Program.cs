@@ -36,6 +36,7 @@ internal static class EffectSummaryCli
             .ToArray();
 
         PurityClassificationReport? purityClassificationReport = null;
+        GeneratedPurityCatalogDocument? generatedPurityCatalog = null;
         if (options.IncludePurityClassification || options.CompareManualCatalogs)
         {
             var classificationOutput = PurityClassificationEngine.Classify(
@@ -43,13 +44,15 @@ internal static class EffectSummaryCli
                 includeCatalogComparison: options.CompareManualCatalogs);
             reports = classificationOutput.Assemblies;
             purityClassificationReport = classificationOutput.Report;
+            generatedPurityCatalog = classificationOutput.GeneratedPurityCatalog;
         }
 
         var document = new EffectSummaryDocument(
             SchemaVersion: purityClassificationReport == null ? 1 : 2,
             GeneratedAtUtc: DateTimeOffset.UtcNow,
             Assemblies: reports,
-            PurityReport: purityClassificationReport);
+            PurityReport: purityClassificationReport,
+            GeneratedPurityCatalog: generatedPurityCatalog);
 
         var jsonOptions = new JsonSerializerOptions
         {
@@ -415,13 +418,14 @@ internal static class AssemblyEffectSummarizer
         var metadataToken = $"0x{MetadataTokens.GetToken(handle):X8}";
         var cacheKey = $"mvid:{moduleVersionId}|token:{metadataToken}|il:{methodBodySha256 ?? "no-il"}";
         return new MethodEffectSummary(
-            Symbol: GetMethodSymbol(reader, handle),
+            Symbol: GetMethodDisplaySymbol(reader, handle),
+            ExactSymbolKey: GetMethodExactKey(reader, handle),
             MetadataToken: metadataToken,
             RelativeVirtualAddress: definition.RelativeVirtualAddress,
             MethodBodySha256: methodBodySha256,
             CacheKey: cacheKey,
             Effects: effects.ToArray(),
-            RootCandidates: GetRootCandidates(effects).ToArray(),
+            RootCandidates: GetRootCandidates(effects, calls).ToArray(),
             TransitiveRootCandidates: Array.Empty<string>(),
             ThrownExceptionTypes: thrownExceptionTypes.ToArray(),
             TransitiveThrownExceptionTypes: Array.Empty<string>(),
@@ -445,7 +449,7 @@ internal static class AssemblyEffectSummarizer
     private static List<MethodEffectSummary> AddTransitiveRootCandidates(IReadOnlyList<MethodEffectSummary> summaries)
     {
         var bySymbol = summaries
-            .GroupBy(summary => summary.Symbol, StringComparer.Ordinal)
+            .GroupBy(summary => summary.ExactSymbolKey, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
         var rootMemo = new Dictionary<string, string[]>(StringComparer.Ordinal);
@@ -456,8 +460,8 @@ internal static class AssemblyEffectSummarizer
         return summaries
             .Select(summary => summary with
             {
-                TransitiveRootCandidates = VisitRootCandidates(summary.Symbol, bySymbol, rootMemo, rootVisiting),
-                TransitiveThrownExceptionTypes = VisitThrownExceptionTypes(summary.Symbol, bySymbol, exceptionMemo, exceptionVisiting)
+                TransitiveRootCandidates = VisitRootCandidates(summary.ExactSymbolKey, bySymbol, rootMemo, rootVisiting),
+                TransitiveThrownExceptionTypes = VisitThrownExceptionTypes(summary.ExactSymbolKey, bySymbol, exceptionMemo, exceptionVisiting)
             })
             .ToList();
     }
@@ -534,9 +538,13 @@ internal static class AssemblyEffectSummarizer
         return result;
     }
 
-    private static IEnumerable<string> GetRootCandidates(IEnumerable<string> effects)
+    private static IEnumerable<string> GetRootCandidates(
+        IEnumerable<string> effects,
+        IEnumerable<string> calls)
     {
         var roots = new SortedSet<string>(StringComparer.Ordinal);
+        var effectSet = new HashSet<string>(effects, StringComparer.Ordinal);
+        var callSet = new HashSet<string>(calls, StringComparer.Ordinal);
         foreach (var effect in effects)
         {
             switch (effect)
@@ -560,7 +568,9 @@ internal static class AssemblyEffectSummarizer
                     roots.Add("object_state_write");
                     break;
                 case "writes_indirect_memory":
-                    roots.Add("caller_visible_memory_write");
+                    roots.Add(IsFreshOwnedMemoryWrite(effectSet, callSet)
+                        ? "fresh_owned_memory_write"
+                        : "caller_visible_memory_write");
                     break;
                 case "indirect_call":
                 case "virtual_call":
@@ -576,6 +586,34 @@ internal static class AssemblyEffectSummarizer
         }
 
         return roots;
+    }
+
+    private static bool IsFreshOwnedMemoryWrite(
+        IReadOnlySet<string> effects,
+        IReadOnlySet<string> calls)
+    {
+        if (!effects.Contains("writes_indirect_memory") || !effects.Contains("allocates_array"))
+        {
+            return false;
+        }
+
+        if (effects.Contains("writes_static_field") ||
+            effects.Contains("writes_instance_field") ||
+            effects.Contains("reads_static_field") ||
+            effects.Contains("reads_instance_field") ||
+            effects.Contains("indirect_call") ||
+            effects.Contains("virtual_call") ||
+            effects.Contains("block_memory_write"))
+        {
+            return false;
+        }
+
+        return calls.All(IsPurityNeutralIntrinsicHelperCall);
+    }
+
+    private static bool IsPurityNeutralIntrinsicHelperCall(string callSymbol)
+    {
+        return callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal);
     }
 
     private static void AnalyzeIl(
@@ -621,7 +659,7 @@ internal static class AssemblyEffectSummarizer
 
                 if (operandToken is not null)
                 {
-                    calledSymbol = ResolveMethodToken(reader, operandToken.Value);
+                    calledSymbol = ResolveMethodExactKey(reader, operandToken.Value);
                     calls.Add(calledSymbol);
                 }
 
@@ -705,7 +743,7 @@ internal static class AssemblyEffectSummarizer
                 effects.Add("loads_method_pointer");
                 if (operandToken is not null)
                 {
-                    calls.Add(ResolveMethodToken(reader, operandToken.Value));
+                    calls.Add(ResolveMethodExactKey(reader, operandToken.Value));
                 }
             }
             else if (opCode.Size == 0)
@@ -1092,26 +1130,26 @@ internal static class AssemblyEffectSummarizer
         }
     }
 
-    private static string ResolveMethodToken(MetadataReader reader, int token)
+    private static string ResolveMethodExactKey(MetadataReader reader, int token)
     {
         var handle = MetadataTokens.Handle(token);
         return handle.Kind switch
         {
-            HandleKind.MethodDefinition => GetMethodSymbol(reader, (MethodDefinitionHandle)handle),
-            HandleKind.MemberReference => GetMemberReferenceSymbol(reader, (MemberReferenceHandle)handle),
-            HandleKind.MethodSpecification => ResolveMethodSpecification(reader, (MethodSpecificationHandle)handle),
+            HandleKind.MethodDefinition => GetMethodExactKey(reader, (MethodDefinitionHandle)handle),
+            HandleKind.MemberReference => GetMemberReferenceExactKey(reader, (MemberReferenceHandle)handle),
+            HandleKind.MethodSpecification => ResolveMethodSpecificationExactKey(reader, (MethodSpecificationHandle)handle),
             _ => $"metadata-token:0x{token:X8}",
         };
     }
 
-    private static string ResolveMethodSpecification(MetadataReader reader, MethodSpecificationHandle handle)
+    private static string ResolveMethodSpecificationExactKey(MetadataReader reader, MethodSpecificationHandle handle)
     {
         var specification = reader.GetMethodSpecification(handle);
         var method = specification.Method;
         return method.Kind switch
         {
-            HandleKind.MethodDefinition => GetMethodSymbol(reader, (MethodDefinitionHandle)method),
-            HandleKind.MemberReference => GetMemberReferenceSymbol(reader, (MemberReferenceHandle)method),
+            HandleKind.MethodDefinition => GetMethodExactKey(reader, (MethodDefinitionHandle)method),
+            HandleKind.MemberReference => GetMemberReferenceExactKey(reader, (MemberReferenceHandle)method),
             _ => $"method-spec:0x{MetadataTokens.GetToken(handle):X8}",
         };
     }
@@ -1127,12 +1165,21 @@ internal static class AssemblyEffectSummarizer
         };
     }
 
-    private static string GetMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
+    private static string GetMethodDisplaySymbol(MetadataReader reader, MethodDefinitionHandle handle)
     {
         var definition = reader.GetMethodDefinition(handle);
         var typeName = GetTypeName(reader, definition.GetDeclaringType());
         var methodName = reader.GetString(definition.Name);
-        var signature = DecodeMethodSignature(reader, definition);
+        var signature = DecodeMethodDisplaySignature(reader, definition);
+        return $"{typeName}.{methodName}{signature}";
+    }
+
+    private static string GetMethodExactKey(MetadataReader reader, MethodDefinitionHandle handle)
+    {
+        var definition = reader.GetMethodDefinition(handle);
+        var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
+        var methodName = reader.GetString(definition.Name);
+        var signature = DecodeMethodExactSignature(reader, definition);
         return $"{typeName}.{methodName}{signature}";
     }
 
@@ -1147,7 +1194,16 @@ internal static class AssemblyEffectSummarizer
         var memberReference = reader.GetMemberReference(handle);
         var parentName = GetMemberReferenceParentName(reader, memberReference.Parent);
         var name = reader.GetString(memberReference.Name);
-        var signature = DecodeMemberReferenceSignature(reader, memberReference);
+        var signature = DecodeMemberReferenceDisplaySignature(reader, memberReference);
+        return $"{parentName}.{name}{signature}";
+    }
+
+    private static string GetMemberReferenceExactKey(MetadataReader reader, MemberReferenceHandle handle)
+    {
+        var memberReference = reader.GetMemberReference(handle);
+        var parentName = NormalizeExactTypeName(GetMemberReferenceParentName(reader, memberReference.Parent));
+        var name = reader.GetString(memberReference.Name);
+        var signature = DecodeMemberReferenceExactSignature(reader, memberReference);
         return $"{parentName}.{name}{signature}";
     }
 
@@ -1158,7 +1214,7 @@ internal static class AssemblyEffectSummarizer
             HandleKind.TypeDefinition => GetTypeName(reader, (TypeDefinitionHandle)handle),
             HandleKind.TypeReference => GetTypeReferenceName(reader, (TypeReferenceHandle)handle),
             HandleKind.TypeSpecification => DecodeTypeSpecification(reader, (TypeSpecificationHandle)handle),
-            HandleKind.MethodDefinition => GetMethodSymbol(reader, (MethodDefinitionHandle)handle),
+            HandleKind.MethodDefinition => GetMethodDisplaySymbol(reader, (MethodDefinitionHandle)handle),
             HandleKind.ModuleReference => reader.GetString(reader.GetModuleReference((ModuleReferenceHandle)handle).Name),
             _ => $"metadata-parent:0x{MetadataTokens.GetToken(handle):X8}",
         };
@@ -1191,7 +1247,7 @@ internal static class AssemblyEffectSummarizer
         return string.IsNullOrEmpty(ns) ? name : $"{ns}.{name}";
     }
 
-    private static string DecodeMethodSignature(MetadataReader reader, MethodDefinition definition)
+    private static string DecodeMethodDisplaySignature(MetadataReader reader, MethodDefinition definition)
     {
         try
         {
@@ -1204,7 +1260,20 @@ internal static class AssemblyEffectSummarizer
         }
     }
 
-    private static string DecodeMemberReferenceSignature(MetadataReader reader, MemberReference memberReference)
+    private static string DecodeMethodExactSignature(MetadataReader reader, MethodDefinition definition)
+    {
+        try
+        {
+            var signature = definition.DecodeSignature(new TypeNameProvider(reader), genericContext: null);
+            return $"({string.Join(", ", signature.ParameterTypes)})->{signature.ReturnType}";
+        }
+        catch (BadImageFormatException)
+        {
+            return "(?)->?";
+        }
+    }
+
+    private static string DecodeMemberReferenceDisplaySignature(MetadataReader reader, MemberReference memberReference)
     {
         try
         {
@@ -1219,6 +1288,48 @@ internal static class AssemblyEffectSummarizer
         {
             return string.Empty;
         }
+    }
+
+    private static string DecodeMemberReferenceExactSignature(MetadataReader reader, MemberReference memberReference)
+    {
+        try
+        {
+            var signature = memberReference.DecodeMethodSignature(new TypeNameProvider(reader), genericContext: null);
+            return $"({string.Join(", ", signature.ParameterTypes)})->{signature.ReturnType}";
+        }
+        catch (BadImageFormatException)
+        {
+            return "(?)->?";
+        }
+        catch (InvalidOperationException)
+        {
+            return "(?)->?";
+        }
+    }
+
+    private static string NormalizeExactTypeName(string typeName)
+    {
+        return typeName switch
+        {
+            "System.Boolean" => "bool",
+            "System.Byte" => "byte",
+            "System.Char" => "char",
+            "System.Double" => "double",
+            "System.Int16" => "short",
+            "System.Int32" => "int",
+            "System.Int64" => "long",
+            "System.IntPtr" => "nint",
+            "System.Object" => "object",
+            "System.SByte" => "sbyte",
+            "System.Single" => "float",
+            "System.String" => "string",
+            "System.UInt16" => "ushort",
+            "System.UInt32" => "uint",
+            "System.UInt64" => "ulong",
+            "System.UIntPtr" => "nuint",
+            "System.Void" => "void",
+            _ => typeName
+        };
     }
 
     private static string DecodeTypeSpecification(MetadataReader reader, TypeSpecificationHandle handle)
@@ -1344,7 +1455,8 @@ internal sealed record EffectSummaryDocument(
     int SchemaVersion,
     DateTimeOffset GeneratedAtUtc,
     AssemblyEffectReport[] Assemblies,
-    PurityClassificationReport? PurityReport);
+    PurityClassificationReport? PurityReport,
+    GeneratedPurityCatalogDocument? GeneratedPurityCatalog);
 
 internal sealed record AssemblyEffectReport(
     string AssemblyName,
@@ -1357,6 +1469,7 @@ internal sealed record AssemblyEffectReport(
 
 internal sealed record MethodEffectSummary(
     string Symbol,
+    string ExactSymbolKey,
     string MetadataToken,
     int RelativeVirtualAddress,
     string? MethodBodySha256,

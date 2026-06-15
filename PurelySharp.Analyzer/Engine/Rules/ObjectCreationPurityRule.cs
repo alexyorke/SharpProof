@@ -131,6 +131,33 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     return PurityAnalysisResult.Pure;
                 }
 
+                if (constructorSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                    PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
+                        constructorSymbol,
+                        context.SemanticModel.Compilation,
+                        out var generatedPurity))
+                {
+                    if (generatedPurity.IsPure)
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is trusted pure from generated purity summary.");
+                        return PurityAnalysisResult.Pure;
+                    }
+
+                    if (generatedPurity.IsImpure)
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is trusted impure from generated purity summary.");
+                        return PurityAnalysisResult.Impure(
+                            objectCreationOperation.Syntax,
+                            PurityAnalysisEngine.PurityEvidence.Create(
+                                generatedPurity.PrimaryCategory,
+                                ruleName: nameof(ObjectCreationPurityRule),
+                                operation: objectCreationOperation,
+                                syntaxNode: objectCreationOperation.Syntax,
+                                symbol: constructorSymbol,
+                                catalogSource: "generated_purity_summary"));
+                    }
+                }
+
                 var constructorPurity = PurityAnalysisEngine.GetCalleePurity(constructorSymbol, context);
 
 

@@ -135,6 +135,38 @@ namespace PurelySharp.Analyzer
         private static IEnumerable<SummaryEntry> ParseEntries(string json)
         {
             using var document = JsonDocument.Parse(json);
+            if (document.RootElement.TryGetProperty("GeneratedPurityCatalog", out var generatedCatalogElement) &&
+                generatedCatalogElement.ValueKind == JsonValueKind.Object &&
+                generatedCatalogElement.TryGetProperty("Entries", out var entriesElement) &&
+                entriesElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var entryElement in entriesElement.EnumerateArray())
+                {
+                    var symbol = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "ExactSymbolKey") ??
+                        CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "Symbol");
+                    var classification = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "Classification");
+                    if (string.IsNullOrWhiteSpace(symbol) || string.IsNullOrWhiteSpace(classification))
+                    {
+                        continue;
+                    }
+
+                    var categories = ReadStringArray(entryElement, "Categories");
+                    var primaryCategory = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "PrimaryCategory");
+                    yield return new SummaryEntry(
+                        symbol.Trim(),
+                        new PurityEntry(
+                            classification.Trim(),
+                            categories,
+                            string.IsNullOrWhiteSpace(primaryCategory)
+                                ? categories.FirstOrDefault() ?? "generated_purity_summary"
+                                : primaryCategory.Trim()),
+                        SummaryAssemblyIdentity.FromFlatJson(entryElement),
+                        SummaryMethodIdentity.FromFlatJson(entryElement));
+                }
+
+                yield break;
+            }
+
             if (!document.RootElement.TryGetProperty("Assemblies", out var assembliesElement) ||
                 assembliesElement.ValueKind != JsonValueKind.Array)
             {
@@ -213,11 +245,14 @@ namespace PurelySharp.Analyzer
             AddSymbolKey(keys, methodSymbol.ToDisplayString());
             AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol.OriginalDefinition));
             AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol));
+            AddSymbolKey(keys, CreateExactSummaryKey(methodSymbol.OriginalDefinition));
+            AddSymbolKey(keys, CreateExactSummaryKey(methodSymbol));
 
             if (methodSymbol.IsGenericMethod)
             {
                 AddSymbolKey(keys, methodSymbol.ConstructedFrom.ToDisplayString());
                 AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol.ConstructedFrom));
+                AddSymbolKey(keys, CreateExactSummaryKey(methodSymbol.ConstructedFrom));
             }
 
             return keys;
@@ -241,6 +276,21 @@ namespace PurelySharp.Analyzer
                 ", ",
                 methodSymbol.Parameters.Select(parameter => parameter.Type.ToDisplayString(EffectSummaryParameterTypeFormat)));
             return containingTypeName + "." + methodName + "(" + parameterList + ")";
+        }
+
+        private static string CreateExactSummaryKey(IMethodSymbol methodSymbol)
+        {
+            var containingTypeName = methodSymbol.ContainingType.ToDisplayString(EffectSummaryContainingTypeFormat);
+            var methodName = methodSymbol.MethodKind == MethodKind.Constructor
+                ? ".ctor"
+                : methodSymbol.Name;
+            var parameterList = string.Join(
+                ", ",
+                methodSymbol.Parameters.Select(parameter => parameter.Type.ToDisplayString(EffectSummaryParameterTypeFormat)));
+            var returnType = methodSymbol.MethodKind == MethodKind.Constructor
+                ? "void"
+                : methodSymbol.ReturnType.ToDisplayString(EffectSummaryParameterTypeFormat);
+            return containingTypeName + "." + methodName + "(" + parameterList + ")->" + returnType;
         }
 
         private static ActualMethodIdentity? TryResolveActualMethodIdentity(IMethodSymbol methodSymbol, Compilation compilation)
@@ -322,9 +372,17 @@ namespace PurelySharp.Analyzer
                 yield return effectSummaryKey;
             }
 
+            var exactKey = GetExactMethodKey(reader, handle);
+            if (!string.Equals(exactKey, raw, StringComparison.Ordinal) &&
+                !string.Equals(exactKey, effectSummaryKey, StringComparison.Ordinal))
+            {
+                yield return exactKey;
+            }
+
             var roslynDisplay = GetRoslynLikeMethodSymbol(reader, handle);
             if (!string.Equals(roslynDisplay, raw, StringComparison.Ordinal) &&
-                !string.Equals(roslynDisplay, effectSummaryKey, StringComparison.Ordinal))
+                !string.Equals(roslynDisplay, effectSummaryKey, StringComparison.Ordinal) &&
+                !string.Equals(roslynDisplay, exactKey, StringComparison.Ordinal))
             {
                 yield return roslynDisplay;
             }
@@ -385,11 +443,56 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        private static string DecodeExactMethodSignature(MetadataReader reader, MethodDefinition definition)
+        {
+            try
+            {
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), CreateGenericContext(reader, definition));
+                return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
+            }
+            catch (BadImageFormatException)
+            {
+                return "(?)->?";
+            }
+        }
+
         private static string GetEffectSummaryLikeMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
         {
             var definition = reader.GetMethodDefinition(handle);
             var typeName = GetTypeName(reader, definition.GetDeclaringType());
             return typeName + "." + reader.GetString(definition.Name) + DecodeMethodSignature(reader, definition);
+        }
+
+        private static string GetExactMethodKey(MetadataReader reader, MethodDefinitionHandle handle)
+        {
+            var definition = reader.GetMethodDefinition(handle);
+            var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
+            return typeName + "." + reader.GetString(definition.Name) + DecodeExactMethodSignature(reader, definition);
+        }
+
+        private static string NormalizeExactTypeName(string typeName)
+        {
+            return typeName switch
+            {
+                "System.Boolean" => "bool",
+                "System.Byte" => "byte",
+                "System.Char" => "char",
+                "System.Double" => "double",
+                "System.Int16" => "short",
+                "System.Int32" => "int",
+                "System.Int64" => "long",
+                "System.IntPtr" => "nint",
+                "System.Object" => "object",
+                "System.SByte" => "sbyte",
+                "System.Single" => "float",
+                "System.String" => "string",
+                "System.UInt16" => "ushort",
+                "System.UInt32" => "uint",
+                "System.UInt64" => "ulong",
+                "System.UIntPtr" => "nuint",
+                "System.Void" => "void",
+                _ => typeName
+            };
         }
 
         private static string GetRoslynLikeMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
@@ -633,6 +736,11 @@ namespace PurelySharp.Analyzer
                     assemblySha256?.Trim(),
                     moduleVersionId?.Trim());
             }
+
+            public static SummaryAssemblyIdentity? FromFlatJson(JsonElement entryElement)
+            {
+                return FromJson(entryElement);
+            }
         }
 
         private sealed class SummaryMethodIdentity
@@ -686,6 +794,11 @@ namespace PurelySharp.Analyzer
                 }
 
                 return new SummaryMethodIdentity(metadataToken?.Trim(), methodBodySha256?.Trim());
+            }
+
+            public static SummaryMethodIdentity? FromFlatJson(JsonElement entryElement)
+            {
+                return FromJson(entryElement);
             }
         }
 

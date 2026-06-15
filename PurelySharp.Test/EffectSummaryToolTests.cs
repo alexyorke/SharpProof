@@ -137,6 +137,18 @@ public static class PurityFixture
     public static int ImpureViaCallee() => ImpureWrite();
 
     public static int UnknownViaInterface(IWorker worker) => worker.Get();
+
+    public static byte[] PureFreshArray()
+    {
+        var bytes = new byte[4];
+        bytes[0] = 1;
+        return bytes;
+    }
+
+    public static void MutateCallerArray(byte[] bytes)
+    {
+        bytes[0] = 1;
+    }
 }
 """;
 
@@ -153,12 +165,15 @@ public static class PurityFixture
             AssertPurityClassification(summary, "PurityFixture.ImpureViaCallee()", "impure", "impure_callee");
             AssertPurityClassification(summary, "PurityFixture.UnknownViaInterface(IWorker)", "conservative_unknown", "dynamic_dispatch");
             AssertPurityClassification(summary, "AbstractWorker.Get()", "conservative_unknown", "metadata_only_or_external");
+            AssertPurityClassification(summary, "PurityFixture.PureFreshArray()", "pure");
+            AssertPurityClassification(summary, "PurityFixture.MutateCallerArray(byte[])", "impure", "caller_visible_memory_write");
+            AssertFreshnessClassification(summary, "PurityFixture.PureFreshArray()", "fresh_owned_array_write");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             Assert.That(report.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(1));
-            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThanOrEqualTo(6));
-            Assert.That(report.GetProperty("PureCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
-            Assert.That(report.GetProperty("ImpureCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThanOrEqualTo(8));
+            Assert.That(report.GetProperty("PureCount").GetInt32(), Is.GreaterThanOrEqualTo(3));
+            Assert.That(report.GetProperty("ImpureCount").GetInt32(), Is.GreaterThanOrEqualTo(3));
 
             var catalogComparison = report.GetProperty("CatalogComparison");
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
@@ -188,8 +203,79 @@ public static class PurityFixture
                     "System.BitConverter.GetBytes(int)",
                     StringComparison.Ordinal));
 
-            Assert.That(knownPureRow.GetProperty("Classification").GetString(), Is.Not.Empty);
-            Assert.That(knownFreshRow.GetProperty("Note").GetString(), Is.Not.EqualTo("no_fresh_array_allocation_evidence"));
+            Assert.That(knownPureRow.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+            Assert.That(knownFreshRow.GetProperty("Note").GetString(), Is.EqualTo("fresh_owned_array_write"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeStringSlice_NormalizesManualCatalogAliases()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.String.ToCharArray", limit: 10);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            var knownPureRow = catalogComparison.GetProperty("KnownPureMembers")
+                .EnumerateArray()
+                .Single(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "string.ToCharArray()",
+                    StringComparison.Ordinal));
+            var knownFreshRow = catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers")
+                .EnumerateArray()
+                .Single(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "string.ToCharArray()",
+                    StringComparison.Ordinal));
+
+            Assert.That(knownPureRow.GetProperty("Classification").GetString(), Is.Not.EqualTo("unclassified"));
+            Assert.That(knownFreshRow.GetProperty("Note").GetString(), Is.Not.EqualTo("unclassified"));
+            Assert.That(knownPureRow.GetProperty("MatchedExactSymbolKeys").GetArrayLength(), Is.GreaterThan(0));
+            Assert.That(knownFreshRow.GetProperty("MatchedExactSymbolKeys").GetArrayLength(), Is.GreaterThan(0));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_GeneratedPurityCatalog_UsesDistinctExactKeys_ForDuplicateDisplaySymbols()
+        {
+            var source = """
+public readonly struct ConversionFixture
+{
+    private readonly int _value;
+
+    public ConversionFixture(int value)
+    {
+        _value = value;
+    }
+
+    public static explicit operator int(ConversionFixture value) => value._value;
+
+    public static explicit operator long(ConversionFixture value) => value._value;
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryDuplicateDisplaySymbols", source);
+            using var summary = await RunEffectSummaryAsync(
+                fixture.AssemblyPath,
+                includeTransitiveRoots: true,
+                classifyPurity: true,
+                compareManualCatalogs: false);
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var operatorEntries = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Where(entry => string.Equals(
+                    entry.GetProperty("Symbol").GetString(),
+                    "ConversionFixture.op_Explicit(ConversionFixture)",
+                    StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(operatorEntries.Length, Is.EqualTo(2));
+            Assert.That(
+                operatorEntries
+                    .Select(entry => entry.GetProperty("ExactSymbolKey").GetString())
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.Ordinal)
+                    .Count(),
+                Is.EqualTo(2));
         }
 
         private static void AssertThrownExceptions(JsonDocument summary, string methodSymbol, params string[] expectedExceptions)
@@ -236,6 +322,18 @@ public static class PurityFixture
             {
                 Assert.That(categories, Does.Contain(expectedCategory));
             }
+        }
+
+        private static void AssertFreshnessClassification(
+            JsonDocument summary,
+            string methodSymbol,
+            string expectedFreshnessClassification)
+        {
+            var method = FindMethod(summary, methodSymbol);
+            var classification = method.GetProperty("PurityClassification");
+            Assert.That(
+                classification.GetProperty("FreshnessClassification").GetString(),
+                Is.EqualTo(expectedFreshnessClassification));
         }
 
         private static JsonElement FindMethod(JsonDocument summary, string methodSymbol)
