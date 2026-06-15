@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -338,6 +339,53 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_ToolOutput_PropagatesTransitiveMetadataMethodException()
+        {
+            const string boundarySource = """
+using System;
+
+public static class SummaryBoundary
+{
+    public static string Outer(string value)
+    {
+        return Inner(value);
+    }
+
+    public static string Inner(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException();
+        }
+
+        return value;
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryGenerated", boundarySource);
+            var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+public class TestClass
+{
+    public string TestMethod(string value)
+    {
+        return SummaryBoundary.Outer(value);
+    }
+}
+""",
+                summaryJson,
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+        }
+
+        [Test]
         public void ExceptionSummaryCatalog_RepeatedMetadataQueriesReuseAssemblyIdentityCache()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
@@ -512,12 +560,25 @@ public class TestClass
         private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
             string source,
             string effectSummaryJson,
+            ImmutableArray<MetadataReference> additionalReferences,
             string additionalFilePath = "PurelySharp.EffectSummary.json")
         {
             return await GetAnalyzerDiagnosticsAsync(
                 source,
                 new[] { (additionalFilePath, effectSummaryJson) },
-                ImmutableArray<MetadataReference>.Empty);
+                additionalReferences);
+        }
+
+        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
+            string source,
+            string effectSummaryJson,
+            string additionalFilePath = "PurelySharp.EffectSummary.json")
+        {
+            return await GetAnalyzerDiagnosticsAsync(
+                source,
+                effectSummaryJson,
+                ImmutableArray<MetadataReference>.Empty,
+                additionalFilePath);
         }
 
         private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
@@ -589,6 +650,45 @@ public class TestClass
             return new FixtureAssembly(tempDirectory, assemblyPath);
         }
 
+        private static async Task<string> RunEffectSummaryJsonAsync(string assemblyPath, bool includeTransitiveRoots)
+        {
+            var outputPath = Path.Combine(Path.GetDirectoryName(assemblyPath)!, Guid.NewGuid().ToString("N") + ".json");
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                WorkingDirectory = GetRepositoryRoot(),
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            startInfo.ArgumentList.Add("run");
+            startInfo.ArgumentList.Add("--project");
+            startInfo.ArgumentList.Add("Tools\\PurelySharp.EffectSummary\\PurelySharp.EffectSummary.csproj");
+            startInfo.ArgumentList.Add("--");
+            startInfo.ArgumentList.Add("--assembly");
+            startInfo.ArgumentList.Add(assemblyPath);
+            startInfo.ArgumentList.Add("--output");
+            startInfo.ArgumentList.Add(outputPath);
+            if (includeTransitiveRoots)
+            {
+                startInfo.ArgumentList.Add("--transitive-roots");
+            }
+
+            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start effect summary tool.");
+            var standardOutput = await process.StandardOutput.ReadToEndAsync();
+            var standardError = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            if (process.ExitCode != 0)
+            {
+                throw new AssertionException(
+                    "Effect summary tool failed." + Environment.NewLine +
+                    standardOutput + Environment.NewLine +
+                    standardError);
+            }
+
+            return await File.ReadAllTextAsync(outputPath);
+        }
+
         private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
         {
             var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
@@ -604,6 +704,11 @@ public class TestClass
                 .Select(path => MetadataReference.CreateFromFile(path))
                 .Cast<MetadataReference>()
                 .ToImmutableArray();
+        }
+
+        private static string GetRepositoryRoot()
+        {
+            return Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory, "..", "..", "..", ".."));
         }
 
         private sealed record AssemblyIdentity(string AssemblyName, string AssemblySha256, string ModuleVersionId);
