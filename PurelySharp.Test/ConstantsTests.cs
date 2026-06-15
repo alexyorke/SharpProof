@@ -184,6 +184,8 @@ public static class RecentCatalogSignatureSamples
         _ = BitConverter.GetBytes(1);
         _ = BitConverter.GetBytes(1f);
         _ = BitConverter.GetBytes(1L);
+        _ = BitConverter.GetBytes(1u);
+        _ = BitConverter.GetBytes(1ul);
         _ = text.ToCharArray();
         _ = BitOperations.IsPow2(1);
         _ = BitOperations.IsPow2(1u);
@@ -254,6 +256,10 @@ public static class RecentCatalogSignatureSamples
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1f)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1L)"), expectedPure: true, expectedImpure: false);
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1L)")));
+            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1u)"), expectedPure: true, expectedImpure: false);
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1u)")));
+            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1ul)"), expectedPure: true, expectedImpure: false);
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1ul)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "text.ToCharArray()"), expectedPure: true, expectedImpure: false);
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "text.ToCharArray()")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1)"), expectedPure: true, expectedImpure: false);

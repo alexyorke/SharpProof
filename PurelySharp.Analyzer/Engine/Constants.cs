@@ -1046,6 +1046,8 @@ public static class Constants
         "System.BitConverter.GetBytes(float)",
         "System.BitConverter.GetBytes(double)",
         "System.BitConverter.GetBytes(long)",
+        "System.BitConverter.GetBytes(uint)",
+        "System.BitConverter.GetBytes(ulong)",
         "System.Convert.FromBase64String(string)",
         "System.Convert.FromHexString(string)",
         "System.Guid.ToByteArray()",
@@ -1077,6 +1079,8 @@ public static class Constants
         "System.BitConverter.GetBytes(float)",
         "System.BitConverter.GetBytes(double)",
         "System.BitConverter.GetBytes(long)",
+        "System.BitConverter.GetBytes(uint)",
+        "System.BitConverter.GetBytes(ulong)",
         "System.BitConverter.ToInt32(byte[], int)",
         "System.BitConverter.ToDouble(byte[], int)",
 
