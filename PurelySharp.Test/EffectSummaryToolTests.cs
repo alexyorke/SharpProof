@@ -208,6 +208,23 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeBitConverterReadSlice_TreatsIntrinsicHelpersAsPure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.BitConverter.ToInt32", limit: 20);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            var knownPureRow = catalogComparison.GetProperty("KnownPureMembers")
+                .EnumerateArray()
+                .Single(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.BitConverter.ToInt32(byte[], int)",
+                    StringComparison.Ordinal));
+
+            Assert.That(knownPureRow.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStringSlice_NormalizesManualCatalogAliases()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.String.ToCharArray", limit: 10);
@@ -276,6 +293,61 @@ public readonly struct ConversionFixture
                     .Distinct(StringComparer.Ordinal)
                     .Count(),
                 Is.EqualTo(2));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_ClassifiesFreshObjectConstructionAsInternalOnly()
+        {
+            var source = """
+public sealed class Box
+{
+    private readonly int _value;
+
+    public Box(int value)
+    {
+        _value = value;
+    }
+}
+
+public sealed class MutableBox
+{
+    public int Value;
+}
+
+public static class FreshObjectFixture
+{
+    public static Box MakeConstructedBox()
+    {
+        return new Box(42);
+    }
+
+    public static MutableBox MakeAssignedBox()
+    {
+        var box = new MutableBox();
+        box.Value = 5;
+        return box;
+    }
+
+    public static void MutateExistingBox(MutableBox box)
+    {
+        box.Value = 7;
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryFreshObjectWrites", source);
+            using var summary = await RunEffectSummaryAsync(
+                fixture.AssemblyPath,
+                includeTransitiveRoots: true,
+                classifyPurity: true,
+                compareManualCatalogs: false);
+
+            AssertPurityClassification(summary, "Box..ctor(int)", "pure");
+            AssertFreshnessClassification(summary, "Box..ctor(int)", "fresh_owned_object_write");
+            AssertPurityClassification(summary, "FreshObjectFixture.MakeConstructedBox()", "pure");
+            AssertPurityClassification(summary, "FreshObjectFixture.MakeAssignedBox()", "pure");
+            AssertFreshnessClassification(summary, "FreshObjectFixture.MakeAssignedBox()", "fresh_owned_object_write");
+            AssertPurityClassification(summary, "FreshObjectFixture.MutateExistingBox(MutableBox)", "impure", "object_state_write");
         }
 
         private static void AssertThrownExceptions(JsonDocument summary, string methodSymbol, params string[] expectedExceptions)

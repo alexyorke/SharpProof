@@ -417,6 +417,7 @@ internal static class AssemblyEffectSummarizer
 
         var metadataToken = $"0x{MetadataTokens.GetToken(handle):X8}";
         var cacheKey = $"mvid:{moduleVersionId}|token:{metadataToken}|il:{methodBodySha256 ?? "no-il"}";
+        var isConstructor = string.Equals(reader.GetString(definition.Name), ".ctor", StringComparison.Ordinal);
         return new MethodEffectSummary(
             Symbol: GetMethodDisplaySymbol(reader, handle),
             ExactSymbolKey: GetMethodExactKey(reader, handle),
@@ -425,7 +426,7 @@ internal static class AssemblyEffectSummarizer
             MethodBodySha256: methodBodySha256,
             CacheKey: cacheKey,
             Effects: effects.ToArray(),
-            RootCandidates: GetRootCandidates(effects, calls).ToArray(),
+            RootCandidates: GetRootCandidates(effects, calls, isConstructor).ToArray(),
             TransitiveRootCandidates: Array.Empty<string>(),
             ThrownExceptionTypes: thrownExceptionTypes.ToArray(),
             TransitiveThrownExceptionTypes: Array.Empty<string>(),
@@ -540,7 +541,8 @@ internal static class AssemblyEffectSummarizer
 
     private static IEnumerable<string> GetRootCandidates(
         IEnumerable<string> effects,
-        IEnumerable<string> calls)
+        IEnumerable<string> calls,
+        bool isConstructor)
     {
         var roots = new SortedSet<string>(StringComparer.Ordinal);
         var effectSet = new HashSet<string>(effects, StringComparer.Ordinal);
@@ -565,7 +567,9 @@ internal static class AssemblyEffectSummarizer
                     roots.Add("global_state_write");
                     break;
                 case "writes_instance_field":
-                    roots.Add("object_state_write");
+                    roots.Add(IsFreshOwnedObjectWrite(effectSet, callSet, isConstructor)
+                        ? "fresh_owned_object_write"
+                        : "object_state_write");
                     break;
                 case "writes_indirect_memory":
                     roots.Add(IsFreshOwnedMemoryWrite(effectSet, callSet)
@@ -611,9 +615,48 @@ internal static class AssemblyEffectSummarizer
         return calls.All(IsPurityNeutralIntrinsicHelperCall);
     }
 
+    private static bool IsFreshOwnedObjectWrite(
+        IReadOnlySet<string> effects,
+        IReadOnlySet<string> calls,
+        bool isConstructor)
+    {
+        if (!effects.Contains("writes_instance_field"))
+        {
+            return false;
+        }
+
+        if (!isConstructor && !effects.Contains("allocates_object"))
+        {
+            return false;
+        }
+
+        if (effects.Contains("writes_static_field") ||
+            effects.Contains("reads_static_field") ||
+            effects.Contains("reads_instance_field") ||
+            effects.Contains("writes_indirect_memory") ||
+            effects.Contains("indirect_call") ||
+            effects.Contains("virtual_call") ||
+            effects.Contains("block_memory_write"))
+        {
+            return false;
+        }
+
+        return calls.All(IsFreshObjectInitializationHelperCall);
+    }
+
     private static bool IsPurityNeutralIntrinsicHelperCall(string callSymbol)
     {
-        return callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal);
+        return callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.Add(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.BitCast(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences(", StringComparison.Ordinal);
+    }
+
+    private static bool IsFreshObjectInitializationHelperCall(string callSymbol)
+    {
+        return IsPurityNeutralIntrinsicHelperCall(callSymbol) ||
+            callSymbol.Contains(".ctor(", StringComparison.Ordinal);
     }
 
     private static void AnalyzeIl(

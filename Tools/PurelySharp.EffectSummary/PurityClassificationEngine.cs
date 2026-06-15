@@ -61,7 +61,8 @@ internal static class PurityClassificationEngine
 
     private static readonly ImmutableHashSet<string> InternalOnlyRoots = ImmutableHashSet.Create(
         StringComparer.Ordinal,
-        "fresh_owned_memory_write");
+        "fresh_owned_memory_write",
+        "fresh_owned_object_write");
 
     public static PurityClassificationOutput Classify(
         AssemblyEffectReport[] assemblies,
@@ -147,6 +148,12 @@ internal static class PurityClassificationEngine
         {
             if (string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal) &&
                 summary.RootCandidates.Contains("fresh_owned_memory_write", StringComparer.Ordinal))
+            {
+                continue;
+            }
+
+            if (string.Equals(effect, "writes_instance_field", StringComparison.Ordinal) &&
+                summary.RootCandidates.Contains("fresh_owned_object_write", StringComparer.Ordinal))
             {
                 continue;
             }
@@ -465,7 +472,19 @@ internal static class PurityClassificationEngine
 
     private static string GetFreshnessClassification(MethodEffectSummary? summary, string classification)
     {
-        if (summary == null || !summary.Effects.Contains("allocates_array", StringComparer.Ordinal))
+        if (summary == null)
+        {
+            return "none";
+        }
+
+        if (summary.RootCandidates.Contains("fresh_owned_object_write", StringComparer.Ordinal))
+        {
+            return string.Equals(classification, "pure", StringComparison.Ordinal)
+                ? "fresh_owned_object_write"
+                : "fresh_object_candidate_requires_non_pure_resolution";
+        }
+
+        if (!summary.Effects.Contains("allocates_array", StringComparer.Ordinal))
         {
             return "none";
         }
@@ -506,7 +525,11 @@ internal static class PurityClassificationEngine
 
     private static bool IsPurityNeutralIntrinsicHelperCall(string callSymbol)
     {
-        return callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal);
+        return callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.Add(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.BitCast(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences(", StringComparison.Ordinal);
     }
 }
 
