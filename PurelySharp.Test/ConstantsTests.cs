@@ -66,7 +66,10 @@ public static class CatalogSignatureSamples
         byte[] bytes = new byte[1];
         ReadOnlySpan<byte> left = stackalloc byte[1];
         ReadOnlySpan<byte> right = stackalloc byte[1];
+        _ = SHA1.HashData(bytes);
         _ = SHA256.HashData(bytes);
+        _ = SHA384.HashData(bytes);
+        _ = SHA512.HashData(bytes);
         _ = MD5.HashData(bytes);
         _ = CryptographicOperations.FixedTimeEquals(left, right);
         return Array.Empty<int>().Length + list.Count + now.Day;
@@ -103,6 +106,10 @@ public static class CatalogSignatureSamples
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "CryptographicOperations.FixedTimeEquals(left, right)"), Is.EqualTo("System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan<byte>, System.ReadOnlySpan<byte>)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "CryptographicOperations.FixedTimeEquals(left, right)")));
 
+            Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.SHA1.HashData(byte[])"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)")));
+
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.SHA256.HashData(byte[])"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(bytes)")));
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(bytes)")));
@@ -110,6 +117,14 @@ public static class CatalogSignatureSamples
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.MD5.HashData(byte[])"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(bytes)")));
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(bytes)")));
+
+            Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.SHA384.HashData(byte[])"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(bytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(bytes)")));
+
+            Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.SHA512.HashData(byte[])"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(bytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(bytes)")));
         }
 
         [Test]
