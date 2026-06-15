@@ -1047,6 +1047,7 @@ public static class Constants
         "System.Convert.FromBase64String(string)",
         "System.Convert.FromHexString(string)",
         "System.Guid.ToByteArray()",
+        "System.Guid.ToByteArray(bool)",
         "System.Security.Cryptography.SHA1.HashData(byte[])",
         "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan<byte>)",
         "System.Security.Cryptography.MD5.HashData(byte[])",
@@ -1188,6 +1189,7 @@ public static class Constants
         "System.Guid.TryParse(string?, out System.Guid)",
         "System.Guid.TryParseExact(string?, string?, out System.Guid)",
         "System.Guid.ToByteArray()",
+        "System.Guid.ToByteArray(bool)",
         "System.Guid.ToString()",
         "System.Guid.ToString(string?)",
 

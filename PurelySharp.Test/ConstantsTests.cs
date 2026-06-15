@@ -178,6 +178,7 @@ public static class RecentCatalogSignatureSamples
         _ = Guid.TryParseExact(text, ""D"", out parsed);
         _ = guid.ToString(""N"");
         _ = guid.ToByteArray();
+        _ = guid.ToByteArray(true);
         _ = Convert.FromBase64String(text);
         _ = Convert.FromHexString(text);
         _ = BitConverter.GetBytes(1);
@@ -239,6 +240,8 @@ public static class RecentCatalogSignatureSamples
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "guid.ToString(\"N\")"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "guid.ToByteArray()"), expectedPure: true, expectedImpure: false);
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "guid.ToByteArray()")));
+            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "guid.ToByteArray(true)"), expectedPure: true, expectedImpure: false);
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "guid.ToByteArray(true)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64String(text)"), expectedPure: true, expectedImpure: false);
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64String(text)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Convert.FromHexString(text)"), expectedPure: true, expectedImpure: false);
