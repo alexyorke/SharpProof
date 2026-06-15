@@ -164,6 +164,7 @@ public static class RecentCatalogSignatureSamples
         _ = guid.ToString(""N"");
         _ = guid.ToByteArray();
         _ = Convert.FromBase64String(text);
+        _ = BitConverter.GetBytes(1);
         _ = BitOperations.IsPow2(1);
         _ = BitOperations.IsPow2(1u);
         _ = BitOperations.IsPow2(1L);
@@ -223,6 +224,8 @@ public static class RecentCatalogSignatureSamples
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "guid.ToByteArray()")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64String(text)"), expectedPure: true, expectedImpure: false);
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64String(text)")));
+            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1)"), expectedPure: true, expectedImpure: false);
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1u)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1L)"), expectedPure: true, expectedImpure: false);

@@ -38,11 +38,13 @@ Evidence:
 Current repo evidence:
 - `SHA256.HashData(byte[])` and `MD5.HashData(byte[])` are cataloged as
   known pure members and as reviewed trusted fresh-array producers.
-- `Convert.FromBase64String(string)` and `Guid.ToByteArray()` are also now
-  in the reviewed trusted fresh-array subset.
+- `Convert.FromBase64String(string)`, `Guid.ToByteArray()`, and
+  `BitConverter.GetBytes(...)` are also now in the reviewed trusted
+  fresh-array subset.
 - Signature validation exists in `ConstantsTests`.
 - Direct and stable-local returns of those reviewed `HashData`,
-  `Convert.FromBase64String`, and `Guid.ToByteArray` results now pass.
+  `Convert.FromBase64String`, `Guid.ToByteArray`, and `BitConverter.GetBytes`
+  results now pass.
 - The broader conservative policy still remains for other returned array
   producers such as `BitConverter.GetBytes`, `string.Split`, `Encoding.GetBytes`,
   `ToArray`, and direct fresh array returns.
