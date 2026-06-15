@@ -148,6 +148,67 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_GenericMetadataMethodSummary_MatchesConstructedCall()
+        {
+            const string boundarySource = """
+using System;
+
+public static class GenericBoundary
+{
+    public static T EchoOrThrow<T>(T value) where T : class
+    {
+        if (value is null)
+        {
+            throw new InvalidOperationException();
+        }
+
+        return value;
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("GenericBoundarySummary", boundarySource);
+            var boundaryCompilation = CSharpCompilation.Create(
+                "GenericBoundaryInspection",
+                Array.Empty<SyntaxTree>(),
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(fixture.AssemblyPath)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var boundaryType = boundaryCompilation.GetTypeByMetadataName("GenericBoundary")!;
+            var methodSymbol = boundaryType.GetMembers("EchoOrThrow").OfType<IMethodSymbol>().Single();
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public class TestClass
+{
+    public string TestMethod(string value)
+    {
+        return GenericBoundary.EchoOrThrow<string>(value);
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreateEffectSummaryJson(
+                            identity.AssemblyName,
+                            identity.AssemblySha256,
+                            identity.ModuleVersionId,
+                            symbol: methodSymbol.OriginalDefinition.ToDisplayString(),
+                            thrownExceptionTypesJson: """[ "System.InvalidOperationException" ]""",
+                            transitiveThrownExceptionTypesJson: "[]"))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+        }
+
+        [Test]
         public void ExceptionSummaryCatalog_RepeatedMetadataQueriesReuseAssemblyIdentityCache()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
@@ -326,18 +387,30 @@ public class TestClass
         {
             return await GetAnalyzerDiagnosticsAsync(
                 source,
-                (additionalFilePath, effectSummaryJson));
+                new[] { (additionalFilePath, effectSummaryJson) },
+                ImmutableArray<MetadataReference>.Empty);
         }
 
         private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
             string source,
             params (string Path, string Text)[] effectSummaryFiles)
         {
+            return await GetAnalyzerDiagnosticsAsync(
+                source,
+                effectSummaryFiles,
+                ImmutableArray<MetadataReference>.Empty);
+        }
+
+        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
+            string source,
+            (string Path, string Text)[] effectSummaryFiles,
+            ImmutableArray<MetadataReference> additionalReferences)
+        {
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var compilation = CSharpCompilation.Create(
                 "ExceptionSummaryCatalogValidationTests",
                 new[] { syntaxTree },
-                GetTrustedPlatformReferences(),
+                GetTrustedPlatformReferences().AddRange(additionalReferences),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             var analyzerOptions = new AnalyzerOptions(
@@ -358,6 +431,33 @@ public class TestClass
                     reportSuppressedDiagnostics: false));
 
             return await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
+        }
+
+        private static async Task<FixtureAssembly> CreateFixtureAssemblyAsync(string assemblyName, string source)
+        {
+            var tempDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "exception-summary-fixture-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDirectory);
+            var assemblyPath = Path.Combine(tempDirectory, assemblyName + ".dll");
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                assemblyName,
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            await using var stream = File.Create(assemblyPath);
+            var emitResult = compilation.Emit(stream);
+            if (!emitResult.Success)
+            {
+                throw new AssertionException(string.Join(
+                    Environment.NewLine,
+                    emitResult.Diagnostics.Select(diagnostic => diagnostic.ToString())));
+            }
+
+            return new FixtureAssembly(tempDirectory, assemblyPath);
         }
 
         private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
@@ -399,6 +499,29 @@ public class TestClass
             public override SourceText GetText(System.Threading.CancellationToken cancellationToken = default)
             {
                 return _text;
+            }
+        }
+
+        private sealed class FixtureAssembly : IAsyncDisposable
+        {
+            public FixtureAssembly(string directoryPath, string assemblyPath)
+            {
+                DirectoryPath = directoryPath;
+                AssemblyPath = assemblyPath;
+            }
+
+            public string DirectoryPath { get; }
+
+            public string AssemblyPath { get; }
+
+            public ValueTask DisposeAsync()
+            {
+                if (Directory.Exists(DirectoryPath))
+                {
+                    Directory.Delete(DirectoryPath, recursive: true);
+                }
+
+                return ValueTask.CompletedTask;
             }
         }
 
