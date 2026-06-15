@@ -26,7 +26,6 @@
     <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Analyzer.Testing.NUnit" Version="1.1.2" />
     <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.CodeFix.Testing.NUnit" Version="1.1.2" />
     <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.CodeRefactoring.Testing.NUnit" Version="1.1.2" />
-    <PackageReference Include="Microsoft.Z3" Version="4.12.2" PrivateAssets="all" />
     <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
     <PackageReference Include="System.CodeDom" Version="10.0.8" PrivateAssets="all" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" PrivateAssets="all" />
@@ -37,6 +36,7 @@
     
     <ProjectReference Include="..\PurelySharp.Attributes\PurelySharp.Attributes.csproj" />
     <ProjectReference Include="..\PurelySharp.Analyzer\PurelySharp.Analyzer.csproj" />
+    <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
     <ProjectReference Include="..\Tools\PurelySharp.CorpusReport\PurelySharp.CorpusReport.csproj" />
     <ProjectReference Include="..\Tools\PurelySharp.Fuzz\PurelySharp.Fuzz.csproj" />
   </ItemGroup>

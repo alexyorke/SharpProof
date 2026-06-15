@@ -1,6 +1,6 @@
 using Microsoft.Z3;
 
-namespace PurelySharp.Test.Smt
+namespace SearchLib.Smt
 {
     internal sealed class Z3FormulaEncoder : IDisposable
     {

@@ -1,19 +1,12 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.Z3;
+using SearchLib.Smt;
 
 namespace PurelySharp.Test.Smt
 {
-    internal enum Feasibility
-    {
-        Satisfiable,
-        Unsatisfiable,
-        Unknown,
-    }
-
     internal sealed class SmtPathOracle : IDisposable
     {
-        private readonly Z3FormulaEncoder _encoder = new();
+        private readonly SmtSolver _solver = new();
 
         public Feasibility IsSatisfiable(
             IEnumerable<ExpressionSyntax> pathConditions,
@@ -26,7 +19,7 @@ namespace PurelySharp.Test.Smt
                 return Feasibility.Unknown;
             }
 
-            return IsSatisfiable(formulas, timeout);
+            return _solver.IsSatisfiable(formulas, timeout);
         }
 
         public Feasibility IsSatisfiable(
@@ -51,14 +44,7 @@ namespace PurelySharp.Test.Smt
                 return Feasibility.Unknown;
             }
 
-            using var solver = _encoder.CreateSolver(timeout);
-            foreach (var formula in formulas)
-            {
-                solver.Assert(_encoder.EncodeCondition(formula));
-            }
-
-            solver.Assert(_encoder.Negate(conclusionFormula));
-            return ToFeasibility(solver.Check());
+            return _solver.Implies(formulas, conclusionFormula, timeout);
         }
 
         public Feasibility Implies(
@@ -73,28 +59,12 @@ namespace PurelySharp.Test.Smt
 
         public Feasibility IsSatisfiable(IEnumerable<SmtFormula> pathConditions, TimeSpan timeout)
         {
-            using var solver = _encoder.CreateSolver(timeout);
-            foreach (var formula in pathConditions)
-            {
-                solver.Assert(_encoder.EncodeCondition(formula));
-            }
-
-            return ToFeasibility(solver.Check());
+            return _solver.IsSatisfiable(pathConditions, timeout);
         }
 
         public void Dispose()
         {
-            _encoder.Dispose();
-        }
-
-        private static Feasibility ToFeasibility(Status status)
-        {
-            return status switch
-            {
-                Status.SATISFIABLE => Feasibility.Satisfiable,
-                Status.UNSATISFIABLE => Feasibility.Unsatisfiable,
-                _ => Feasibility.Unknown,
-            };
+            _solver.Dispose();
         }
 
         private static bool TryTranslateAll(

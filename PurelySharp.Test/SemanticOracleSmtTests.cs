@@ -3,6 +3,8 @@ using Microsoft.CodeAnalysis;
 using NUnit.Framework;
 using PurelySharp.Analyzer;
 using PurelySharp.Test.Smt;
+using SearchLib.Smt;
+
 
 namespace PurelySharp.Test
 {
