@@ -1045,6 +1045,7 @@ public static class Constants
         "System.BitConverter.GetBytes(int)",
         "System.BitConverter.GetBytes(double)",
         "System.Convert.FromBase64String(string)",
+        "System.Convert.FromHexString(string)",
         "System.Guid.ToByteArray()",
         "System.Security.Cryptography.MD5.HashData(byte[])",
         "System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan<byte>)",

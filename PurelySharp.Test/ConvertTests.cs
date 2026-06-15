@@ -69,6 +69,65 @@ public class TestClass
         }
 
         [Test]
+        public async Task ConvertFromHexString_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(string value)
+    {
+        return Convert.FromHexString(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConvertFromHexString_LocalNonEscapingUse_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(string value)
+    {
+        var bytes = Convert.FromHexString(value);
+        return bytes.Length;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConvertFromHexString_LocalReturned_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(string value)
+    {
+        var bytes = Convert.FromHexString(value);
+        return bytes;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ConvertToBase64StringSegment_NoDiagnostic()
         {
             var test = @"
