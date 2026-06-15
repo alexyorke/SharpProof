@@ -61,6 +61,65 @@ public class TestClass
         }
 
         [Test]
+        public async Task StringToCharArray_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public char[] TestMethod(string input)
+    {
+        return input.ToCharArray();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StringToCharArray_LocalNonEscapingUse_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(string input)
+    {
+        var chars = input.ToCharArray();
+        return chars.Length;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StringToCharArray_LocalReturned_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public char[] TestMethod(string input)
+    {
+        var chars = input.ToCharArray();
+        return chars;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task StringInterpolation_NoDiagnostic()
         {
             var test = @"
