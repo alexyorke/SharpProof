@@ -2413,6 +2413,15 @@ namespace PurelySharp.Analyzer.Engine
                 return true;
             }
 
+            if (operation is ICoalesceOperation coalesceOperation &&
+                TryResolveKnownConcreteType(coalesceOperation.Value, currentState, out var coalesceValueType) &&
+                TryResolveKnownConcreteType(coalesceOperation.WhenNull, currentState, out var coalesceWhenNullType) &&
+                SymbolEqualityComparer.Default.Equals(coalesceValueType, coalesceWhenNullType))
+            {
+                concreteType = coalesceValueType;
+                return true;
+            }
+
             concreteType = null!;
             return false;
         }

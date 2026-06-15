@@ -12,14 +12,14 @@ design docs such as `docs/effect-summary.md` are not backlog files.
 
 ## Current repo truth
 
-- Last confirmed full `PurelySharp.Test` baseline: `2083/2083` green.
+- Last confirmed full `PurelySharp.Test` baseline: `2085/2085` green.
 - The analyzer already has:
   - explainable `PS0002` evidence properties
   - `PS0010` exception reporting and effect-summary tooling
   - manifest-backed Roslyn shape coverage tests
   - deterministic and random fuzz infrastructure
-  - exact concrete dispatch narrowing for locals, aliases, casts, and
-    same-concrete conditional or `if`/`else` merges
+- exact concrete dispatch narrowing for locals, aliases, casts, and
+    same-concrete conditional, `??`, or `if`/`else` merges
   - explicit rules for anonymous object creation, inline array access, and
     implicit indexer reference
 - Remaining work is now mostly precision and trust calibration, not broad
@@ -75,7 +75,8 @@ Evidence:
 Remaining:
 - Recover concrete targets through deeper heterogeneous or nested branch and
   flow-merge cases beyond the currently supported exact-local, alias,
-  cast-based, and same-concrete merge cases.
+  cast-based, and same-concrete conditional, coalesce, or `if`/`else` merge
+  cases.
 - Distinguish provable virtual or interface dispatch from truly unknown
   dynamic dispatch.
 - Improve static abstract interface member resolution in generic contexts.
