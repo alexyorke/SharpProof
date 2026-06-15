@@ -27,7 +27,7 @@ Not backlog files:
     same-concrete conditional, `??`, or `if`/`else` merges
   - explicit rules for anonymous object creation, inline array access, and
     implicit indexer reference
-- Last confirmed full `PurelySharp.Test` baseline: `2132/2132` green.
+- Last confirmed full `PurelySharp.Test` baseline: `2135/2135` green.
 
 ## Immediate next actions
 
@@ -95,6 +95,7 @@ Current state:
   - `SHA512.HashData(byte[])`
   - `MD5.HashData(byte[])`
   - `Convert.FromBase64String(string)`
+  - `Convert.FromBase64CharArray(char[], int, int)`
   - `Convert.FromHexString(string)`
   - `Guid.ToByteArray()`
   - `Guid.ToByteArray(bool)`

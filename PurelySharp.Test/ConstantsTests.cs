@@ -177,9 +177,11 @@ public static class RecentCatalogSignatureSamples
         _ = Guid.TryParse(text, out var parsed);
         _ = Guid.TryParseExact(text, ""D"", out parsed);
         _ = guid.ToString(""N"");
+        var chars = text.ToCharArray();
         _ = guid.ToByteArray();
         _ = guid.ToByteArray(true);
         _ = Convert.FromBase64String(text);
+        _ = Convert.FromBase64CharArray(chars, 0, text.Length);
         _ = Convert.FromHexString(text);
         _ = BitConverter.GetBytes(true);
         _ = BitConverter.GetBytes('a');
@@ -190,7 +192,7 @@ public static class RecentCatalogSignatureSamples
         _ = BitConverter.GetBytes((ushort)1);
         _ = BitConverter.GetBytes(1u);
         _ = BitConverter.GetBytes(1ul);
-        _ = text.ToCharArray();
+        _ = chars;
         _ = BitOperations.IsPow2(1);
         _ = BitOperations.IsPow2(1u);
         _ = BitOperations.IsPow2(1L);
@@ -252,6 +254,8 @@ public static class RecentCatalogSignatureSamples
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "guid.ToByteArray(true)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64String(text)"), expectedPure: true, expectedImpure: false);
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64String(text)")));
+            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64CharArray(chars, 0, text.Length)"), expectedPure: true, expectedImpure: false);
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64CharArray(chars, 0, text.Length)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Convert.FromHexString(text)"), expectedPure: true, expectedImpure: false);
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "Convert.FromHexString(text)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(true)"), expectedPure: true, expectedImpure: false);

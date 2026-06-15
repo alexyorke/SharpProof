@@ -128,6 +128,68 @@ public class TestClass
         }
 
         [Test]
+        public async Task ConvertFromBase64CharArray_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(string value)
+    {
+        var chars = value.ToCharArray();
+        return Convert.FromBase64CharArray(chars, 0, chars.Length);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConvertFromBase64CharArray_LocalNonEscapingUse_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(string value)
+    {
+        var chars = value.ToCharArray();
+        var bytes = Convert.FromBase64CharArray(chars, 0, chars.Length);
+        return bytes.Length;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConvertFromBase64CharArray_LocalReturned_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(string value)
+    {
+        var chars = value.ToCharArray();
+        var bytes = Convert.FromBase64CharArray(chars, 0, chars.Length);
+        return bytes;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ConvertToBase64StringSegment_NoDiagnostic()
         {
             var test = @"

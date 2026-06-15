@@ -1052,6 +1052,7 @@ public static class Constants
         "System.BitConverter.GetBytes(ushort)",
         "System.BitConverter.GetBytes(uint)",
         "System.BitConverter.GetBytes(ulong)",
+        "System.Convert.FromBase64CharArray(char[], int, int)",
         "System.Convert.FromBase64String(string)",
         "System.Convert.FromHexString(string)",
         "System.Guid.ToByteArray()",
@@ -1137,6 +1138,7 @@ public static class Constants
         "System.Collections.Immutable.ImmutableHashSet.Create<T>()",
 
 
+        "System.Convert.FromBase64CharArray(char[], int, int)",
         "System.Convert.FromBase64String(string)",
         "System.Convert.ToBase64String(byte[])",
         "System.Convert.ToBase64String(byte[], int, int)",
