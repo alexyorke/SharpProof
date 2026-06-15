@@ -15,9 +15,10 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace PurelySharp.Analyzer
 {
-    internal sealed class ExceptionSummaryCatalog
+    internal sealed class GeneratedPurityCatalog
     {
         private const string SummaryFileName = "PurelySharp.EffectSummary.json";
+        private static readonly AsyncLocal<GeneratedPurityCatalog?> CurrentCatalog = new AsyncLocal<GeneratedPurityCatalog?>();
         private static readonly SymbolDisplayFormat EffectSummaryContainingTypeFormat = new SymbolDisplayFormat(
             typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
             genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
@@ -26,7 +27,7 @@ namespace PurelySharp.Analyzer
             genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
             miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
 
-        public static readonly ExceptionSummaryCatalog Empty = new ExceptionSummaryCatalog(
+        public static readonly GeneratedPurityCatalog Empty = new GeneratedPurityCatalog(
             ImmutableDictionary<string, ImmutableArray<SummaryEntry>>.Empty);
 
         private static readonly ConcurrentDictionary<string, ActualAssemblyIdentity?> AssemblyIdentityCache =
@@ -36,12 +37,14 @@ namespace PurelySharp.Analyzer
 
         private readonly ImmutableDictionary<string, ImmutableArray<SummaryEntry>> _entriesBySymbol;
 
-        private ExceptionSummaryCatalog(ImmutableDictionary<string, ImmutableArray<SummaryEntry>> entriesBySymbol)
+        private GeneratedPurityCatalog(ImmutableDictionary<string, ImmutableArray<SummaryEntry>> entriesBySymbol)
         {
             _entriesBySymbol = entriesBySymbol;
         }
 
-        public static ExceptionSummaryCatalog FromOptions(AnalyzerOptions options, CancellationToken cancellationToken)
+        public static GeneratedPurityCatalog Current => CurrentCatalog.Value ?? Empty;
+
+        public static GeneratedPurityCatalog FromOptions(AnalyzerOptions options, CancellationToken cancellationToken)
         {
             var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
             foreach (var additionalFile in options.AdditionalFiles)
@@ -74,29 +77,31 @@ namespace PurelySharp.Analyzer
                 return Empty;
             }
 
-            return new ExceptionSummaryCatalog(entriesBySymbol.ToImmutableDictionary(
+            return new GeneratedPurityCatalog(entriesBySymbol.ToImmutableDictionary(
                 item => item.Key,
                 item => item.Value.ToImmutable(),
                 StringComparer.Ordinal));
         }
 
-        public bool TryGetExceptions(IMethodSymbol methodSymbol, out ImmutableArray<string> exceptionTypes)
+        public static IDisposable UseCurrent(GeneratedPurityCatalog catalog)
         {
-            return TryGetExceptions(methodSymbol, compilation: null, out exceptionTypes);
+            return new Scope(CurrentCatalog.Value, catalog);
         }
 
-        public bool TryGetExceptions(
-            IMethodSymbol methodSymbol,
-            Compilation? compilation,
-            out ImmutableArray<string> exceptionTypes)
+        public bool TryGetPurity(IMethodSymbol methodSymbol, Compilation compilation, out PurityEntry classification)
         {
-            var matchedExceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
-            var actualAssemblyIdentity = compilation is null
-                ? null
-                : TryResolveActualAssemblyIdentity(methodSymbol, compilation);
-            var actualMethodIdentity = compilation is null
-                ? null
-                : TryResolveActualMethodIdentity(methodSymbol, compilation);
+            classification = default;
+            if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
+            {
+                return false;
+            }
+
+            var actualAssemblyIdentity = TryResolveActualAssemblyIdentity(methodSymbol, compilation);
+            var actualMethodIdentity = TryResolveActualMethodIdentity(methodSymbol, compilation);
+            if (actualAssemblyIdentity == null || actualMethodIdentity == null)
+            {
+                return false;
+            }
 
             foreach (var key in GetSymbolKeys(methodSymbol))
             {
@@ -112,18 +117,12 @@ namespace PurelySharp.Analyzer
                         continue;
                     }
 
-                    matchedExceptionTypes.UnionWith(entry.ExceptionTypes);
+                    classification = entry.Classification;
+                    return true;
                 }
             }
 
-            if (matchedExceptionTypes.Count == 0)
-            {
-                exceptionTypes = ImmutableArray<string>.Empty;
-                return false;
-            }
-
-            exceptionTypes = matchedExceptionTypes.ToImmutableArray();
-            return true;
+            return false;
         }
 
         private static bool IsSummaryFile(string path)
@@ -154,38 +153,42 @@ namespace PurelySharp.Analyzer
                 foreach (var methodElement in methodsElement.EnumerateArray())
                 {
                     var symbol = CompatibilityHelpers.GetTrimmedStringProperty(methodElement, "Symbol");
-                    if (symbol == null)
+                    if (symbol == null ||
+                        !methodElement.TryGetProperty("PurityClassification", out var purityElement) ||
+                        purityElement.ValueKind != JsonValueKind.Object)
                     {
                         continue;
                     }
 
-                    var exceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
-                    AddExceptionTypes(exceptionTypes, methodElement, "ThrownExceptionTypes");
-                    AddExceptionTypes(exceptionTypes, methodElement, "TransitiveThrownExceptionTypes");
-                    if (exceptionTypes.Count == 0)
+                    var classification = CompatibilityHelpers.GetTrimmedStringProperty(purityElement, "Classification");
+                    if (string.IsNullOrWhiteSpace(classification) ||
+                        string.Equals(classification, "conservative_unknown", StringComparison.Ordinal))
                     {
                         continue;
                     }
+
+                    var categories = ReadStringArray(purityElement, "Categories");
                     yield return new SummaryEntry(
                         symbol,
-                        exceptionTypes.ToImmutableArray(),
+                        new PurityEntry(
+                            classification.Trim(),
+                            categories,
+                            categories.FirstOrDefault() ?? "generated_purity_summary"),
                         assemblyIdentity,
                         SummaryMethodIdentity.FromJson(methodElement));
                 }
             }
         }
 
-        private static void AddExceptionTypes(
-            ImmutableSortedSet<string>.Builder exceptionTypes,
-            JsonElement methodElement,
-            string propertyName)
+        private static ImmutableArray<string> ReadStringArray(JsonElement element, string propertyName)
         {
-            if (!methodElement.TryGetProperty(propertyName, out var valuesElement) ||
+            if (!element.TryGetProperty(propertyName, out var valuesElement) ||
                 valuesElement.ValueKind != JsonValueKind.Array)
             {
-                return;
+                return ImmutableArray<string>.Empty;
             }
 
+            var builder = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
             foreach (var valueElement in valuesElement.EnumerateArray())
             {
                 if (valueElement.ValueKind != JsonValueKind.String)
@@ -196,9 +199,11 @@ namespace PurelySharp.Analyzer
                 var value = valueElement.GetString();
                 if (!string.IsNullOrWhiteSpace(value))
                 {
-                    exceptionTypes.Add(value.Trim());
+                    builder.Add(value.Trim());
                 }
             }
+
+            return builder.ToImmutableArray();
         }
 
         private static IEnumerable<string> GetSymbolKeys(IMethodSymbol methodSymbol)
@@ -238,15 +243,8 @@ namespace PurelySharp.Analyzer
             return containingTypeName + "." + methodName + "(" + parameterList + ")";
         }
 
-        private static ActualMethodIdentity? TryResolveActualMethodIdentity(
-            IMethodSymbol methodSymbol,
-            Compilation compilation)
+        private static ActualMethodIdentity? TryResolveActualMethodIdentity(IMethodSymbol methodSymbol, Compilation compilation)
         {
-            if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
-            {
-                return null;
-            }
-
             foreach (var reference in compilation.References.OfType<PortableExecutableReference>())
             {
                 var assemblySymbol = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
@@ -391,10 +389,7 @@ namespace PurelySharp.Analyzer
         {
             var definition = reader.GetMethodDefinition(handle);
             var typeName = GetTypeName(reader, definition.GetDeclaringType());
-            var methodName = definition.Attributes.HasFlag(System.Reflection.MethodAttributes.SpecialName)
-                ? reader.GetString(definition.Name)
-                : reader.GetString(definition.Name);
-            return typeName + "." + methodName + DecodeMethodSignature(reader, definition);
+            return typeName + "." + reader.GetString(definition.Name) + DecodeMethodSignature(reader, definition);
         }
 
         private static string GetRoslynLikeMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
@@ -446,11 +441,8 @@ namespace PurelySharp.Analyzer
 
         private sealed class EffectSummaryTypeNameProvider : ISignatureTypeProvider<string, object?>
         {
-            private readonly MetadataReader _reader;
-
             public EffectSummaryTypeNameProvider(MetadataReader reader)
             {
-                _reader = reader;
             }
 
             public string GetArrayType(string elementType, ArrayShape shape)
@@ -460,12 +452,8 @@ namespace PurelySharp.Analyzer
             }
 
             public string GetByReferenceType(string elementType) => "ref " + elementType;
-
             public string GetFunctionPointerType(MethodSignature<string> signature) => "delegate*";
-
-            public string GetGenericInstantiation(string genericType, ImmutableArray<string> typeArguments)
-                => genericType + "<" + string.Join(", ", typeArguments) + ">";
-
+            public string GetGenericInstantiation(string genericType, ImmutableArray<string> typeArguments) => genericType + "<" + string.Join(", ", typeArguments) + ">";
             public string GetGenericMethodParameter(object? genericContext, int index)
             {
                 var context = genericContext as GenericContext;
@@ -473,7 +461,6 @@ namespace PurelySharp.Analyzer
                     ? context.MethodParameters[index]
                     : "!!" + index;
             }
-
             public string GetGenericTypeParameter(object? genericContext, int index)
             {
                 var context = genericContext as GenericContext;
@@ -481,55 +468,36 @@ namespace PurelySharp.Analyzer
                     ? context.TypeParameters[index]
                     : "!" + index;
             }
-
             public string GetModifiedType(string modifier, string unmodifiedType, bool isRequired) => unmodifiedType;
-
             public string GetPinnedType(string elementType) => elementType;
-
             public string GetPointerType(string elementType) => elementType + "*";
-
-            public string GetPrimitiveType(PrimitiveTypeCode typeCode)
+            public string GetPrimitiveType(PrimitiveTypeCode typeCode) => typeCode switch
             {
-                return typeCode switch
-                {
-                    PrimitiveTypeCode.Boolean => "bool",
-                    PrimitiveTypeCode.Byte => "byte",
-                    PrimitiveTypeCode.Char => "char",
-                    PrimitiveTypeCode.Double => "double",
-                    PrimitiveTypeCode.Int16 => "short",
-                    PrimitiveTypeCode.Int32 => "int",
-                    PrimitiveTypeCode.Int64 => "long",
-                    PrimitiveTypeCode.IntPtr => "nint",
-                    PrimitiveTypeCode.Object => "object",
-                    PrimitiveTypeCode.SByte => "sbyte",
-                    PrimitiveTypeCode.Single => "float",
-                    PrimitiveTypeCode.String => "string",
-                    PrimitiveTypeCode.TypedReference => "typedref",
-                    PrimitiveTypeCode.UInt16 => "ushort",
-                    PrimitiveTypeCode.UInt32 => "uint",
-                    PrimitiveTypeCode.UInt64 => "ulong",
-                    PrimitiveTypeCode.UIntPtr => "nuint",
-                    PrimitiveTypeCode.Void => "void",
-                    _ => typeCode.ToString(),
-                };
-            }
-
+                PrimitiveTypeCode.Boolean => "bool",
+                PrimitiveTypeCode.Byte => "byte",
+                PrimitiveTypeCode.Char => "char",
+                PrimitiveTypeCode.Double => "double",
+                PrimitiveTypeCode.Int16 => "short",
+                PrimitiveTypeCode.Int32 => "int",
+                PrimitiveTypeCode.Int64 => "long",
+                PrimitiveTypeCode.IntPtr => "nint",
+                PrimitiveTypeCode.Object => "object",
+                PrimitiveTypeCode.SByte => "sbyte",
+                PrimitiveTypeCode.Single => "float",
+                PrimitiveTypeCode.String => "string",
+                PrimitiveTypeCode.TypedReference => "typedref",
+                PrimitiveTypeCode.UInt16 => "ushort",
+                PrimitiveTypeCode.UInt32 => "uint",
+                PrimitiveTypeCode.UInt64 => "ulong",
+                PrimitiveTypeCode.UIntPtr => "nuint",
+                PrimitiveTypeCode.Void => "void",
+                _ => typeCode.ToString(),
+            };
             public string GetSZArrayType(string elementType) => elementType + "[]";
-
-            public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind)
-                => GetTypeName(metadataReader, handle);
-
-            public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind)
-                => GetTypeReferenceName(metadataReader, handle);
-
-            public string GetTypeFromSpecification(
-                MetadataReader metadataReader,
-                object? genericContext,
-                TypeSpecificationHandle handle,
-                byte rawTypeKind)
-            {
-                return metadataReader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
-            }
+            public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind) => GetTypeName(metadataReader, handle);
+            public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind) => GetTypeReferenceName(metadataReader, handle);
+            public string GetTypeFromSpecification(MetadataReader metadataReader, object? genericContext, TypeSpecificationHandle handle, byte rawTypeKind)
+                => metadataReader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
         }
 
         private sealed class GenericContext
@@ -541,19 +509,11 @@ namespace PurelySharp.Analyzer
             }
 
             public ImmutableArray<string> TypeParameters { get; }
-
             public ImmutableArray<string> MethodParameters { get; }
         }
 
-        private static ActualAssemblyIdentity? TryResolveActualAssemblyIdentity(
-            IMethodSymbol methodSymbol,
-            Compilation compilation)
+        private static ActualAssemblyIdentity? TryResolveActualAssemblyIdentity(IMethodSymbol methodSymbol, Compilation compilation)
         {
-            if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
-            {
-                return null;
-            }
-
             foreach (var reference in compilation.References.OfType<PortableExecutableReference>())
             {
                 var assemblySymbol = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
@@ -579,22 +539,19 @@ namespace PurelySharp.Analyzer
         {
             public SummaryEntry(
                 string symbol,
-                ImmutableArray<string> exceptionTypes,
+                PurityEntry classification,
                 SummaryAssemblyIdentity? assemblyIdentity,
                 SummaryMethodIdentity? methodIdentity)
             {
                 Symbol = symbol;
-                ExceptionTypes = exceptionTypes;
+                Classification = classification;
                 AssemblyIdentity = assemblyIdentity;
                 MethodIdentity = methodIdentity;
             }
 
             public string Symbol { get; }
-
-            public ImmutableArray<string> ExceptionTypes { get; }
-
+            public PurityEntry Classification { get; }
             public SummaryAssemblyIdentity? AssemblyIdentity { get; }
-
             public SummaryMethodIdentity? MethodIdentity { get; }
 
             public bool IsTrustedFor(
@@ -618,12 +575,25 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        internal readonly struct PurityEntry
+        {
+            public PurityEntry(string classification, ImmutableArray<string> categories, string primaryCategory)
+            {
+                Classification = classification;
+                Categories = categories;
+                PrimaryCategory = primaryCategory;
+            }
+
+            public string Classification { get; }
+            public ImmutableArray<string> Categories { get; }
+            public string PrimaryCategory { get; }
+            public bool IsPure => string.Equals(Classification, "pure", StringComparison.Ordinal);
+            public bool IsImpure => string.Equals(Classification, "impure", StringComparison.Ordinal);
+        }
+
         private sealed class SummaryAssemblyIdentity
         {
-            public SummaryAssemblyIdentity(
-                string? assemblyName,
-                string? assemblySha256,
-                string? moduleVersionId)
+            public SummaryAssemblyIdentity(string? assemblyName, string? assemblySha256, string? moduleVersionId)
             {
                 AssemblyName = assemblyName;
                 AssemblySha256 = assemblySha256;
@@ -631,9 +601,7 @@ namespace PurelySharp.Analyzer
             }
 
             public string? AssemblyName { get; }
-
             public string? AssemblySha256 { get; }
-
             public string? ModuleVersionId { get; }
 
             public bool IsComplete =>
@@ -676,7 +644,6 @@ namespace PurelySharp.Analyzer
             }
 
             public string? MetadataToken { get; }
-
             public string? MethodBodySha256 { get; }
 
             public bool IsCompleteEnoughFor(ActualMethodIdentity? actualMethodIdentity)
@@ -731,7 +698,6 @@ namespace PurelySharp.Analyzer
             }
 
             public string MetadataToken { get; }
-
             public string? MethodBodySha256 { get; }
         }
 
@@ -745,9 +711,7 @@ namespace PurelySharp.Analyzer
             }
 
             public string AssemblyName { get; }
-
             public string AssemblySha256 { get; }
-
             public string ModuleVersionId { get; }
 
             public static ActualAssemblyIdentity? FromFile(string path)
@@ -774,6 +738,22 @@ namespace PurelySharp.Analyzer
                 using var stream = File.OpenRead(path);
                 using var sha256 = SHA256.Create();
                 return CompatibilityHelpers.ToLowerHex(sha256.ComputeHash(stream));
+            }
+        }
+
+        private sealed class Scope : IDisposable
+        {
+            private readonly GeneratedPurityCatalog? _previous;
+
+            public Scope(GeneratedPurityCatalog? previous, GeneratedPurityCatalog current)
+            {
+                _previous = previous;
+                CurrentCatalog.Value = current;
+            }
+
+            public void Dispose()
+            {
+                CurrentCatalog.Value = _previous;
             }
         }
     }

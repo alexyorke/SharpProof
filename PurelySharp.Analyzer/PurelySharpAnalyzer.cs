@@ -41,9 +41,11 @@ namespace PurelySharp.Analyzer
                 var emitExplanations = config.EmitExplanations;
                 var baseline = Configuration.DiagnosticBaseline.FromOptions(startContext.Options, startContext.CancellationToken);
                 var exceptionSummaryCatalog = ExceptionSummaryCatalog.FromOptions(startContext.Options, startContext.CancellationToken);
+                var generatedPurityCatalog = GeneratedPurityCatalog.FromOptions(startContext.Options, startContext.CancellationToken);
 
                 startContext.RegisterSyntaxNodeAction(c =>
                 {
+                    using (GeneratedPurityCatalog.UseCurrent(generatedPurityCatalog))
                     using (Engine.ImpurityCatalog.UseConfiguredOverrides(config))
                     {
                         MethodPurityAnalyzer.AnalyzeSymbolForPurity(c, purityService, missingPuritySuggestions, emitExplanations, baseline);

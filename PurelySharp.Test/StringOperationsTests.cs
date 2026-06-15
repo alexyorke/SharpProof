@@ -120,6 +120,68 @@ public class TestClass
         }
 
         [Test]
+        public async Task StringCtorFromReadOnlySpan_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(string input)
+    {
+        ReadOnlySpan<char> chars = input.AsSpan();
+        return new string(chars);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StringCtorFromReadOnlySpan_LocalNonEscapingUse_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(string input)
+    {
+        ReadOnlySpan<char> chars = input.AsSpan();
+        var copy = new string(chars);
+        return copy.Length;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StringCtorFromReadOnlySpan_LocalReturned_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(string input)
+    {
+        ReadOnlySpan<char> chars = input.AsSpan();
+        var copy = new string(chars);
+        return copy;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task StringInterpolation_NoDiagnostic()
         {
             var test = @"

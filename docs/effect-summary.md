@@ -3,6 +3,9 @@
 `Tools/PurelySharp.EffectSummary` is the first step toward evidence-based BCL and framework purity summaries.
 
 The goal is to reduce hand-maintained heuristics by summarizing implementation assemblies and then feeding stable effect facts back into the analyzer/catalog pipeline.
+The current first landing is report-first: the tool can now emit fixed-point,
+implementation-derived purity classifications without changing live `PS0002`
+behavior.
 
 ## Why assembly summaries first
 
@@ -20,7 +23,7 @@ The summary tool can inspect those assemblies directly and emit JSON facts such 
 - direct thrown exception types for simple IL patterns such as `new SomeException(...); throw` and `new SomeException(...); stloc; ldloc; throw`
 - P/Invoke, native, internal-call, abstract, and no-IL-body roots
 
-Those facts are intentionally lower-level than `pure` or `impure`. Final purity decisions should be made by a later fixed-point classifier that applies PurelySharp policy profiles to the evidence.
+Those facts are intentionally lower-level than `pure` or `impure`. Final purity decisions are now generated in a report-only fixed-point classifier layered on top of the emitted evidence, and later analyzer consumption should continue to use the same evidence-first model.
 
 Each method also emits `RootCandidates`, which are explicit review categories derived from low-level effects:
 
@@ -36,6 +39,15 @@ Each method also emits `RootCandidates`, which are explicit review categories de
 - `unsafe_or_block_memory_write`
 
 These are not final purity verdicts. They are evidence labels used to seed later policy-aware fixed-point classification.
+
+The report-only classifier currently emits one of:
+
+- `pure`
+- `impure`
+- `conservative_unknown`
+
+It stays conservative whenever evidence is incomplete, unresolved, or identity
+validation would be required before trusting the result in the live analyzer.
 
 ## Root seed policy
 
@@ -85,6 +97,18 @@ dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --sym
 
 When transitive roots are enabled, the JSON also includes `TransitiveThrownExceptionTypes`. For example, `System.ArgumentNullException.ThrowIfNull(...)` can surface `System.ArgumentNullException` from its helper callee even when the public guard method does not directly contain the `throw` instruction.
 
+Add report-only purity classification to the JSON:
+
+```powershell
+dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix System.String.Format --include-callees --max-depth 2 --transitive-roots --classify-purity --limit 50
+```
+
+Compare emitted methods against the current reviewed manual catalogs:
+
+```powershell
+dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix System.BitConverter.GetBytes --include-callees --classify-purity --compare-manual-catalogs --limit 50
+```
+
 ## Analyzer consumption
 
 The analyzer can consume generated exception summaries when the JSON is supplied as an additional file named `PurelySharp.EffectSummary.json` or `*.PurelySharp.EffectSummary.json`.
@@ -101,6 +125,12 @@ dotnet run --project Tools\PurelySharp.EffectSummary -- --assembly "C:\Program F
 
 The output schema is versioned and includes the assembly module version ID so generated summaries can be tied to the exact runtime build.
 
+When purity classification is enabled, schema version `2` adds:
+
+- per-method `PurityClassification`
+- top-level `PurityReport`
+- optional manual-catalog comparison rows for emitted methods only
+
 Summary files are also self-validating enough to cache and share:
 
 - each assembly report includes `AssemblySha256`
@@ -109,12 +139,11 @@ Summary files are also self-validating enough to cache and share:
 
 Consumers can use those fields to reject summaries generated from a different runtime, SDK, package build, or project assembly. For source or project-specific libraries, regenerate the summary after rebuilds and compare the cache key before trusting a row.
 
-## Next steps
+## Remaining work tracking
 
-The durable path from here is:
+Backlog items for the effect-summary pipeline now live only in
+`REMAINING_ANALYZER_BACKLOG.md`.
 
-1. Add a fixed-point classifier over the emitted call/effect graph.
-2. Add explicit root seed files for native/runtime/OS/environment/reflection/threading categories.
-3. Add cache/index validation commands that compare `AssemblySha256`, `ModuleVersionId`, `MetadataToken`, and `MethodBodySha256` against local assemblies before analyzer consumption.
-4. Generate and version checked-in framework summaries for supported target frameworks.
-5. Optionally clone `dotnet/runtime` or the unified .NET source tree to map IL summaries back to source files and comments for review.
+This document should stay descriptive: how the tool works, what evidence it
+emits, and how the analyzer consumes that evidence. It should not carry a
+parallel todo or status list.

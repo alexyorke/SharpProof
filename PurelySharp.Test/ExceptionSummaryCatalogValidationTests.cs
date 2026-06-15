@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
@@ -25,9 +26,8 @@ namespace PurelySharp.Test
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
             var diagnostics = await GetAnalyzerDiagnosticsAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
-                coreLib.AssemblyName,
-                coreLib.AssemblySha256,
-                coreLib.ModuleVersionId));
+                coreLib,
+                "System.ArgumentNullException.ThrowIfNull(object, string)"));
 
             var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId);
 
@@ -40,7 +40,8 @@ namespace PurelySharp.Test
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
             var diagnostics = await GetAnalyzerDiagnosticsAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
-                coreLib.AssemblyName,
+                coreLib,
+                "System.ArgumentNullException.ThrowIfNull(object, string)",
                 "0000000000000000000000000000000000000000000000000000000000000000",
                 "00000000-0000-0000-0000-000000000000"));
 
@@ -52,9 +53,36 @@ namespace PurelySharp.Test
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
             var diagnostics = await GetAnalyzerDiagnosticsAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
-                coreLib.AssemblyName,
+                coreLib,
+                "System.ArgumentNullException.ThrowIfNull(object, string)",
                 string.Empty,
                 coreLib.ModuleVersionId));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_EffectSummary_WithMismatchedMetadataToken_IsIgnored()
+        {
+            var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
+                coreLib,
+                "System.ArgumentNullException.ThrowIfNull(object, string)",
+                metadataToken: "0x06000001"));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_EffectSummary_WithMismatchedMethodBodyHash_IsIgnored()
+        {
+            var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
+            var methodIdentity = GetMethodIdentity(coreLib.AssemblyPath, "System.ArgumentNullException.ThrowIfNull(object, string)");
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
+                coreLib,
+                "System.ArgumentNullException.ThrowIfNull(object, string)",
+                metadataToken: methodIdentity.MetadataToken,
+                methodBodySha256: new string('0', methodIdentity.MethodBodySha256!.Length)));
 
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
@@ -65,7 +93,7 @@ namespace PurelySharp.Test
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
             var diagnostics = await GetAnalyzerDiagnosticsAsync(
                 CreateLibraryCallSource(),
-                CreateEffectSummaryJson(coreLib.AssemblyName, coreLib.AssemblySha256, coreLib.ModuleVersionId),
+                CreateEffectSummaryJson(coreLib, "System.ArgumentNullException.ThrowIfNull(object, string)"),
                 "runtime.PurelySharp.EffectSummary.json");
 
             var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId);
@@ -81,9 +109,8 @@ namespace PurelySharp.Test
             var diagnostics = await GetAnalyzerDiagnosticsAsync(
                 CreateLibraryCallSource(),
                 CreateEffectSummaryJson(
-                    coreLib.AssemblyName,
-                    coreLib.AssemblySha256,
-                    coreLib.ModuleVersionId,
+                    coreLib,
+                    "System.ArgumentNullException.ThrowIfNull(object, string)",
                     thrownExceptionTypesJson: """[ "System.InvalidOperationException" ]""",
                     transitiveThrownExceptionTypesJson: """[ "System.ArgumentNullException" ]"""));
 
@@ -112,10 +139,9 @@ namespace PurelySharp.Test
             var diagnostics = await GetAnalyzerDiagnosticsAsync(
                 CreateLibraryCallSource(),
                 CreateEffectSummaryJson(
-                    coreLib.AssemblyName,
-                    coreLib.AssemblySha256,
-                    coreLib.ModuleVersionId,
-                    symbol: "System.ArgumentNullException.ThrowIfNull(object)"));
+                    coreLib,
+                    "System.ArgumentNullException.ThrowIfNull(object)",
+                    actualMethodLookupSymbol: "System.ArgumentNullException.ThrowIfNull(object, string)"));
 
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
@@ -128,16 +154,14 @@ namespace PurelySharp.Test
                 CreateLibraryCallSource(),
                 ("PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(
-                        coreLib.AssemblyName,
-                        coreLib.AssemblySha256,
-                        coreLib.ModuleVersionId,
+                        coreLib,
+                        "System.ArgumentNullException.ThrowIfNull(object, string)",
                         thrownExceptionTypesJson: """[ "System.InvalidOperationException" ]""",
                         transitiveThrownExceptionTypesJson: "[]")),
                 ("runtime.PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(
-                        coreLib.AssemblyName,
-                        coreLib.AssemblySha256,
-                        coreLib.ModuleVersionId,
+                        coreLib,
+                        "System.ArgumentNullException.ThrowIfNull(object, string)",
                         thrownExceptionTypesJson: "[]",
                         transitiveThrownExceptionTypesJson: """[ "System.ArgumentNullException" ]""")));
 
@@ -194,10 +218,9 @@ public class TestClass
                 {
                     ("PurelySharp.EffectSummary.json",
                         CreateEffectSummaryJson(
-                            identity.AssemblyName,
-                            identity.AssemblySha256,
-                            identity.ModuleVersionId,
-                            symbol: methodSymbol.OriginalDefinition.ToDisplayString(),
+                            identity,
+                            methodSymbol.OriginalDefinition.ToDisplayString(),
+                            actualMethodLookupSymbol: "GenericBoundary.EchoOrThrow(!!0)",
                             thrownExceptionTypesJson: """[ "System.InvalidOperationException" ]""",
                             transitiveThrownExceptionTypesJson: "[]"))
                 },
@@ -251,10 +274,9 @@ public class TestClass
                 {
                     ("PurelySharp.EffectSummary.json",
                         CreateEffectSummaryJson(
-                            identity.AssemblyName,
-                            identity.AssemblySha256,
-                            identity.ModuleVersionId,
-                            symbol: constructorSymbol.OriginalDefinition.ToDisplayString(),
+                            identity,
+                            constructorSymbol.OriginalDefinition.ToDisplayString(),
+                            actualMethodLookupSymbol: "ConstructorBoundary..ctor(string)",
                             thrownExceptionTypesJson: """[ "System.InvalidOperationException" ]""",
                             transitiveThrownExceptionTypesJson: "[]"))
                 },
@@ -323,10 +345,9 @@ public class TestClass
                 {
                     ("PurelySharp.EffectSummary.json",
                         CreateEffectSummaryJson(
-                            identity.AssemblyName,
-                            identity.AssemblySha256,
-                            identity.ModuleVersionId,
-                            symbol: getterSymbol.OriginalDefinition.ToDisplayString(),
+                            identity,
+                            getterSymbol.OriginalDefinition.ToDisplayString(),
+                            actualMethodLookupSymbol: "PropertyBoundary.get_DangerousValue()",
                             thrownExceptionTypesJson: """[ "System.InvalidOperationException" ]""",
                             transitiveThrownExceptionTypesJson: "[]"))
                 },
@@ -386,6 +407,220 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_ToolOutput_PropagatesCommonMetadataExceptions()
+        {
+            const string boundarySource = """
+using System;
+
+public static class SummaryBoundary
+{
+    public static void ThrowIndexOutOfRange() => throw new IndexOutOfRangeException();
+    public static void ThrowInvalidCast() => throw new InvalidCastException();
+    public static void ThrowObjectDisposed() => throw new ObjectDisposedException("stream");
+    public static void ThrowFormat() => throw new FormatException();
+    public static void ThrowOverflow() => throw new OverflowException();
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryCommonExceptions", boundarySource);
+            var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+public class TestClass
+{
+    public void IndexOutOfRange() => SummaryBoundary.ThrowIndexOutOfRange();
+    public void InvalidCast() => SummaryBoundary.ThrowInvalidCast();
+    public void ObjectDisposed() => SummaryBoundary.ThrowObjectDisposed();
+    public void Format() => SummaryBoundary.ThrowFormat();
+    public void Overflow() => SummaryBoundary.ThrowOverflow();
+}
+""",
+                summaryJson,
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            AssertEffectSummaryException(diagnostics, "IndexOutOfRange", "System.IndexOutOfRangeException");
+            AssertEffectSummaryException(diagnostics, "InvalidCast", "System.InvalidCastException");
+            AssertEffectSummaryException(diagnostics, "ObjectDisposed", "System.ObjectDisposedException");
+            AssertEffectSummaryException(diagnostics, "Format", "System.FormatException");
+            AssertEffectSummaryException(diagnostics, "Overflow", "System.OverflowException");
+        }
+
+        [Test]
+        public async Task Ps0010_EffectSummary_ToolOutput_DoesNotReportLocallyCaughtMetadataThrow()
+        {
+            const string boundarySource = """
+using System;
+
+public static class SummaryBoundary
+{
+    public static int HandleLocally()
+    {
+        try
+        {
+            throw new FormatException();
+        }
+        catch (FormatException)
+        {
+            return 1;
+        }
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryCaughtException", boundarySource);
+            var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+public class TestClass
+{
+    public int TestMethod()
+    {
+        return SummaryBoundary.HandleLocally();
+    }
+}
+""",
+                summaryJson,
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_EffectSummary_ToolOutput_PropagatesMetadataRethrow()
+        {
+            const string boundarySource = """
+using System;
+
+public static class SummaryBoundary
+{
+    public static void RethrowOverflow()
+    {
+        try
+        {
+            throw new OverflowException();
+        }
+        catch (OverflowException)
+        {
+            throw;
+        }
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryRethrowException", boundarySource);
+            var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+public class TestClass
+{
+    public void TestMethod()
+    {
+        SummaryBoundary.RethrowOverflow();
+    }
+}
+""",
+                summaryJson,
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            AssertEffectSummaryException(diagnostics, "TestMethod", "System.OverflowException");
+        }
+
+        [Test]
+        public async Task Ps0002_EffectSummary_WithTrustedGeneratedPureClassification_SuppressesUnknownExternalCall()
+        {
+            const string boundarySource = """
+public static class PureBoundary
+{
+    public static int Double(int value) => value * 2;
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("GeneratedPureBoundary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(int value)
+    {
+        return PureBoundary.Double(value);
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "PureBoundary.Double(int)",
+                            "pure",
+                            """[]"""))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_EffectSummary_WithTrustedGeneratedImpureClassification_ReportsImpurity()
+        {
+            const string boundarySource = """
+public static class ImpureBoundary
+{
+    private static int _state;
+
+    public static int Next()
+    {
+        _state++;
+        return _state;
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("GeneratedImpureBoundary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        return ImpureBoundary.Next();
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "ImpureBoundary.Next()",
+                            "impure",
+                            """[ "global_state_write" ]"""))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+        }
+
+        [Test]
         public void ExceptionSummaryCatalog_RepeatedMetadataQueriesReuseAssemblyIdentityCache()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
@@ -401,7 +636,7 @@ public class TestClass
             var analyzerOptions = new AnalyzerOptions(
                 ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
-                    CreateEffectSummaryJson(coreLib.AssemblyName, coreLib.AssemblySha256, coreLib.ModuleVersionId))),
+                    CreateEffectSummaryJson(coreLib, "System.ArgumentNullException.ThrowIfNull(object, string)"))),
                 new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
 
             var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.ExceptionSummaryCatalog", throwOnError: true)!;
@@ -464,21 +699,30 @@ public class TestClass
         }
 
         private static string CreateEffectSummaryJson(
-            string assemblyName,
-            string assemblySha256,
-            string moduleVersionId,
-            string symbol = "System.ArgumentNullException.ThrowIfNull(object, string)",
+            AssemblyIdentity assemblyIdentity,
+            string symbol,
+            string? assemblySha256 = null,
+            string? moduleVersionId = null,
+            string? metadataToken = null,
+            string? methodBodySha256 = null,
+            string? actualMethodLookupSymbol = null,
             string? thrownExceptionTypesJson = null,
             string? transitiveThrownExceptionTypesJson = null)
         {
+            var methodIdentity = GetMethodIdentity(assemblyIdentity.AssemblyPath, actualMethodLookupSymbol ?? symbol);
             thrownExceptionTypesJson ??= "[]";
             transitiveThrownExceptionTypesJson ??= """[ "System.ArgumentNullException" ]""";
+            assemblySha256 ??= assemblyIdentity.AssemblySha256;
+            moduleVersionId ??= assemblyIdentity.ModuleVersionId;
+            metadataToken ??= methodIdentity.MetadataToken;
+            methodBodySha256 ??= methodIdentity.MethodBodySha256;
+            var methodBodySha256Json = methodBodySha256 == null ? "null" : "\"" + methodBodySha256 + "\"";
             return $$"""
 {
   "SchemaVersion": 1,
   "Assemblies": [
     {
-      "AssemblyName": "{{assemblyName}}",
+      "AssemblyName": "{{assemblyIdentity.AssemblyName}}",
       "AssemblyPath": "runtime",
       "AssemblySha256": "{{assemblySha256}}",
       "ModuleVersionId": "{{moduleVersionId}}",
@@ -487,9 +731,9 @@ public class TestClass
       "Methods": [
         {
           "Symbol": "{{symbol}}",
-          "MetadataToken": "0x06000001",
+          "MetadataToken": "{{metadataToken}}",
           "RelativeVirtualAddress": 0,
-          "MethodBodySha256": null,
+          "MethodBodySha256": {{methodBodySha256Json}},
           "CacheKey": "validation-test",
           "Effects": [],
           "RootCandidates": [],
@@ -541,6 +785,91 @@ public class TestClass
 """;
         }
 
+        private static string CreatePuritySummaryJson(
+            AssemblyIdentity assemblyIdentity,
+            string actualMethodLookupSymbol,
+            string classification,
+            string categoriesJson,
+            string? symbolOverride = null)
+        {
+            var methodIdentity = GetMethodIdentity(assemblyIdentity.AssemblyPath, actualMethodLookupSymbol);
+            var symbol = symbolOverride ?? actualMethodLookupSymbol;
+
+            return $$"""
+{
+  "SchemaVersion": 2,
+  "Assemblies": [
+    {
+      "AssemblyName": "{{assemblyIdentity.AssemblyName}}",
+      "AssemblyPath": "{{assemblyIdentity.AssemblyPath.Replace("\\", "\\\\")}}",
+      "AssemblySha256": "{{assemblyIdentity.AssemblySha256}}",
+      "ModuleVersionId": "{{assemblyIdentity.ModuleVersionId}}",
+      "MethodCount": 1,
+      "EmittedMethodCount": 1,
+      "Methods": [
+        {
+          "Symbol": "{{symbol}}",
+          "MetadataToken": "{{methodIdentity.MetadataToken}}",
+          "RelativeVirtualAddress": 0,
+          "MethodBodySha256": {{FormatJsonStringOrNull(methodIdentity.MethodBodySha256)}},
+          "CacheKey": "validation-test",
+          "Effects": [],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "{{classification}}",
+            "Categories": {{categoriesJson}},
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none"
+          }
+        }
+      ]
+    }
+  ]
+}
+""";
+        }
+
+        private static MethodIdentity GetMethodIdentity(string assemblyPath, string symbol)
+        {
+            using var stream = File.OpenRead(assemblyPath);
+            using var peReader = new PEReader(stream);
+            var metadataReader = peReader.GetMetadataReader();
+
+            foreach (var handle in metadataReader.MethodDefinitions)
+            {
+                var methodSymbol = GetMethodSymbol(metadataReader, handle);
+                if (!string.Equals(methodSymbol, symbol, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var definition = metadataReader.GetMethodDefinition(handle);
+                string? methodBodySha256 = null;
+                if (definition.RelativeVirtualAddress != 0)
+                {
+                    var body = peReader.GetMethodBody(definition.RelativeVirtualAddress);
+                    var il = body.GetILBytes();
+                    if (il != null)
+                    {
+                        using var sha256 = SHA256.Create();
+                        methodBodySha256 = Convert.ToHexString(sha256.ComputeHash(il)).ToLowerInvariant();
+                    }
+                }
+
+                return new MethodIdentity($"0x{MetadataTokens.GetToken(handle):X8}", methodBodySha256);
+            }
+
+            throw new AssertionException("Method symbol did not resolve in assembly: " + symbol);
+        }
+
         private static AssemblyIdentity GetAssemblyIdentity(string assemblyPath)
         {
             using var stream = File.OpenRead(assemblyPath);
@@ -554,7 +883,56 @@ public class TestClass
             using var sha256 = SHA256.Create();
             var assemblySha256 = Convert.ToHexString(sha256.ComputeHash(stream)).ToLowerInvariant();
 
-            return new AssemblyIdentity(assemblyName, assemblySha256, moduleVersionId);
+            return new AssemblyIdentity(assemblyPath, assemblyName, assemblySha256, moduleVersionId);
+        }
+
+        private static string GetMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
+        {
+            var definition = reader.GetMethodDefinition(handle);
+            var typeName = GetTypeName(reader, definition.GetDeclaringType());
+            var methodName = reader.GetString(definition.Name);
+            var signature = DecodeMethodSignature(reader, definition);
+            return typeName + "." + methodName + signature;
+        }
+
+        private static string GetTypeName(MetadataReader reader, TypeDefinitionHandle handle)
+        {
+            if (handle.IsNil)
+            {
+                return "<module>";
+            }
+
+            var definition = reader.GetTypeDefinition(handle);
+            var name = reader.GetString(definition.Name);
+            var declaringType = definition.GetDeclaringType();
+            if (!declaringType.IsNil)
+            {
+                return GetTypeName(reader, declaringType) + "+" + name;
+            }
+
+            var ns = reader.GetString(definition.Namespace);
+            return string.IsNullOrEmpty(ns) ? name : ns + "." + name;
+        }
+
+        private static string GetTypeReferenceName(MetadataReader reader, TypeReferenceHandle handle)
+        {
+            var reference = reader.GetTypeReference(handle);
+            var name = reader.GetString(reference.Name);
+            var ns = reader.GetString(reference.Namespace);
+            return string.IsNullOrEmpty(ns) ? name : ns + "." + name;
+        }
+
+        private static string DecodeMethodSignature(MetadataReader reader, MethodDefinition definition)
+        {
+            try
+            {
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
+                return "(" + string.Join(", ", signature.ParameterTypes) + ")";
+            }
+            catch (BadImageFormatException)
+            {
+                return "(?)";
+            }
         }
 
         private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
@@ -711,7 +1089,78 @@ public class TestClass
             return Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory, "..", "..", "..", ".."));
         }
 
-        private sealed record AssemblyIdentity(string AssemblyName, string AssemblySha256, string ModuleVersionId);
+        private static void AssertEffectSummaryException(
+            ImmutableArray<Diagnostic> diagnostics,
+            string methodName,
+            string exceptionType)
+        {
+            var diagnostic = diagnostics
+                .Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId)
+                .Single(d => d.GetMessage().Contains("'" + methodName + "'", StringComparison.Ordinal));
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo(exceptionType));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+        }
+
+        private sealed class EffectSummaryTypeNameProvider : ISignatureTypeProvider<string, object?>
+        {
+            private readonly MetadataReader _reader;
+
+            public EffectSummaryTypeNameProvider(MetadataReader reader)
+            {
+                _reader = reader;
+            }
+
+            public string GetArrayType(string elementType, ArrayShape shape)
+            {
+                var rank = Math.Max(shape.Rank, 1);
+                return elementType + "[" + new string(',', rank - 1) + "]";
+            }
+
+            public string GetByReferenceType(string elementType) => "ref " + elementType;
+            public string GetFunctionPointerType(MethodSignature<string> signature) => "delegate*";
+            public string GetGenericInstantiation(string genericType, ImmutableArray<string> typeArguments) => genericType + "<" + string.Join(", ", typeArguments) + ">";
+            public string GetGenericMethodParameter(object? genericContext, int index) => "!!" + index;
+            public string GetGenericTypeParameter(object? genericContext, int index) => "!" + index;
+            public string GetModifiedType(string modifier, string unmodifiedType, bool isRequired) => unmodifiedType;
+            public string GetPinnedType(string elementType) => elementType;
+            public string GetPointerType(string elementType) => elementType + "*";
+            public string GetPrimitiveType(PrimitiveTypeCode typeCode) => typeCode switch
+            {
+                PrimitiveTypeCode.Boolean => "bool",
+                PrimitiveTypeCode.Byte => "byte",
+                PrimitiveTypeCode.Char => "char",
+                PrimitiveTypeCode.Double => "double",
+                PrimitiveTypeCode.Int16 => "short",
+                PrimitiveTypeCode.Int32 => "int",
+                PrimitiveTypeCode.Int64 => "long",
+                PrimitiveTypeCode.IntPtr => "nint",
+                PrimitiveTypeCode.Object => "object",
+                PrimitiveTypeCode.SByte => "sbyte",
+                PrimitiveTypeCode.Single => "float",
+                PrimitiveTypeCode.String => "string",
+                PrimitiveTypeCode.TypedReference => "typedref",
+                PrimitiveTypeCode.UInt16 => "ushort",
+                PrimitiveTypeCode.UInt32 => "uint",
+                PrimitiveTypeCode.UInt64 => "ulong",
+                PrimitiveTypeCode.UIntPtr => "nuint",
+                PrimitiveTypeCode.Void => "void",
+                _ => typeCode.ToString(),
+            };
+            public string GetSZArrayType(string elementType) => elementType + "[]";
+            public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind) => GetTypeName(metadataReader, handle);
+            public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind) => GetTypeReferenceName(metadataReader, handle);
+            public string GetTypeFromSpecification(MetadataReader metadataReader, object? genericContext, TypeSpecificationHandle handle, byte rawTypeKind)
+                => metadataReader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
+        }
+
+        private sealed record AssemblyIdentity(string AssemblyPath, string AssemblyName, string AssemblySha256, string ModuleVersionId);
+        private sealed record MethodIdentity(string MetadataToken, string? MethodBodySha256);
+
+        private static string FormatJsonStringOrNull(string? value)
+        {
+            return value == null ? "null" : "\"" + value + "\"";
+        }
 
         private static int GetCount(object instance)
         {

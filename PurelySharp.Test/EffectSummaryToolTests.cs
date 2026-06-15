@@ -104,6 +104,94 @@ public static class ExceptionFixture
             AssertThrownExceptions(summary, "ExceptionFixture.RethrowOverflow()", "System.OverflowException");
         }
 
+        [Test]
+        public async Task EffectSummaryTool_Produces_ReportOnly_Purity_Classifications()
+        {
+            var source = """
+using System;
+
+public interface IWorker
+{
+    int Get();
+}
+
+public abstract class AbstractWorker
+{
+    public abstract int Get();
+}
+
+public static class PurityFixture
+{
+    private static int _state;
+
+    public static int PureLeaf() => 42;
+
+    public static int PureViaCallee() => PureLeaf();
+
+    public static int ImpureWrite()
+    {
+        _state++;
+        return _state;
+    }
+
+    public static int ImpureViaCallee() => ImpureWrite();
+
+    public static int UnknownViaInterface(IWorker worker) => worker.Get();
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryPurityClassification", source);
+            using var summary = await RunEffectSummaryAsync(
+                fixture.AssemblyPath,
+                includeTransitiveRoots: true,
+                classifyPurity: true,
+                compareManualCatalogs: true);
+
+            AssertPurityClassification(summary, "PurityFixture.PureLeaf()", "pure");
+            AssertPurityClassification(summary, "PurityFixture.PureViaCallee()", "pure");
+            AssertPurityClassification(summary, "PurityFixture.ImpureWrite()", "impure", "global_state_write");
+            AssertPurityClassification(summary, "PurityFixture.ImpureViaCallee()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "PurityFixture.UnknownViaInterface(IWorker)", "conservative_unknown", "dynamic_dispatch");
+            AssertPurityClassification(summary, "AbstractWorker.Get()", "conservative_unknown", "metadata_only_or_external");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(1));
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThanOrEqualTo(6));
+            Assert.That(report.GetProperty("PureCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+            Assert.That(report.GetProperty("ImpureCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeBitConverterSlice_ProducesCatalogComparisonWithoutCrashing()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.BitConverter.GetBytes", limit: 20);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            var knownPureRow = catalogComparison.GetProperty("KnownPureMembers")
+                .EnumerateArray()
+                .Single(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.BitConverter.GetBytes(int)",
+                    StringComparison.Ordinal));
+            var knownFreshRow = catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers")
+                .EnumerateArray()
+                .Single(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.BitConverter.GetBytes(int)",
+                    StringComparison.Ordinal));
+
+            Assert.That(knownPureRow.GetProperty("Classification").GetString(), Is.Not.Empty);
+            Assert.That(knownFreshRow.GetProperty("Note").GetString(), Is.Not.EqualTo("no_fresh_array_allocation_evidence"));
+        }
+
         private static void AssertThrownExceptions(JsonDocument summary, string methodSymbol, params string[] expectedExceptions)
         {
             var method = FindMethod(summary, methodSymbol);
@@ -128,6 +216,28 @@ public static class ExceptionFixture
             Assert.That(transitiveExceptions, Is.EqualTo(expectedExceptions));
         }
 
+        private static void AssertPurityClassification(
+            JsonDocument summary,
+            string methodSymbol,
+            string expectedClassification,
+            params string[] expectedCategories)
+        {
+            var method = FindMethod(summary, methodSymbol);
+            var classification = method.GetProperty("PurityClassification");
+            Assert.That(classification.GetProperty("Classification").GetString(), Is.EqualTo(expectedClassification));
+
+            var categories = classification.GetProperty("Categories")
+                .EnumerateArray()
+                .Select(value => value.GetString())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
+
+            foreach (var expectedCategory in expectedCategories)
+            {
+                Assert.That(categories, Does.Contain(expectedCategory));
+            }
+        }
+
         private static JsonElement FindMethod(JsonDocument summary, string methodSymbol)
         {
             var methods = summary.RootElement
@@ -142,7 +252,11 @@ public static class ExceptionFixture
                 StringComparison.Ordinal));
         }
 
-        private static async Task<JsonDocument> RunEffectSummaryAsync(string assemblyPath, bool includeTransitiveRoots)
+        private static async Task<JsonDocument> RunEffectSummaryAsync(
+            string assemblyPath,
+            bool includeTransitiveRoots,
+            bool classifyPurity = false,
+            bool compareManualCatalogs = false)
         {
             var outputPath = Path.Combine(Path.GetDirectoryName(assemblyPath)!, Guid.NewGuid().ToString("N") + ".json");
             var startInfo = new ProcessStartInfo
@@ -165,6 +279,58 @@ public static class ExceptionFixture
             {
                 startInfo.ArgumentList.Add("--transitive-roots");
             }
+            if (classifyPurity)
+            {
+                startInfo.ArgumentList.Add("--classify-purity");
+            }
+            if (compareManualCatalogs)
+            {
+                startInfo.ArgumentList.Add("--compare-manual-catalogs");
+            }
+
+            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start effect summary tool.");
+            var standardOutput = await process.StandardOutput.ReadToEndAsync();
+            var standardError = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            if (process.ExitCode != 0)
+            {
+                throw new AssertionException(
+                    "Effect summary tool failed." + Environment.NewLine +
+                    standardOutput + Environment.NewLine +
+                    standardError);
+            }
+
+            return JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+        }
+
+        private static async Task<JsonDocument> RunRuntimeEffectSummaryAsync(string symbolPrefix, int limit)
+        {
+            var outputPath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "runtime-effect-summary-" + Guid.NewGuid().ToString("N") + ".json");
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                WorkingDirectory = GetRepositoryRoot(),
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            startInfo.ArgumentList.Add("run");
+            startInfo.ArgumentList.Add("--project");
+            startInfo.ArgumentList.Add("Tools\\PurelySharp.EffectSummary\\PurelySharp.EffectSummary.csproj");
+            startInfo.ArgumentList.Add("--");
+            startInfo.ArgumentList.Add("--framework");
+            startInfo.ArgumentList.Add("net8.0");
+            startInfo.ArgumentList.Add("--symbol-prefix");
+            startInfo.ArgumentList.Add(symbolPrefix);
+            startInfo.ArgumentList.Add("--include-callees");
+            startInfo.ArgumentList.Add("--classify-purity");
+            startInfo.ArgumentList.Add("--compare-manual-catalogs");
+            startInfo.ArgumentList.Add("--limit");
+            startInfo.ArgumentList.Add(limit.ToString());
+            startInfo.ArgumentList.Add("--output");
+            startInfo.ArgumentList.Add(outputPath);
 
             using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start effect summary tool.");
             var standardOutput = await process.StandardOutput.ReadToEndAsync();

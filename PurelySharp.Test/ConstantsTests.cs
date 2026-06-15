@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using PurelySharp.Analyzer.Engine;
+using PurelySharp.Analyzer;
 
 namespace PurelySharp.Test
 {
@@ -63,14 +64,22 @@ public static class CatalogSignatureSamples
         _ = IPAddress.Loopback;
         _ = names.Contains(""alpha"");
         _ = new FileNotFoundException(""missing.txt"");
+        ReadOnlySpan<char> chars = ""alpha"".AsSpan();
         byte[] bytes = new byte[1];
+        ReadOnlySpan<byte> spanBytes = bytes;
         ReadOnlySpan<byte> left = stackalloc byte[1];
         ReadOnlySpan<byte> right = stackalloc byte[1];
+        _ = new string(chars);
         _ = SHA1.HashData(bytes);
         _ = SHA256.HashData(bytes);
         _ = SHA384.HashData(bytes);
         _ = SHA512.HashData(bytes);
         _ = MD5.HashData(bytes);
+        _ = SHA1.HashData(spanBytes);
+        _ = SHA256.HashData(spanBytes);
+        _ = SHA384.HashData(spanBytes);
+        _ = SHA512.HashData(spanBytes);
+        _ = MD5.HashData(spanBytes);
         _ = CryptographicOperations.FixedTimeEquals(left, right);
         return Array.Empty<int>().Length + list.Count + now.Day;
     }
@@ -103,6 +112,9 @@ public static class CatalogSignatureSamples
             Assert.That(GetObjectCreationSignature(compilation, syntaxTree, "new FileNotFoundException(\"missing.txt\")"), Is.EqualTo("System.IO.FileNotFoundException.FileNotFoundException(string?)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetObjectCreationSignature(compilation, syntaxTree, "new FileNotFoundException(\"missing.txt\")")));
 
+            Assert.That(GetObjectCreationSignature(compilation, syntaxTree, "new string(chars)"), Is.EqualTo("string.String(System.ReadOnlySpan<char>)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetObjectCreationSignature(compilation, syntaxTree, "new string(chars)")));
+
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "CryptographicOperations.FixedTimeEquals(left, right)"), Is.EqualTo("System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan<byte>, System.ReadOnlySpan<byte>)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "CryptographicOperations.FixedTimeEquals(left, right)")));
 
@@ -125,6 +137,26 @@ public static class CatalogSignatureSamples
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.SHA512.HashData(byte[])"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(bytes)")));
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(bytes)")));
+
+            Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(spanBytes)"), Is.EqualTo("System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan<byte>)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(spanBytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(spanBytes)")));
+
+            Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(spanBytes)"), Is.EqualTo("System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan<byte>)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(spanBytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(spanBytes)")));
+
+            Assert.That(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(spanBytes)"), Is.EqualTo("System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan<byte>)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(spanBytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(spanBytes)")));
+
+            Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(spanBytes)"), Is.EqualTo("System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan<byte>)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(spanBytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(spanBytes)")));
+
+            Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(spanBytes)"), Is.EqualTo("System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan<byte>)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(spanBytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(spanBytes)")));
         }
 
         [Test]
@@ -178,6 +210,8 @@ public static class RecentCatalogSignatureSamples
         _ = Guid.TryParseExact(text, ""D"", out parsed);
         _ = guid.ToString(""N"");
         var chars = text.ToCharArray();
+        ReadOnlySpan<char> charSpan = text.AsSpan();
+        _ = new string(charSpan);
         _ = guid.ToByteArray();
         _ = guid.ToByteArray(true);
         _ = Convert.FromBase64String(text);
@@ -248,6 +282,7 @@ public static class RecentCatalogSignatureSamples
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Guid.TryParse(text, out var parsed)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Guid.TryParseExact(text, \"D\", out parsed)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "guid.ToString(\"N\")"), expectedPure: true, expectedImpure: false);
+            AssertCatalogMembership(GetObjectCreationSignature(compilation, syntaxTree, "new string(charSpan)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "guid.ToByteArray()"), expectedPure: true, expectedImpure: false);
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "guid.ToByteArray()")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "guid.ToByteArray(true)"), expectedPure: true, expectedImpure: false);

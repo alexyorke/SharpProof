@@ -447,6 +447,32 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            if (originalDefinitionSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
+                    originalDefinitionSymbol,
+                    context.SemanticModel.Compilation,
+                    out var generatedPurity))
+            {
+                if (generatedPurity.IsPure)
+                {
+                    PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (trusted generated purity summary)");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                }
+
+                if (generatedPurity.IsImpure)
+                {
+                    PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (trusted generated purity summary)");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        invocationOperation.Syntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            generatedPurity.PrimaryCategory,
+                            nameof(MethodInvocationPurityRule),
+                            invocationOperation,
+                            symbol: originalDefinitionSymbol,
+                            catalogSource: "generated_purity_summary"));
+                }
+            }
+
 
 
             string methodDisplayString = originalDefinitionSymbol.ToDisplayString();

@@ -788,6 +788,32 @@ namespace PurelySharp.Analyzer.Engine
                     return PurityAnalysisResult.Pure;
                 }
 
+                if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                    TryGetTrustedGeneratedPurity(methodSymbol, semanticModel.Compilation, out var generatedPurity))
+                {
+                    if (generatedPurity.IsPure)
+                    {
+                        LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is trusted pure from generated purity summary.");
+                        purityCache[methodSymbol] = PurityAnalysisResult.Pure;
+                        return PurityAnalysisResult.Pure;
+                    }
+
+                    if (generatedPurity.IsImpure)
+                    {
+                        LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is trusted impure from generated purity summary.");
+                        var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+                        var generatedResult = ImpureResult(
+                            syntax,
+                            PurityEvidence.Create(
+                                generatedPurity.PrimaryCategory,
+                                syntaxNode: syntax,
+                                symbol: methodSymbol,
+                                catalogSource: "generated_purity_summary"));
+                        purityCache[methodSymbol] = generatedResult;
+                        return generatedResult;
+                    }
+                }
+
                 if (IsKnownImpure(methodSymbol))
                 {
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is known impure.");
@@ -2462,6 +2488,14 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             return HasAssemblyAttributeNamed(symbol, "PureExternalAttribute", "PurelySharp.Attributes.PureExternalAttribute");
+        }
+
+        internal static bool TryGetTrustedGeneratedPurity(
+            IMethodSymbol methodSymbol,
+            Compilation compilation,
+            out GeneratedPurityCatalog.PurityEntry purity)
+        {
+            return GeneratedPurityCatalog.Current.TryGetPurity(methodSymbol, compilation, out purity);
         }
 
 

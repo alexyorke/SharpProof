@@ -35,10 +35,21 @@ internal static class EffectSummaryCli
                 options.IncludeTransitiveRoots))
             .ToArray();
 
+        PurityClassificationReport? purityClassificationReport = null;
+        if (options.IncludePurityClassification || options.CompareManualCatalogs)
+        {
+            var classificationOutput = PurityClassificationEngine.Classify(
+                reports,
+                includeCatalogComparison: options.CompareManualCatalogs);
+            reports = classificationOutput.Assemblies;
+            purityClassificationReport = classificationOutput.Report;
+        }
+
         var document = new EffectSummaryDocument(
-            SchemaVersion: 1,
+            SchemaVersion: purityClassificationReport == null ? 1 : 2,
             GeneratedAtUtc: DateTimeOffset.UtcNow,
-            Assemblies: reports);
+            Assemblies: reports,
+            PurityReport: purityClassificationReport);
 
         var jsonOptions = new JsonSerializerOptions
         {
@@ -76,6 +87,8 @@ internal static class EffectSummaryCli
         Console.Error.WriteLine("  --include-callees          Also emit same-assembly callees reachable from matched symbols.");
         Console.Error.WriteLine("  --max-depth <count>        Maximum same-assembly callee depth when --include-callees is used. Default: 1.");
         Console.Error.WriteLine("  --transitive-roots         Propagate root candidate labels through same-assembly calls.");
+        Console.Error.WriteLine("  --classify-purity         Add report-only fixed-point purity classifications to the JSON output.");
+        Console.Error.WriteLine("  --compare-manual-catalogs Compare emitted methods against the current reviewed manual catalogs.");
         Console.Error.WriteLine("  --output <path>            Write JSON to a file instead of stdout.");
         Console.Error.WriteLine("  --limit <count>            Limit emitted method summaries for smoke testing.");
         Console.Error.WriteLine("  --help                     Show this help.");
@@ -101,6 +114,10 @@ internal sealed class CliOptions
     public int MaxDepth { get; private set; } = 1;
 
     public bool IncludeTransitiveRoots { get; private set; }
+
+    public bool IncludePurityClassification { get; private set; }
+
+    public bool CompareManualCatalogs { get; private set; }
 
     public bool ShowHelp { get; private set; }
 
@@ -132,6 +149,13 @@ internal sealed class CliOptions
                     break;
                 case "--transitive-roots":
                     options.IncludeTransitiveRoots = true;
+                    break;
+                case "--classify-purity":
+                    options.IncludePurityClassification = true;
+                    break;
+                case "--compare-manual-catalogs":
+                    options.IncludePurityClassification = true;
+                    options.CompareManualCatalogs = true;
                     break;
                 case "--output":
                     options.OutputPath = ReadRequiredValue(args, ref i, arg);
@@ -882,6 +906,8 @@ internal static class AssemblyEffectSummarizer
 
     private static string? GetEntityTypeName(MetadataReader reader, EntityHandle handle)
     {
+        try
+        {
             return handle.Kind switch
             {
                 HandleKind.TypeDefinition => GetExceptionTypeDefinitionName(reader, (TypeDefinitionHandle)handle),
@@ -889,6 +915,11 @@ internal static class AssemblyEffectSummarizer
                 _ => null
             };
         }
+        catch (BadImageFormatException)
+        {
+            return null;
+        }
+    }
 
     private static string GetExceptionTypeDefinitionName(MetadataReader reader, TypeDefinitionHandle handle)
     {
@@ -942,33 +973,40 @@ internal static class AssemblyEffectSummarizer
         string thrownExceptionType,
         string catchExceptionType)
     {
-        var currentType = thrownExceptionType;
-        var visitedTypes = new HashSet<string>(StringComparer.Ordinal);
-        while (visitedTypes.Add(currentType))
+        try
         {
-            var definitionHandle = reader.TypeDefinitions
-                .FirstOrDefault(handle => string.Equals(
-                    GetExceptionTypeDefinitionName(reader, handle),
-                    currentType,
-                    StringComparison.Ordinal));
-            if (definitionHandle.IsNil)
+            var currentType = thrownExceptionType;
+            var visitedTypes = new HashSet<string>(StringComparer.Ordinal);
+            while (visitedTypes.Add(currentType))
             {
-                return false;
-            }
+                var definitionHandle = reader.TypeDefinitions
+                    .FirstOrDefault(handle => string.Equals(
+                        GetExceptionTypeDefinitionName(reader, handle),
+                        currentType,
+                        StringComparison.Ordinal));
+                if (definitionHandle.IsNil)
+                {
+                    return false;
+                }
 
-            var definition = reader.GetTypeDefinition(definitionHandle);
-            var baseType = GetEntityTypeName(reader, definition.BaseType);
-            if (string.IsNullOrWhiteSpace(baseType))
-            {
-                return false;
-            }
+                var definition = reader.GetTypeDefinition(definitionHandle);
+                var baseType = GetEntityTypeName(reader, definition.BaseType);
+                if (string.IsNullOrWhiteSpace(baseType))
+                {
+                    return false;
+                }
 
-            if (string.Equals(baseType, catchExceptionType, StringComparison.Ordinal))
-            {
-                return true;
-            }
+                if (string.Equals(baseType, catchExceptionType, StringComparison.Ordinal))
+                {
+                    return true;
+                }
 
-            currentType = baseType;
+                currentType = baseType;
+            }
+        }
+        catch (BadImageFormatException)
+        {
+            return false;
         }
 
         return false;
@@ -1305,7 +1343,8 @@ internal sealed class TypeNameProvider : ISignatureTypeProvider<string, object?>
 internal sealed record EffectSummaryDocument(
     int SchemaVersion,
     DateTimeOffset GeneratedAtUtc,
-    AssemblyEffectReport[] Assemblies);
+    AssemblyEffectReport[] Assemblies,
+    PurityClassificationReport? PurityReport);
 
 internal sealed record AssemblyEffectReport(
     string AssemblyName,
@@ -1328,4 +1367,7 @@ internal sealed record MethodEffectSummary(
     string[] ThrownExceptionTypes,
     string[] TransitiveThrownExceptionTypes,
     string[] Calls,
-    string[] Fields);
+    string[] Fields)
+{
+    public MethodPurityClassification? PurityClassification { get; init; }
+}

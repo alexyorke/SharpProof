@@ -341,6 +341,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 out methodSymbol);
         }
 
+
         private static bool IsPureArrayReturningInvocationReturn(
             IOperation? returnedValue,
             out IMethodSymbol methodSymbol)

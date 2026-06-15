@@ -7,6 +7,7 @@ Merged here and expected to stay deleted:
 - `REFACTORING_STATUS_PURELYSHARP.md`
 - `IMPLEMENTATION_TODO.md`
 - `FUZZ_BACKLOG.md`
+- backlog-style "next steps" previously carried in `docs/effect-summary.md`
 
 Not backlog files:
 
@@ -18,21 +19,39 @@ Not backlog files:
 ## Current repo truth
 
 - Only top-level backlog/status markdown still present is this file.
+- The only markdown file that should carry remaining-work items is this file.
 - The analyzer already has:
   - explainable `PS0002` evidence properties
   - `PS0010` exception reporting and effect-summary tooling
+  - report-only implementation-derived purity classification in
+    `Tools/PurelySharp.EffectSummary`
   - manifest-backed Roslyn shape coverage tests
   - deterministic and random fuzz infrastructure
   - exact concrete dispatch narrowing for locals, aliases, casts, and
     same-concrete conditional, `??`, or `if`/`else` merges
   - explicit rules for anonymous object creation, inline array access, and
     implicit indexer reference
-- Last confirmed full `PurelySharp.Test` baseline: `2135/2135` green.
+- Last confirmed full `PurelySharp.Test` baseline: `2149/2149` green.
+
+## What still remains, at a high level
+
+- Close evidence-backed analyzer precision gaps that still show up as
+  `unknown_external_call`, `dynamic_dispatch`, `unsupported_operation`, or
+  deliberately conservative test expectations.
+- Expand trusted effect-summary coverage so metadata and hidden-runtime methods
+  can be classified from concrete evidence instead of broad catalogs.
+- Use the new report-only implementation-derived classifier as the gate for
+  catalog retirement, rather than broad manual cleanup.
+- Keep the backlog artifact-driven: promote repeated fuzz or corpus findings
+  into deterministic regressions, then remove the backlog item once the gap is
+  test-locked.
 
 ## Immediate next actions
 
 - [ ] Continue expanding trusted effect-summary coverage for metadata-only or
       hidden implementation methods.
+- [ ] Use the report-only purity classifier output to choose the first narrow
+      reviewed manual-catalog retirement tranche.
 - [ ] Pick the next bounded analyzer precision fix from the P0 list and land it
       behind narrow regressions.
 
@@ -56,12 +75,20 @@ Current state:
   - multi-file summary merge for the same trusted symbol
   - wrong-symbol rows being ignored
   - malformed rows being ignored
+  - assembly hash, module version ID, metadata token, and method-body hash
+    validation before trusting a consumed metadata summary
 - Boundary coverage now also locks generic metadata method summary matching on
   constructed calls.
 - Metadata fixture coverage now also locks constructor and property-getter
   summary matching through trusted assembly identity.
 - End-to-end fixture coverage now also locks emitted-summary to consumed-summary
-  alignment for transitive metadata exceptions.
+  alignment for transitive metadata exceptions, common direct metadata
+  exception families, metadata methods that catch their own throws, and
+  metadata rethrow paths that should still escape.
+- A report-only fixed-point purity classifier now consumes the same emitted
+  evidence and can compare emitted members against the current reviewed manual
+  pure, impure, and fresh-array catalogs without changing live analyzer
+  behavior.
 
 Remaining:
 
@@ -71,6 +98,13 @@ Remaining:
       stay aligned.
 - [ ] Reduce conservative `unknown_external_call` fallbacks only when a
       trusted per-member summary exists.
+- [ ] Add or check in reviewed framework summary artifacts only after identity
+      validation is strong enough to reject mismatched runtimes.
+- [ ] Promote trusted generated purity rows into optional analyzer consumption
+      only for exact external members after review.
+- [ ] Keep runtime-native, OS, reflection, environment, time, culture,
+      randomness, threading, synchronization, and unsafe roots explicit and
+      evidence-labeled rather than broad heuristic allowlists.
 
 Done when:
 
@@ -90,10 +124,15 @@ Current state:
 
 - Reviewed trusted fresh-array producers already include:
   - `SHA1.HashData(byte[])`
+  - `SHA1.HashData(System.ReadOnlySpan<byte>)`
   - `SHA256.HashData(byte[])`
+  - `SHA256.HashData(System.ReadOnlySpan<byte>)`
   - `SHA384.HashData(byte[])`
+  - `SHA384.HashData(System.ReadOnlySpan<byte>)`
   - `SHA512.HashData(byte[])`
+  - `SHA512.HashData(System.ReadOnlySpan<byte>)`
   - `MD5.HashData(byte[])`
+  - `MD5.HashData(System.ReadOnlySpan<byte>)`
   - `Convert.FromBase64String(string)`
   - `Convert.FromBase64CharArray(char[], int, int)`
   - `Convert.FromHexString(string)`
@@ -104,6 +143,8 @@ Current state:
     `char`, `short`, `ushort`, `int`, `uint`, `float`, `long`, `ulong`, and
     `double`
 - Signature validation exists in `ConstantsTests`.
+- Catalog proof now also explicitly locks `string(ReadOnlySpan<char>)` as a
+  reviewed pure materialization path, separate from the fresh-array subset.
 
 Remaining:
 
@@ -143,6 +184,9 @@ Remaining:
 - [ ] Improve static abstract interface member resolution in generic contexts.
 - [ ] Keep mutable field and property receiver flows conservative unless the
       target stays provable.
+- [ ] Revisit repo-proven conservative interface/property cases such as
+      framework configuration getters only if the concrete target can be
+      narrowed without guessing across external implementations.
 
 Done when:
 
@@ -187,6 +231,9 @@ Remaining:
       bounded precision wins.
 - [ ] Keep multi-source and wrapper-heavy cases conservative unless the source
       side stays provable.
+- [ ] Keep generic interpolation, comparer callbacks, and delegate-backed
+      formatting/query helpers conservative unless their callback targets can be
+      proven exactly.
 
 Done when:
 
@@ -236,6 +283,43 @@ Done when:
 - Any new crypto allowances are per-member, evidence-based, and regression
   tested.
 
+### 8. Exception and effect-summary depth beyond the current PS0010 baseline
+
+Evidence:
+
+- `PurelySharp.Test/ExceptionFlowAnalysisTests.cs`
+- `PurelySharp.Test/EffectSummaryToolTests.cs`
+- `PurelySharp.Test/ExceptionSummaryCatalogValidationTests.cs`
+- `Tools/PurelySharp.EffectSummary/Program.cs`
+- `docs/effect-summary.md`
+
+Current state:
+
+- `PS0010` already covers source throws, simple rethrows, definite divide by
+  zero, definite null dereference, basic catch suppression, same-compilation
+  source propagation, and trusted consumed metadata summaries.
+- The effect-summary tool already emits low-level call/effect facts, root
+  candidates, thrown exception types, assembly SHA-256, method-body SHA-256,
+  cache keys, and module version ID metadata.
+
+Remaining:
+
+- [ ] Add more fixture-based end-to-end tests that prove emitted summaries are
+      consumed exactly as intended by the analyzer.
+- [ ] Tighten coverage for caught-vs-escaped exceptions in metadata summaries,
+      especially where IL exception handler tables matter.
+- [ ] Expand library-style fixture coverage for common propagated exceptions
+      such as `IndexOutOfRangeException`, `InvalidCastException`,
+      `ObjectDisposedException`, `FormatException`, and `OverflowException`.
+- [ ] Keep nullability, arithmetic, and path-feasibility growth bounded and
+      regression-tested instead of turning PS0010 into speculative symbolic
+      execution.
+
+Done when:
+
+- Exception diagnostics for trusted metadata methods are driven by validated
+  summaries and fixture-backed regressions instead of ad hoc assumptions.
+
 ## P1 - Explicit conservative surfaces
 
 ### 1. Remaining conservative Roslyn operation shapes
@@ -269,6 +353,9 @@ Remaining:
 - [ ] Either implement bounded support or keep each remaining shape locked
       behind explicit conservative-contract tests and deterministic generator
       coverage.
+- [ ] Keep the manifest, generator registry, and deterministic shape-targeting
+      tests in sync so every `generator_backed` shape stays reachable on
+      purpose, not by fuzzing luck.
 
 ### 2. Runtime surfaces that should stay conservative unless root proof exists
 
@@ -300,6 +387,9 @@ Remaining:
       frameworks where practical.
 - [ ] Separate generated evidence from hand-maintained policy so catalog edits
       stay reviewable.
+- [ ] Keep effect-summary generated evidence and catalog policy in distinct
+      files or stages so reviewed policy changes do not get hidden inside tool
+      output churn.
 
 ### 2. Broader performance and caching coverage
 
@@ -327,6 +417,8 @@ Remaining:
 - [ ] Use corpus and fuzz outputs to refresh this file from evidence instead of
       ad hoc notes.
 - [ ] Promote repeated findings into deterministic regressions quickly.
+- [ ] Periodically collapse repo comments or tests that still describe fixed
+      behavior as limitations so this file stays the only remaining-work view.
 
 ### 4. Documentation discipline
 
@@ -348,3 +440,5 @@ Remaining:
 6. Mutual recursion proof.
 7. Conservative Roslyn shape tranche.
 8. Catalog and perf durability work.
+9. Keep `docs/effect-summary.md` and `README.md` descriptive only, with no
+   parallel remaining-work lists.

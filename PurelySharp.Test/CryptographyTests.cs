@@ -247,6 +247,133 @@ public class TestClass
         }
 
         [Test]
+        public async Task Sha256_HashData_ReadOnlySpan_NoDiagnostic()
+        {
+            var test = @"
+#nullable enable
+using System;
+using System.Security.Cryptography;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(ReadOnlySpan<byte> data)
+    {
+        return SHA256.HashData(data);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Sha256_HashData_ReadOnlySpan_LocalReturned_NoDiagnostic()
+        {
+            var test = @"
+#nullable enable
+using System;
+using System.Security.Cryptography;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(ReadOnlySpan<byte> data)
+    {
+        var hash = SHA256.HashData(data);
+        return hash;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Md5_HashData_ReadOnlySpan_NoDiagnostic()
+        {
+            var test = @"
+#nullable enable
+using System;
+using System.Security.Cryptography;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(ReadOnlySpan<byte> data)
+    {
+        return MD5.HashData(data);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Sha1_HashData_ReadOnlySpan_NoDiagnostic()
+        {
+            var test = @"
+#nullable enable
+using System;
+using System.Security.Cryptography;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(ReadOnlySpan<byte> data)
+    {
+        return SHA1.HashData(data);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Sha384_HashData_ReadOnlySpan_NoDiagnostic()
+        {
+            var test = @"
+#nullable enable
+using System;
+using System.Security.Cryptography;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(ReadOnlySpan<byte> data)
+    {
+        return SHA384.HashData(data);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Sha512_HashData_ReadOnlySpan_NoDiagnostic()
+        {
+            var test = @"
+#nullable enable
+using System;
+using System.Security.Cryptography;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(ReadOnlySpan<byte> data)
+    {
+        return SHA512.HashData(data);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task SignedCms_Decode_Diagnostic()
         {
             var test = @"
