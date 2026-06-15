@@ -427,5 +427,125 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task BitConverterGetBytesBool_ReturnedArray_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(bool value)
+    {
+        return BitConverter.GetBytes(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task BitConverterGetBytesBool_LocalReturnedArray_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(bool value)
+    {
+        var bytes = BitConverter.GetBytes(value);
+        return bytes;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task BitConverterGetBytesBool_ConditionalReturnedArray_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(bool useLeft, bool value)
+    {
+        return useLeft
+            ? BitConverter.GetBytes(value)
+            : BitConverter.GetBytes(!value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task BitConverterGetBytesChar_ReturnedArray_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(char value)
+    {
+        return BitConverter.GetBytes(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task BitConverterGetBytesChar_LocalReturnedArray_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(char value)
+    {
+        var bytes = BitConverter.GetBytes(value);
+        return bytes;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task BitConverterGetBytesChar_ConditionalReturnedArray_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public byte[] TestMethod(bool useLeft, char value)
+    {
+        return useLeft
+            ? BitConverter.GetBytes(value)
+            : BitConverter.GetBytes((char)(value + 1));
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

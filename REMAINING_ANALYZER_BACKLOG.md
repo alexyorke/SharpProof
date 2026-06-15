@@ -27,7 +27,7 @@ Not backlog files:
     same-concrete conditional, `??`, or `if`/`else` merges
   - explicit rules for anonymous object creation, inline array access, and
     implicit indexer reference
-- Last confirmed full `PurelySharp.Test` baseline: `2126/2126` green.
+- Last confirmed full `PurelySharp.Test` baseline: `2132/2132` green.
 
 ## Immediate next actions
 
@@ -99,11 +99,9 @@ Current state:
   - `Guid.ToByteArray()`
   - `Guid.ToByteArray(bool)`
   - `string.ToCharArray()`
-  - reviewed `BitConverter.GetBytes(short)`, `BitConverter.GetBytes(ushort)`,
-    `BitConverter.GetBytes(int)`, `BitConverter.GetBytes(uint)`,
-    `BitConverter.GetBytes(float)`, `BitConverter.GetBytes(long)`,
-    `BitConverter.GetBytes(ulong)`, and `BitConverter.GetBytes(double)`
-    overloads
+  - reviewed primitive `BitConverter.GetBytes(...)` overloads for `bool`,
+    `char`, `short`, `ushort`, `int`, `uint`, `float`, `long`, `ulong`, and
+    `double`
 - Signature validation exists in `ConstantsTests`.
 
 Remaining:

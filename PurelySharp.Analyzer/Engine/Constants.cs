@@ -1044,6 +1044,8 @@ public static class Constants
     {
         "System.BitConverter.GetBytes(int)",
         "System.BitConverter.GetBytes(short)",
+        "System.BitConverter.GetBytes(bool)",
+        "System.BitConverter.GetBytes(char)",
         "System.BitConverter.GetBytes(float)",
         "System.BitConverter.GetBytes(double)",
         "System.BitConverter.GetBytes(long)",
@@ -1079,6 +1081,8 @@ public static class Constants
 
         "System.BitConverter.GetBytes(int)",
         "System.BitConverter.GetBytes(short)",
+        "System.BitConverter.GetBytes(bool)",
+        "System.BitConverter.GetBytes(char)",
         "System.BitConverter.GetBytes(float)",
         "System.BitConverter.GetBytes(double)",
         "System.BitConverter.GetBytes(long)",
