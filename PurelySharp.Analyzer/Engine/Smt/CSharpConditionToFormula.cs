@@ -73,7 +73,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
             }
 
             if (expression is IsPatternExpressionSyntax isPatternExpression &&
-                TryTranslateIsNullPattern(isPatternExpression, semanticModel, cancellationToken, out var patternFormula))
+                TryTranslateConstantPattern(isPatternExpression, semanticModel, cancellationToken, out var patternFormula))
             {
                 formula = patternFormula;
                 return true;
@@ -83,7 +83,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
             return false;
         }
 
-        private static bool TryTranslateIsNullPattern(
+        private static bool TryTranslateConstantPattern(
             IsPatternExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -97,18 +97,22 @@ namespace PurelySharp.Analyzer.Engine.Smt
             }
 
             if (expression.Pattern is ConstantPatternSyntax constantPattern &&
-                constantPattern.Expression.IsKind(SyntaxKind.NullLiteralExpression))
+                TryTranslateValue(constantPattern.Expression, semanticModel, cancellationToken, out var constantValue) &&
+                constantValue != null &&
+                AreComparable(value, constantValue))
             {
-                formula = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtNullConstant());
+                formula = new SmtBinaryFormula(SmtBinaryOperator.Equal, value, constantValue);
                 return true;
             }
 
             if (expression.Pattern is UnaryPatternSyntax unaryPattern &&
                 unaryPattern.OperatorToken.IsKind(SyntaxKind.NotKeyword) &&
                 unaryPattern.Pattern is ConstantPatternSyntax notPattern &&
-                notPattern.Expression.IsKind(SyntaxKind.NullLiteralExpression))
+                TryTranslateValue(notPattern.Expression, semanticModel, cancellationToken, out var negatedConstantValue) &&
+                negatedConstantValue != null &&
+                AreComparable(value, negatedConstantValue))
             {
-                formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtNullConstant());
+                formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, negatedConstantValue);
                 return true;
             }
 

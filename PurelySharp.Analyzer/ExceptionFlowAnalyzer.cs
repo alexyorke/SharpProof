@@ -8,12 +8,15 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Analyzer.Engine;
+using PurelySharp.Analyzer.Engine.Smt;
+using SearchLib.Smt;
 
 namespace PurelySharp.Analyzer
 {
     internal static class ExceptionFlowAnalyzer
     {
         private const string UnknownExceptionType = "unknown";
+        private static readonly TimeSpan SmtTimeout = TimeSpan.FromMilliseconds(25);
 
         private static readonly SymbolDisplayFormat ExceptionTypeDisplayFormat = new SymbolDisplayFormat(
             typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
@@ -652,25 +655,30 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
+            if (!TryCreateFactFormula(symbol, factKind, out var factFormula) || factFormula == null)
+            {
+                return false;
+            }
+
+            var pathConditions = new List<SmtFormula>();
             foreach (var ifStatement in useNode.Ancestors().OfType<IfStatementSyntax>())
             {
                 if (ifStatement.Statement.Span.Contains(useNode.SpanStart) &&
-                    ConditionImpliesFact(ifStatement.Condition, symbol, factKind, branchWhenTrue: true, semanticModel, cancellationToken) &&
                     !IsSymbolAssignedBeforeUse(ifStatement.Statement, useNode.SpanStart, symbol, semanticModel, cancellationToken))
                 {
-                    return true;
+                    TryAddPathCondition(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
                 }
 
                 if (ifStatement.Else?.Statement is { } elseStatement &&
                     elseStatement.Span.Contains(useNode.SpanStart) &&
-                    ConditionImpliesFact(ifStatement.Condition, symbol, factKind, branchWhenTrue: false, semanticModel, cancellationToken) &&
                     !IsSymbolAssignedBeforeUse(elseStatement, useNode.SpanStart, symbol, semanticModel, cancellationToken))
                 {
-                    return true;
+                    TryAddPathCondition(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, pathConditions);
                 }
             }
 
-            return IsKnownByPrecedingGuardIf(symbol, useNode, semanticModel, cancellationToken, factKind);
+            AddPrecedingGuardConditions(symbol, useNode, semanticModel, cancellationToken, pathConditions);
+            return pathConditions.Count > 0 && PathConditionsImplyFact(pathConditions, factFormula);
         }
 
         private static bool IsKnownByPriorAssignment(
@@ -752,12 +760,12 @@ namespace PurelySharp.Analyzer
             return matchedAssignment;
         }
 
-        private static bool IsKnownByPrecedingGuardIf(
+        private static void AddPrecedingGuardConditions(
             ISymbol symbol,
             SyntaxNode useNode,
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken,
-            PathFactKind factKind)
+            ICollection<SmtFormula> pathConditions)
         {
             var containingStatement = useNode
                 .AncestorsAndSelf()
@@ -765,7 +773,7 @@ namespace PurelySharp.Analyzer
                 .FirstOrDefault(statement => statement.Parent is BlockSyntax);
             if (containingStatement?.Parent is not BlockSyntax block)
             {
-                return false;
+                return;
             }
 
             foreach (var statement in block.Statements)
@@ -778,14 +786,11 @@ namespace PurelySharp.Analyzer
                 if (statement is IfStatementSyntax ifStatement &&
                     ifStatement.Else == null &&
                     StatementDefinitelyExits(ifStatement.Statement) &&
-                    ConditionImpliesFact(ifStatement.Condition, symbol, factKind, branchWhenTrue: false, semanticModel, cancellationToken) &&
                     !IsSymbolAssignedBetween(block, ifStatement.Span.End, useNode.SpanStart, symbol, semanticModel, cancellationToken))
                 {
-                    return true;
+                    TryAddPathCondition(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, pathConditions);
                 }
             }
-
-            return false;
         }
 
         private static ISymbol? GetLocalOrParameterSymbol(
@@ -819,70 +824,6 @@ namespace PurelySharp.Analyzer
             }
         }
 
-        private static bool ConditionImpliesFact(
-            ExpressionSyntax condition,
-            ISymbol symbol,
-            PathFactKind factKind,
-            bool branchWhenTrue,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
-        {
-            condition = UnwrapFactExpression(condition);
-            if (condition is PrefixUnaryExpressionSyntax prefixUnary &&
-                prefixUnary.IsKind(SyntaxKind.LogicalNotExpression))
-            {
-                return ConditionImpliesFact(prefixUnary.Operand, symbol, factKind, !branchWhenTrue, semanticModel, cancellationToken);
-            }
-
-            if (condition is BinaryExpressionSyntax binaryExpression)
-            {
-                if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression))
-                {
-                    return branchWhenTrue &&
-                        (ConditionImpliesFact(binaryExpression.Left, symbol, factKind, branchWhenTrue: true, semanticModel, cancellationToken) ||
-                         ConditionImpliesFact(binaryExpression.Right, symbol, factKind, branchWhenTrue: true, semanticModel, cancellationToken));
-                }
-
-                if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression))
-                {
-                    return !branchWhenTrue &&
-                        (ConditionImpliesFact(binaryExpression.Left, symbol, factKind, branchWhenTrue: false, semanticModel, cancellationToken) ||
-                         ConditionImpliesFact(binaryExpression.Right, symbol, factKind, branchWhenTrue: false, semanticModel, cancellationToken));
-                }
-
-                var equalityImpliesFact = binaryExpression.IsKind(SyntaxKind.EqualsExpression) && branchWhenTrue;
-                var inequalityImpliesFact = binaryExpression.IsKind(SyntaxKind.NotEqualsExpression) && !branchWhenTrue;
-                if (!equalityImpliesFact && !inequalityImpliesFact)
-                {
-                    return false;
-                }
-
-                return IsSymbolComparedToFact(binaryExpression.Left, binaryExpression.Right, symbol, factKind, semanticModel, cancellationToken) ||
-                    IsSymbolComparedToFact(binaryExpression.Right, binaryExpression.Left, symbol, factKind, semanticModel, cancellationToken);
-            }
-
-            if (condition is IsPatternExpressionSyntax isPatternExpression &&
-                ExpressionMatchesSymbol(isPatternExpression.Expression, symbol, semanticModel, cancellationToken) &&
-                PatternImpliesFact(isPatternExpression.Pattern, factKind, branchWhenTrue, semanticModel, cancellationToken))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        private static bool IsSymbolComparedToFact(
-            ExpressionSyntax symbolExpression,
-            ExpressionSyntax factExpression,
-            ISymbol symbol,
-            PathFactKind factKind,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
-        {
-            return ExpressionMatchesSymbol(symbolExpression, symbol, semanticModel, cancellationToken) &&
-                ExpressionMatchesFact(factExpression, factKind, semanticModel, cancellationToken);
-        }
-
         private static bool ExpressionMatchesSymbol(
             ExpressionSyntax expression,
             ISymbol symbol,
@@ -909,30 +850,103 @@ namespace PurelySharp.Analyzer
             return constantValue.HasValue && IsIntegralOrDecimalZero(constantValue.Value);
         }
 
-        private static bool PatternImpliesFact(
-            PatternSyntax pattern,
+        private static bool TryCreateFactFormula(
+            ISymbol symbol,
             PathFactKind factKind,
+            out SmtFormula? factFormula)
+        {
+            factFormula = null;
+            var variableName = GetSmtVariableName(symbol);
+            switch (symbol)
+            {
+                case ILocalSymbol localSymbol:
+                    return TryCreateFactFormula(localSymbol.Type, variableName, factKind, out factFormula);
+                case IParameterSymbol parameterSymbol:
+                    return TryCreateFactFormula(parameterSymbol.Type, variableName, factKind, out factFormula);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool TryCreateFactFormula(
+            ITypeSymbol typeSymbol,
+            string variableName,
+            PathFactKind factKind,
+            out SmtFormula? factFormula)
+        {
+            factFormula = null;
+            if (factKind == PathFactKind.Null)
+            {
+                if (!IsReferenceType(typeSymbol))
+                {
+                    return false;
+                }
+
+                factFormula = new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    new SmtVariable(variableName, SmtValueKind.Reference),
+                    new SmtNullConstant());
+                return true;
+            }
+
+            if (!IsSearchLibIntegralType(typeSymbol))
+            {
+                return false;
+            }
+
+            factFormula = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtVariable(variableName, SmtValueKind.Int),
+                new SmtIntegerConstant(0));
+            return true;
+        }
+
+        private static bool IsSearchLibIntegralType(ITypeSymbol typeSymbol)
+        {
+            return typeSymbol.SpecialType is
+                SpecialType.System_SByte or
+                SpecialType.System_Byte or
+                SpecialType.System_Int16 or
+                SpecialType.System_UInt16 or
+                SpecialType.System_Int32 or
+                SpecialType.System_UInt32 or
+                SpecialType.System_Int64;
+        }
+
+        private static string GetSmtVariableName(ISymbol symbol)
+        {
+            var firstLocation = symbol.Locations.FirstOrDefault();
+            var start = firstLocation?.SourceSpan.Start ?? 0;
+            return symbol.Name + "#" + start.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static void TryAddPathCondition(
+            ExpressionSyntax condition,
             bool branchWhenTrue,
             SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
         {
-            if (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
+            if (!CSharpConditionToFormula.TryTranslate(condition, semanticModel, cancellationToken, out var formula) ||
+                formula == null)
             {
-                return PatternImpliesFact(parenthesizedPattern.Pattern, factKind, branchWhenTrue, semanticModel, cancellationToken);
+                return;
             }
 
-            if (pattern is ConstantPatternSyntax constantPattern)
+            if (!branchWhenTrue)
             {
-                return branchWhenTrue && ExpressionMatchesFact(constantPattern.Expression, factKind, semanticModel, cancellationToken);
+                formula = new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
             }
 
-            if (pattern is UnaryPatternSyntax unaryPattern &&
-                unaryPattern.OperatorToken.IsKind(SyntaxKind.NotKeyword))
-            {
-                return PatternImpliesFact(unaryPattern.Pattern, factKind, !branchWhenTrue, semanticModel, cancellationToken);
-            }
+            pathConditions.Add(formula);
+        }
 
-            return false;
+        private static bool PathConditionsImplyFact(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula factFormula)
+        {
+            using var solver = new SmtSolver();
+            return solver.Implies(pathConditions, factFormula, SmtTimeout) == Feasibility.Unsatisfiable;
         }
 
         private static bool IsSymbolAssignedBeforeUse(
