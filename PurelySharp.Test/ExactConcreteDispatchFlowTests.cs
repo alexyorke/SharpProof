@@ -371,5 +371,95 @@ public class TestClass
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
 
+        [Test]
+        public async Task VirtualMethodDispatch_SameConcreteSwitchExpressionMerge_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public abstract class Worker
+{
+    [EnforcePure]
+    public abstract int Compute(int value);
+}
+
+public class ExactWorker : Worker
+{
+    [EnforcePure]
+    public override int Compute(int value) => value + 1;
+}
+
+public class ImpureWorker : ExactWorker
+{
+    [EnforcePure]
+    public override int {|PS0002:Compute|}(int value)
+    {
+        System.Console.WriteLine(value);
+        return value + 2;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int Process(bool chooseLeft, int value)
+    {
+        Worker worker = chooseLeft switch
+        {
+            true => new ExactWorker(),
+            false => new ExactWorker(),
+        };
+
+        return worker.Compute(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task VirtualMethodDispatch_NullCoalescingAssignmentExactConcreteLocal_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public abstract class Worker
+{
+    [EnforcePure]
+    public abstract int Compute(int value);
+}
+
+public class ExactWorker : Worker
+{
+    [EnforcePure]
+    public override int Compute(int value) => value + 1;
+}
+
+public class ImpureWorker : ExactWorker
+{
+    [EnforcePure]
+    public override int {|PS0002:Compute|}(int value)
+    {
+        System.Console.WriteLine(value);
+        return value + 2;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int Process(int value)
+    {
+        Worker worker = new ExactWorker();
+        worker ??= new ExactWorker();
+        return worker.Compute(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
     }
 }
