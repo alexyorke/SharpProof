@@ -97,6 +97,32 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ContradictoryNullPatternGuardedImpureCall_DoesNotReport()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string value", "(value is null) && (value is not null)"),
+                Is.True);
+
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string value)
+    {
+        if ((value is null) && (value is not null))
+        {
+            Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_SatisfiableGuardedImpureCall_ReportsStructuredEvidence()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
