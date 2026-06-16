@@ -31,7 +31,8 @@ internal static class PurityClassificationEngine
         "allocates_array",
         "allocates_box",
         "allocates_object",
-        "calls_method");
+        "calls_method",
+        "reads_instance_field");
 
     private static readonly ImmutableHashSet<string> ConservativeEffects = ImmutableHashSet.Create(
         StringComparer.Ordinal,
@@ -40,7 +41,6 @@ internal static class PurityClassificationEngine
         "loads_method_pointer",
         "native_or_internal_call",
         "no_il_body",
-        "reads_instance_field",
         "virtual_call");
 
     private static readonly ImmutableHashSet<string> ImpureRoots = ImmutableHashSet.Create(

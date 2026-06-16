@@ -257,7 +257,7 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeStringSlice_NormalizesManualCatalogAliases()
+        public async Task EffectSummaryTool_RuntimeStringSlice_NormalizesManualCatalogAliases_AndClassifiesFreshReturnAsPure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.String.ToCharArray", limit: 10);
 
@@ -276,8 +276,8 @@ public static class PurityFixture
                     "string.ToCharArray()",
                     StringComparison.Ordinal));
 
-            Assert.That(knownPureRow.GetProperty("Classification").GetString(), Is.EqualTo("conservative_unknown"));
-            Assert.That(knownFreshRow.GetProperty("Note").GetString(), Is.EqualTo("fresh_array_candidate_requires_non_pure_resolution"));
+            Assert.That(knownPureRow.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+            Assert.That(knownFreshRow.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
             Assert.That(knownPureRow.GetProperty("MatchedExactSymbolKeys").GetArrayLength(), Is.GreaterThan(0));
             Assert.That(knownFreshRow.GetProperty("MatchedExactSymbolKeys").GetArrayLength(), Is.GreaterThan(0));
         }
