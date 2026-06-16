@@ -61,6 +61,8 @@ internal static class PurityClassificationEngine
 
     private static readonly ImmutableHashSet<string> InternalOnlyRoots = ImmutableHashSet.Create(
         StringComparer.Ordinal,
+        "safe_static_cache_read",
+        "safe_static_constant_read",
         "fresh_owned_memory_write",
         "fresh_owned_object_write");
 
@@ -154,6 +156,13 @@ internal static class PurityClassificationEngine
 
             if (string.Equals(effect, "writes_instance_field", StringComparison.Ordinal) &&
                 summary.RootCandidates.Contains("fresh_owned_object_write", StringComparer.Ordinal))
+            {
+                continue;
+            }
+
+            if (string.Equals(effect, "reads_static_field", StringComparison.Ordinal) &&
+                (summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
+                 summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal)))
             {
                 continue;
             }
@@ -529,6 +538,7 @@ internal static class PurityClassificationEngine
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.Add(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.BitCast(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences(", StringComparison.Ordinal);
     }
 }

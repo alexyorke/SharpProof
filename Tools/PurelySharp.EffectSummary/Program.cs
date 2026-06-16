@@ -426,7 +426,7 @@ internal static class AssemblyEffectSummarizer
             MethodBodySha256: methodBodySha256,
             CacheKey: cacheKey,
             Effects: effects.ToArray(),
-            RootCandidates: GetRootCandidates(effects, calls, isConstructor).ToArray(),
+            RootCandidates: GetRootCandidates(effects, calls, fields, isConstructor).ToArray(),
             TransitiveRootCandidates: Array.Empty<string>(),
             ThrownExceptionTypes: thrownExceptionTypes.ToArray(),
             TransitiveThrownExceptionTypes: Array.Empty<string>(),
@@ -542,11 +542,13 @@ internal static class AssemblyEffectSummarizer
     private static IEnumerable<string> GetRootCandidates(
         IEnumerable<string> effects,
         IEnumerable<string> calls,
+        IEnumerable<string> fields,
         bool isConstructor)
     {
         var roots = new SortedSet<string>(StringComparer.Ordinal);
         var effectSet = new HashSet<string>(effects, StringComparer.Ordinal);
         var callSet = new HashSet<string>(calls, StringComparer.Ordinal);
+        var fieldSet = new HashSet<string>(fields, StringComparer.Ordinal);
         foreach (var effect in effects)
         {
             switch (effect)
@@ -561,7 +563,18 @@ internal static class AssemblyEffectSummarizer
                     roots.Add("metadata_only_or_external");
                     break;
                 case "reads_static_field":
-                    roots.Add("global_state_read");
+                    if (IsSafeStaticCacheRead(fieldSet))
+                    {
+                        roots.Add("safe_static_cache_read");
+                    }
+                    else if (IsSafeStaticConstantRead(fieldSet))
+                    {
+                        roots.Add("safe_static_constant_read");
+                    }
+                    else
+                    {
+                        roots.Add("global_state_read");
+                    }
                     break;
                 case "writes_static_field":
                     roots.Add("global_state_write");
@@ -590,6 +603,20 @@ internal static class AssemblyEffectSummarizer
         }
 
         return roots;
+    }
+
+    private static bool IsSafeStaticCacheRead(IReadOnlySet<string> fields)
+    {
+        return fields.Count > 0 && fields.All(static field =>
+            field.StartsWith("System.Array+EmptyArray`1", StringComparison.Ordinal) &&
+            field.EndsWith(".Value", StringComparison.Ordinal));
+    }
+
+    private static bool IsSafeStaticConstantRead(IReadOnlySet<string> fields)
+    {
+        return fields.Count > 0 && fields.All(static field =>
+            string.Equals(field, "IsLittleEndian", StringComparison.Ordinal) ||
+            string.Equals(field, "System.BitConverter.IsLittleEndian", StringComparison.Ordinal));
     }
 
     private static bool IsFreshOwnedMemoryWrite(
@@ -650,6 +677,7 @@ internal static class AssemblyEffectSummarizer
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.Add(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.BitCast(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences(", StringComparison.Ordinal);
     }
 

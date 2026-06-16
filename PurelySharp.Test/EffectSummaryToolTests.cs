@@ -225,6 +225,38 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeArrayEmptySlice_TreatsSafeStaticCacheReadsAsPure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Array.Empty", limit: 10);
+
+            var methods = FindMethodsByPrefix(summary, "System.Array.Empty");
+            Assert.That(methods.Length, Is.GreaterThan(0));
+
+            foreach (var method in methods)
+            {
+                var classification = method.GetProperty("PurityClassification");
+                Assert.That(classification.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+            }
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeGuidToByteArraySlice_TreatsRuntimeHelpersAndEndianReadsAsPure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Guid.ToByteArray", limit: 20);
+
+            var methods = FindMethodsByPrefix(summary, "System.Guid.ToByteArray");
+            Assert.That(methods.Length, Is.EqualTo(2));
+
+            foreach (var method in methods)
+            {
+                var symbol = method.GetProperty("Symbol").GetString();
+                var classification = method.GetProperty("PurityClassification");
+                Assert.That(classification.GetProperty("Classification").GetString(), Is.EqualTo("pure"), symbol);
+                Assert.That(classification.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("fresh_array_candidate_via_local_helpers"), symbol);
+            }
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStringSlice_NormalizesManualCatalogAliases()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.String.ToCharArray", limit: 10);
@@ -244,8 +276,8 @@ public static class PurityFixture
                     "string.ToCharArray()",
                     StringComparison.Ordinal));
 
-            Assert.That(knownPureRow.GetProperty("Classification").GetString(), Is.Not.EqualTo("unclassified"));
-            Assert.That(knownFreshRow.GetProperty("Note").GetString(), Is.Not.EqualTo("unclassified"));
+            Assert.That(knownPureRow.GetProperty("Classification").GetString(), Is.EqualTo("conservative_unknown"));
+            Assert.That(knownFreshRow.GetProperty("Note").GetString(), Is.EqualTo("fresh_array_candidate_requires_non_pure_resolution"));
             Assert.That(knownPureRow.GetProperty("MatchedExactSymbolKeys").GetArrayLength(), Is.GreaterThan(0));
             Assert.That(knownFreshRow.GetProperty("MatchedExactSymbolKeys").GetArrayLength(), Is.GreaterThan(0));
         }
@@ -420,6 +452,21 @@ public static class FreshObjectFixture
                 method.GetProperty("Symbol").GetString(),
                 methodSymbol,
                 StringComparison.Ordinal));
+        }
+
+        private static JsonElement[] FindMethodsByPrefix(JsonDocument summary, string methodSymbolPrefix)
+        {
+            return summary.RootElement
+                .GetProperty("Assemblies")[0]
+                .GetProperty("Methods")
+                .EnumerateArray()
+                .Where(method =>
+                {
+                    var symbol = method.GetProperty("Symbol").GetString();
+                    return !string.IsNullOrWhiteSpace(symbol) &&
+                        symbol.StartsWith(methodSymbolPrefix, StringComparison.Ordinal);
+                })
+                .ToArray();
         }
 
         private static async Task<JsonDocument> RunEffectSummaryAsync(
