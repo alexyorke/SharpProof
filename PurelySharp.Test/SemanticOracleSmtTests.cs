@@ -123,6 +123,32 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ContradictoryRelationalPatternGuardedImpureCall_DoesNotReport()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int x", "x is > 0 and < 0"),
+                Is.True);
+
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int x)
+    {
+        if (x is > 0 and < 0)
+        {
+            Console.WriteLine(x);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_SatisfiableGuardedImpureCall_ReportsStructuredEvidence()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
@@ -221,6 +247,31 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_RelationalPatternExactZero_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (divisor is <= 0 and >= 0)
+        {
+            return value / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
         public async Task Ps0010_GuardExcludesZeroDivisor_DoesNotReport()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"
@@ -249,6 +300,26 @@ public class TestClass
     public int TestMethod(int value, int divisor)
     {
         if (divisor < 0 || divisor > 0)
+        {
+            return value / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_RelationalPatternNonZero_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (divisor is < 0 or > 0)
         {
             return value / divisor;
         }

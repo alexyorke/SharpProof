@@ -67,7 +67,7 @@ namespace PurelySharp.Test.Smt
             }
 
             if (expression is IsPatternExpressionSyntax isPatternExpression &&
-                TryTranslateConstantPattern(isPatternExpression, semanticModel, cancellationToken, out var patternFormula))
+                TryTranslatePatternExpression(isPatternExpression, semanticModel, cancellationToken, out var patternFormula))
             {
                 formula = patternFormula;
                 return true;
@@ -77,7 +77,7 @@ namespace PurelySharp.Test.Smt
             return false;
         }
 
-        private static bool TryTranslateConstantPattern(
+        private static bool TryTranslatePatternExpression(
             IsPatternExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -89,7 +89,24 @@ namespace PurelySharp.Test.Smt
                 return false;
             }
 
-            if (expression.Pattern is ConstantPatternSyntax constantPattern &&
+            return TryTranslatePattern(value, expression.Pattern, semanticModel, cancellationToken, out formula);
+        }
+
+        private static bool TryTranslatePattern(
+            SmtFormula value,
+            PatternSyntax pattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            [NotNullWhen(true)] out SmtFormula? formula)
+        {
+            formula = null;
+
+            if (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
+            {
+                return TryTranslatePattern(value, parenthesizedPattern.Pattern, semanticModel, cancellationToken, out formula);
+            }
+
+            if (pattern is ConstantPatternSyntax constantPattern &&
                 TryTranslateValue(constantPattern.Expression, semanticModel, cancellationToken, out var constantValue) &&
                 constantValue != null &&
                 AreComparable(value, constantValue))
@@ -98,15 +115,54 @@ namespace PurelySharp.Test.Smt
                 return true;
             }
 
-            if (expression.Pattern is UnaryPatternSyntax unaryPattern &&
+            if (pattern is UnaryPatternSyntax unaryPattern &&
                 unaryPattern.OperatorToken.IsKind(SyntaxKind.NotKeyword) &&
-                unaryPattern.Pattern is ConstantPatternSyntax notPattern &&
-                TryTranslateValue(notPattern.Expression, semanticModel, cancellationToken, out var negatedConstantValue) &&
-                negatedConstantValue != null &&
-                AreComparable(value, negatedConstantValue))
+                TryTranslatePattern(value, unaryPattern.Pattern, semanticModel, cancellationToken, out var negatedPattern) &&
+                negatedPattern != null)
             {
-                formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, negatedConstantValue);
+                formula = new SmtUnaryFormula(SmtUnaryOperator.Not, negatedPattern);
                 return true;
+            }
+
+            if (pattern is BinaryPatternSyntax binaryPattern &&
+                TryTranslatePattern(value, binaryPattern.Left, semanticModel, cancellationToken, out var leftPattern) &&
+                TryTranslatePattern(value, binaryPattern.Right, semanticModel, cancellationToken, out var rightPattern) &&
+                leftPattern != null &&
+                rightPattern != null)
+            {
+                if (binaryPattern.IsKind(SyntaxKind.AndPattern))
+                {
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.And, leftPattern, rightPattern);
+                    return true;
+                }
+
+                if (binaryPattern.IsKind(SyntaxKind.OrPattern))
+                {
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.Or, leftPattern, rightPattern);
+                    return true;
+                }
+            }
+
+            if (pattern is RelationalPatternSyntax relationalPattern &&
+                value.Kind == SmtValueKind.Int &&
+                TryTranslateValue(relationalPattern.Expression, semanticModel, cancellationToken, out var relationalValue) &&
+                relationalValue is { Kind: SmtValueKind.Int })
+            {
+                switch (relationalPattern.OperatorToken.Kind())
+                {
+                    case SyntaxKind.GreaterThanToken:
+                        formula = new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, value, relationalValue);
+                        return true;
+                    case SyntaxKind.GreaterThanEqualsToken:
+                        formula = new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, value, relationalValue);
+                        return true;
+                    case SyntaxKind.LessThanToken:
+                        formula = new SmtBinaryFormula(SmtBinaryOperator.LessThan, value, relationalValue);
+                        return true;
+                    case SyntaxKind.LessThanEqualsToken:
+                        formula = new SmtBinaryFormula(SmtBinaryOperator.LessThanOrEqual, value, relationalValue);
+                        return true;
+                }
             }
 
             return false;
