@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Analyzer.Engine;
 using PurelySharp.Analyzer.Engine.Smt;
+using SearchLib.Purity;
 using SearchLib.Smt;
 
 namespace PurelySharp.Analyzer
@@ -945,8 +946,15 @@ namespace PurelySharp.Analyzer
             IEnumerable<SmtFormula> pathConditions,
             SmtFormula factFormula)
         {
-            using var solver = new SmtSolver();
-            return solver.Implies(pathConditions, factFormula, SmtTimeout) == Feasibility.Unsatisfiable;
+            var query = new PurityProofQuery(
+                pathConditions.ToArray(),
+                new PurityHazard(
+                    PurityHazardKind.BranchReachability,
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, factFormula)));
+
+            using var search = new PurityProofSearch();
+            var proofResult = search.Classify(query, SmtTimeout);
+            return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
         }
 
         private static bool IsSymbolAssignedBeforeUse(
