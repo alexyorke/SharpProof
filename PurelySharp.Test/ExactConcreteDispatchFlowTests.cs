@@ -556,5 +556,92 @@ public class TestClass
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
 
+        [Test]
+        public async Task VirtualMethodDispatch_NullInitializedNullCoalescingAssignmentExactConcreteLocal_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public abstract class Worker
+{
+    [EnforcePure]
+    public abstract int Compute(int value);
+}
+
+public class ExactWorker : Worker
+{
+    [EnforcePure]
+    public override int Compute(int value) => value + 1;
+}
+
+public class ImpureWorker : ExactWorker
+{
+    [EnforcePure]
+    public override int {|PS0002:Compute|}(int value)
+    {
+        System.Console.WriteLine(value);
+        return value + 2;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int Process(int value)
+    {
+        Worker worker = null;
+        worker ??= new ExactWorker();
+        return worker.Compute(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task VirtualPropertyDispatch_NullInitializedNullCoalescingAssignmentExactConcreteLocal_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public abstract class BaseValue
+{
+    public abstract int Value { get; }
+}
+
+public class ExactValue : BaseValue
+{
+    public override int Value => 1;
+}
+
+public class ImpureValue : ExactValue
+{
+    public override int {|PS0002:Value|}
+    {
+        [EnforcePure]
+        get
+        {
+            System.Console.WriteLine(1);
+            return 2;
+        }
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int ReadValue()
+    {
+        BaseValue value = null;
+        value ??= new ExactValue();
+        return value.Value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
     }
 }
