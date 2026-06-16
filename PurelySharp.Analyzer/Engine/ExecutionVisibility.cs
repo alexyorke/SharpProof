@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using SearchLib.Purity;
 using PurelySharp.Analyzer.Engine.Smt;
 using SearchLib.Smt;
 
@@ -253,20 +254,28 @@ namespace PurelySharp.Analyzer.Engine
                 return KnownBooleanValue.Unknown;
             }
 
-            using var solver = new SmtSolver();
-            var whenTrue = solver.IsSatisfiable(new[] { formula }, SmtTimeout);
-            if (whenTrue == Feasibility.Unsatisfiable)
+            if (IsBranchConditionUnreachable(formula))
             {
                 return KnownBooleanValue.False;
             }
 
-            var whenFalse = solver.IsSatisfiable(new[] { new SmtUnaryFormula(SmtUnaryOperator.Not, formula) }, SmtTimeout);
-            if (whenFalse == Feasibility.Unsatisfiable)
+            if (IsBranchConditionUnreachable(new SmtUnaryFormula(SmtUnaryOperator.Not, formula)))
             {
                 return KnownBooleanValue.True;
             }
 
             return KnownBooleanValue.Unknown;
+        }
+
+        private static bool IsBranchConditionUnreachable(SmtFormula formula)
+        {
+            var query = new PurityProofQuery(
+                Array.Empty<SmtFormula>(),
+                new PurityHazard(PurityHazardKind.BranchReachability, formula));
+
+            using var search = new PurityProofSearch();
+            var proofResult = search.Classify(query, SmtTimeout);
+            return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
         }
 
         private enum KnownBooleanValue

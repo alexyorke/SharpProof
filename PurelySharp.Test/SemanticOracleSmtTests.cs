@@ -45,6 +45,14 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ExecutionVisibility_TautologicalCondition_IsAlwaysTrue()
+        {
+            Assert.That(
+                IsConditionAlwaysTrue("int x", "x >= 0 || x <= 0"),
+                Is.True);
+        }
+
+        [Test]
         public async Task Ps0002_ContradictoryGuardedImpureCall_DoesNotReport()
         {
             Assert.That(
@@ -494,6 +502,16 @@ public class TestClass
             var method = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly
                 .GetType("PurelySharp.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!
                 .GetMethod("IsConditionAlwaysFalse", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+
+            return (bool)method.Invoke(null, new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
+        }
+
+        private static bool IsConditionAlwaysTrue(string parameterList, string conditionExpression)
+        {
+            var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression);
+            var method = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly
+                .GetType("PurelySharp.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!
+                .GetMethod("IsConditionAlwaysTrue", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
 
             return (bool)method.Invoke(null, new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
         }
