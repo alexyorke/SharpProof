@@ -821,6 +821,224 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_EffectSummary_WithTrustedGeneratedPureBinaryOperatorClassification_SuppressesUnknownExternalCall()
+        {
+            const string boundarySource = """
+public readonly struct PureOperatorBoundary
+{
+    public PureOperatorBoundary(int value)
+    {
+        Value = value;
+    }
+
+    public int Value { get; }
+
+    public static PureOperatorBoundary operator +(PureOperatorBoundary left, PureOperatorBoundary right)
+    {
+        return new PureOperatorBoundary(left.Value + right.Value);
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("GeneratedPureOperatorBoundary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public PureOperatorBoundary TestMethod(PureOperatorBoundary left, PureOperatorBoundary right)
+    {
+        return left + right;
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "PureOperatorBoundary.op_Addition(PureOperatorBoundary, PureOperatorBoundary)",
+                            "pure",
+                            """[]"""))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_EffectSummary_WithTrustedGeneratedImpureBinaryOperatorClassification_ReportsImpurity()
+        {
+            const string boundarySource = """
+public struct ImpureOperatorBoundary
+{
+    private static int _state;
+
+    public ImpureOperatorBoundary(int value)
+    {
+        Value = value;
+    }
+
+    public int Value { get; }
+
+    public static ImpureOperatorBoundary operator +(ImpureOperatorBoundary left, ImpureOperatorBoundary right)
+    {
+        _state++;
+        return new ImpureOperatorBoundary(left.Value + right.Value + _state);
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("GeneratedImpureOperatorBoundary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public ImpureOperatorBoundary TestMethod(ImpureOperatorBoundary left, ImpureOperatorBoundary right)
+    {
+        return left + right;
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "ImpureOperatorBoundary.op_Addition(ImpureOperatorBoundary, ImpureOperatorBoundary)",
+                            "impure",
+                            """[ "global_state_write" ]"""))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+        }
+
+        [Test]
+        public async Task Ps0002_EffectSummary_WithTrustedGeneratedPureConversionClassification_SuppressesUnknownExternalCall()
+        {
+            const string boundarySource = """
+public readonly struct PureConversionBoundary
+{
+    public PureConversionBoundary(int value)
+    {
+        Value = value;
+    }
+
+    public int Value { get; }
+
+    public static explicit operator int(PureConversionBoundary value)
+    {
+        return value.Value;
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("GeneratedPureConversionBoundary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(PureConversionBoundary value)
+    {
+        return (int)value;
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "PureConversionBoundary.op_Explicit(PureConversionBoundary)",
+                            "pure",
+                            """[]"""))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_EffectSummary_WithTrustedGeneratedImpureConversionClassification_ReportsImpurity()
+        {
+            const string boundarySource = """
+public struct ImpureConversionBoundary
+{
+    private static int _state;
+
+    public ImpureConversionBoundary(int value)
+    {
+        Value = value;
+    }
+
+    public int Value { get; }
+
+    public static explicit operator int(ImpureConversionBoundary value)
+    {
+        _state++;
+        return value.Value + _state;
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("GeneratedImpureConversionBoundary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(ImpureConversionBoundary value)
+    {
+        return (int)value;
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "ImpureConversionBoundary.op_Explicit(ImpureConversionBoundary)",
+                            "impure",
+                            """[ "global_state_write" ]"""))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+        }
+
+        [Test]
         public void ExceptionSummaryCatalog_RepeatedMetadataQueriesReuseAssemblyIdentityCache()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);

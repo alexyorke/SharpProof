@@ -76,99 +76,28 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (binaryOperation.OperatorMethod != null)
             {
-
-                if (IsStaticAbstractInterfaceOperator(binaryOperation.OperatorMethod))
+                var operatorMethod = binaryOperation.OperatorMethod;
+                if (IsStaticAbstractInterfaceOperator(operatorMethod))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Static abstract interface operator '{binaryOperation.OperatorMethod.Name}' has unresolved dispatch targets. Binary operation is Impure.");
+                    PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Static abstract interface operator '{operatorMethod.Name}' has unresolved dispatch targets. Binary operation is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         binaryOperation.Syntax,
                         PurityAnalysisEngine.PurityEvidence.Create(
                             "unknown_external_call",
                             nameof(BinaryOperationPurityRule),
                             binaryOperation,
-                            symbol: binaryOperation.OperatorMethod));
+                            symbol: operatorMethod));
                 }
 
-                if (context.PurityCache.TryGetValue(binaryOperation.OperatorMethod.OriginalDefinition, out var cachedResult))
-                {
-                    if (!cachedResult.IsPure)
-                    {
-                        PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] User-defined operator method '{binaryOperation.OperatorMethod.Name}' is IMPURE (cached). Binary operation is Impure.");
-                        return cachedResult.WithCallee(binaryOperation.OperatorMethod, binaryOperation.Syntax);
-                    }
-                    PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] User-defined operator method '{binaryOperation.OperatorMethod.Name}' is Pure (cached).");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-                }
-
-
-                if (PurityAnalysisEngine.IsKnownPureBCLMember(binaryOperation.OperatorMethod))
-                {
-                    PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] User-defined operator method '{binaryOperation.OperatorMethod.Name}' is known pure BCL member.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-                }
-
-                if (PurityAnalysisEngine.IsKnownImpure(binaryOperation.OperatorMethod))
-                {
-                    PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] User-defined operator method '{binaryOperation.OperatorMethod.Name}' is known impure. Binary operation is Impure.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(binaryOperation.Syntax);
-                }
-
-
-                var operatorPurity = PurityAnalysisEngine.GetCalleePurity(binaryOperation.OperatorMethod, context);
+                var operatorPurity = PurityAnalysisEngine.GetCalleePurity(operatorMethod, context);
 
                 if (!operatorPurity.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] User-defined operator method '{binaryOperation.OperatorMethod.Name}' is IMPURE. Binary operation is Impure.");
-                    return operatorPurity.WithCallee(binaryOperation.OperatorMethod, binaryOperation.Syntax);
+                    PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] User-defined operator method '{operatorMethod.Name}' is IMPURE. Binary operation is Impure.");
+                    return operatorPurity.WithCallee(operatorMethod, binaryOperation.Syntax);
                 }
 
-                PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] User-defined operator method '{binaryOperation.OperatorMethod.Name}' is Pure.");
-            }
-
-
-            if (binaryOperation.IsChecked)
-            {
-                PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Operation is checked. Checking operator method purity.");
-
-
-                if (binaryOperation.OperatorMethod != null)
-                {
-
-                    if (context.PurityCache.TryGetValue(binaryOperation.OperatorMethod.OriginalDefinition, out var cachedResult))
-                    {
-                        if (!cachedResult.IsPure)
-                        {
-                            PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Checked operator method '{binaryOperation.OperatorMethod.Name}' is IMPURE (cached). Binary operation is Impure.");
-                            return cachedResult.WithCallee(binaryOperation.OperatorMethod, binaryOperation.Syntax);
-                        }
-                        PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Checked operator method '{binaryOperation.OperatorMethod.Name}' is Pure (cached).");
-                        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-                    }
-
-
-                    if (PurityAnalysisEngine.IsKnownPureBCLMember(binaryOperation.OperatorMethod))
-                    {
-                        PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Checked operator method '{binaryOperation.OperatorMethod.Name}' is known pure BCL member.");
-                        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-                    }
-
-                    if (PurityAnalysisEngine.IsKnownImpure(binaryOperation.OperatorMethod))
-                    {
-                        PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Checked operator method '{binaryOperation.OperatorMethod.Name}' is known impure. Binary operation is Impure.");
-                        return PurityAnalysisEngine.PurityAnalysisResult.Impure(binaryOperation.Syntax);
-                    }
-
-
-                    var operatorPurity = PurityAnalysisEngine.GetCalleePurity(binaryOperation.OperatorMethod, context);
-
-                    if (!operatorPurity.IsPure)
-                    {
-                        PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Checked operator method '{binaryOperation.OperatorMethod.Name}' is IMPURE. Binary operation is Impure.");
-                        return operatorPurity.WithCallee(binaryOperation.OperatorMethod, binaryOperation.Syntax);
-                    }
-
-                    PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Checked operator method '{binaryOperation.OperatorMethod.Name}' is Pure.");
-                }
+                PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] User-defined operator method '{operatorMethod.Name}' is Pure.");
             }
 
 

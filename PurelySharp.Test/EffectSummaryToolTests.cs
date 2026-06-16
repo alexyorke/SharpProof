@@ -480,8 +480,6 @@ public static class FreshObjectFixture
             {
                 FileName = "dotnet",
                 WorkingDirectory = GetRepositoryRoot(),
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
                 UseShellExecute = false,
             };
             startInfo.ArgumentList.Add("run");
@@ -506,15 +504,21 @@ public static class FreshObjectFixture
             }
 
             using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start effect summary tool.");
-            var standardOutput = await process.StandardOutput.ReadToEndAsync();
-            var standardError = await process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
+            try
+            {
+                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(120));
+            }
+            catch (TimeoutException)
+            {
+                TryKillProcess(process);
+                throw new AssertionException("Effect summary tool timed out after 120 seconds.");
+            }
             if (process.ExitCode != 0)
             {
                 throw new AssertionException(
-                    "Effect summary tool failed." + Environment.NewLine +
-                    standardOutput + Environment.NewLine +
-                    standardError);
+                    "Effect summary tool failed with exit code " + process.ExitCode + "." + Environment.NewLine +
+                    "Assembly: " + assemblyPath + Environment.NewLine +
+                    "Output: " + outputPath);
             }
 
             return JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
@@ -529,8 +533,6 @@ public static class FreshObjectFixture
             {
                 FileName = "dotnet",
                 WorkingDirectory = GetRepositoryRoot(),
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
                 UseShellExecute = false,
             };
             startInfo.ArgumentList.Add("run");
@@ -550,15 +552,21 @@ public static class FreshObjectFixture
             startInfo.ArgumentList.Add(outputPath);
 
             using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start effect summary tool.");
-            var standardOutput = await process.StandardOutput.ReadToEndAsync();
-            var standardError = await process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
+            try
+            {
+                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(120));
+            }
+            catch (TimeoutException)
+            {
+                TryKillProcess(process);
+                throw new AssertionException("Effect summary tool timed out after 120 seconds.");
+            }
             if (process.ExitCode != 0)
             {
                 throw new AssertionException(
-                    "Effect summary tool failed." + Environment.NewLine +
-                    standardOutput + Environment.NewLine +
-                    standardError);
+                    "Effect summary tool failed with exit code " + process.ExitCode + "." + Environment.NewLine +
+                    "Symbol prefix: " + symbolPrefix + Environment.NewLine +
+                    "Output: " + outputPath);
             }
 
             return JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
@@ -611,6 +619,20 @@ public static class FreshObjectFixture
         private static string GetRepositoryRoot()
         {
             return Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory, "..", "..", "..", ".."));
+        }
+
+        private static void TryKillProcess(Process process)
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+            }
+            catch
+            {
+            }
         }
 
         private sealed class FixtureAssembly : IAsyncDisposable

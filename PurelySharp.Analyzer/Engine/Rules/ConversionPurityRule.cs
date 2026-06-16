@@ -76,19 +76,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 var operatorResult = PurityAnalysisEngine.GetCalleePurity(operatorMethod, context);
 
                 PurityAnalysisEngine.LogDebug($"    [ConversionRule] Operator Method Result: IsPure={operatorResult.IsPure}");
-
-
-
                 if (!operatorResult.IsPure)
                 {
-
                     return operatorResult.WithCallee(operatorMethod, conversionOperation.Syntax);
                 }
-                else
-                {
 
-                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-                }
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
 

@@ -48,99 +48,28 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (unaryOperation.OperatorMethod != null)
             {
-
-                if (IsStaticAbstractInterfaceOperator(unaryOperation.OperatorMethod))
+                var operatorMethod = unaryOperation.OperatorMethod;
+                if (IsStaticAbstractInterfaceOperator(operatorMethod))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] Static abstract interface operator '{unaryOperation.OperatorMethod.Name}' has unresolved dispatch targets. Unary operation is Impure.");
+                    PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] Static abstract interface operator '{operatorMethod.Name}' has unresolved dispatch targets. Unary operation is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         unaryOperation.Syntax,
                         PurityAnalysisEngine.PurityEvidence.Create(
                             "unknown_external_call",
                             nameof(UnaryOperationPurityRule),
                             unaryOperation,
-                            symbol: unaryOperation.OperatorMethod));
+                            symbol: operatorMethod));
                 }
 
-                if (context.PurityCache.TryGetValue(unaryOperation.OperatorMethod.OriginalDefinition, out var cachedResult))
-                {
-                    if (!cachedResult.IsPure)
-                    {
-                        PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] User-defined operator method '{unaryOperation.OperatorMethod.Name}' is IMPURE (cached). Unary operation is Impure.");
-                        return cachedResult.WithCallee(unaryOperation.OperatorMethod, unaryOperation.Syntax);
-                    }
-                    PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] User-defined operator method '{unaryOperation.OperatorMethod.Name}' is Pure (cached).");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-                }
-
-
-                if (PurityAnalysisEngine.IsKnownPureBCLMember(unaryOperation.OperatorMethod))
-                {
-                    PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] User-defined operator method '{unaryOperation.OperatorMethod.Name}' is known pure BCL member.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-                }
-
-                if (PurityAnalysisEngine.IsKnownImpure(unaryOperation.OperatorMethod))
-                {
-                    PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] User-defined operator method '{unaryOperation.OperatorMethod.Name}' is known impure. Unary operation is Impure.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(unaryOperation.Syntax);
-                }
-
-
-                var operatorPurity = PurityAnalysisEngine.GetCalleePurity(unaryOperation.OperatorMethod, context);
+                var operatorPurity = PurityAnalysisEngine.GetCalleePurity(operatorMethod, context);
 
                 if (!operatorPurity.IsPure)
                 {
-                    PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] User-defined operator method '{unaryOperation.OperatorMethod.Name}' is IMPURE. Unary operation is Impure.");
-                    return operatorPurity.WithCallee(unaryOperation.OperatorMethod, unaryOperation.Syntax);
+                    PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] User-defined operator method '{operatorMethod.Name}' is IMPURE. Unary operation is Impure.");
+                    return operatorPurity.WithCallee(operatorMethod, unaryOperation.Syntax);
                 }
 
-                PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] User-defined operator method '{unaryOperation.OperatorMethod.Name}' is Pure.");
-            }
-
-
-            if (unaryOperation.IsChecked)
-            {
-                PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] Operation is checked. Checking operator method purity.");
-
-
-                if (unaryOperation.OperatorMethod != null)
-                {
-
-                    if (context.PurityCache.TryGetValue(unaryOperation.OperatorMethod.OriginalDefinition, out var cachedResult))
-                    {
-                        if (!cachedResult.IsPure)
-                        {
-                            PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] Checked operator method '{unaryOperation.OperatorMethod.Name}' is IMPURE (cached). Unary operation is Impure.");
-                            return cachedResult.WithCallee(unaryOperation.OperatorMethod, unaryOperation.Syntax);
-                        }
-                        PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] Checked operator method '{unaryOperation.OperatorMethod.Name}' is Pure (cached).");
-                        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-                    }
-
-
-                    if (PurityAnalysisEngine.IsKnownPureBCLMember(unaryOperation.OperatorMethod))
-                    {
-                        PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] Checked operator method '{unaryOperation.OperatorMethod.Name}' is known pure BCL member.");
-                        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-                    }
-
-                    if (PurityAnalysisEngine.IsKnownImpure(unaryOperation.OperatorMethod))
-                    {
-                        PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] Checked operator method '{unaryOperation.OperatorMethod.Name}' is known impure. Unary operation is Impure.");
-                        return PurityAnalysisEngine.PurityAnalysisResult.Impure(unaryOperation.Syntax);
-                    }
-
-
-                    var operatorPurity = PurityAnalysisEngine.GetCalleePurity(unaryOperation.OperatorMethod, context);
-
-                    if (!operatorPurity.IsPure)
-                    {
-                        PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] Checked operator method '{unaryOperation.OperatorMethod.Name}' is IMPURE. Unary operation is Impure.");
-                        return operatorPurity.WithCallee(unaryOperation.OperatorMethod, unaryOperation.Syntax);
-                    }
-
-                    PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] Checked operator method '{unaryOperation.OperatorMethod.Name}' is Pure.");
-                }
+                PurityAnalysisEngine.LogDebug($"    [UnaryOpRule] User-defined operator method '{operatorMethod.Name}' is Pure.");
             }
 
 
