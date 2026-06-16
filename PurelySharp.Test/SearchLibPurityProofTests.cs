@@ -116,5 +116,25 @@ namespace PurelySharp.Test
             Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
             Assert.That(result.Reason, Is.EqualTo("impure_call_reachable"));
         }
+
+        [Test]
+        public void PurityProof_QueryBranchReachability_ContradictoryGuard_IsProvablyPure()
+        {
+            using var search = new PurityProofSearch();
+            var x = new SmtVariable("x", SmtValueKind.Int);
+            var query = new PurityProofQuery(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(0)),
+                },
+                new PurityHazard(
+                    PurityHazardKind.BranchReachability,
+                    new SmtBinaryFormula(SmtBinaryOperator.LessThan, x, new SmtIntegerConstant(0))));
+
+            var result = search.Classify(query, TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+        }
     }
 }

@@ -12,6 +12,7 @@ using System.IO;
 using System.Globalization;
 using PurelySharp.Analyzer.Engine.Smt;
 using PurelySharp.Analyzer.Engine.Rules;
+using SearchLib.Purity;
 using SearchLib.Smt;
 using System.Threading;
 
@@ -2024,10 +2025,14 @@ namespace PurelySharp.Analyzer.Engine
                 ? formula
                 : new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
             var nextPathConditions = currentState.PathConditions.Add(edgeFormula);
-            var solverPathConditions = AppendDefinitelyNullFacts(currentState, nextPathConditions);
+            var proofPathConditions = AppendDefinitelyNullFacts(currentState, currentState.PathConditions);
+            var branchQuery = new PurityProofQuery(
+                proofPathConditions,
+                new PurityHazard(PurityHazardKind.BranchReachability, edgeFormula));
 
-            using var solver = new SmtSolver();
-            if (solver.IsSatisfiable(solverPathConditions, SmtTimeout) == Feasibility.Unsatisfiable)
+            using var search = new PurityProofSearch();
+            var proofResult = search.Classify(branchQuery, SmtTimeout);
+            if (proofResult.Outcome == PurityProofOutcome.ProvablyPure)
             {
                 return false;
             }
@@ -2130,104 +2135,107 @@ namespace PurelySharp.Analyzer.Engine
 
             foreach (var ancestor in syntaxNode.Ancestors())
             {
+                if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.SwitchExpressionSyntax switchExpressionSyntax &&
+                    IsInUnmatchedConstantSwitchExpressionArm(syntaxNode, switchExpressionSyntax, semanticModel))
+                {
+                    return true;
+                }
+
+                if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.SwitchStatementSyntax switchStatementSyntax &&
+                    IsInUnmatchedConstantSwitchStatementSection(syntaxNode, switchStatementSyntax, semanticModel))
+                {
+                    return true;
+                }
+            }
+
+            var pathConditions = CollectAncestorReachabilityConditions(syntaxNode, semanticModel);
+            if (pathConditions.Length == 0)
+            {
+                return false;
+            }
+
+            var query = new PurityProofQuery(
+                pathConditions,
+                new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
+
+            using var search = new PurityProofSearch();
+            var proofResult = search.Classify(query, SmtTimeout);
+            return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
+        }
+
+        private static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditions(
+            SyntaxNode syntaxNode,
+            SemanticModel semanticModel)
+        {
+            var builder = ImmutableArray.CreateBuilder<SmtFormula>();
+
+            foreach (var ancestor in syntaxNode.Ancestors())
+            {
                 if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.IfStatementSyntax ifStatementSyntax)
                 {
-                    var conditionValue = semanticModel.GetConstantValue(ifStatementSyntax.Condition);
-                    if (conditionValue.HasValue && conditionValue.Value is bool ifCondition)
+                    if (ifStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
                     {
-                        bool inThenBranch = ifStatementSyntax.Statement.Span.Contains(syntaxNode.Span);
-                        bool inElseBranch = ifStatementSyntax.Else?.Statement.Span.Contains(syntaxNode.Span) == true;
-                        if ((ifCondition && inElseBranch) || (!ifCondition && inThenBranch))
-                        {
-                            return true;
-                        }
+                        AddReachabilityCondition(builder, ifStatementSyntax.Condition, mustBeTrue: true, semanticModel);
+                    }
+                    else if (ifStatementSyntax.Else?.Statement.Span.Contains(syntaxNode.Span) == true)
+                    {
+                        AddReachabilityCondition(builder, ifStatementSyntax.Condition, mustBeTrue: false, semanticModel);
                     }
                 }
                 else if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.ConditionalExpressionSyntax conditionalExpressionSyntax)
                 {
-                    var conditionValue = semanticModel.GetConstantValue(conditionalExpressionSyntax.Condition);
-                    if (conditionValue.HasValue && conditionValue.Value is bool conditionalResult)
+                    if (conditionalExpressionSyntax.WhenTrue.Span.Contains(syntaxNode.Span))
                     {
-                        bool inTrueBranch = conditionalExpressionSyntax.WhenTrue.Span.Contains(syntaxNode.Span);
-                        bool inFalseBranch = conditionalExpressionSyntax.WhenFalse.Span.Contains(syntaxNode.Span);
-                        if ((conditionalResult && inFalseBranch) || (!conditionalResult && inTrueBranch))
-                        {
-                            return true;
-                        }
+                        AddReachabilityCondition(builder, conditionalExpressionSyntax.Condition, mustBeTrue: true, semanticModel);
+                    }
+                    else if (conditionalExpressionSyntax.WhenFalse.Span.Contains(syntaxNode.Span))
+                    {
+                        AddReachabilityCondition(builder, conditionalExpressionSyntax.Condition, mustBeTrue: false, semanticModel);
                     }
                 }
-                else if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.ConditionalAccessExpressionSyntax conditionalAccessExpressionSyntax)
+                else if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.BinaryExpressionSyntax binaryExpressionSyntax &&
+                         binaryExpressionSyntax.Right.Span.Contains(syntaxNode.Span))
                 {
-                    var receiverValue = semanticModel.GetConstantValue(conditionalAccessExpressionSyntax.Expression);
-                    if (receiverValue.HasValue &&
-                        receiverValue.Value == null &&
-                        conditionalAccessExpressionSyntax.WhenNotNull.Span.Contains(syntaxNode.Span))
+                    if (binaryExpressionSyntax.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.LogicalAndExpression))
                     {
-                        return true;
+                        AddReachabilityCondition(builder, binaryExpressionSyntax.Left, mustBeTrue: true, semanticModel);
+                    }
+                    else if (binaryExpressionSyntax.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.LogicalOrExpression))
+                    {
+                        AddReachabilityCondition(builder, binaryExpressionSyntax.Left, mustBeTrue: false, semanticModel);
                     }
                 }
-                else if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.BinaryExpressionSyntax binaryExpressionSyntax)
+                else if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.WhileStatementSyntax whileStatementSyntax &&
+                         whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
                 {
-                    var leftValue = semanticModel.GetConstantValue(binaryExpressionSyntax.Left);
-                    if (leftValue.HasValue &&
-                        leftValue.Value is bool leftBool &&
-                        binaryExpressionSyntax.Right.Span.Contains(syntaxNode.Span))
-                    {
-                        if ((binaryExpressionSyntax.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.LogicalAndExpression) && !leftBool) ||
-                            (binaryExpressionSyntax.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.LogicalOrExpression) && leftBool))
-                        {
-                            return true;
-                        }
-                    }
-
-                    if (leftValue.HasValue &&
-                        leftValue.Value != null &&
-                        binaryExpressionSyntax.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.CoalesceExpression) &&
-                        binaryExpressionSyntax.Right.Span.Contains(syntaxNode.Span))
-                    {
-                        return true;
-                    }
-                }
-                else if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.SwitchExpressionSyntax switchExpressionSyntax)
-                {
-                    if (IsInUnmatchedConstantSwitchExpressionArm(syntaxNode, switchExpressionSyntax, semanticModel))
-                    {
-                        return true;
-                    }
-                }
-                else if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.SwitchStatementSyntax switchStatementSyntax)
-                {
-                    if (IsInUnmatchedConstantSwitchStatementSection(syntaxNode, switchStatementSyntax, semanticModel))
-                    {
-                        return true;
-                    }
-                }
-                else if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.WhileStatementSyntax whileStatementSyntax)
-                {
-                    var conditionValue = semanticModel.GetConstantValue(whileStatementSyntax.Condition);
-                    if (conditionValue.HasValue &&
-                        conditionValue.Value is bool whileCondition &&
-                        !whileCondition &&
-                        whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
-                    {
-                        return true;
-                    }
+                    AddReachabilityCondition(builder, whileStatementSyntax.Condition, mustBeTrue: true, semanticModel);
                 }
                 else if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.ForStatementSyntax forStatementSyntax &&
-                         forStatementSyntax.Condition != null)
+                         forStatementSyntax.Condition != null &&
+                         forStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
                 {
-                    var conditionValue = semanticModel.GetConstantValue(forStatementSyntax.Condition);
-                    if (conditionValue.HasValue &&
-                        conditionValue.Value is bool forCondition &&
-                        !forCondition &&
-                        forStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
-                    {
-                        return true;
-                    }
+                    AddReachabilityCondition(builder, forStatementSyntax.Condition, mustBeTrue: true, semanticModel);
                 }
             }
 
-            return false;
+            return builder.ToImmutable();
+        }
+
+        private static void AddReachabilityCondition(
+            ImmutableArray<SmtFormula>.Builder builder,
+            ExpressionSyntax expressionSyntax,
+            bool mustBeTrue,
+            SemanticModel semanticModel)
+        {
+            if (!CSharpConditionToFormula.TryTranslate(expressionSyntax, semanticModel, CancellationToken.None, out var formula) ||
+                formula == null)
+            {
+                return;
+            }
+
+            builder.Add(mustBeTrue
+                ? formula
+                : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
         }
 
         private static bool IsInUnmatchedConstantSwitchExpressionArm(

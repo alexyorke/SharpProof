@@ -4,6 +4,7 @@ namespace SearchLib.Purity
 {
     public enum PurityHazardKind
     {
+        BranchReachability,
         ImpureCallReachability,
         NullDereference,
         DivideByZero,

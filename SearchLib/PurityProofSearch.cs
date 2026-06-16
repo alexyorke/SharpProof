@@ -42,11 +42,26 @@ namespace SearchLib.Purity
         {
             return query.Hazard.Kind switch
             {
+                PurityHazardKind.BranchReachability => ClassifyBranchReachability(query.PathConditions, query.Hazard.TriggerCondition, timeout),
                 PurityHazardKind.ImpureCallReachability => ClassifyImpureCallReachability(query.PathConditions, query.Hazard.TriggerCondition, timeout),
                 PurityHazardKind.NullDereference => ClassifyNullDereference(query.PathConditions, query.Hazard.TriggerCondition, timeout),
                 PurityHazardKind.DivideByZero => ClassifyDivideByZero(query.PathConditions, query.Hazard.TriggerCondition, timeout),
                 _ => new PurityProofResult(PurityProofOutcome.Unknown, Feasibility.Unknown, Feasibility.Unknown, "unsupported_hazard_kind"),
             };
+        }
+
+        public PurityProofResult ClassifyBranchReachability(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula branchReachabilityCondition,
+            TimeSpan timeout)
+        {
+            return ClassifyCore(
+                pathConditions,
+                branchReachabilityCondition,
+                timeout,
+                pureReason: "branch_unreachable",
+                impureReason: "branch_reachable",
+                unknownReason: "branch_feasibility_unknown");
         }
 
         public PurityProofResult ClassifyImpureCallReachability(
