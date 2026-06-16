@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PurelySharp.Attributes\PurelySharp.Attributes.csproj" />
+    <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
     
   </ItemGroup>
   

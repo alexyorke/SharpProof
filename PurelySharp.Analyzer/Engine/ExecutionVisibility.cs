@@ -4,11 +4,15 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using PurelySharp.Analyzer.Engine.Smt;
+using SearchLib.Smt;
 
 namespace PurelySharp.Analyzer.Engine
 {
     internal static class ExecutionVisibility
     {
+        private static readonly TimeSpan SmtTimeout = TimeSpan.FromMilliseconds(25);
+
         public static IEnumerable<IOperation> VisibleDescendants(IOperation rootOperation)
         {
             foreach (var operation in rootOperation.DescendantsAndSelf())
@@ -176,9 +180,12 @@ namespace PurelySharp.Analyzer.Engine
                         return KnownBooleanValue.True;
                     }
 
-                    return IsUnsatisfiableConjunction(binaryExpression, semanticModel, cancellationToken)
-                        ? KnownBooleanValue.False
-                        : KnownBooleanValue.Unknown;
+                    if (IsUnsatisfiableConjunction(binaryExpression, semanticModel, cancellationToken))
+                    {
+                        return KnownBooleanValue.False;
+                    }
+
+                    return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken);
                 }
 
                 if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression))
@@ -195,18 +202,24 @@ namespace PurelySharp.Analyzer.Engine
                         return KnownBooleanValue.False;
                     }
 
-                    return KnownBooleanValue.Unknown;
+                    return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken);
                 }
 
-                return EvaluateKnownComparison(binaryExpression, semanticModel, cancellationToken);
+                var comparisonValue = EvaluateKnownComparison(binaryExpression, semanticModel, cancellationToken);
+                return comparisonValue != KnownBooleanValue.Unknown
+                    ? comparisonValue
+                    : EvaluateWithSmtFallback(expression, semanticModel, cancellationToken);
             }
 
             if (expression is IsPatternExpressionSyntax isPatternExpression)
             {
-                return EvaluateKnownPattern(isPatternExpression, semanticModel, cancellationToken);
+                var patternValue = EvaluateKnownPattern(isPatternExpression, semanticModel, cancellationToken);
+                return patternValue != KnownBooleanValue.Unknown
+                    ? patternValue
+                    : EvaluateWithSmtFallback(expression, semanticModel, cancellationToken);
             }
 
-            return KnownBooleanValue.Unknown;
+            return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken);
         }
 
         private static KnownBooleanValue EvaluateKnownComparison(
@@ -756,6 +769,33 @@ namespace PurelySharp.Analyzer.Engine
                 KnownBooleanValue.False => KnownBooleanValue.True,
                 _ => KnownBooleanValue.Unknown
             };
+        }
+
+        private static KnownBooleanValue EvaluateWithSmtFallback(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (!CSharpConditionToFormula.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||
+                formula == null)
+            {
+                return KnownBooleanValue.Unknown;
+            }
+
+            using var solver = new SmtSolver();
+            var whenTrue = solver.IsSatisfiable(new[] { formula }, SmtTimeout);
+            if (whenTrue == Feasibility.Unsatisfiable)
+            {
+                return KnownBooleanValue.False;
+            }
+
+            var whenFalse = solver.IsSatisfiable(new[] { new SmtUnaryFormula(SmtUnaryOperator.Not, formula) }, SmtTimeout);
+            if (whenFalse == Feasibility.Unsatisfiable)
+            {
+                return KnownBooleanValue.True;
+            }
+
+            return KnownBooleanValue.Unknown;
         }
 
         private enum KnownBooleanValue

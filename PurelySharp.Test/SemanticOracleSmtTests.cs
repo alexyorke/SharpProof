@@ -71,6 +71,32 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_DisjunctiveContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int x", "(x == 0 || x == 1) && x != 0 && x != 1"),
+                Is.True);
+
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int x)
+    {
+        if ((x == 0 || x == 1) && x != 0 && x != 1)
+        {
+            Console.WriteLine(x);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_SatisfiableGuardedImpureCall_ReportsStructuredEvidence()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
