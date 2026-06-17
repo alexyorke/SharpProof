@@ -606,7 +606,7 @@ public class TestClass
     [EnforcePure]
     public string TestMethod(string path)
     {
-        // Path operations are pure string manipulations
+        // Path helpers are mixed, but Console.WriteLine is the blocking impurity here
         string dir = Path.GetDirectoryName(path);
         string ext = Path.GetExtension(path);
         string fileName = Path.GetFileName(path);
@@ -739,7 +739,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task PathGetExtension_NoDiagnostic()
+        public async Task PathGetExtension_Diagnostic()
         {
             var test = @"
 #nullable enable
@@ -749,7 +749,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string? TestMethod(string path)
+    public string? {|PS0002:TestMethod|}(string path)
     {
         return Path.GetExtension(path);
     }
@@ -759,7 +759,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task PathGetFileNameWithoutExtension_NoDiagnostic()
+        public async Task PathGetFileNameWithoutExtension_Diagnostic()
         {
             var test = @"
 #nullable enable
@@ -769,9 +769,41 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string? TestMethod(string path)
+    public string? {|PS0002:TestMethod|}(string path)
     {
         return Path.GetFileNameWithoutExtension(path);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task PathHelpers_Diagnostic()
+        {
+            var test = @"
+#nullable enable
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string? {|PS0002:DirectoryNameMethod|}(string path)
+    {
+        return Path.GetDirectoryName(path);
+    }
+
+    [EnforcePure]
+    public string? {|PS0002:FileNameMethod|}(string path)
+    {
+        return Path.GetFileName(path);
+    }
+
+    [EnforcePure]
+    public string? {|PS0002:ChangeExtensionMethod|}(string path)
+    {
+        return Path.ChangeExtension(path, ".txt");
     }
 }";
 

@@ -34,8 +34,8 @@ namespace PurelySharp.Test
         {
             Assert.That(Constants.KnownImpureTypeNames, Does.Not.Contain("System.Guid"));
             Assert.That(Constants.KnownImpureMethods, Does.Contain("System.Guid.NewGuid()"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain("System.Guid.CompareTo(System.Guid)"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain("System.Guid.Equals(System.Guid)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.CompareTo(System.Guid)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.Equals(System.Guid)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.Guid(byte[])"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.Guid(string)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.Parse(string)"));
@@ -59,6 +59,32 @@ namespace PurelySharp.Test
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.ToByteArray(bool)"));
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Guid.ToByteArray()"));
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Guid.ToByteArray(bool)"));
+        }
+
+        [Test]
+        public void PathHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.IO.Path.Combine(string, string)",
+                "System.IO.Path.ChangeExtension(string, string)",
+                "System.IO.Path.ChangeExtension(string?, string?)",
+                "System.IO.Path.GetDirectoryName(string)",
+                "System.IO.Path.GetDirectoryName(string?)",
+                "System.IO.Path.GetExtension(string)",
+                "System.IO.Path.GetExtension(string?)",
+                "System.IO.Path.GetFileName(string)",
+                "System.IO.Path.GetFileName(string?)",
+                "System.IO.Path.GetFileNameWithoutExtension(string)",
+                "System.IO.Path.GetFileNameWithoutExtension(string?)",
+                "System.IO.Path.HasExtension(string)",
+                "System.IO.Path.HasExtension(string?)",
+            };
+
+            foreach (var member in members)
+            {
+                Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(member));
+            }
         }
 
         [Test]
