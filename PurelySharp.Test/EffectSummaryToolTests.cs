@@ -691,6 +691,7 @@ public static class PurityFixture
 
             AssertPurityClassification(summary, "System.DateTimeOffset.AddDays(double)", "pure");
             AssertPurityClassification(summary, "System.DateTimeOffset.ToUnixTimeMilliseconds()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.ToUnixTimeSeconds()", "pure");
             AssertPurityClassification(summary, "System.DateTimeOffset.get_Offset()", "pure");
             AssertPurityClassification(summary, "System.DateTimeOffset.FromUnixTimeMilliseconds(long)", "impure", "global_state_read", "throw");
             AssertPurityClassification(summary, "System.DateTimeOffset.FromUnixTimeSeconds(long)", "impure", "global_state_read", "throw");

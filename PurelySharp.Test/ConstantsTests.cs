@@ -572,7 +572,8 @@ public static class RecentCatalogSignatureSamples
         var fromMilliseconds = DateTimeOffset.FromUnixTimeMilliseconds(0);
         var fromSeconds = DateTimeOffset.FromUnixTimeSeconds(0);
         var added = value.AddDays(1);
-        return added.ToUnixTimeMilliseconds() + value.Offset.Ticks;
+        var seconds = added.ToUnixTimeSeconds();
+        return added.ToUnixTimeMilliseconds() + seconds + value.Offset.Ticks;
     }
 }";
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
@@ -678,6 +679,7 @@ public static class RecentCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTimeOffset.FromUnixTimeSeconds(0)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddDays(1)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "added.ToUnixTimeMilliseconds()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "added.ToUnixTimeSeconds()"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Offset"));
         }
 

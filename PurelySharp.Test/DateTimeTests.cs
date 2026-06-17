@@ -313,6 +313,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task DateTimeOffsetToUnixTimeSeconds_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public long TestMethod(DateTimeOffset value)
+    {
+        return value.ToUnixTimeSeconds();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task DateTimeOffsetFromUnixTimeSeconds_Diagnostic()
         {
             var test = @"

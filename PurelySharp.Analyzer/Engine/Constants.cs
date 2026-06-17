@@ -1135,7 +1135,6 @@ public static class Constants
         "System.DateTimeOffset.AddSeconds(double)",
         "System.DateTimeOffset.AddTicks(long)",
         "System.DateTimeOffset.AddYears(int)",
-        "System.DateTimeOffset.ToUnixTimeSeconds()",
         "System.DateTimeOffset.DateTime.get",
         "System.DateTimeOffset.Day.get",
         "System.DateTimeOffset.DayOfWeek.get",
