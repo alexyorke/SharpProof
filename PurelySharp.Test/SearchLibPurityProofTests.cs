@@ -137,6 +137,17 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void PurityProof_SafeStaticCacheRead_IsProvablyPure()
+        {
+            using var search = new PurityProofSearch();
+
+            var result = search.ClassifyStaticCacheRead(Array.Empty<SmtFormula>(), TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.Reason, Is.EqualTo("safe_static_cache_read"));
+        }
+
+        [Test]
         public void PurityProof_QueryBranchReachability_ContradictoryGuard_IsProvablyPure()
         {
             using var search = new PurityProofSearch();

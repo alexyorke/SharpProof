@@ -6,6 +6,7 @@ namespace SearchLib.Purity
     {
         BranchReachability,
         ImpureCallReachability,
+        StaticCacheRead,
         NullDereference,
         DivideByZero,
     }

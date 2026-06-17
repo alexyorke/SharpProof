@@ -38,29 +38,23 @@ namespace SearchLib.Purity
                 unknownReason: "impurity_feasibility_unknown");
         }
 
+        public PurityProofResult ClassifyStaticCacheRead(
+            IEnumerable<SmtFormula> pathConditions,
+            TimeSpan timeout)
+        {
+            return ClassifyInternalOnlyEffect(pathConditions, timeout, "safe_static_cache_read");
+        }
+
         public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout)
         {
+            if (query.Hazard.Kind == PurityHazardKind.StaticCacheRead)
+            {
+                return ClassifyStaticCacheRead(query.PathConditions, timeout);
+            }
+
             if (query.Hazard.Visibility == PurityEffectVisibility.InternalOnly)
             {
-                var pathFeasibility = _solver.IsSatisfiable(query.PathConditions, timeout);
-                return pathFeasibility switch
-                {
-                    Feasibility.Unsatisfiable => new PurityProofResult(
-                        PurityProofOutcome.ProvablyPure,
-                        pathFeasibility,
-                        Feasibility.Unsatisfiable,
-                        "path_unsatisfiable"),
-                    Feasibility.Unknown => new PurityProofResult(
-                        PurityProofOutcome.Unknown,
-                        pathFeasibility,
-                        Feasibility.Unknown,
-                        "path_feasibility_unknown"),
-                    _ => new PurityProofResult(
-                        PurityProofOutcome.ProvablyPure,
-                        pathFeasibility,
-                        Feasibility.Unsatisfiable,
-                        "effect_not_caller_visible"),
-                };
+                return ClassifyInternalOnlyEffect(query.PathConditions, timeout);
             }
 
             return query.Hazard.Kind switch
@@ -70,6 +64,33 @@ namespace SearchLib.Purity
                 PurityHazardKind.NullDereference => ClassifyNullDereference(query.PathConditions, query.Hazard.TriggerCondition, timeout),
                 PurityHazardKind.DivideByZero => ClassifyDivideByZero(query.PathConditions, query.Hazard.TriggerCondition, timeout),
                 _ => new PurityProofResult(PurityProofOutcome.Unknown, Feasibility.Unknown, Feasibility.Unknown, "unsupported_hazard_kind"),
+            };
+        }
+
+        private PurityProofResult ClassifyInternalOnlyEffect(
+            IEnumerable<SmtFormula> pathConditions,
+            TimeSpan timeout,
+            string pureReason = "effect_not_caller_visible")
+        {
+            var normalizedPathConditions = pathConditions.ToArray();
+            var pathFeasibility = _solver.IsSatisfiable(normalizedPathConditions, timeout);
+            return pathFeasibility switch
+            {
+                Feasibility.Unsatisfiable => new PurityProofResult(
+                    PurityProofOutcome.ProvablyPure,
+                    pathFeasibility,
+                    Feasibility.Unsatisfiable,
+                    "path_unsatisfiable"),
+                Feasibility.Unknown => new PurityProofResult(
+                    PurityProofOutcome.Unknown,
+                    pathFeasibility,
+                    Feasibility.Unknown,
+                    "path_feasibility_unknown"),
+                _ => new PurityProofResult(
+                    PurityProofOutcome.ProvablyPure,
+                    pathFeasibility,
+                    Feasibility.Unsatisfiable,
+                    pureReason),
             };
         }
 
