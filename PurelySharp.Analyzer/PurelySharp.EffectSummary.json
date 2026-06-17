@@ -8,7 +8,7 @@
       "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
       "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
       "MethodCount": 34519,
-      "EmittedMethodCount": 1,
+      "EmittedMethodCount": 3,
       "Methods": [
         {
           "Symbol": "System.Array.Empty()",
@@ -39,14 +39,86 @@
             "HasUnsupportedEffects": false,
             "FreshnessClassification": "none"
           }
+        },
+        {
+          "Symbol": "System.Guid.ToByteArray()",
+          "ExactSymbolKey": "System.Guid.ToByteArray()->byte[]",
+          "MetadataToken": "0x060012EB",
+          "RelativeVirtualAddress": 6997976,
+          "MethodBodySha256": "fa47a962cbc04dc705b209588d2683c1a15809d04f4c3210f595775527e78b91",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060012EB|il:fa47a962cbc04dc705b209588d2683c1a15809d04f4c3210f595775527e78b91",
+          "Effects": [
+            "allocates_array",
+            "calls_method",
+            "reads_static_field"
+          ],
+          "RootCandidates": [
+            "safe_static_constant_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.Runtime.InteropServices.MemoryMarshal.TryWrite(System.Span`1<byte>, ref !!0)->bool",
+            "System.Span`1<byte>.op_Implicit(!0[])->System.Span`1<!0>"
+          ],
+          "Fields": [
+            "IsLittleEndian"
+          ],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_array_candidate_via_local_helpers"
+          }
+        },
+        {
+          "Symbol": "System.Guid.ToByteArray(bool)",
+          "ExactSymbolKey": "System.Guid.ToByteArray(bool)->byte[]",
+          "MetadataToken": "0x060012EC",
+          "RelativeVirtualAddress": 6998020,
+          "MethodBodySha256": "94a703fc916f09ca4221f2eafce68757ba7f4b6a906c3bbbcfe7431cec0f4f4b",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060012EC|il:94a703fc916f09ca4221f2eafce68757ba7f4b6a906c3bbbcfe7431cec0f4f4b",
+          "Effects": [
+            "allocates_array",
+            "calls_method",
+            "reads_static_field"
+          ],
+          "RootCandidates": [
+            "safe_static_constant_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.Guid..ctor(System.ReadOnlySpan`1<byte>, bool)->void",
+            "System.Guid.AsBytes(ref System.Guid)->System.ReadOnlySpan`1<byte>",
+            "System.Runtime.InteropServices.MemoryMarshal.TryWrite(System.Span`1<byte>, ref !!0)->bool",
+            "System.Span`1<byte>.op_Implicit(!0[])->System.Span`1<!0>"
+          ],
+          "Fields": [
+            "IsLittleEndian"
+          ],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_array_candidate_via_local_helpers"
+          }
         }
       ]
     }
   ],
   "PurityReport": {
     "SchemaVersion": 1,
-    "MethodCount": 1,
-    "PureCount": 1,
+    "MethodCount": 3,
+    "PureCount": 3,
     "ImpureCount": 0,
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
@@ -76,6 +148,44 @@
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none"
+      },
+      {
+        "Symbol": "System.Guid.ToByteArray()",
+        "ExactSymbolKey": "System.Guid.ToByteArray()->byte[]",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060012EB|il:fa47a962cbc04dc705b209588d2683c1a15809d04f4c3210f595775527e78b91",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x060012EB",
+        "MethodBodySha256": "fa47a962cbc04dc705b209588d2683c1a15809d04f4c3210f595775527e78b91",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_array_candidate_via_local_helpers"
+      },
+      {
+        "Symbol": "System.Guid.ToByteArray(bool)",
+        "ExactSymbolKey": "System.Guid.ToByteArray(bool)->byte[]",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060012EC|il:94a703fc916f09ca4221f2eafce68757ba7f4b6a906c3bbbcfe7431cec0f4f4b",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x060012EC",
+        "MethodBodySha256": "94a703fc916f09ca4221f2eafce68757ba7f4b6a906c3bbbcfe7431cec0f4f4b",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_array_candidate_via_local_helpers"
       }
     ]
   }

@@ -2864,6 +2864,15 @@ namespace PurelySharp.Analyzer.Engine
             return GeneratedPurityCatalog.Current.TryGetPurity(methodSymbol, compilation, out purity);
         }
 
+        internal static bool IsTrustedGeneratedFreshOwnedArrayReturningMember(
+            IMethodSymbol methodSymbol,
+            Compilation compilation)
+        {
+            return TryGetTrustedGeneratedPurity(methodSymbol, compilation, out var purity) &&
+                purity.IsPure &&
+                purity.IsFreshArrayCandidate;
+        }
+
 
         internal static bool HasImpureAttribute(ISymbol symbol)
         {

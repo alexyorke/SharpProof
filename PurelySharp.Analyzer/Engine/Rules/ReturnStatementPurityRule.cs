@@ -232,7 +232,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
             {
                 var originalDefinition = invocationOperation.TargetMethod.OriginalDefinition;
                 if (IsArrayEmptyFactory(originalDefinition) ||
-                    PurityAnalysisEngine.IsKnownFreshOwnedArrayReturningMember(originalDefinition))
+                    PurityAnalysisEngine.IsKnownFreshOwnedArrayReturningMember(originalDefinition) ||
+                    PurityAnalysisEngine.IsTrustedGeneratedFreshOwnedArrayReturningMember(
+                        originalDefinition,
+                        semanticModel.Compilation))
                 {
                     methodSymbol = originalDefinition;
                     return true;

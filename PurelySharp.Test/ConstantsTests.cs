@@ -44,6 +44,15 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void GuidToByteArray_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.ToByteArray()"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.ToByteArray(bool)"));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Guid.ToByteArray()"));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Guid.ToByteArray(bool)"));
+        }
+
+        [Test]
         public void RepresentativeCatalogSignaturesResolveAgainstNet80References()
         {
             var source = @"
@@ -286,10 +295,6 @@ public static class RecentCatalogSignatureSamples
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Guid.TryParseExact(text, \"D\", out parsed)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "guid.ToString(\"N\")"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetObjectCreationSignature(compilation, syntaxTree, "new string(charSpan)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "guid.ToByteArray()"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "guid.ToByteArray()")));
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "guid.ToByteArray(true)"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "guid.ToByteArray(true)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64String(text)"), expectedPure: true, expectedImpure: false);
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64String(text)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64CharArray(chars, 0, text.Length)"), expectedPure: true, expectedImpure: false);

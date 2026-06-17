@@ -171,6 +171,7 @@ namespace PurelySharp.Analyzer
 
                     var categories = ReadStringArray(entryElement, "Categories");
                     var primaryCategory = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "PrimaryCategory");
+                    var freshnessClassification = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "FreshnessClassification") ?? "none";
                     yield return new SummaryEntry(
                         symbol.Trim(),
                         new PurityEntry(
@@ -178,7 +179,9 @@ namespace PurelySharp.Analyzer
                             categories,
                             string.IsNullOrWhiteSpace(primaryCategory)
                                 ? categories.FirstOrDefault() ?? "generated_purity_summary"
-                                : primaryCategory.Trim()),
+                                : primaryCategory.Trim(),
+                            ReadBooleanProperty(entryElement, "HasFreshArrayAllocationEvidence"),
+                            freshnessClassification),
                         SummaryAssemblyIdentity.FromFlatJson(entryElement),
                         SummaryMethodIdentity.FromFlatJson(entryElement));
                 }
@@ -219,16 +222,25 @@ namespace PurelySharp.Analyzer
                     }
 
                     var categories = ReadStringArray(purityElement, "Categories");
+                    var freshnessClassification = CompatibilityHelpers.GetTrimmedStringProperty(purityElement, "FreshnessClassification") ?? "none";
                     yield return new SummaryEntry(
                         symbol,
                         new PurityEntry(
                             classification.Trim(),
                             categories,
-                            categories.FirstOrDefault() ?? "generated_purity_summary"),
+                            categories.FirstOrDefault() ?? "generated_purity_summary",
+                            ReadBooleanProperty(purityElement, "HasFreshArrayAllocationEvidence"),
+                            freshnessClassification),
                         assemblyIdentity,
                         SummaryMethodIdentity.FromJson(methodElement));
                 }
             }
+        }
+
+        private static bool ReadBooleanProperty(JsonElement element, string propertyName)
+        {
+            return element.TryGetProperty(propertyName, out var valueElement) &&
+                valueElement.ValueKind == JsonValueKind.True;
         }
 
         private static ImmutableArray<string> ReadStringArray(JsonElement element, string propertyName)
@@ -314,6 +326,17 @@ namespace PurelySharp.Analyzer
 
         private static ActualMethodIdentity? TryResolveActualMethodIdentity(IMethodSymbol methodSymbol, Compilation compilation)
         {
+            var implementationPath = TryResolveRuntimeImplementationAssemblyPath(methodSymbol);
+            if (!string.IsNullOrWhiteSpace(implementationPath))
+            {
+                var path = implementationPath!;
+                if (File.Exists(path) &&
+                    TryResolveMethodIdentityFromPath(methodSymbol, path, out var implementationIdentity))
+                {
+                    return implementationIdentity;
+                }
+            }
+
             foreach (var reference in compilation.References.OfType<PortableExecutableReference>())
             {
                 var assemblySymbol = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
@@ -329,7 +352,8 @@ namespace PurelySharp.Analyzer
                     return null;
                 }
 
-                var methodMap = MethodIdentityCache.GetOrAdd(referencePath, static path => LoadMethodIdentities(path));
+                var path = referencePath!;
+                var methodMap = MethodIdentityCache.GetOrAdd(path, static resolvedPath => LoadMethodIdentities(resolvedPath));
                 foreach (var key in GetSymbolKeys(methodSymbol))
                 {
                     if (methodMap.TryGetValue(key, out var identity))
@@ -342,6 +366,30 @@ namespace PurelySharp.Analyzer
             }
 
             return null;
+        }
+
+        private static bool TryResolveMethodIdentityFromPath(
+            IMethodSymbol methodSymbol,
+            string assemblyPath,
+            out ActualMethodIdentity identity)
+        {
+            identity = null!;
+            if (string.IsNullOrWhiteSpace(assemblyPath) || !File.Exists(assemblyPath))
+            {
+                return false;
+            }
+
+            var implementationMethodMap = MethodIdentityCache.GetOrAdd(assemblyPath, static path => LoadMethodIdentities(path));
+            foreach (var key in GetSymbolKeys(methodSymbol))
+            {
+                if (implementationMethodMap.TryGetValue(key, out var foundIdentity))
+                {
+                    identity = foundIdentity;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static ImmutableDictionary<string, ActualMethodIdentity> LoadMethodIdentities(string path)
@@ -636,6 +684,17 @@ namespace PurelySharp.Analyzer
 
         private static ActualAssemblyIdentity? TryResolveActualAssemblyIdentity(IMethodSymbol methodSymbol, Compilation compilation)
         {
+            var implementationPath = TryResolveRuntimeImplementationAssemblyPath(methodSymbol);
+            if (!string.IsNullOrWhiteSpace(implementationPath))
+            {
+                var path = implementationPath!;
+                if (File.Exists(path) &&
+                    TryResolveMethodIdentityFromPath(methodSymbol, path, out _))
+                {
+                    return AssemblyIdentityCache.GetOrAdd(path, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
+                }
+            }
+
             foreach (var reference in compilation.References.OfType<PortableExecutableReference>())
             {
                 var assemblySymbol = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
@@ -651,7 +710,42 @@ namespace PurelySharp.Analyzer
                     return null;
                 }
 
-                return AssemblyIdentityCache.GetOrAdd(referencePath, static path => ActualAssemblyIdentity.FromFile(path));
+                var path = referencePath!;
+                return AssemblyIdentityCache.GetOrAdd(path, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
+            }
+
+            return null;
+        }
+
+        private static string? TryResolveRuntimeImplementationAssemblyPath(IMethodSymbol methodSymbol)
+        {
+            if (methodSymbol.ContainingType?.ContainingNamespace?.ToDisplayString().StartsWith("System", StringComparison.Ordinal) == true)
+            {
+                var coreLibPath = typeof(object).Assembly.Location;
+                if (!string.IsNullOrWhiteSpace(coreLibPath) && File.Exists(coreLibPath))
+                {
+                    return coreLibPath;
+                }
+            }
+
+            var assemblyName = methodSymbol.ContainingAssembly?.Identity.Name;
+            if (string.IsNullOrWhiteSpace(assemblyName))
+            {
+                return null;
+            }
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!string.Equals(assembly.GetName().Name, assemblyName, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var location = assembly.Location;
+                if (!string.IsNullOrWhiteSpace(location) && File.Exists(location))
+                {
+                    return location;
+                }
             }
 
             return null;
@@ -699,18 +793,30 @@ namespace PurelySharp.Analyzer
 
         internal readonly struct PurityEntry
         {
-            public PurityEntry(string classification, ImmutableArray<string> categories, string primaryCategory)
+            public PurityEntry(
+                string classification,
+                ImmutableArray<string> categories,
+                string primaryCategory,
+                bool hasFreshArrayAllocationEvidence,
+                string freshnessClassification)
             {
                 Classification = classification;
                 Categories = categories;
                 PrimaryCategory = primaryCategory;
+                HasFreshArrayAllocationEvidence = hasFreshArrayAllocationEvidence;
+                FreshnessClassification = freshnessClassification;
             }
 
             public string Classification { get; }
             public ImmutableArray<string> Categories { get; }
             public string PrimaryCategory { get; }
+            public bool HasFreshArrayAllocationEvidence { get; }
+            public string FreshnessClassification { get; }
             public bool IsPure => string.Equals(Classification, "pure", StringComparison.Ordinal);
             public bool IsImpure => string.Equals(Classification, "impure", StringComparison.Ordinal);
+            public bool IsFreshArrayCandidate =>
+                HasFreshArrayAllocationEvidence &&
+                string.Equals(FreshnessClassification, "fresh_array_candidate_via_local_helpers", StringComparison.Ordinal);
         }
 
         private sealed class SummaryAssemblyIdentity
