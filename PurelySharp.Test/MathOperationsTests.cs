@@ -12,7 +12,7 @@ namespace PurelySharp.Test
     public class MathOperationsTests
     {
         [Test]
-        public async Task ComplexNestedExpressions_NoDiagnostic()
+        public async Task ComplexNestedExpressions_Diagnostic()
         {
             var test = @"
 using System;
@@ -23,7 +23,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public double TestMethod(double x, double y, double z)
+    public double {|PS0002:TestMethod|}(double x, double y, double z)
     {
         var a = Math.Sin(x) * Math.Cos(y);
         var b = Math.Pow(Math.E, z) / Math.PI; // Pure: Math.E/PI allowed
@@ -36,7 +36,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task SimpleMathMethod_NoDiagnostic()
+        public async Task SimpleMathMethod_Diagnostic()
         {
             var test = @"
 using System;
@@ -47,7 +47,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public double TestMethod(double x)
+    public double {|PS0002:TestMethod|}(double x)
     {
         return Math.Sin(x);
     }
@@ -78,7 +78,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task MathMethodChain_NoDiagnostic()
+        public async Task MathMethodChain_Diagnostic()
         {
             var test = @"
 using System;
@@ -89,12 +89,62 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public double TestMethod(double x)
+    public double {|PS0002:TestMethod|}(double x)
     {
         return Math.Sin(Math.Cos(x));
     }
 }";
 
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task MathDoubleHelpers_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public double {|PS0002:CeilingMethod|}(double x)
+    {
+        return Math.Ceiling(x);
+    }
+
+    [EnforcePure]
+    public double {|PS0002:FloorMethod|}(double x)
+    {
+        return Math.Floor(x);
+    }
+
+    [EnforcePure]
+    public double {|PS0002:TruncateMethod|}(double x)
+    {
+        return Math.Truncate(x);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task MathSignDecimal_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(decimal x)
+    {
+        return Math.Sign(x);
+    }
+}";
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }

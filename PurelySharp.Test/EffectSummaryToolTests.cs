@@ -452,7 +452,6 @@ public static class PurityFixture
                 "System.Math.Max(System.Decimal, System.Decimal)",
                 "System.Math.Min(System.Decimal, System.Decimal)",
                 "System.Math.Round(System.Decimal)",
-                "System.Math.Truncate(double)",
             };
 
             foreach (var symbol in representativePureSymbols)
@@ -464,7 +463,10 @@ public static class PurityFixture
             }
 
             AssertPurityClassification(summary, "System.Math.Ceiling(double)", "conservative_unknown", "metadata_only_or_external");
+            AssertPurityClassification(summary, "System.Math.Floor(double)", "conservative_unknown", "metadata_only_or_external");
+            AssertPurityClassification(summary, "System.Math.Sin(double)", "conservative_unknown", "metadata_only_or_external");
             AssertPurityClassification(summary, "System.Math.Sqrt(double)", "conservative_unknown", "metadata_only_or_external");
+            AssertPurityClassification(summary, "System.Math.Truncate(double)", "conservative_unknown", "unknown_callee");
         }
 
         [Test]

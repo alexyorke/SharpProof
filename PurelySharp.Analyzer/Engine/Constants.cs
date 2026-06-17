@@ -1235,10 +1235,6 @@ public static class Constants
         "System.Math.E",
         "System.Math.PI",
         "System.Math.Tau",
-        "System.Math.Ceiling(double)",
-        "System.Math.Floor(double)",
-        "System.Math.Sin(double)",
-        "System.Math.Sqrt(double)",
 
 
         "System.Net.WebUtility.HtmlDecode(string)",
@@ -1478,8 +1474,6 @@ public static class Constants
         "System.Linq.Enumerable.Take<TSource>(System.Collections.Generic.IEnumerable<TSource>, int)",
         "System.Linq.Enumerable.ThenBy",
         "System.Linq.Enumerable.Zip",
-        "System.Math.Sign(decimal)",
-        "System.Math.Truncate(double)",
         "System.Net.IPEndPoint.IPEndPoint(System.Net.IPAddress, int)",
         "System.ObjectDisposedException.ObjectDisposedException(string)",
         "System.Runtime.InteropServices.Marshal.SizeOf<T>()",

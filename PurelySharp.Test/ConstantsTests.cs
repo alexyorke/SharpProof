@@ -187,6 +187,17 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void MathDoubleHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Math.Ceiling(double)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Math.Floor(double)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Math.Sin(double)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Math.Sqrt(double)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Math.Truncate(double)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Math.Sign(decimal)"));
+        }
+
+        [Test]
         public void MemoryExtensionsCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

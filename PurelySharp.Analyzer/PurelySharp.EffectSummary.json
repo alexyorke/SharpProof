@@ -178,17 +178,19 @@
                                                        "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
                                                        "MetadataToken":  "0x06000254",
                                                        "MethodBodySha256":  "22bc18e9cb67a0a6f3ae01b6e9dd378d67ea7f732f284f5b0672dc872233e5a8",
-                                                       "Classification":  "pure",
-                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Classification":  "conservative_unknown",
+                                                       "PrimaryCategory":  "unknown_callee",
                                                        "Categories":  [
 
-                                                                      ],
+                                                                      "unknown_callee"
+                                                       ],
                                                        "FirstBlockingCallChain":  [
 
-                                                                                  ],
+                                                                                  "System.Math.ModF(double, double*)"
+                                                       ],
                                                        "HasFreshArrayAllocationEvidence":  false,
                                                        "HasFreshObjectAllocationEvidence":  false,
-                                                       "HasUnsupportedEffects":  false,
+                                                       "HasUnsupportedEffects":  true,
                                                        "FreshnessClassification":  "none"
                                                    },
                                                    {
