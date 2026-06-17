@@ -106,6 +106,14 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void MathConstants_AreExplicitlyCataloged()
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Contain("System.Math.E"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Contain("System.Math.PI"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Contain("System.Math.Tau"));
+        }
+
+        [Test]
         public void MemoryExtensionsCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

@@ -1216,6 +1216,9 @@ public static class Constants
 
 
 
+        "System.Math.E",
+        "System.Math.PI",
+        "System.Math.Tau",
         "System.Math.Ceiling(double)",
         "System.Math.Floor(double)",
         "System.Math.Sin(double)",

@@ -136,12 +136,6 @@ namespace PurelySharp.Analyzer.Engine
 			{
 				PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Match found for {symbol.ToDisplayString()} using signature '{signature}'");
 			}
-			else if (symbol.ContainingNamespace?.ToString().Equals("System", StringComparison.Ordinal) == true &&
-				symbol.ContainingType?.Name.Equals("Math", StringComparison.Ordinal) == true)
-			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Assuming pure for System.Math member: {symbol.ToDisplayString()}");
-				isKnownPure = true;
-			}
 
 			return isKnownPure;
 		}
