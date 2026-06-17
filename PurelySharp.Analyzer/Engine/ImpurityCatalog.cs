@@ -81,25 +81,6 @@ namespace PurelySharp.Analyzer.Engine
 				return true;
 			}
 
-			if (symbol.ContainingType?.ContainingNamespace?.ToString().StartsWith("System.Collections.Immutable", StringComparison.Ordinal) == true)
-			{
-				if (symbol.Name.Contains("Create") || symbol.Name.Contains("Add") || symbol.Name.Contains("Set") || symbol.Name.Contains("Remove"))
-				{
-					PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Assuming pure for System.Collections.Immutable member: {symbol.ToDisplayString()}");
-					return true;
-				}
-				if (symbol.Kind == SymbolKind.Property && (symbol.Name == "Count" || symbol.Name == "Length" || symbol.Name == "IsEmpty"))
-				{
-					PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Assuming pure for System.Collections.Immutable property: {symbol.ToDisplayString()}");
-					return true;
-				}
-				if (symbol.Kind == SymbolKind.Method && (symbol.Name == "Contains" || symbol.Name == "IndexOf" || symbol.Name == "TryGetValue"))
-				{
-					PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Assuming pure for System.Collections.Immutable method: {symbol.ToDisplayString()}");
-					return true;
-				}
-			}
-
 			string signature = symbol.OriginalDefinition.ToDisplayString();
 			if (symbol.Kind == SymbolKind.Property)
 			{
