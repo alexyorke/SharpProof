@@ -86,7 +86,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task DateTimeAddTicks_NoDiagnostic()
+        public async Task DateTimeAddTicks_Diagnostic()
         {
             var test = @"
 using System;
@@ -95,7 +95,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public DateTime TestMethod(DateTime value)
+    public DateTime {|PS0002:TestMethod|}(DateTime value)
     {
         return value.AddTicks(1);
     }
@@ -104,8 +104,15 @@ public class TestClass
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
 
-        [Test]
-        public async Task DateTimeDeterministicAddMethods_NoDiagnostic()
+        [TestCase("value.Add(offset)")]
+        [TestCase("value.AddDays(1)")]
+        [TestCase("value.AddHours(1)")]
+        [TestCase("value.AddMilliseconds(2)")]
+        [TestCase("value.AddMinutes(3)")]
+        [TestCase("value.AddMonths(4)")]
+        [TestCase("value.AddSeconds(5)")]
+        [TestCase("value.AddYears(6)")]
+        public async Task DateTimeDeterministicAddMethods_Diagnostic(string expression)
         {
             var test = @"
 using System;
@@ -114,16 +121,9 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public DateTime TestMethod(DateTime value, TimeSpan offset)
+    public DateTime {|PS0002:TestMethod|}(DateTime value, TimeSpan offset)
     {
-        return value
-            .Add(offset)
-            .AddHours(1)
-            .AddMilliseconds(2)
-            .AddMinutes(3)
-            .AddMonths(4)
-            .AddSeconds(5)
-            .AddYears(6);
+        return " + expression + @";
     }
 }";
 
@@ -151,7 +151,26 @@ public class TestClass
         }
 
         [Test]
-        public async Task DateTimeBinaryRoundTripHelpers_NoDiagnostic()
+        public async Task DateTimeSubtract_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TimeSpan TestMethod(DateTime left, DateTime right)
+    {
+        return left.Subtract(right);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task DateTimeToBinary_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -162,7 +181,7 @@ public class TestClass
     [EnforcePure]
     public DateTime TestMethod(DateTime value)
     {
-        return DateTime.FromBinary(value.ToBinary());
+        return value.ToBinary();
     }
 }";
 
@@ -170,7 +189,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task DateTimeOADateAndDaysInMonthHelpers_NoDiagnostic()
+        public async Task DateTimeBinaryRoundTripHelpers_Diagnostic()
         {
             var test = @"
 using System;
@@ -179,10 +198,47 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public double TestMethod(DateTime value)
+    public DateTime {|PS0002:TestMethod|}(DateTime value)
     {
-        return DateTime.FromOADate(value.ToOADate()).ToOADate() +
-            DateTime.DaysInMonth(value.Year, value.Month);
+        return DateTime.FromBinary(value.ToBinary());
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task DateTimeDaysInMonth_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(DateTime value)
+    {
+        return DateTime.DaysInMonth(value.Year, value.Month);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task DateTimeOADateRoundTrip_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public double {|PS0002:TestMethod|}(DateTime value)
+    {
+        return DateTime.FromOADate(value.ToOADate()).ToOADate();
     }
 }";
 

@@ -706,6 +706,31 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeDateTimeSlice_TreatsAddAndRoundTripHelpersDifferently()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.DateTime", limit: 40);
+
+            AssertPurityClassification(summary, "System.DateTime.Add(System.TimeSpan)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTime.AddDays(double)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTime.AddHours(double)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTime.AddMilliseconds(double)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTime.AddMinutes(double)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTime.AddMonths(int)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTime.AddSeconds(double)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTime.AddTicks(long)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTime.AddYears(int)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTime.FromBinary(long)", "impure", "global_state_read", "throw");
+            AssertPurityClassification(summary, "System.DateTime.FromOADate(double)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTime.ToOADate()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTime.ToBinary()", "pure");
+            AssertPurityClassification(summary, "System.DateTime.Compare(System.DateTime, System.DateTime)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.CompareTo(System.DateTime)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.Equals(System.DateTime)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.Subtract(System.DateTime)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.DaysInMonth(int, int)", "pure");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeUnsafeSlice_TreatsReadUnalignedAsPureAndWriteUnalignedAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Runtime.CompilerServices.Unsafe", limit: 20);

@@ -699,6 +699,52 @@ public static class RecentCatalogSignatureSamples
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Offset"));
         }
 
+        [Test]
+        public void DateTimeGeneratedPurityEntriesResolveAgainstNet80References()
+        {
+            var source = @"
+using System;
+
+public static class DateTimeCatalogSignatureSamples
+{
+    public static DateTime Sample(DateTime value, TimeSpan offset)
+    {
+        _ = value.Add(offset);
+        _ = value.AddDays(1);
+        _ = value.AddHours(2);
+        _ = value.AddMilliseconds(3);
+        _ = value.AddMinutes(4);
+        _ = value.AddMonths(5);
+        _ = value.AddSeconds(6);
+        _ = value.AddTicks(7);
+        _ = value.AddYears(8);
+        _ = DateTime.FromBinary(value.ToBinary());
+        _ = DateTime.FromOADate(value.ToOADate());
+        _ = value.ToBinary();
+        return value;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "DateTimeGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.Add(offset)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddDays(1)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddHours(2)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddMilliseconds(3)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddMinutes(4)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddMonths(5)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddSeconds(6)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddTicks(7)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddYears(8)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTime.FromBinary(value.ToBinary())"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTime.FromOADate(value.ToOADate())"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.ToBinary()"));
+        }
+
         private static void AssertCatalogMembership(string signature, bool expectedPure, bool expectedImpure)
         {
             Assert.That(Constants.KnownPureBCLMembers.Contains(signature), Is.EqualTo(expectedPure), signature);
