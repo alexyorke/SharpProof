@@ -1619,7 +1619,6 @@ public static class Constants
         "System.Collections.Generic.SortedSet<T>.GetViewBetween(T, T)",
         "System.ComponentModel.DataAnnotations.EmailAddressAttribute.EmailAddressAttribute()",
         "System.ComponentModel.DataAnnotations.RegularExpressionAttribute.RegularExpressionAttribute(string)",
-        "System.Convert.ToHexString(byte[])",
         "decimal.Negate(decimal)",
         "double.PositiveInfinity.get",
         "System.IO.FileNotFoundException.FileNotFoundException(string?)",

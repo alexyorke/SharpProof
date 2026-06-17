@@ -228,7 +228,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToHexStringSpan_NoDiagnostic()
+        public async Task ConvertToHexString_ReportsPS0002()
         {
             var test = @"
 using System;
@@ -237,7 +237,45 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod(ReadOnlySpan<byte> bytes)
+    public string {|PS0002:TestMethod|}(byte[] bytes)
+    {
+        return Convert.ToHexString(bytes);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConvertToHexStringSegment_ReportsPS0002()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(byte[] bytes)
+    {
+        return Convert.ToHexString(bytes, 0, bytes.Length);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConvertToHexStringSpan_ReportsPS0002()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(ReadOnlySpan<byte> bytes)
     {
         return Convert.ToHexString(bytes);
     }

@@ -345,6 +345,38 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeConvertToHexSlice_TreatsRuntimeHelpersAsImpure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Convert.ToHexString", limit: 20);
+
+            var methods = FindMethodsByPrefix(summary, "System.Convert.ToHexString");
+            Assert.That(methods.Length, Is.EqualTo(3));
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Convert.ToHexString(byte[])", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Convert.ToHexString(byte[], int, int)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Convert.ToHexString(System.ReadOnlySpan`1<byte>)", "impure", "global_state_read");
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var symbols = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.Convert.ToHexString", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(symbols, Is.EqualTo(new[]
+            {
+                "System.Convert.ToHexString(System.ReadOnlySpan`1<byte>)",
+                "System.Convert.ToHexString(byte[])",
+                "System.Convert.ToHexString(byte[], int, int)",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_GeneratedPurityCatalog_UsesDistinctExactKeys_ForDuplicateDisplaySymbols()
         {
             var source = """

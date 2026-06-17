@@ -188,6 +188,73 @@
         "FreshnessClassification": "fresh_array_candidate_via_local_helpers"
       },
       {
+        "Symbol": "System.Convert.ToHexString(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Convert.ToHexString(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Estring",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000F1B|il:9dedc0681e7e95de1694f06bfcabfd67025d46768e1147e887baaf31e276743c",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06000F1B",
+        "MethodBodySha256": "9dedc0681e7e95de1694f06bfcabfd67025d46768e1147e887baaf31e276743c",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
+        "Categories": [
+          "global_state_read"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none"
+      },
+      {
+        "Symbol": "System.Convert.ToHexString(byte[])",
+        "ExactSymbolKey": "System.Convert.ToHexString(byte[])->string",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000F19|il:48987024637fcc2af68a8ce70291675dd84360dcca556de652dcf812dc976bb8",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06000F19",
+        "MethodBodySha256": "48987024637fcc2af68a8ce70291675dd84360dcca556de652dcf812dc976bb8",
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Convert.ToHexString(System.ReadOnlySpan\u00601\u003Cbyte\u003E)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none"
+      },
+      {
+        "Symbol": "System.Convert.ToHexString(byte[], int, int)",
+        "ExactSymbolKey": "System.Convert.ToHexString(byte[], int, int)->string",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000F1A|il:65c2f88c946458307873f8937b244671f86873c5575936e69ac0d347f93fef1c",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06000F1A",
+        "MethodBodySha256": "65c2f88c946458307873f8937b244671f86873c5575936e69ac0d347f93fef1c",
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Convert.ToHexString(System.ReadOnlySpan\u00601\u003Cbyte\u003E)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none"
+      },
+      {
         "Symbol": "System.Convert.ToBase64String(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Base64FormattingOptions)",
         "ExactSymbolKey": "System.Convert.ToBase64String(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Base64FormattingOptions)-\u003Estring",
         "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000F08|il:02dd06c83d57413bbec6ce51b0af765535a546c5b7e3d4057e5ad9fde329d486",
