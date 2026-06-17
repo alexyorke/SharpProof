@@ -53,6 +53,13 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void StringToCharArray_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("string.ToCharArray()"));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("string.ToCharArray()"));
+        }
+
+        [Test]
         public void ConvertCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Convert.FromBase64String(string)"));
@@ -325,8 +332,6 @@ public static class RecentCatalogSignatureSamples
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1u)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1ul)"), expectedPure: true, expectedImpure: false);
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1ul)")));
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "text.ToCharArray()"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "text.ToCharArray()")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1u)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1L)"), expectedPure: true, expectedImpure: false);

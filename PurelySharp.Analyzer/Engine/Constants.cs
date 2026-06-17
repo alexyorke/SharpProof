@@ -1063,7 +1063,6 @@ public static class Constants
         "System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan<byte>)",
         "System.Security.Cryptography.SHA512.HashData(byte[])",
         "System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan<byte>)",
-        "string.ToCharArray()",
     };
 
     public static readonly HashSet<string> KnownPureBCLMembers = new HashSet<string>(StringComparer.Ordinal)
@@ -1723,7 +1722,6 @@ public static class Constants
         "string.StartsWith(string)",
         "string.Substring(int)",
         "string.Substring(int, int)",
-        "string.ToCharArray()",
         "string.ToLower()",
         "string.ToLowerInvariant()",
         "string.ToString()",

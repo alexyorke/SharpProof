@@ -281,29 +281,31 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeStringSlice_NormalizesManualCatalogAliases_AndClassifiesFreshReturnAsPure()
+        public async Task EffectSummaryTool_RuntimeStringSlice_TreatsToCharArrayAsGeneratedPurityEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.String.ToCharArray", limit: 10);
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
-            var knownPureRow = catalogComparison.GetProperty("KnownPureMembers")
-                .EnumerateArray()
-                .Single(row => string.Equals(
-                    row.GetProperty("Symbol").GetString(),
-                    "string.ToCharArray()",
-                    StringComparison.Ordinal));
-            var knownFreshRow = catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers")
-                .EnumerateArray()
-                .Single(row => string.Equals(
-                    row.GetProperty("Symbol").GetString(),
-                    "string.ToCharArray()",
-                    StringComparison.Ordinal));
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            Assert.That(knownPureRow.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
-            Assert.That(knownFreshRow.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
-            Assert.That(knownPureRow.GetProperty("MatchedExactSymbolKeys").GetArrayLength(), Is.GreaterThan(0));
-            Assert.That(knownFreshRow.GetProperty("MatchedExactSymbolKeys").GetArrayLength(), Is.GreaterThan(0));
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var toCharArrayRows = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Where(entry => string.Equals(
+                    entry.GetProperty("Symbol").GetString(),
+                    "System.String.ToCharArray()",
+                    StringComparison.Ordinal) ||
+                    string.Equals(
+                        entry.GetProperty("Symbol").GetString(),
+                        "System.String.ToCharArray(int, int)",
+                        StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(toCharArrayRows.Length, Is.EqualTo(2));
+            Assert.That(toCharArrayRows.All(row => row.GetProperty("Classification").GetString() == "pure"), Is.True);
+            Assert.That(toCharArrayRows.All(row => row.GetProperty("FreshnessClassification").GetString() == "fresh_array_candidate_via_local_helpers"), Is.True);
         }
 
         [Test]
