@@ -190,7 +190,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToBase64StringSegment_NoDiagnostic()
+        public async Task ConvertToBase64String_ReportsPS0002()
         {
             var test = @"
 using System;
@@ -199,7 +199,26 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod(byte[] bytes)
+    public string {|PS0002:TestMethod|}(byte[] bytes)
+    {
+        return Convert.ToBase64String(bytes);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConvertToBase64StringSegment_ReportsPS0002()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(byte[] bytes)
     {
         return Convert.ToBase64String(bytes, 0, bytes.Length);
     }

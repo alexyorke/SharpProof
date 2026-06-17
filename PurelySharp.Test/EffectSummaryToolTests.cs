@@ -309,6 +309,42 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeConvertToBase64Slice_TreatsRuntimeHelpersAsImpure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Convert.ToBase64String", limit: 20);
+
+            var methods = FindMethodsByPrefix(summary, "System.Convert.ToBase64String");
+            Assert.That(methods.Length, Is.EqualTo(5));
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Convert.ToBase64String(byte[])", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Convert.ToBase64String(byte[], System.Base64FormattingOptions)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Convert.ToBase64String(byte[], int, int)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Convert.ToBase64String(byte[], int, int, System.Base64FormattingOptions)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Convert.ToBase64String(System.ReadOnlySpan`1<byte>, System.Base64FormattingOptions)", "impure", "global_state_read", "throw");
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var symbols = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.Convert.ToBase64String", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(symbols, Is.EqualTo(new[]
+            {
+                "System.Convert.ToBase64String(System.ReadOnlySpan`1<byte>, System.Base64FormattingOptions)",
+                "System.Convert.ToBase64String(byte[])",
+                "System.Convert.ToBase64String(byte[], System.Base64FormattingOptions)",
+                "System.Convert.ToBase64String(byte[], int, int)",
+                "System.Convert.ToBase64String(byte[], int, int, System.Base64FormattingOptions)",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_GeneratedPurityCatalog_UsesDistinctExactKeys_ForDuplicateDisplaySymbols()
         {
             var source = """

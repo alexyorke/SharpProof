@@ -62,10 +62,14 @@ namespace PurelySharp.Test
         [Test]
         public void ConvertCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Convert.ToBase64String(byte[])"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Convert.ToBase64String(byte[], int, int)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Convert.FromBase64String(string)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Convert.FromBase64CharArray(char[], int, int)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Convert.FromHexString(string)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Convert.FromHexString(System.ReadOnlySpan<char>)"));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Convert.ToBase64String(byte[])"));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Convert.ToBase64String(byte[], int, int)"));
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Convert.FromBase64String(string)"));
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Convert.FromBase64CharArray(char[], int, int)"));
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Convert.FromHexString(string)"));
