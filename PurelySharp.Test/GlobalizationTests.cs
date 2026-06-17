@@ -1705,7 +1705,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToSingle_String_CurrentCulture_Diagnostic()
+        public async Task ConvertToSingle_String_CurrentCulture_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -1715,7 +1715,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public float {|PS0002:TestMethod|}(string value)
+    public float TestMethod(string value)
     {
         return Convert.ToSingle(value);
     }
@@ -1745,7 +1745,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToDouble_String_CurrentCulture_Diagnostic()
+        public async Task ConvertToDouble_String_CurrentCulture_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -1755,7 +1755,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public double {|PS0002:TestMethod|}(string value)
+    public double TestMethod(string value)
     {
         return Convert.ToDouble(value);
     }
@@ -1825,7 +1825,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToByte_String_CurrentCulture_Diagnostic()
+        public async Task ConvertToByte_String_CurrentCulture_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -1835,7 +1835,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public byte {|PS0002:TestMethod|}(string value)
+    public byte TestMethod(string value)
     {
         return Convert.ToByte(value);
     }
@@ -1865,7 +1865,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToDateTime_String_CurrentCulture_Diagnostic()
+        public async Task ConvertToDateTime_String_CurrentCulture_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -1875,7 +1875,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public DateTime {|PS0002:TestMethod|}(string value)
+    public DateTime TestMethod(string value)
     {
         return Convert.ToDateTime(value);
     }
@@ -1925,7 +1925,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToSByte_String_CurrentCulture_Diagnostic()
+        public async Task ConvertToSByte_String_CurrentCulture_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -1935,7 +1935,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public sbyte {|PS0002:TestMethod|}(string value)
+    public sbyte TestMethod(string value)
     {
         return Convert.ToSByte(value);
     }
@@ -1965,7 +1965,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToInt32_String_CurrentCulture_Diagnostic()
+        public async Task ConvertToInt32_String_CurrentCulture_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -1975,7 +1975,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public int {|PS0002:TestMethod|}(string value)
+    public int TestMethod(string value)
     {
         return Convert.ToInt32(value);
     }
@@ -2005,7 +2005,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToInt64_String_CurrentCulture_Diagnostic()
+        public async Task ConvertToInt64_String_CurrentCulture_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -2015,7 +2015,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public long {|PS0002:TestMethod|}(string value)
+    public long TestMethod(string value)
     {
         return Convert.ToInt64(value);
     }
@@ -2045,7 +2045,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToInt16_String_CurrentCulture_Diagnostic()
+        public async Task ConvertToInt16_String_CurrentCulture_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -2055,7 +2055,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public short {|PS0002:TestMethod|}(string value)
+    public short TestMethod(string value)
     {
         return Convert.ToInt16(value);
     }
@@ -2085,7 +2085,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToUInt16_String_CurrentCulture_Diagnostic()
+        public async Task ConvertToUInt16_String_CurrentCulture_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -2095,7 +2095,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public ushort {|PS0002:TestMethod|}(string value)
+    public ushort TestMethod(string value)
     {
         return Convert.ToUInt16(value);
     }
@@ -2125,7 +2125,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToUInt32_String_CurrentCulture_Diagnostic()
+        public async Task ConvertToUInt32_String_CurrentCulture_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -2135,7 +2135,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public uint {|PS0002:TestMethod|}(string value)
+    public uint TestMethod(string value)
     {
         return Convert.ToUInt32(value);
     }
@@ -2165,7 +2165,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToUInt64_String_CurrentCulture_Diagnostic()
+        public async Task ConvertToUInt64_String_CurrentCulture_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -2175,7 +2175,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public ulong {|PS0002:TestMethod|}(string value)
+    public ulong TestMethod(string value)
     {
         return Convert.ToUInt64(value);
     }
