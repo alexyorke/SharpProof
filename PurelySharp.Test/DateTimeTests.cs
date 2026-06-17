@@ -266,7 +266,16 @@ public class TestClass
         }
 
         [Test]
-        public async Task DateTimeOffsetDeterministicAddMethods_NoDiagnostic()
+        [TestCase("value.Add(offset)")]
+        [TestCase("value.AddDays(1)")]
+        [TestCase("value.AddHours(2)")]
+        [TestCase("value.AddMilliseconds(3)")]
+        [TestCase("value.AddMinutes(4)")]
+        [TestCase("value.AddMonths(5)")]
+        [TestCase("value.AddSeconds(6)")]
+        [TestCase("value.AddTicks(7)")]
+        [TestCase("value.AddYears(8)")]
+        public async Task DateTimeOffsetAddMethods_Diagnostic(string expression)
         {
             var test = @"
 using System;
@@ -275,18 +284,9 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public DateTimeOffset TestMethod(DateTimeOffset value, TimeSpan offset)
+    public DateTimeOffset {|PS0002:TestMethod|}(DateTimeOffset value, TimeSpan offset)
     {
-        return value
-            .Add(offset)
-            .AddDays(1)
-            .AddHours(2)
-            .AddMilliseconds(3)
-            .AddMinutes(4)
-            .AddMonths(5)
-            .AddSeconds(6)
-            .AddTicks(7)
-            .AddYears(8);
+        return " + expression + @";
     }
 }";
 

@@ -685,11 +685,19 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeDateTimeOffsetSlice_TreatsFactoriesAndDerivedHelpersDifferently()
+        public async Task EffectSummaryTool_RuntimeDateTimeOffsetSlice_TreatsAddMethodsFactoriesAndDerivedHelpersDifferently()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.DateTimeOffset", limit: 20);
 
-            AssertPurityClassification(summary, "System.DateTimeOffset.AddDays(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.Add(System.TimeSpan)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddDays(double)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddHours(double)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddMilliseconds(double)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddMinutes(double)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddMonths(int)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddSeconds(double)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddTicks(long)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddYears(int)", "impure", "impure_callee");
             AssertPurityClassification(summary, "System.DateTimeOffset.ToUnixTimeMilliseconds()", "pure");
             AssertPurityClassification(summary, "System.DateTimeOffset.ToUnixTimeSeconds()", "pure");
             AssertPurityClassification(summary, "System.DateTimeOffset.get_Offset()", "pure");

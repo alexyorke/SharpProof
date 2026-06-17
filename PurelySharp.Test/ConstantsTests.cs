@@ -571,6 +571,14 @@ public static class RecentCatalogSignatureSamples
         _ = BinaryPrimitives.ReverseEndianness((UInt128)1);
         var fromMilliseconds = DateTimeOffset.FromUnixTimeMilliseconds(0);
         var fromSeconds = DateTimeOffset.FromUnixTimeSeconds(0);
+        var add = value.Add(TimeSpan.FromHours(1));
+        var addHours = value.AddHours(2);
+        var addMilliseconds = value.AddMilliseconds(3);
+        var addMinutes = value.AddMinutes(4);
+        var addMonths = value.AddMonths(5);
+        var addSeconds = value.AddSeconds(6);
+        var addTicks = value.AddTicks(7);
+        var addYears = value.AddYears(8);
         var added = value.AddDays(1);
         var seconds = added.ToUnixTimeSeconds();
         return added.ToUnixTimeMilliseconds() + seconds + value.Offset.Ticks;
@@ -677,6 +685,14 @@ public static class RecentCatalogSignatureSamples
 
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTimeOffset.FromUnixTimeMilliseconds(0)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTimeOffset.FromUnixTimeSeconds(0)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.Add(TimeSpan.FromHours(1))"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddHours(2)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddMilliseconds(3)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddMinutes(4)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddMonths(5)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddSeconds(6)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddTicks(7)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddYears(8)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddDays(1)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "added.ToUnixTimeMilliseconds()"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "added.ToUnixTimeSeconds()"));
