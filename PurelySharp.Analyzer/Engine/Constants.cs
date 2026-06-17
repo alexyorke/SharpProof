@@ -1327,7 +1327,6 @@ public static class Constants
         "System.StringComparer.Ordinal.Equals(string, string)",
 
 
-        "System.Text.Json.JsonSerializer.Serialize<TValue>(TValue, System.Text.Json.JsonSerializerOptions?)",
         "System.Text.RegularExpressions.Regex.Regex(string)",
         "System.Text.RegularExpressions.Regex.IsMatch(string, string)",
         "System.Text.RegularExpressions.Regex.Match(string, string)",

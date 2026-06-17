@@ -27,16 +27,16 @@ public class SimplePoco
 ";
 
         [Test]
-        public async Task PureMethodWithJsonSerializePoco_MissingAttributeDiagnostics()
+        public async Task JsonSerializePoco_Diagnostic()
         {
             var test = TestSetup + @"
 
 public class TestClass
 {
-    [EnforcePure] // Although Serialize might be pure, the method itself is marked
-    public string TestMethod(SimplePoco poco)
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(SimplePoco poco)
     {
-        // Serialization of simple POCOs is generally considered pure
+        // Serialization is impure because the runtime implementation reads serializer state and can throw.
         return JsonSerializer.Serialize(poco);
     }
 }";
