@@ -167,10 +167,18 @@ public static class PurityFixture
             AssertPurityClassification(summary, "AbstractWorker.Get()", "conservative_unknown", "metadata_only_or_external");
             AssertPurityClassification(summary, "PurityFixture.PureFreshArray()", "pure");
             AssertPurityClassification(summary, "PurityFixture.MutateCallerArray(byte[])", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "PurityFixture.PureLeaf()", "none");
+            AssertEffectVisibilityClassification(summary, "PurityFixture.PureViaCallee()", "none");
+            AssertEffectVisibilityClassification(summary, "PurityFixture.ImpureWrite()", "caller_visible");
+            AssertEffectVisibilityClassification(summary, "PurityFixture.ImpureViaCallee()", "caller_visible");
+            AssertEffectVisibilityClassification(summary, "PurityFixture.UnknownViaInterface(IWorker)", "unknown");
+            AssertEffectVisibilityClassification(summary, "AbstractWorker.Get()", "unknown");
+            AssertEffectVisibilityClassification(summary, "PurityFixture.PureFreshArray()", "internal_only");
+            AssertEffectVisibilityClassification(summary, "PurityFixture.MutateCallerArray(byte[])", "caller_visible");
             AssertFreshnessClassification(summary, "PurityFixture.PureFreshArray()", "fresh_owned_array_write");
 
             var report = summary.RootElement.GetProperty("PurityReport");
-            Assert.That(report.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(1));
+            Assert.That(report.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(2));
             Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThanOrEqualTo(8));
             Assert.That(report.GetProperty("PureCount").GetInt32(), Is.GreaterThanOrEqualTo(3));
             Assert.That(report.GetProperty("ImpureCount").GetInt32(), Is.GreaterThanOrEqualTo(3));
@@ -194,6 +202,7 @@ public static class PurityFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            Assert.That(generatedCatalog.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(2));
             var generatedRows = generatedCatalog.GetProperty("Entries")
                 .EnumerateArray()
                 .Where(row => row.GetProperty("Symbol").GetString()?.StartsWith("System.BitConverter.GetBytes", StringComparison.Ordinal) == true)
@@ -221,6 +230,7 @@ public static class PurityFixture
             {
                 Assert.That(row.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
                 Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("fresh_owned_array_write"));
+                Assert.That(row.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("internal_only"));
                 Assert.That(row.GetProperty("HasFreshArrayAllocationEvidence").GetBoolean(), Is.True);
                 Assert.That(row.GetProperty("HasUnsupportedEffects").GetBoolean(), Is.False);
             }
@@ -618,6 +628,7 @@ public static class PurityFixture
             {
                 var classification = method.GetProperty("PurityClassification");
                 Assert.That(classification.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+                Assert.That(classification.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("internal_only"));
             }
         }
 
@@ -635,6 +646,7 @@ public static class PurityFixture
                 var classification = method.GetProperty("PurityClassification");
                 Assert.That(classification.GetProperty("Classification").GetString(), Is.EqualTo("pure"), symbol);
                 Assert.That(classification.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("fresh_array_candidate_via_local_helpers"), symbol);
+                Assert.That(classification.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("internal_only"), symbol);
             }
         }
 
@@ -925,6 +937,18 @@ public static class FreshObjectFixture
             Assert.That(
                 classification.GetProperty("FreshnessClassification").GetString(),
                 Is.EqualTo(expectedFreshnessClassification));
+        }
+
+        private static void AssertEffectVisibilityClassification(
+            JsonDocument summary,
+            string methodSymbol,
+            string expectedEffectVisibilityClassification)
+        {
+            var method = FindMethod(summary, methodSymbol);
+            var classification = method.GetProperty("PurityClassification");
+            Assert.That(
+                classification.GetProperty("EffectVisibilityClassification").GetString(),
+                Is.EqualTo(expectedEffectVisibilityClassification));
         }
 
         private static JsonElement FindMethod(JsonDocument summary, string methodSymbol)

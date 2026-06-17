@@ -227,7 +227,8 @@ internal static class PurityClassificationEngine
                 HasFreshArrayAllocationEvidence: summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
                 HasFreshObjectAllocationEvidence: summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
                 HasUnsupportedEffects: conservativeCategories.Count > 0,
-                FreshnessClassification: GetFreshnessClassification(summary, "impure"));
+                FreshnessClassification: GetFreshnessClassification(summary, "impure"),
+                EffectVisibilityClassification: GetEffectVisibilityClassification(summary, "impure"));
         }
         else if (conservativeCategories.Count > 0)
         {
@@ -238,7 +239,8 @@ internal static class PurityClassificationEngine
                 HasFreshArrayAllocationEvidence: summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
                 HasFreshObjectAllocationEvidence: summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
                 HasUnsupportedEffects: true,
-                FreshnessClassification: GetFreshnessClassification(summary, "conservative_unknown"));
+                FreshnessClassification: GetFreshnessClassification(summary, "conservative_unknown"),
+                EffectVisibilityClassification: GetEffectVisibilityClassification(summary, "conservative_unknown"));
         }
         else
         {
@@ -249,7 +251,8 @@ internal static class PurityClassificationEngine
                 HasFreshArrayAllocationEvidence: summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
                 HasFreshObjectAllocationEvidence: summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
                 HasUnsupportedEffects: false,
-                FreshnessClassification: GetFreshnessClassification(summary, "pure"));
+                FreshnessClassification: GetFreshnessClassification(summary, "pure"),
+                EffectVisibilityClassification: GetEffectVisibilityClassification(summary, "pure"));
         }
 
         memo[symbol] = result;
@@ -285,7 +288,8 @@ internal static class PurityClassificationEngine
             HasFreshArrayAllocationEvidence: summary?.Effects.Contains("allocates_array", StringComparer.Ordinal) == true,
             HasFreshObjectAllocationEvidence: summary?.Effects.Contains("allocates_object", StringComparer.Ordinal) == true,
             HasUnsupportedEffects: true,
-            FreshnessClassification: GetFreshnessClassification(summary, "conservative_unknown"));
+            FreshnessClassification: GetFreshnessClassification(summary, "conservative_unknown"),
+            EffectVisibilityClassification: GetEffectVisibilityClassification(summary, "conservative_unknown"));
     }
 
     private static PurityClassificationReport BuildReport(
@@ -303,7 +307,7 @@ internal static class PurityClassificationEngine
         var unknownCount = methods.Count - pureCount - impureCount;
 
         return new PurityClassificationReport(
-            SchemaVersion: 1,
+            SchemaVersion: 2,
             MethodCount: methods.Count,
             PureCount: pureCount,
             ImpureCount: impureCount,
@@ -360,7 +364,7 @@ internal static class PurityClassificationEngine
     private static GeneratedPurityCatalogDocument BuildGeneratedPurityCatalog(IReadOnlyList<AssemblyEffectReport> assemblies)
     {
         return new GeneratedPurityCatalogDocument(
-            SchemaVersion: 1,
+            SchemaVersion: 2,
             Entries: assemblies
                 .SelectMany(assembly => assembly.Methods.Select(method => CreateGeneratedPurityEntry(assembly, method)))
                 .OrderBy(static entry => entry.ExactSymbolKey, StringComparer.Ordinal)
@@ -393,7 +397,8 @@ internal static class PurityClassificationEngine
             HasFreshArrayAllocationEvidence: classification.HasFreshArrayAllocationEvidence,
             HasFreshObjectAllocationEvidence: classification.HasFreshObjectAllocationEvidence,
             HasUnsupportedEffects: classification.HasUnsupportedEffects,
-            FreshnessClassification: classification.FreshnessClassification);
+            FreshnessClassification: classification.FreshnessClassification,
+            EffectVisibilityClassification: classification.EffectVisibilityClassification);
     }
 
     private static MethodPurityClassification? AggregateCatalogClassification(IReadOnlyList<MethodPurityClassification> classifications)
@@ -433,7 +438,8 @@ internal static class PurityClassificationEngine
             HasFreshArrayAllocationEvidence: classifications.Any(static item => item.HasFreshArrayAllocationEvidence),
             HasFreshObjectAllocationEvidence: classifications.Any(static item => item.HasFreshObjectAllocationEvidence),
             HasUnsupportedEffects: classifications.Any(static item => item.HasUnsupportedEffects),
-            FreshnessClassification: AggregateFreshnessClassification(classifications));
+            FreshnessClassification: AggregateFreshnessClassification(classifications),
+            EffectVisibilityClassification: AggregateEffectVisibilityClassification(classifications));
     }
 
     private static string AggregateFreshnessClassification(IReadOnlyList<MethodPurityClassification> classifications)
@@ -532,6 +538,59 @@ internal static class PurityClassificationEngine
         return "fresh_array_candidate_with_unknown_escape_risk";
     }
 
+    private static string GetEffectVisibilityClassification(MethodEffectSummary? summary, string classification)
+    {
+        if (summary == null)
+        {
+            return "unknown";
+        }
+
+        if (string.Equals(classification, "conservative_unknown", StringComparison.Ordinal))
+        {
+            return "unknown";
+        }
+
+        if (string.Equals(classification, "impure", StringComparison.Ordinal))
+        {
+            return "caller_visible";
+        }
+
+        if (summary.RootCandidates.Contains("fresh_owned_memory_write", StringComparer.Ordinal) ||
+            summary.RootCandidates.Contains("fresh_owned_object_write", StringComparer.Ordinal) ||
+            summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
+            summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal))
+        {
+            return "internal_only";
+        }
+
+        return "none";
+    }
+
+    private static string AggregateEffectVisibilityClassification(IReadOnlyList<MethodPurityClassification> classifications)
+    {
+        var values = classifications
+            .Select(static classification => classification.EffectVisibilityClassification)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        if (values.Contains("caller_visible", StringComparer.Ordinal))
+        {
+            return "caller_visible";
+        }
+
+        if (values.Contains("unknown", StringComparer.Ordinal))
+        {
+            return "unknown";
+        }
+
+        if (values.Contains("internal_only", StringComparer.Ordinal))
+        {
+            return "internal_only";
+        }
+
+        return "none";
+    }
+
     private static bool IsPurityNeutralIntrinsicHelperCall(string callSymbol)
     {
         return callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
@@ -591,7 +650,8 @@ internal sealed record GeneratedPurityCatalogEntry(
     bool HasFreshArrayAllocationEvidence,
     bool HasFreshObjectAllocationEvidence,
     bool HasUnsupportedEffects,
-    string FreshnessClassification);
+    string FreshnessClassification,
+    string EffectVisibilityClassification);
 
 internal sealed record MethodPurityClassification(
     string Classification,
@@ -601,4 +661,5 @@ internal sealed record MethodPurityClassification(
     bool HasFreshObjectAllocationEvidence,
     [property: JsonPropertyName("HasUnsupportedEffects")]
     bool HasUnsupportedEffects,
-    string FreshnessClassification);
+    string FreshnessClassification,
+    string EffectVisibilityClassification);
