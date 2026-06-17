@@ -67,6 +67,8 @@ namespace PurelySharp.Test
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.String.StartsWith(System.String)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.String.StartsWith(char)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.String.EndsWith(char)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("string.StartsWith(string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("string.EndsWith(string)"));
         }
 
         [Test]

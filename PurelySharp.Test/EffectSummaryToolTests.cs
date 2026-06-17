@@ -716,6 +716,19 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStringPrefixSuffixSlice_TreatsStartsWithAndEndsWithAsImpure()
+        {
+            using var startsWithSummary = await RunRuntimeEffectSummaryAsync("System.String.StartsWith", limit: 20);
+            using var endsWithSummary = await RunRuntimeEffectSummaryAsync("System.String.EndsWith", limit: 20);
+
+            AssertPurityClassification(startsWithSummary, "System.String.StartsWith(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(startsWithSummary, "System.String.StartsWith(string)", "caller_visible");
+
+            AssertPurityClassification(endsWithSummary, "System.String.EndsWith(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(endsWithSummary, "System.String.EndsWith(string)", "caller_visible");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeConvertToBase64Slice_TreatsRuntimeHelpersAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Convert.ToBase64String", limit: 20);
