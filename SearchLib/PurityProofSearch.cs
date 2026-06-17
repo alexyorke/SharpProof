@@ -45,11 +45,23 @@ namespace SearchLib.Purity
             return ClassifyInternalOnlyEffect(pathConditions, timeout, "safe_static_cache_read");
         }
 
+        public PurityProofResult ClassifyFreshOwnedObjectWrite(
+            IEnumerable<SmtFormula> pathConditions,
+            TimeSpan timeout)
+        {
+            return ClassifyInternalOnlyEffect(pathConditions, timeout, "fresh_owned_object_write");
+        }
+
         public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout)
         {
             if (query.Hazard.Kind == PurityHazardKind.StaticCacheRead)
             {
                 return ClassifyStaticCacheRead(query.PathConditions, timeout);
+            }
+
+            if (query.Hazard.Kind == PurityHazardKind.FreshOwnedObjectWrite)
+            {
+                return ClassifyFreshOwnedObjectWrite(query.PathConditions, timeout);
             }
 
             if (query.Hazard.Visibility == PurityEffectVisibility.InternalOnly)

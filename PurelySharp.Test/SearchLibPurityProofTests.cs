@@ -148,6 +148,17 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void PurityProof_FreshOwnedObjectWrite_IsProvablyPure()
+        {
+            using var search = new PurityProofSearch();
+
+            var result = search.ClassifyFreshOwnedObjectWrite(Array.Empty<SmtFormula>(), TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.Reason, Is.EqualTo("fresh_owned_object_write"));
+        }
+
+        [Test]
         public void PurityProof_QueryBranchReachability_ContradictoryGuard_IsProvablyPure()
         {
             using var search = new PurityProofSearch();
