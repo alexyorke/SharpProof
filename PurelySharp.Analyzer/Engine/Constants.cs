@@ -1327,13 +1327,6 @@ public static class Constants
         "System.StringComparer.Ordinal.Equals(string, string)",
 
 
-        "System.Text.RegularExpressions.Regex.Regex(string)",
-        "System.Text.RegularExpressions.Regex.IsMatch(string, string)",
-        "System.Text.RegularExpressions.Regex.Match(string, string)",
-        "System.Text.RegularExpressions.Regex.Replace(string, string, string)",
-        "System.Text.RegularExpressions.Regex.IsMatch(string)",
-        "System.Text.RegularExpressions.Regex.Match(string)",
-        "System.Text.RegularExpressions.Regex.Replace(string, string)",
         "System.Text.StringBuilder.ToString()",
 
 
@@ -1598,7 +1591,6 @@ public static class Constants
         "System.Runtime.InteropServices.MemoryMarshal.AsBytes<T>(System.Span<T>)",
         "string.IsNullOrWhiteSpace(System.ReadOnlySpan<char>)",
         "System.TimeSpan.Zero.get",
-        "System.Text.RegularExpressions.Regex.IsMatch(string, string)",
         "System.Collections.Generic.List<T>.Find(System.Predicate<T>)",
         "System.Collections.Generic.List<T>.get_Count()",
 

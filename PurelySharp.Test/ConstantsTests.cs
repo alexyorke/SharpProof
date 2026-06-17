@@ -85,6 +85,18 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void RegexHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.RegularExpressions.Regex.Regex(string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.RegularExpressions.Regex.IsMatch(string, string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.RegularExpressions.Regex.Match(string, string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.RegularExpressions.Regex.Replace(string, string, string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.RegularExpressions.Regex.IsMatch(string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.RegularExpressions.Regex.Match(string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.RegularExpressions.Regex.Replace(string, string)"));
+        }
+
+        [Test]
         public void UnsafeUnalignedHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(ref byte)"));

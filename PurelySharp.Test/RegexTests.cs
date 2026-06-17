@@ -17,7 +17,7 @@ namespace PurelySharp.Test
 
 
         [Test]
-        public async Task Regex_IsMatch_Static_NoDiagnostic()
+        public async Task Regex_IsMatch_Static_Diagnostic()
         {
             var test = @"
 using System;
@@ -27,9 +27,8 @@ using System.Text.RegularExpressions;
 public class TestClass
 {
     [EnforcePure]
-    public bool TestMethod(string input)
+    public bool {|PS0002:TestMethod|}(string input)
     {
-        // Static Regex.IsMatch is treated as pure.
         return Regex.IsMatch(input, ""^[a-z]+$"");
     }
 }
@@ -38,7 +37,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task Regex_Match_Static_NoDiagnostic()
+        public async Task Regex_Match_Static_Diagnostic()
         {
             var test = @"
 using System;
@@ -48,9 +47,8 @@ using System.Text.RegularExpressions;
 public class TestClass
 {
     [EnforcePure]
-    public Match TestMethod(string input)
+    public Match {|PS0002:TestMethod|}(string input)
     {
-        // Static Regex.Match is treated as pure.
         return Regex.Match(input, ""^[a-z]+$"");
     }
 }
@@ -92,7 +90,7 @@ public class TestClass
 
 
         [Test]
-        public async Task Regex_Constructor_NoDiagnostic()
+        public async Task Regex_Constructor_Diagnostic()
         {
             var test = @"
 using System;
@@ -102,10 +100,89 @@ using System.Text.RegularExpressions;
 public class TestClass
 {
     [EnforcePure]
-    public Regex TestMethod()
+    public Regex {|PS0002:TestMethod|}()
     {
-        // Regex construction is treated as pure.
         return new Regex(""^[a-z]+$"");
+    }
+}
+";
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Regex_IsMatch_Instance_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Text.RegularExpressions;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool {|PS0002:TestMethod|}(Regex regex, string input)
+    {
+        return regex.IsMatch(input);
+    }
+}
+";
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Regex_Match_Instance_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Text.RegularExpressions;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Match {|PS0002:TestMethod|}(Regex regex, string input)
+    {
+        return regex.Match(input);
+    }
+}
+";
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Regex_Replace_Static_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Text.RegularExpressions;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(string input)
+    {
+        return Regex.Replace(input, ""[a-z]"", ""x"");
+    }
+}
+";
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Regex_Replace_Instance_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Text.RegularExpressions;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(Regex regex, string input)
+    {
+        return regex.Replace(input, ""x"");
     }
 }
 ";
