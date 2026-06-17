@@ -639,6 +639,28 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeUnsafeSlice_TreatsReadUnalignedAsPureAndWriteUnalignedAsImpure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Runtime.CompilerServices.Unsafe", limit: 20);
+
+            var methods = FindMethodsByPrefix(summary, "System.Runtime.CompilerServices.Unsafe");
+            var readMethods = methods.Where(method =>
+                method.GetProperty("Symbol").GetString() is "System.Runtime.CompilerServices.Unsafe.ReadUnaligned(ref byte)" or
+                    "System.Runtime.CompilerServices.Unsafe.ReadUnaligned(void*)")
+                .ToArray();
+            var writeMethods = methods.Where(method =>
+                method.GetProperty("Symbol").GetString() is "System.Runtime.CompilerServices.Unsafe.WriteUnaligned(ref byte, !!0)" or
+                    "System.Runtime.CompilerServices.Unsafe.WriteUnaligned(void*, !!0)")
+                .ToArray();
+
+            Assert.That(readMethods.Length, Is.EqualTo(2));
+            Assert.That(readMethods.All(method => method.GetProperty("PurityClassification").GetProperty("Classification").GetString() == "pure"), Is.True);
+            Assert.That(writeMethods.Length, Is.EqualTo(2));
+            Assert.That(writeMethods.All(method => method.GetProperty("PurityClassification").GetProperty("Classification").GetString() == "impure"), Is.True);
+            Assert.That(writeMethods.All(method => method.GetProperty("PurityClassification").GetProperty("PrimaryCategory").GetString() == "caller_visible_memory_write"), Is.True);
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStringSlice_TreatsToCharArrayAsGeneratedPurityEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.String.ToCharArray", limit: 10);

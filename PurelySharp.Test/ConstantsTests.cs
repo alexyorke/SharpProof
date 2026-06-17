@@ -53,6 +53,15 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void UnsafeUnalignedHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(ref byte)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(void*)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(ref byte, !!0)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(void*, !!0)"));
+        }
+
+        [Test]
         public void BitOperationsCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
