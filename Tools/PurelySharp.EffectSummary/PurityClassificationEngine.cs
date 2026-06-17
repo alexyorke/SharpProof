@@ -307,7 +307,7 @@ internal static class PurityClassificationEngine
         var unknownCount = methods.Count - pureCount - impureCount;
 
         return new PurityClassificationReport(
-            SchemaVersion: 2,
+            SchemaVersion: 3,
             MethodCount: methods.Count,
             PureCount: pureCount,
             ImpureCount: impureCount,
@@ -352,6 +352,7 @@ internal static class PurityClassificationEngine
                     Classification: classification?.Classification ?? "unclassified",
                     Categories: classification?.Categories ?? Array.Empty<string>(),
                     FirstBlockingCallChain: classification?.FirstBlockingCallChain ?? Array.Empty<string>(),
+                    EffectVisibilityClassification: classification?.EffectVisibilityClassification ?? "unknown",
                     Note: note,
                     MatchedExactSymbolKeys: matchedMethods
                         .Select(static method => method.ExactSymbolKey)
@@ -626,6 +627,7 @@ internal sealed record CatalogComparisonRow(
     string Classification,
     string[] Categories,
     string[] FirstBlockingCallChain,
+    string EffectVisibilityClassification,
     string? Note,
     string[] MatchedExactSymbolKeys);
 

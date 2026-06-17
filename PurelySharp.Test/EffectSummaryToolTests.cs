@@ -159,6 +159,7 @@ public static class PurityFixture
                 classifyPurity: true,
                 compareManualCatalogs: true);
 
+            Assert.That(summary.RootElement.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(3));
             AssertPurityClassification(summary, "PurityFixture.PureLeaf()", "pure");
             AssertPurityClassification(summary, "PurityFixture.PureViaCallee()", "pure");
             AssertPurityClassification(summary, "PurityFixture.ImpureWrite()", "impure", "global_state_write");
@@ -178,7 +179,7 @@ public static class PurityFixture
             AssertFreshnessClassification(summary, "PurityFixture.PureFreshArray()", "fresh_owned_array_write");
 
             var report = summary.RootElement.GetProperty("PurityReport");
-            Assert.That(report.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(2));
+            Assert.That(report.GetProperty("SchemaVersion").GetInt32(), Is.EqualTo(3));
             Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThanOrEqualTo(8));
             Assert.That(report.GetProperty("PureCount").GetInt32(), Is.GreaterThanOrEqualTo(3));
             Assert.That(report.GetProperty("ImpureCount").GetInt32(), Is.GreaterThanOrEqualTo(3));
@@ -614,6 +615,7 @@ public static class PurityFixture
                     StringComparison.Ordinal));
 
             Assert.That(knownPureRow.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+            Assert.That(knownPureRow.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("none"));
         }
 
         [Test]

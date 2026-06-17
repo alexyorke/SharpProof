@@ -48,7 +48,7 @@ internal static class EffectSummaryCli
         }
 
         var document = new EffectSummaryDocument(
-            SchemaVersion: purityClassificationReport == null ? 1 : 2,
+            SchemaVersion: purityClassificationReport == null ? 1 : 3,
             GeneratedAtUtc: DateTimeOffset.UtcNow,
             Assemblies: reports,
             PurityReport: purityClassificationReport,
