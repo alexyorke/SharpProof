@@ -182,7 +182,7 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeBitConverterSlice_ProducesCatalogComparisonWithoutCrashing()
+        public async Task EffectSummaryTool_RuntimeBitConverterSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.BitConverter.GetBytes", limit: 20);
 
@@ -190,21 +190,40 @@ public static class PurityFixture
             Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
 
             var catalogComparison = report.GetProperty("CatalogComparison");
-            var knownPureRow = catalogComparison.GetProperty("KnownPureMembers")
-                .EnumerateArray()
-                .Single(row => string.Equals(
-                    row.GetProperty("Symbol").GetString(),
-                    "System.BitConverter.GetBytes(int)",
-                    StringComparison.Ordinal));
-            var knownFreshRow = catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers")
-                .EnumerateArray()
-                .Single(row => string.Equals(
-                    row.GetProperty("Symbol").GetString(),
-                    "System.BitConverter.GetBytes(int)",
-                    StringComparison.Ordinal));
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            Assert.That(knownPureRow.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
-            Assert.That(knownFreshRow.GetProperty("Note").GetString(), Is.EqualTo("fresh_owned_array_write"));
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var generatedRows = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Where(row => row.GetProperty("Symbol").GetString()?.StartsWith("System.BitConverter.GetBytes", StringComparison.Ordinal) == true)
+                .ToArray();
+
+            Assert.That(generatedRows, Has.Length.EqualTo(11));
+            Assert.That(
+                generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
+                Is.EquivalentTo(new[]
+                {
+                    "System.BitConverter.GetBytes(bool)",
+                    "System.BitConverter.GetBytes(char)",
+                    "System.BitConverter.GetBytes(short)",
+                    "System.BitConverter.GetBytes(int)",
+                    "System.BitConverter.GetBytes(long)",
+                    "System.BitConverter.GetBytes(ushort)",
+                    "System.BitConverter.GetBytes(uint)",
+                    "System.BitConverter.GetBytes(ulong)",
+                    "System.BitConverter.GetBytes(System.Half)",
+                    "System.BitConverter.GetBytes(float)",
+                    "System.BitConverter.GetBytes(double)",
+                }));
+
+            foreach (var row in generatedRows)
+            {
+                Assert.That(row.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+                Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("fresh_owned_array_write"));
+                Assert.That(row.GetProperty("HasFreshArrayAllocationEvidence").GetBoolean(), Is.True);
+                Assert.That(row.GetProperty("HasUnsupportedEffects").GetBoolean(), Is.False);
+            }
         }
 
         [Test]

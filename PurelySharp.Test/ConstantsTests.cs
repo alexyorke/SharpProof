@@ -322,26 +322,25 @@ public static class RecentCatalogSignatureSamples
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Guid.TryParseExact(text, \"D\", out parsed)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "guid.ToString(\"N\")"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetObjectCreationSignature(compilation, syntaxTree, "new string(charSpan)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(true)"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(true)")));
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes('a')"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes('a')")));
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes((Half)1)"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes((Half)1)")));
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes((short)1)"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes((short)1)")));
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1)"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1)")));
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1f)"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1f)")));
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1L)"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1L)")));
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes((ushort)1)"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes((ushort)1)")));
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1u)"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1u)")));
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1ul)"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(1ul)")));
+            var bitConverterGetBytesExpressions = new[]
+            {
+                "BitConverter.GetBytes(true)",
+                "BitConverter.GetBytes('a')",
+                "BitConverter.GetBytes((Half)1)",
+                "BitConverter.GetBytes((short)1)",
+                "BitConverter.GetBytes(1)",
+                "BitConverter.GetBytes(1f)",
+                "BitConverter.GetBytes(1L)",
+                "BitConverter.GetBytes((ushort)1)",
+                "BitConverter.GetBytes(1u)",
+                "BitConverter.GetBytes(1ul)",
+            };
+
+            foreach (var expression in bitConverterGetBytesExpressions)
+            {
+                AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, expression));
+            }
+
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1u)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1L)"), expectedPure: true, expectedImpure: false);
@@ -391,6 +390,13 @@ public static class RecentCatalogSignatureSamples
             Assert.That(Constants.KnownPureBCLMembers.Contains(signature), Is.EqualTo(expectedPure), signature);
             Assert.That(Constants.KnownImpureMethods.Contains(signature), Is.EqualTo(expectedImpure), signature);
             Assert.That(expectedPure && expectedImpure, Is.False, "Test sample should not intentionally expect a catalog conflict: " + signature);
+        }
+
+        private static void AssertNotInManualCatalogs(string signature)
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(signature), signature);
+            Assert.That(Constants.KnownImpureMethods, Does.Not.Contain(signature), signature);
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(signature), signature);
         }
 
         private static string GetInvocationSignature(Compilation compilation, SyntaxTree syntaxTree, string expressionText)

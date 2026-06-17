@@ -1042,17 +1042,6 @@ public static class Constants
 
     public static readonly HashSet<string> KnownFreshOwnedArrayReturningMembers = new HashSet<string>(StringComparer.Ordinal)
     {
-        "System.BitConverter.GetBytes(int)",
-        "System.BitConverter.GetBytes(short)",
-        "System.BitConverter.GetBytes(bool)",
-        "System.BitConverter.GetBytes(char)",
-        "System.BitConverter.GetBytes(System.Half)",
-        "System.BitConverter.GetBytes(float)",
-        "System.BitConverter.GetBytes(double)",
-        "System.BitConverter.GetBytes(long)",
-        "System.BitConverter.GetBytes(ushort)",
-        "System.BitConverter.GetBytes(uint)",
-        "System.BitConverter.GetBytes(ulong)",
         "System.Security.Cryptography.SHA1.HashData(byte[])",
         "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan<byte>)",
         "System.Security.Cryptography.MD5.HashData(byte[])",
@@ -1073,17 +1062,6 @@ public static class Constants
         "System.Array.Length.get",
 
 
-        "System.BitConverter.GetBytes(int)",
-        "System.BitConverter.GetBytes(short)",
-        "System.BitConverter.GetBytes(bool)",
-        "System.BitConverter.GetBytes(char)",
-        "System.BitConverter.GetBytes(System.Half)",
-        "System.BitConverter.GetBytes(float)",
-        "System.BitConverter.GetBytes(double)",
-        "System.BitConverter.GetBytes(long)",
-        "System.BitConverter.GetBytes(ushort)",
-        "System.BitConverter.GetBytes(uint)",
-        "System.BitConverter.GetBytes(ulong)",
         "System.BitConverter.ToInt32(byte[], int)",
         "System.BitConverter.ToDouble(byte[], int)",
 
