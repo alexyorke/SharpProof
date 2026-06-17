@@ -759,6 +759,42 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStringContainsSlice_TreatsSelectedOverloadsAsPureAndStringSearchAsConservative()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.String.Contains", limit: 20);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.String.Contains(string)", "conservative_unknown", "dynamic_dispatch");
+            AssertEffectVisibilityClassification(summary, "System.String.Contains(string)", "unknown");
+            AssertPurityClassification(summary, "System.String.Contains(char)", "pure");
+            AssertPurityClassification(summary, "System.String.Contains(char, System.StringComparison)", "pure");
+            AssertPurityClassification(summary, "System.String.Contains(string, System.StringComparison)", "pure");
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var rows = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Where(row => row.GetProperty("Symbol").GetString()?.StartsWith("System.String.Contains", StringComparison.Ordinal) == true)
+                .ToArray();
+
+            Assert.That(rows, Has.Length.EqualTo(4));
+            Assert.That(
+                rows.Select(row => row.GetProperty("Symbol").GetString()),
+                Is.EquivalentTo(new[]
+                {
+                    "System.String.Contains(char)",
+                    "System.String.Contains(char, System.StringComparison)",
+                    "System.String.Contains(string)",
+                    "System.String.Contains(string, System.StringComparison)",
+                }));
+            Assert.That(rows.Count(row => row.GetProperty("Classification").GetString() == "pure"), Is.EqualTo(3));
+            Assert.That(rows.Count(row => row.GetProperty("Classification").GetString() == "conservative_unknown"), Is.EqualTo(1));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeConvertToBase64Slice_TreatsRuntimeHelpersAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Convert.ToBase64String", limit: 20);

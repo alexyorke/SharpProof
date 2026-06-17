@@ -1483,7 +1483,6 @@ public static class Constants
         "System.Net.IPEndPoint.IPEndPoint(System.Net.IPAddress, int)",
         "System.ObjectDisposedException.ObjectDisposedException(string)",
         "System.Runtime.InteropServices.Marshal.SizeOf<T>()",
-        "string.Contains(string)",
         "string.IndexOf(char)",
         "string.Insert(int, string)",
         "string.Join(string, System.Collections.Generic.IEnumerable<string>)",
@@ -1616,10 +1615,6 @@ public static class Constants
 
         "string.Clone()",
         "string.CompareTo(string)",
-        "string.Contains(char)",
-        "string.Contains(char, System.StringComparison)",
-        "string.Contains(string)",
-        "string.Contains(string, System.StringComparison)",
         "string.Equals(string)",
         "string.Equals(string, string)",
         "string.Equals(string, System.StringComparison)",

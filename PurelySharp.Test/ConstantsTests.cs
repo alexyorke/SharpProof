@@ -72,6 +72,15 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void StringContainsHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("string.Contains(string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("string.Contains(char)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("string.Contains(char, System.StringComparison)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("string.Contains(string, System.StringComparison)"));
+        }
+
+        [Test]
         public void EncodingLookupHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.Encoding.UTF8.get"));
