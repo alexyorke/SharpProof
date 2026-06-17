@@ -349,6 +349,27 @@ public static class RecentCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1ul)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2((nint)1)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2((nuint)1)"));
+            var binaryPrimitivesReadExpressions = new[]
+            {
+                "BinaryPrimitives.ReadInt16BigEndian(bytes)",
+                "BinaryPrimitives.ReadInt16LittleEndian(bytes)",
+                "BinaryPrimitives.ReadInt32BigEndian(bytes)",
+                "BinaryPrimitives.ReadInt32LittleEndian(bytes)",
+                "BinaryPrimitives.ReadInt64BigEndian(bytes)",
+                "BinaryPrimitives.ReadInt64LittleEndian(bytes)",
+                "BinaryPrimitives.ReadUInt16BigEndian(bytes)",
+                "BinaryPrimitives.ReadUInt16LittleEndian(bytes)",
+                "BinaryPrimitives.ReadUInt32BigEndian(bytes)",
+                "BinaryPrimitives.ReadUInt32LittleEndian(bytes)",
+                "BinaryPrimitives.ReadUInt64BigEndian(bytes)",
+                "BinaryPrimitives.ReadUInt64LittleEndian(bytes)",
+            };
+
+            foreach (var expression in binaryPrimitivesReadExpressions)
+            {
+                AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, expression));
+            }
+
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.LeadingZeroCount(1u)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.LeadingZeroCount(1ul)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.Log2(1u)"), expectedPure: true, expectedImpure: false);
@@ -365,18 +386,6 @@ public static class RecentCatalogSignatureSamples
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.TrailingZeroCount(1u)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.TrailingZeroCount(1L)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.TrailingZeroCount(1ul)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReadInt16BigEndian(bytes)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReadInt16LittleEndian(bytes)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReadInt32BigEndian(bytes)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReadInt32LittleEndian(bytes)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReadInt64BigEndian(bytes)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReadInt64LittleEndian(bytes)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReadUInt16BigEndian(bytes)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReadUInt16LittleEndian(bytes)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReadUInt32BigEndian(bytes)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReadUInt32LittleEndian(bytes)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReadUInt64BigEndian(bytes)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReadUInt64LittleEndian(bytes)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReverseEndianness((short)1)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReverseEndianness((ushort)1)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReverseEndianness(1)"), expectedPure: true, expectedImpure: false);

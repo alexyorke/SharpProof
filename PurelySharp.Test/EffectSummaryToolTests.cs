@@ -266,6 +266,51 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeBinaryPrimitivesReadSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Buffers.Binary.BinaryPrimitives.Read", limit: 20);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var generatedRows = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Where(row => row.GetProperty("Symbol").GetString()?.StartsWith("System.Buffers.Binary.BinaryPrimitives.Read", StringComparison.Ordinal) == true)
+                .ToArray();
+
+            Assert.That(generatedRows, Has.Length.EqualTo(12));
+            Assert.That(
+                generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
+                Is.EquivalentTo(new[]
+                {
+                    "System.Buffers.Binary.BinaryPrimitives.ReadInt16BigEndian(System.ReadOnlySpan<byte>)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(System.ReadOnlySpan<byte>)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(System.ReadOnlySpan<byte>)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(System.ReadOnlySpan<byte>)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReadInt64BigEndian(System.ReadOnlySpan<byte>)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReadInt64LittleEndian(System.ReadOnlySpan<byte>)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(System.ReadOnlySpan<byte>)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(System.ReadOnlySpan<byte>)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(System.ReadOnlySpan<byte>)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(System.ReadOnlySpan<byte>)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReadUInt64BigEndian(System.ReadOnlySpan<byte>)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(System.ReadOnlySpan<byte>)",
+                }));
+
+            foreach (var row in generatedRows)
+            {
+                Assert.That(row.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+                Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("none"));
+                Assert.That(row.GetProperty("HasUnsupportedEffects").GetBoolean(), Is.False);
+            }
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeConvertBase64Slice_TreatsRuntimeHelpersAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Convert.FromBase64", limit: 20);
