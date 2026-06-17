@@ -358,6 +358,61 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeBitOperationsFastHelpersSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Numerics.BitOperations", limit: 80);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            var knownPureRows = catalogComparison.GetProperty("KnownPureMembers").EnumerateArray().ToArray();
+            Assert.That(knownPureRows.Any(row =>
+                string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.PopCount(uint)", StringComparison.Ordinal) ||
+                string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.PopCount(ulong)", StringComparison.Ordinal) ||
+                string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.PopCount(nuint)", StringComparison.Ordinal) ||
+                string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.RotateLeft(uint, int)", StringComparison.Ordinal) ||
+                string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.RotateLeft(ulong, int)", StringComparison.Ordinal) ||
+                string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.RotateLeft(nuint, int)", StringComparison.Ordinal) ||
+                string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.RotateRight(uint, int)", StringComparison.Ordinal) ||
+                string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.RotateRight(ulong, int)", StringComparison.Ordinal) ||
+                string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.RotateRight(nuint, int)", StringComparison.Ordinal)),
+                Is.False);
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var generatedPureRows = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Where(row =>
+                    (row.GetProperty("Symbol").GetString()?.StartsWith("System.Numerics.BitOperations.PopCount", StringComparison.Ordinal) == true ||
+                     row.GetProperty("Symbol").GetString()?.StartsWith("System.Numerics.BitOperations.RotateLeft", StringComparison.Ordinal) == true ||
+                     row.GetProperty("Symbol").GetString()?.StartsWith("System.Numerics.BitOperations.RotateRight", StringComparison.Ordinal) == true) &&
+                    string.Equals(row.GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedPureRows, Has.Length.EqualTo(9));
+            Assert.That(
+                generatedPureRows.Select(row => row.GetProperty("Symbol").GetString()),
+                Is.EquivalentTo(new[]
+                {
+                    "System.Numerics.BitOperations.PopCount(uint)",
+                    "System.Numerics.BitOperations.PopCount(ulong)",
+                    "System.Numerics.BitOperations.PopCount(nuint)",
+                    "System.Numerics.BitOperations.RotateLeft(uint, int)",
+                    "System.Numerics.BitOperations.RotateLeft(ulong, int)",
+                    "System.Numerics.BitOperations.RotateLeft(nuint, int)",
+                    "System.Numerics.BitOperations.RotateRight(uint, int)",
+                    "System.Numerics.BitOperations.RotateRight(ulong, int)",
+                    "System.Numerics.BitOperations.RotateRight(nuint, int)",
+                }));
+
+            foreach (var row in generatedPureRows)
+            {
+                Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("none"));
+                Assert.That(row.GetProperty("HasUnsupportedEffects").GetBoolean(), Is.False);
+            }
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeConvertBase64Slice_TreatsRuntimeHelpersAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Convert.FromBase64", limit: 20);
