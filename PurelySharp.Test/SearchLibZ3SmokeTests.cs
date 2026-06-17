@@ -56,6 +56,21 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_ReferenceNullAndNonNullConjunction_IsUnsatisfiable()
+        {
+            using var solver = new SmtSolver();
+            var reference = new SmtVariable("reference", SmtValueKind.Reference);
+            var isNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, reference, new SmtNullConstant());
+            var isNotNull = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, reference, new SmtNullConstant());
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[] { isNull, isNotNull },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void PurityProof_NonNullGuard_MakesNullDereferenceProvablyPure()
         {
             using var search = new PurityProofSearch();

@@ -5,7 +5,15 @@ namespace SearchLib.Smt
     internal sealed class Z3FormulaEncoder : IDisposable
     {
         private readonly Context _context = new();
+        private readonly Sort _referenceSort;
+        private readonly Expr _nullReference;
         private readonly Dictionary<string, Expr> _variables = new(StringComparer.Ordinal);
+
+        public Z3FormulaEncoder()
+        {
+            _referenceSort = _context.MkUninterpretedSort("Reference");
+            _nullReference = _context.MkConst("null_reference", _referenceSort);
+        }
 
         public BoolExpr EncodeCondition(SmtFormula formula)
         {
@@ -37,7 +45,7 @@ namespace SearchLib.Smt
             {
                 SmtBooleanConstant booleanConstant => booleanConstant.Value ? _context.MkTrue() : _context.MkFalse(),
                 SmtIntegerConstant integerConstant => _context.MkInt(integerConstant.Value),
-                SmtNullConstant => _context.MkInt(0),
+                SmtNullConstant => _nullReference,
                 SmtVariable variable => GetOrCreateVariable(variable),
                 SmtUnaryFormula unaryFormula => EncodeUnary(unaryFormula),
                 SmtBinaryFormula binaryFormula => EncodeBinary(binaryFormula),
@@ -81,7 +89,7 @@ namespace SearchLib.Smt
             {
                 SmtValueKind.Bool => _context.MkBoolConst(variable.Name),
                 SmtValueKind.Int => _context.MkIntConst(variable.Name),
-                SmtValueKind.Reference => _context.MkIntConst(variable.Name),
+                SmtValueKind.Reference => _context.MkConst(variable.Name, _referenceSort),
                 _ => throw new InvalidOperationException("Unsupported SMT variable kind."),
             };
 
