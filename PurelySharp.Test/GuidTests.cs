@@ -184,7 +184,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task GuidToByteArrayReturnedArray_NoDiagnostic()
+        public async Task GuidToByteArrayReturnedArray_UsesGeneratedFreshOwnedArrayEvidence_NoDiagnostic()
         {
             var test = @"
 using System;

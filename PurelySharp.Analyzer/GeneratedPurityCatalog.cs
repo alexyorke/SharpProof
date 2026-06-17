@@ -835,7 +835,8 @@ namespace PurelySharp.Analyzer
             public bool IsImpure => string.Equals(Classification, "impure", StringComparison.Ordinal);
             public bool IsFreshArrayCandidate =>
                 HasFreshArrayAllocationEvidence &&
-                string.Equals(FreshnessClassification, "fresh_array_candidate_via_local_helpers", StringComparison.Ordinal);
+                (string.Equals(FreshnessClassification, "fresh_array_candidate_via_local_helpers", StringComparison.Ordinal) ||
+                 string.Equals(FreshnessClassification, "fresh_owned_array_write", StringComparison.Ordinal));
         }
 
         private sealed class SummaryAssemblyIdentity
