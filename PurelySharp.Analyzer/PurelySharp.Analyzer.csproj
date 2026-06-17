@@ -30,6 +30,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="PurelySharp.EffectSummary.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\PurelySharp.Attributes\PurelySharp.Attributes.csproj" />
     <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
     

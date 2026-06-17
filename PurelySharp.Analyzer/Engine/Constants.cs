@@ -1073,8 +1073,6 @@ public static class Constants
 
     public static readonly HashSet<string> KnownPureBCLMembers = new HashSet<string>(StringComparer.Ordinal)
     {
-
-        "System.Array.Empty<T>()",
         "System.Array.Exists<T>(T[], System.Predicate<T>)",
         "System.Array.IndexOf(System.Array, object)",
         "System.Array.TrueForAll<T>(T[], System.Predicate<T>)",

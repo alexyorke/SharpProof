@@ -134,6 +134,11 @@ namespace TestNamespace {
                 file.Include.EndsWith("PurelySharp.Attributes.dll", StringComparison.Ordinal) &&
                 file.PackagePath == "lib/netstandard2.0"), Is.True,
                 "The attributes assembly must be packed as a library reference.");
+
+            Assert.That(packageFiles.Any(file =>
+                file.Include.EndsWith("PurelySharp.EffectSummary.json", StringComparison.Ordinal) &&
+                file.PackagePath == "analyzers/dotnet/cs"), Is.True,
+                "The generated purity artifact must be packed next to the analyzer so runtime-helper proofs are available.");
         }
 
         [Test]

@@ -38,6 +38,12 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ArrayEmpty_IsSourcedFromGeneratedPurityEvidence_NotTheStaticPureCatalog()
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Array.Empty<T>()"));
+        }
+
+        [Test]
         public void RepresentativeCatalogSignaturesResolveAgainstNet80References()
         {
             var source = @"
@@ -99,9 +105,6 @@ public static class CatalogSignatureSamples
 
             Assert.That(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback"), Is.EqualTo("System.Net.IPAddress.Loopback.get"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback")));
-
-            Assert.That(GetInvocationSignature(compilation, syntaxTree, "Array.Empty<int>()"), Is.EqualTo("System.Array.Empty<T>()"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "Array.Empty<int>()")));
 
             Assert.That(GetPropertySignature(compilation, syntaxTree, "list.Count"), Is.EqualTo("System.Collections.Generic.List<T>.Count.get"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetPropertySignature(compilation, syntaxTree, "list.Count")));
@@ -189,7 +192,6 @@ public static class CatalogConflictSamples
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "list.Add(1)"), expectedPure: false, expectedImpure: true);
             AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "DateTime.Now"), expectedPure: false, expectedImpure: true);
             AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Array.Empty<int>()"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "list.Count"), expectedPure: true, expectedImpure: false);
         }
 
