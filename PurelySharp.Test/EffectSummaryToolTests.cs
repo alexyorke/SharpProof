@@ -614,7 +614,31 @@ public static class PurityFixture
                 Is.EquivalentTo(new[]
                 {
                     "System.BitConverter.ToInt32(byte[], int)",
+                    "System.BitConverter.ToInt32(System.ReadOnlySpan`1<byte>)",
+                }));
+
+            foreach (var row in knownPureRows)
+            {
+                Assert.That(row.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+                Assert.That(row.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("none"));
+            }
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeBitConverterDoubleSlice_TreatsIntrinsicHelpersAsPure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.BitConverter.ToDouble", limit: 20);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            var knownPureRows = catalogComparison.GetProperty("KnownPureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                knownPureRows.Select(row => row.GetProperty("Symbol").GetString()),
+                Is.EquivalentTo(new[]
+                {
                     "System.BitConverter.ToDouble(byte[], int)",
+                    "System.BitConverter.ToDouble(System.ReadOnlySpan`1<byte>)",
                 }));
 
             foreach (var row in knownPureRows)

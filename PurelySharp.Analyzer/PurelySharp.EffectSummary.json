@@ -1024,6 +1024,98 @@
                                                        "FreshnessClassification":  "fresh_owned_array_write"
                                                    },
                                                    {
+                                                       "Symbol":  "System.BitConverter.ToDouble(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+                                                       "ExactSymbolKey":  "System.BitConverter.ToDouble(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Edouble",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000C20|il:4229db96f5c154a8df66ba709a35aec019883d514def08208428177f65236151",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x06000C20",
+                                                       "MethodBodySha256":  "4229db96f5c154a8df66ba709a35aec019883d514def08208428177f65236151",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.BitConverter.ToDouble(byte[], int)",
+                                                       "ExactSymbolKey":  "System.BitConverter.ToDouble(byte[], int)-\u003Edouble",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000C1F|il:621e71d224de8042d7f8a7f37d70bae58a9e8aed764ce67bc2ee0384443f5564",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x06000C1F",
+                                                       "MethodBodySha256":  "621e71d224de8042d7f8a7f37d70bae58a9e8aed764ce67bc2ee0384443f5564",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.BitConverter.ToInt32(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+                                                       "ExactSymbolKey":  "System.BitConverter.ToInt32(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Eint",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000C12|il:3efa63e6bc6abaf287d79f011880e01036ba522233cac6be499a274fc27aebb3",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x06000C12",
+                                                       "MethodBodySha256":  "3efa63e6bc6abaf287d79f011880e01036ba522233cac6be499a274fc27aebb3",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.BitConverter.ToInt32(byte[], int)",
+                                                       "ExactSymbolKey":  "System.BitConverter.ToInt32(byte[], int)-\u003Eint",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000C11|il:cc5b35a86280cf29edaf20e005844beba9ca03ae4c07a3325f872b84c614ad1e",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x06000C11",
+                                                       "MethodBodySha256":  "cc5b35a86280cf29edaf20e005844beba9ca03ae4c07a3325f872b84c614ad1e",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
                                                        "Symbol":  "System.Numerics.BitOperations.IsPow2(int)",
                                                        "ExactSymbolKey":  "System.Numerics.BitOperations.IsPow2(int)-\u003ebool",
                                                        "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600290C|il:7fd221897ce40a409fac7cd1446765b3789c9bfa62e3754e88657b7aec217956",
