@@ -208,6 +208,30 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeConvertBase64Slice_TreatsRuntimeHelpersAsImpure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Convert.FromBase64", limit: 20);
+
+            var methods = FindMethodsByPrefix(summary, "System.Convert.FromBase64");
+            Assert.That(methods.Length, Is.GreaterThan(0));
+
+            AssertPurityClassification(summary, "System.Convert.FromBase64CharArray(char[], int, int)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Convert.FromBase64String(string)", "impure", "impure_callee");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeConvertHexSlice_TreatsRuntimeHelpersAsImpure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Convert.FromHexString", limit: 20);
+
+            var methods = FindMethodsByPrefix(summary, "System.Convert.FromHexString");
+            Assert.That(methods.Length, Is.GreaterThan(0));
+
+            AssertPurityClassification(summary, "System.Convert.FromHexString(System.ReadOnlySpan`1<char>)", "impure", "throw");
+            AssertPurityClassification(summary, "System.Convert.FromHexString(string)", "impure", "impure_callee");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeBitConverterReadSlice_TreatsIntrinsicHelpersAsPure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.BitConverter.ToInt32", limit: 20);

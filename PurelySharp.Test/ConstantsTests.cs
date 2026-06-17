@@ -53,6 +53,19 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ConvertCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Convert.FromBase64String(string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Convert.FromBase64CharArray(char[], int, int)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Convert.FromHexString(string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Convert.FromHexString(System.ReadOnlySpan<char>)"));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Convert.FromBase64String(string)"));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Convert.FromBase64CharArray(char[], int, int)"));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Convert.FromHexString(string)"));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Convert.FromHexString(System.ReadOnlySpan<char>)"));
+        }
+
+        [Test]
         public void RepresentativeCatalogSignaturesResolveAgainstNet80References()
         {
             var source = @"
@@ -225,9 +238,6 @@ public static class RecentCatalogSignatureSamples
         _ = new string(charSpan);
         _ = guid.ToByteArray();
         _ = guid.ToByteArray(true);
-        _ = Convert.FromBase64String(text);
-        _ = Convert.FromBase64CharArray(chars, 0, text.Length);
-        _ = Convert.FromHexString(text);
         _ = BitConverter.GetBytes(true);
         _ = BitConverter.GetBytes('a');
         _ = BitConverter.GetBytes((Half)1);
@@ -295,12 +305,6 @@ public static class RecentCatalogSignatureSamples
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Guid.TryParseExact(text, \"D\", out parsed)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "guid.ToString(\"N\")"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetObjectCreationSignature(compilation, syntaxTree, "new string(charSpan)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64String(text)"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64String(text)")));
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64CharArray(chars, 0, text.Length)"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "Convert.FromBase64CharArray(chars, 0, text.Length)")));
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Convert.FromHexString(text)"), expectedPure: true, expectedImpure: false);
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "Convert.FromHexString(text)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(true)"), expectedPure: true, expectedImpure: false);
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes(true)")));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitConverter.GetBytes('a')"), expectedPure: true, expectedImpure: false);

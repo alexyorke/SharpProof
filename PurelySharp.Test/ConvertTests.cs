@@ -10,7 +10,7 @@ namespace PurelySharp.Test
     public class ConvertTests
     {
         [Test]
-        public async Task ConvertFromBase64String_NoDiagnostic()
+        public async Task ConvertFromBase64String_ReportsPS0002()
         {
             var test = @"
 using System;
@@ -19,7 +19,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public byte[] TestMethod(string value)
+    public byte[] {|PS0002:TestMethod|}(string value)
     {
         return Convert.FromBase64String(value);
     }
@@ -29,7 +29,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertFromBase64String_LocalNonEscapingUse_NoDiagnostic()
+        public async Task ConvertFromBase64String_LocalNonEscapingUse_ReportsPS0002()
         {
             var test = @"
 using System;
@@ -38,7 +38,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public int TestMethod(string value)
+    public int {|PS0002:TestMethod|}(string value)
     {
         var bytes = Convert.FromBase64String(value);
         return bytes.Length;
@@ -49,7 +49,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertFromBase64String_LocalReturned_NoDiagnostic()
+        public async Task ConvertFromBase64String_LocalReturned_ReportsPS0002()
         {
             var test = @"
 using System;
@@ -58,7 +58,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public byte[] TestMethod(string value)
+    public byte[] {|PS0002:TestMethod|}(string value)
     {
         var bytes = Convert.FromBase64String(value);
         return bytes;
@@ -69,7 +69,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertFromHexString_NoDiagnostic()
+        public async Task ConvertFromHexString_ReportsPS0002()
         {
             var test = @"
 using System;
@@ -78,7 +78,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public byte[] TestMethod(string value)
+    public byte[] {|PS0002:TestMethod|}(string value)
     {
         return Convert.FromHexString(value);
     }
@@ -88,7 +88,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertFromHexString_LocalNonEscapingUse_NoDiagnostic()
+        public async Task ConvertFromHexString_LocalNonEscapingUse_ReportsPS0002()
         {
             var test = @"
 using System;
@@ -97,7 +97,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public int TestMethod(string value)
+    public int {|PS0002:TestMethod|}(string value)
     {
         var bytes = Convert.FromHexString(value);
         return bytes.Length;
@@ -108,7 +108,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertFromHexString_LocalReturned_NoDiagnostic()
+        public async Task ConvertFromHexString_LocalReturned_ReportsPS0002()
         {
             var test = @"
 using System;
@@ -117,7 +117,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public byte[] TestMethod(string value)
+    public byte[] {|PS0002:TestMethod|}(string value)
     {
         var bytes = Convert.FromHexString(value);
         return bytes;
@@ -128,7 +128,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertFromBase64CharArray_NoDiagnostic()
+        public async Task ConvertFromBase64CharArray_ReportsPS0002()
         {
             var test = @"
 using System;
@@ -137,7 +137,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public byte[] TestMethod(string value)
+    public byte[] {|PS0002:TestMethod|}(string value)
     {
         var chars = value.ToCharArray();
         return Convert.FromBase64CharArray(chars, 0, chars.Length);
@@ -148,7 +148,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertFromBase64CharArray_LocalNonEscapingUse_NoDiagnostic()
+        public async Task ConvertFromBase64CharArray_LocalNonEscapingUse_ReportsPS0002()
         {
             var test = @"
 using System;
@@ -157,7 +157,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public int TestMethod(string value)
+    public int {|PS0002:TestMethod|}(string value)
     {
         var chars = value.ToCharArray();
         var bytes = Convert.FromBase64CharArray(chars, 0, chars.Length);
@@ -169,7 +169,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertFromBase64CharArray_LocalReturned_NoDiagnostic()
+        public async Task ConvertFromBase64CharArray_LocalReturned_ReportsPS0002()
         {
             var test = @"
 using System;
@@ -178,7 +178,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public byte[] TestMethod(string value)
+    public byte[] {|PS0002:TestMethod|}(string value)
     {
         var chars = value.ToCharArray();
         var bytes = Convert.FromBase64CharArray(chars, 0, chars.Length);

@@ -1053,9 +1053,6 @@ public static class Constants
         "System.BitConverter.GetBytes(ushort)",
         "System.BitConverter.GetBytes(uint)",
         "System.BitConverter.GetBytes(ulong)",
-        "System.Convert.FromBase64CharArray(char[], int, int)",
-        "System.Convert.FromBase64String(string)",
-        "System.Convert.FromHexString(string)",
         "System.Security.Cryptography.SHA1.HashData(byte[])",
         "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan<byte>)",
         "System.Security.Cryptography.MD5.HashData(byte[])",
@@ -1136,8 +1133,6 @@ public static class Constants
         "System.Collections.Immutable.ImmutableHashSet.Create<T>()",
 
 
-        "System.Convert.FromBase64CharArray(char[], int, int)",
-        "System.Convert.FromBase64String(string)",
         "System.Convert.ToBase64String(byte[])",
         "System.Convert.ToBase64String(byte[], int, int)",
 
@@ -1629,7 +1624,6 @@ public static class Constants
         "System.Collections.Generic.SortedSet<T>.GetViewBetween(T, T)",
         "System.ComponentModel.DataAnnotations.EmailAddressAttribute.EmailAddressAttribute()",
         "System.ComponentModel.DataAnnotations.RegularExpressionAttribute.RegularExpressionAttribute(string)",
-        "System.Convert.FromHexString(string)",
         "System.Convert.ToHexString(byte[])",
         "decimal.Negate(decimal)",
         "double.PositiveInfinity.get",

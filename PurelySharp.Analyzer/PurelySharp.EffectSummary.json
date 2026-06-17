@@ -186,6 +186,98 @@
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "fresh_array_candidate_via_local_helpers"
+      },
+      {
+        "Symbol": "System.Convert.FromBase64CharArray(char[], int, int)",
+        "ExactSymbolKey": "System.Convert.FromBase64CharArray(char[], int, int)->byte[]",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000F14|il:bf77007ade359421fdf2045bc83ffd276701b84e254fa65db9d5c90a9986f941",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06000F14",
+        "MethodBodySha256": "bf77007ade359421fdf2045bc83ffd276701b84e254fa65db9d5c90a9986f941",
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Convert.FromBase64CharPtr(char*, int)",
+          "System.Convert.FromBase64_ComputeResultLength(char*, int)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none"
+      },
+      {
+        "Symbol": "System.Convert.FromBase64String(string)",
+        "ExactSymbolKey": "System.Convert.FromBase64String(string)->byte[]",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000F0F|il:7a7569857433808bbcdeece2b1ef5c841f2020edb5c31c5b894bab8831aa8479",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06000F0F",
+        "MethodBodySha256": "7a7569857433808bbcdeece2b1ef5c841f2020edb5c31c5b894bab8831aa8479",
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Convert.FromBase64CharPtr(char*, int)",
+          "System.Convert.FromBase64_ComputeResultLength(char*, int)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none"
+      },
+      {
+        "Symbol": "System.Convert.FromHexString(System.ReadOnlySpan<char>)",
+        "ExactSymbolKey": "System.Convert.FromHexString(System.ReadOnlySpan<char>)->byte[]",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000F18|il:f332868cf0d4cc9639d7b21128604de9a4ced7badb9a8c985482063fa4ea2305",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06000F18",
+        "MethodBodySha256": "f332868cf0d4cc9639d7b21128604de9a4ced7badb9a8c985482063fa4ea2305",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none"
+      },
+      {
+        "Symbol": "System.Convert.FromHexString(string)",
+        "ExactSymbolKey": "System.Convert.FromHexString(string)->byte[]",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000F17|il:c23f91e4a919b1a959d9bc8013931d8253376288db33ef6b87a4c4ca431cb4b7",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06000F17",
+        "MethodBodySha256": "c23f91e4a919b1a959d9bc8013931d8253376288db33ef6b87a4c4ca431cb4b7",
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Convert.FromHexString(System.ReadOnlySpan<char>)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none"
       }
     ]
   }
