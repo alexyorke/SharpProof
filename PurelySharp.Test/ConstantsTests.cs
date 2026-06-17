@@ -632,10 +632,10 @@ public static class RecentCatalogSignatureSamples
                 AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, expression));
             }
 
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.LeadingZeroCount(1u)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.LeadingZeroCount(1ul)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.Log2(1u)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.Log2(1ul)"), expectedPure: true, expectedImpure: false);
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.LeadingZeroCount(1u)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.LeadingZeroCount(1ul)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.Log2(1u)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.Log2(1ul)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.PopCount(1u)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.PopCount(1ul)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.PopCount((nuint)1)"));
@@ -645,12 +645,12 @@ public static class RecentCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.RotateRight(1u, 1)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.RotateRight(1ul, 1)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.RotateRight((nuint)1, 1)"));
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.RoundUpToPowerOf2(1u)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.RoundUpToPowerOf2(1ul)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.TrailingZeroCount(1)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.TrailingZeroCount(1u)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.TrailingZeroCount(1L)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.TrailingZeroCount(1ul)"), expectedPure: true, expectedImpure: false);
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.RoundUpToPowerOf2(1u)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.RoundUpToPowerOf2(1ul)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.TrailingZeroCount(1)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.TrailingZeroCount(1u)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.TrailingZeroCount(1L)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.TrailingZeroCount(1ul)"));
             var binaryPrimitivesReverseEndiannessExpressions = new[]
             {
                 "BinaryPrimitives.ReverseEndianness((sbyte)1)",
