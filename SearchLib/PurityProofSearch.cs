@@ -40,6 +40,29 @@ namespace SearchLib.Purity
 
         public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout)
         {
+            if (query.Hazard.Visibility == PurityEffectVisibility.InternalOnly)
+            {
+                var pathFeasibility = _solver.IsSatisfiable(query.PathConditions, timeout);
+                return pathFeasibility switch
+                {
+                    Feasibility.Unsatisfiable => new PurityProofResult(
+                        PurityProofOutcome.ProvablyPure,
+                        pathFeasibility,
+                        Feasibility.Unsatisfiable,
+                        "path_unsatisfiable"),
+                    Feasibility.Unknown => new PurityProofResult(
+                        PurityProofOutcome.Unknown,
+                        pathFeasibility,
+                        Feasibility.Unknown,
+                        "path_feasibility_unknown"),
+                    _ => new PurityProofResult(
+                        PurityProofOutcome.ProvablyPure,
+                        pathFeasibility,
+                        Feasibility.Unsatisfiable,
+                        "effect_not_caller_visible"),
+                };
+            }
+
             return query.Hazard.Kind switch
             {
                 PurityHazardKind.BranchReachability => ClassifyBranchReachability(query.PathConditions, query.Hazard.TriggerCondition, timeout),

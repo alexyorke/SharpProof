@@ -10,9 +10,16 @@ namespace SearchLib.Purity
         DivideByZero,
     }
 
+    public enum PurityEffectVisibility
+    {
+        CallerVisible,
+        InternalOnly,
+    }
+
     public sealed record PurityHazard(
         PurityHazardKind Kind,
-        SmtFormula TriggerCondition);
+        SmtFormula TriggerCondition,
+        PurityEffectVisibility Visibility = PurityEffectVisibility.CallerVisible);
 
     public sealed record PurityProofQuery(
         IReadOnlyList<SmtFormula> PathConditions,
