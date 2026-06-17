@@ -61,6 +61,13 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void EncodingUtf8_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.Encoding.UTF8.get"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.Encoding.GetString(byte[])"));
+        }
+
+        [Test]
         public void UnsafeUnalignedHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(ref byte)"));

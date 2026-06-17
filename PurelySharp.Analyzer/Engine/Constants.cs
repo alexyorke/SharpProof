@@ -1340,8 +1340,6 @@ public static class Constants
         "System.StringComparer.Ordinal.Equals(string, string)",
 
 
-        "System.Text.Encoding.GetString(byte[])",
-        "System.Text.Encoding.UTF8.get",
         "System.Text.Json.JsonSerializer.Serialize<TValue>(TValue, System.Text.Json.JsonSerializerOptions?)",
         "System.Text.RegularExpressions.Regex.Regex(string)",
         "System.Text.RegularExpressions.Regex.IsMatch(string, string)",
@@ -1675,10 +1673,6 @@ public static class Constants
 
 
 
-
-
-        "System.Text.Encoding.UTF8.get",
-        "System.Text.Encoding.GetString(byte[])",
         // Exception guard helpers considered pure (diverging without side effects)
         "System.Exception.Message.get",
         "System.ArgumentNullException.ArgumentNullException(string)",

@@ -45,5 +45,43 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task EncodingUtf8Getter_Diagnostic()
+        {
+            var test = @"
+using System.Text;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Encoding {|PS0002:TestMethod|}()
+    {
+        return Encoding.UTF8;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task EncodingUtf8GetString_Diagnostic()
+        {
+            var test = @"
+using System.Text;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(byte[] bytes)
+    {
+        return Encoding.UTF8.GetString(bytes);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }
