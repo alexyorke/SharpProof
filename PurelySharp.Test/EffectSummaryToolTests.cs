@@ -410,7 +410,53 @@ public static class PurityFixture
                 Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("none"));
                 Assert.That(row.GetProperty("HasUnsupportedEffects").GetBoolean(), Is.False);
             }
-        }        [Test]
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeMathSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Math", limit: 120);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var generatedPureRows = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Where(row =>
+                    row.GetProperty("Classification").GetString() == "pure" &&
+                    row.GetProperty("Symbol").GetString()?.StartsWith("System.Math.", StringComparison.Ordinal) == true)
+                .ToArray();
+
+            Assert.That(generatedPureRows, Has.Length.EqualTo(58));
+
+            var representativePureSymbols = new[]
+            {
+                "System.Math.Abs(double)",
+                "System.Math.Abs(int)",
+                "System.Math.Clamp(byte, byte, byte)",
+                "System.Math.Clamp(System.Decimal, System.Decimal, System.Decimal)",
+                "System.Math.Ceiling(System.Decimal)",
+                "System.Math.Floor(System.Decimal)",
+                "System.Math.Max(System.Decimal, System.Decimal)",
+                "System.Math.Min(System.Decimal, System.Decimal)",
+                "System.Math.Round(System.Decimal)",
+                "System.Math.Truncate(double)",
+            };
+
+            foreach (var symbol in representativePureSymbols)
+            {
+                Assert.That(
+                    generatedPureRows.Any(row => string.Equals(row.GetProperty("Symbol").GetString(), symbol, StringComparison.Ordinal)),
+                    Is.True,
+                    symbol);
+            }
+
+            AssertPurityClassification(summary, "System.Math.Ceiling(double)", "conservative_unknown", "metadata_only_or_external");
+            AssertPurityClassification(summary, "System.Math.Sqrt(double)", "conservative_unknown", "metadata_only_or_external");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeBitOperationsDeBruijnHelpersSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Numerics.BitOperations", limit: 80);

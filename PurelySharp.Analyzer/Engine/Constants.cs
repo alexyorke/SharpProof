@@ -1216,13 +1216,8 @@ public static class Constants
 
 
 
-        "System.Math.Abs(double)",
         "System.Math.Ceiling(double)",
-        "System.Math.Clamp",
         "System.Math.Floor(double)",
-        "System.Math.Max",
-        "System.Math.Min",
-        "System.Math.Round",
         "System.Math.Sin(double)",
         "System.Math.Sqrt(double)",
 
@@ -1577,7 +1572,6 @@ public static class Constants
         "System.IO.FileInfo.Name.get",
 
         "System.Linq.Enumerable.TakeWhile<TSource>(System.Collections.Generic.IEnumerable<TSource>, System.Func<TSource, bool>)",
-        "System.Math.Abs(int)",
         "System.Math.Ceiling(decimal)",
         "System.Net.IPAddress.Any.get",
         "System.Net.IPAddress.Loopback.get",
@@ -1595,25 +1589,7 @@ public static class Constants
         "System.String.StartsWith(System.String)",
 
 
-        "System.Math.Abs",
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        
 
 
 

@@ -50,7 +50,9 @@ namespace PurelySharp.Test
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.ToByteArray(bool)"));
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Guid.ToByteArray()"));
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Guid.ToByteArray(bool)"));
-        }        [Test]
+        }
+
+        [Test]
         public void BitOperationsCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
@@ -71,6 +73,29 @@ namespace PurelySharp.Test
                 "System.Numerics.BitOperations.TrailingZeroCount(uint)",
                 "System.Numerics.BitOperations.TrailingZeroCount(long)",
                 "System.Numerics.BitOperations.TrailingZeroCount(ulong)",
+            };
+
+            foreach (var member in members)
+            {
+                Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(member));
+                Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(member));
+            }
+        }
+
+        [Test]
+        public void MathCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Math.Abs",
+                "System.Math.Abs(double)",
+                "System.Math.Abs(int)",
+                "System.Math.Ceiling(decimal)",
+                "System.Math.Clamp",
+                "System.Math.Max",
+                "System.Math.Min",
+                "System.Math.Round",
+                "System.Math.Truncate(double)",
             };
 
             foreach (var member in members)
