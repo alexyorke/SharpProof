@@ -53,6 +53,14 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void StringPrefixSuffix_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.String.StartsWith(System.String)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.String.StartsWith(char)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.String.EndsWith(char)"));
+        }
+
+        [Test]
         public void UnsafeUnalignedHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(ref byte)"));

@@ -1617,10 +1617,9 @@ public static class Constants
         "System.Text.RegularExpressions.Regex.IsMatch(string, string)",
         "System.Collections.Generic.List<T>.Find(System.Predicate<T>)",
         "System.Collections.Generic.List<T>.get_Count()",
-        "System.String.StartsWith(System.String)",
 
 
-        
+
 
 
 
