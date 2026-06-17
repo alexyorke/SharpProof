@@ -1394,8 +1394,6 @@ public static class Constants
         "System.Numerics.Matrix4x4.CreateRotationX(float)",
         "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)",
         "System.Reflection.Metadata.MetadataReader.GetString(System.Reflection.Metadata.StringHandle)",
-        "System.Runtime.CompilerServices.Unsafe.As<TFrom, TTo>(ref TFrom)",
-        "System.Runtime.CompilerServices.Unsafe.SizeOf<T>()",
         "System.Runtime.Intrinsics.X86.Sse.Add(System.Runtime.Intrinsics.Vector128<float>, System.Runtime.Intrinsics.Vector128<float>)",
         "System.Runtime.Intrinsics.X86.Avx2.Multiply(System.Runtime.Intrinsics.Vector256<double>, System.Runtime.Intrinsics.Vector256<double>)",
         "System.Diagnostics.CounterSample.Calculate(System.Diagnostics.CounterSample, System.Diagnostics.CounterSample)",

@@ -658,6 +658,19 @@ public static class PurityFixture
             Assert.That(writeMethods.Length, Is.EqualTo(2));
             Assert.That(writeMethods.All(method => method.GetProperty("PurityClassification").GetProperty("Classification").GetString() == "impure"), Is.True);
             Assert.That(writeMethods.All(method => method.GetProperty("PurityClassification").GetProperty("PrimaryCategory").GetString() == "caller_visible_memory_write"), Is.True);
+
+            var asMethods = methods.Where(method =>
+                method.GetProperty("Symbol").GetString() is "System.Runtime.CompilerServices.Unsafe.As(object)" or
+                    "System.Runtime.CompilerServices.Unsafe.As(ref !!0)")
+                .ToArray();
+            var sizeOfMethods = methods.Where(method =>
+                method.GetProperty("Symbol").GetString() == "System.Runtime.CompilerServices.Unsafe.SizeOf()")
+                .ToArray();
+
+            Assert.That(asMethods.Length, Is.EqualTo(2));
+            Assert.That(asMethods.All(method => method.GetProperty("PurityClassification").GetProperty("Classification").GetString() == "pure"), Is.True);
+            Assert.That(sizeOfMethods.Length, Is.EqualTo(1));
+            Assert.That(sizeOfMethods[0].GetProperty("PurityClassification").GetProperty("Classification").GetString(), Is.EqualTo("pure"));
         }
 
         [Test]

@@ -30,6 +30,45 @@ public class TestClass
         }
 
         [Test]
+        public async Task UnsafeAs_NoDiagnostic()
+        {
+            var test = @"
+using System.Runtime.CompilerServices;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(ref int value)
+    {
+        ref int alias = ref Unsafe.As<int, int>(ref value);
+        return alias;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task UnsafeSizeOf_NoDiagnostic()
+        {
+            var test = @"
+using System.Runtime.CompilerServices;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        return Unsafe.SizeOf<int>();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task UnsafeWriteUnaligned_Diagnostic()
         {
             var test = @"

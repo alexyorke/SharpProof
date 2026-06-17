@@ -59,6 +59,8 @@ namespace PurelySharp.Test
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(void*)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(ref byte, !!0)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(void*, !!0)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Runtime.CompilerServices.Unsafe.As<TFrom, TTo>(ref TFrom)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Runtime.CompilerServices.Unsafe.SizeOf<T>()"));
         }
 
         [Test]

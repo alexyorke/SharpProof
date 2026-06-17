@@ -562,6 +562,75 @@
                                                        "FreshnessClassification":  "none"
                                                    },
                                                    {
+                                                       "Symbol":  "System.Runtime.CompilerServices.Unsafe.As(object)",
+                                                       "ExactSymbolKey":  "System.Runtime.CompilerServices.Unsafe.As(object)-\u003e!!0",
+                                                       "CacheKey":  "mvid:7c39e25e-0207-4f4b-aedc-1c131c046167|token:0x06000014|il:2434fdab84f43e54e4b865934d087d41b9b807519d2c3f311d71fe007360f8ae",
+                                                       "AssemblyName":  "System.Runtime.CompilerServices.Unsafe",
+                                                       "AssemblyPath":  "C:\\Users\\yorke\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\lib\\net6.0\\System.Runtime.CompilerServices.Unsafe.dll",
+                                                       "AssemblySha256":  "2b4eb652a3748bffc734c39e6c352b17472f4a115ae683258429877540fe71c5",
+                                                       "ModuleVersionId":  "7c39e25e-0207-4f4b-aedc-1c131c046167",
+                                                       "MetadataToken":  "0x06000014",
+                                                       "MethodBodySha256":  "2434fdab84f43e54e4b865934d087d41b9b807519d2c3f311d71fe007360f8ae",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.Runtime.CompilerServices.Unsafe.As(ref !!0)",
+                                                       "ExactSymbolKey":  "System.Runtime.CompilerServices.Unsafe.As(ref !!0)-\u003eref !!1",
+                                                       "CacheKey":  "mvid:7c39e25e-0207-4f4b-aedc-1c131c046167|token:0x06000017|il:2434fdab84f43e54e4b865934d087d41b9b807519d2c3f311d71fe007360f8ae",
+                                                       "AssemblyName":  "System.Runtime.CompilerServices.Unsafe",
+                                                       "AssemblyPath":  "C:\\Users\\yorke\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\lib\\net6.0\\System.Runtime.CompilerServices.Unsafe.dll",
+                                                       "AssemblySha256":  "2b4eb652a3748bffc734c39e6c352b17472f4a115ae683258429877540fe71c5",
+                                                       "ModuleVersionId":  "7c39e25e-0207-4f4b-aedc-1c131c046167",
+                                                       "MetadataToken":  "0x06000017",
+                                                       "MethodBodySha256":  "2434fdab84f43e54e4b865934d087d41b9b807519d2c3f311d71fe007360f8ae",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.Runtime.CompilerServices.Unsafe.SizeOf()",
+                                                       "ExactSymbolKey":  "System.Runtime.CompilerServices.Unsafe.SizeOf()-\u003eint",
+                                                       "CacheKey":  "mvid:7c39e25e-0207-4f4b-aedc-1c131c046167|token:0x0600000B|il:65062c20e6d15d2d617eae6361bd885c3c1c9ddc2e016451f7c7f906f2a949c0",
+                                                       "AssemblyName":  "System.Runtime.CompilerServices.Unsafe",
+                                                       "AssemblyPath":  "C:\\Users\\yorke\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\lib\\net6.0\\System.Runtime.CompilerServices.Unsafe.dll",
+                                                       "AssemblySha256":  "2b4eb652a3748bffc734c39e6c352b17472f4a115ae683258429877540fe71c5",
+                                                       "ModuleVersionId":  "7c39e25e-0207-4f4b-aedc-1c131c046167",
+                                                       "MetadataToken":  "0x0600000B",
+                                                       "MethodBodySha256":  "65062c20e6d15d2d617eae6361bd885c3c1c9ddc2e016451f7c7f906f2a949c0",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
                                                        "Symbol":  "System.Convert.FromBase64CharArray(char[], int, int)",
                                                        "ExactSymbolKey":  "System.Convert.FromBase64CharArray(char[], int, int)-\u003ebyte[]",
                                                        "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000F14|il:bf77007ade359421fdf2045bc83ffd276701b84e254fa65db9d5c90a9986f941",
