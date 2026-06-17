@@ -487,7 +487,7 @@ public static class CatalogConflictSamples
         }
 
         [Test]
-        public void RecentGuidAndDateTimeOffsetCatalogEntriesResolveAgainstNet80References()
+        public void RecentGuidAndDateTimeOffsetGeneratedPurityEntriesResolveAgainstNet80References()
         {
             var source = @"
 using System;
@@ -569,6 +569,7 @@ public static class RecentCatalogSignatureSamples
         _ = BinaryPrimitives.ReverseEndianness((nuint)1);
         _ = BinaryPrimitives.ReverseEndianness((Int128)1);
         _ = BinaryPrimitives.ReverseEndianness((UInt128)1);
+        var fromMilliseconds = DateTimeOffset.FromUnixTimeMilliseconds(0);
         var fromSeconds = DateTimeOffset.FromUnixTimeSeconds(0);
         var added = value.AddDays(1);
         return added.ToUnixTimeMilliseconds() + value.Offset.Ticks;
@@ -673,10 +674,11 @@ public static class RecentCatalogSignatureSamples
                 AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, expression));
             }
 
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "DateTimeOffset.FromUnixTimeSeconds(0)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "value.AddDays(1)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "added.ToUnixTimeMilliseconds()"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "value.Offset"), expectedPure: true, expectedImpure: false);
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTimeOffset.FromUnixTimeMilliseconds(0)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTimeOffset.FromUnixTimeSeconds(0)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddDays(1)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "added.ToUnixTimeMilliseconds()"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Offset"));
         }
 
         private static void AssertCatalogMembership(string signature, bool expectedPure, bool expectedImpure)

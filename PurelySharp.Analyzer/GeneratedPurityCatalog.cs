@@ -89,6 +89,25 @@ namespace PurelySharp.Analyzer
                         builder.Add(entry);
                     }
                 }
+
+                foreach (var domainSummaryPath in Directory.EnumerateFiles(builtInSummaryDirectory, "*." + SummaryFileName, SearchOption.TopDirectoryOnly))
+                {
+                    if (string.Equals(Path.GetFileName(domainSummaryPath), SummaryFileName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    foreach (var entry in ParseEntries(File.ReadAllText(domainSummaryPath)))
+                    {
+                        if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
+                        {
+                            builder = ImmutableArray.CreateBuilder<SummaryEntry>();
+                            entriesBySymbol.Add(entry.Symbol, builder);
+                        }
+
+                        builder.Add(entry);
+                    }
+                }
             }
 
             if (entriesBySymbol.Count == 0)

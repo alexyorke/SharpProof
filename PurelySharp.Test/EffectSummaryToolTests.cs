@@ -685,6 +685,18 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeDateTimeOffsetSlice_TreatsFactoriesAndDerivedHelpersDifferently()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.DateTimeOffset", limit: 20);
+
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddDays(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.ToUnixTimeMilliseconds()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_Offset()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.FromUnixTimeMilliseconds(long)", "impure", "global_state_read", "throw");
+            AssertPurityClassification(summary, "System.DateTimeOffset.FromUnixTimeSeconds(long)", "impure", "global_state_read", "throw");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeUnsafeSlice_TreatsReadUnalignedAsPureAndWriteUnalignedAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Runtime.CompilerServices.Unsafe", limit: 20);

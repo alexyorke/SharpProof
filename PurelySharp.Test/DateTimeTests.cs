@@ -313,7 +313,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task DateTimeOffsetFromUnixTimeSeconds_NoDiagnostic()
+        public async Task DateTimeOffsetFromUnixTimeSeconds_Diagnostic()
         {
             var test = @"
 using System;
@@ -322,9 +322,28 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public DateTimeOffset TestMethod(long value)
+    public DateTimeOffset {|PS0002:TestMethod|}(long value)
     {
         return DateTimeOffset.FromUnixTimeSeconds(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task DateTimeOffsetFromUnixTimeMilliseconds_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateTimeOffset {|PS0002:TestMethod|}(long value)
+    {
+        return DateTimeOffset.FromUnixTimeMilliseconds(value);
     }
 }";
 

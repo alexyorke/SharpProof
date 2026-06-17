@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <None Include="PurelySharp.EffectSummary.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="DateTimeOffset.PurelySharp.EffectSummary.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
