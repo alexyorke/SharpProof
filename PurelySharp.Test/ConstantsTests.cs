@@ -198,6 +198,13 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ArrayEmpty_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Array.Empty()"));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Array.Empty()"));
+        }
+
+        [Test]
         public void MemoryExtensionsCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
