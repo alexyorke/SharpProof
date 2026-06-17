@@ -1196,20 +1196,9 @@ public static class Constants
         "System.Globalization.CultureInfo.Name.get",
 
 
-        "System.Guid.Guid(byte[])",
-        "System.Guid.Guid(string)",
         "System.Guid.CompareTo(System.Guid)",
         "System.Guid.Empty.get",
         "System.Guid.Equals(System.Guid)",
-        "System.Guid.Parse(string)",
-        "System.Guid.ParseExact(string, string)",
-        "System.Guid.TryParse(string?, out System.Guid)",
-        "System.Guid.TryParseExact(string?, string?, out System.Guid)",
-        "System.Guid.ToString()",
-        "System.Guid.ToString(string?)",
-
-
-
 
         "System.IO.Path.Combine(string, string)",
         "System.IO.Path.GetDirectoryName(string)",

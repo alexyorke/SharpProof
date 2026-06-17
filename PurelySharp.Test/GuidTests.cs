@@ -29,7 +29,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task GuidParse_NoDiagnostic()
+        public async Task GuidParse_Diagnostic()
         {
             var test = @"
 using System;
@@ -38,7 +38,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public Guid TestMethod(string value)
+    public Guid {|PS0002:TestMethod|}(string value)
     {
         return Guid.Parse(value);
     }
@@ -48,7 +48,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task GuidToString_NoDiagnostic()
+        public async Task GuidToString_Diagnostic()
         {
             var test = @"
 using System;
@@ -57,7 +57,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod(Guid value)
+    public string {|PS0002:TestMethod|}(Guid value)
     {
         return value.ToString();
     }
@@ -86,7 +86,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task GuidTryParse_NoDiagnostic()
+        public async Task GuidTryParse_Diagnostic()
         {
             var test = @"
 using System;
@@ -95,7 +95,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool TestMethod(string value)
+    public bool {|PS0002:TestMethod|}(string value)
     {
         return Guid.TryParse(value, out _);
     }
@@ -105,7 +105,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task GuidExactParseAndFormat_NoDiagnostic()
+        public async Task GuidExactParseAndFormat_Diagnostic()
         {
             var test = @"
 using System;
@@ -114,7 +114,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod(string value)
+    public string {|PS0002:TestMethod|}(string value)
     {
         var parsed = Guid.ParseExact(value, ""D"");
         return Guid.TryParseExact(value, ""D"", out var other)
@@ -127,7 +127,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task GuidStringConstructor_NoDiagnostic()
+        public async Task GuidStringConstructor_Diagnostic()
         {
             var test = @"
 using System;
@@ -136,7 +136,26 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public Guid TestMethod(string value)
+    public Guid {|PS0002:TestMethod|}(string value)
+    {
+        return new Guid(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task GuidByteArrayConstructor_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Guid {|PS0002:TestMethod|}(byte[] value)
     {
         return new Guid(value);
     }

@@ -30,11 +30,20 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void GuidCatalog_DoesNotMarkWholeTypeImpure()
+        public void GuidCatalog_UsesGeneratedEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownImpureTypeNames, Does.Not.Contain("System.Guid"));
             Assert.That(Constants.KnownImpureMethods, Does.Contain("System.Guid.NewGuid()"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain("System.Guid.Parse(string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Contain("System.Guid.CompareTo(System.Guid)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Contain("System.Guid.Equals(System.Guid)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.Guid(byte[])"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.Guid(string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.Parse(string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.ParseExact(string, string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.TryParse(string?, out System.Guid)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.TryParseExact(string?, string?, out System.Guid)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.ToString()"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.ToString(string?)"));
         }
 
         [Test]
