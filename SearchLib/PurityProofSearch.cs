@@ -52,6 +52,27 @@ namespace SearchLib.Purity
             return ClassifyInternalOnlyEffect(pathConditions, timeout, "fresh_owned_object_write");
         }
 
+        public PurityProofResult ClassifyFreshOwnedArrayWrite(
+            IEnumerable<SmtFormula> pathConditions,
+            TimeSpan timeout)
+        {
+            return ClassifyInternalOnlyEffect(pathConditions, timeout, "fresh_owned_array_write");
+        }
+
+        public PurityProofResult ClassifyCallerVisibleMemoryWrite(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula writeCondition,
+            TimeSpan timeout)
+        {
+            return ClassifyCore(
+                pathConditions,
+                writeCondition,
+                timeout,
+                pureReason: "memory_write_unreachable",
+                impureReason: "caller_visible_memory_write_reachable",
+                unknownReason: "caller_visible_memory_write_feasibility_unknown");
+        }
+
         public PurityProofResult Classify(PurityProofQuery query, TimeSpan timeout)
         {
             if (query.Hazard.Kind == PurityHazardKind.StaticCacheRead)
@@ -62,6 +83,16 @@ namespace SearchLib.Purity
             if (query.Hazard.Kind == PurityHazardKind.FreshOwnedObjectWrite)
             {
                 return ClassifyFreshOwnedObjectWrite(query.PathConditions, timeout);
+            }
+
+            if (query.Hazard.Kind == PurityHazardKind.FreshOwnedArrayWrite)
+            {
+                return ClassifyFreshOwnedArrayWrite(query.PathConditions, timeout);
+            }
+
+            if (query.Hazard.Kind == PurityHazardKind.CallerVisibleMemoryWrite)
+            {
+                return ClassifyCallerVisibleMemoryWrite(query.PathConditions, query.Hazard.TriggerCondition, timeout);
             }
 
             if (query.Hazard.Visibility == PurityEffectVisibility.InternalOnly)

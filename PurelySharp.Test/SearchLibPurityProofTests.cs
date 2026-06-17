@@ -159,6 +159,32 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void PurityProof_FreshOwnedArrayWrite_IsProvablyPure()
+        {
+            using var search = new PurityProofSearch();
+
+            var result = search.ClassifyFreshOwnedArrayWrite(Array.Empty<SmtFormula>(), TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.Reason, Is.EqualTo("fresh_owned_array_write"));
+        }
+
+        [Test]
+        public void PurityProof_CallerVisibleMemoryWrite_IsProvablyImpure()
+        {
+            using var search = new PurityProofSearch();
+            var memoryWrite = new SmtBooleanConstant(true);
+
+            var result = search.ClassifyCallerVisibleMemoryWrite(
+                Array.Empty<SmtFormula>(),
+                memoryWrite,
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+            Assert.That(result.Reason, Is.EqualTo("caller_visible_memory_write_reachable"));
+        }
+
+        [Test]
         public void PurityProof_QueryBranchReachability_ContradictoryGuard_IsProvablyPure()
         {
             using var search = new PurityProofSearch();

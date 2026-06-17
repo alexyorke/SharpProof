@@ -8,6 +8,8 @@ namespace SearchLib.Purity
         ImpureCallReachability,
         StaticCacheRead,
         FreshOwnedObjectWrite,
+        FreshOwnedArrayWrite,
+        CallerVisibleMemoryWrite,
         NullDereference,
         DivideByZero,
     }
