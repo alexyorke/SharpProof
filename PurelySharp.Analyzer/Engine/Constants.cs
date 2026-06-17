@@ -1222,9 +1222,6 @@ public static class Constants
         "System.Math.Sqrt(double)",
 
 
-        "System.MemoryExtensions.SequenceEqual<T>(System.ReadOnlySpan<T>, System.ReadOnlySpan<T>)",
-        "System.MemoryExtensions.Trim<T>(System.ReadOnlySpan<T>)",
-
         "System.Net.WebUtility.HtmlDecode(string)",
         "System.Net.WebUtility.HtmlEncode(string)",
         "System.Net.WebUtility.UrlDecode(string)",

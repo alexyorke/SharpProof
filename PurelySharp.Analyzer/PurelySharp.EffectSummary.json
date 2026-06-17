@@ -3621,6 +3621,880 @@
                                                        "HasFreshObjectAllocationEvidence":  false,
                                                        "HasUnsupportedEffects":  false,
                                                        "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.SequenceEqual(System.ReadOnlySpan`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.SequenceEqual(System.ReadOnlySpan`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)-\u003ebool",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600183D|il:f037ccfddf16f59144d50f807e5442304ad5e7bba54b0446eb12ed02fd11b70a",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x0600183D",
+                                                       "MethodBodySha256":  "f037ccfddf16f59144d50f807e5442304ad5e7bba54b0446eb12ed02fd11b70a",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.SequenceEqual(System.Span`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.SequenceEqual(System.Span`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)-\u003ebool",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06001827|il:2d57b5edc6c4a290ef29794142049ead6c6abd09b81b44dbbc01077743dcf0ce",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x06001827",
+                                                       "MethodBodySha256":  "2d57b5edc6c4a290ef29794142049ead6c6abd09b81b44dbbc01077743dcf0ce",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.Trim(System.Memory`1\u003c!!0\u003e, !!0)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.Trim(System.Memory`1\u003c!!0\u003e, !!0)-\u003eSystem.Memory`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06001897|il:897d8ae87175f1365bbb28b09c4e3551192844f123fcedf63b275bd1b9630d02",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x06001897",
+                                                       "MethodBodySha256":  "897d8ae87175f1365bbb28b09c4e3551192844f123fcedf63b275bd1b9630d02",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.Trim(System.Memory`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.Trim(System.Memory`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)-\u003eSystem.Memory`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018A5|il:6723f781016a87b25e0c203c32a17587e88985b7c6fa3c398476df1ebd3b0208",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018A5",
+                                                       "MethodBodySha256":  "6723f781016a87b25e0c203c32a17587e88985b7c6fa3c398476df1ebd3b0208",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.Trim(System.Memory`1\u003cchar\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.Trim(System.Memory`1\u003cchar\u003e)-\u003eSystem.Memory`1\u003cchar\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018B3|il:d4bb47673e8083ecb9bf12094282a7d53b27792602152b67bf42862384a864b8",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018B3",
+                                                       "MethodBodySha256":  "d4bb47673e8083ecb9bf12094282a7d53b27792602152b67bf42862384a864b8",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.Trim(System.ReadOnlyMemory`1\u003c!!0\u003e, !!0)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.Trim(System.ReadOnlyMemory`1\u003c!!0\u003e, !!0)-\u003eSystem.ReadOnlyMemory`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600189A|il:21e9a2de000d370999680b00288860e1460e450b2e8f08bcb8053160acb219be",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x0600189A",
+                                                       "MethodBodySha256":  "21e9a2de000d370999680b00288860e1460e450b2e8f08bcb8053160acb219be",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.Trim(System.ReadOnlyMemory`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.Trim(System.ReadOnlyMemory`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)-\u003eSystem.ReadOnlyMemory`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018A8|il:9ac1246ecf2b168757cee67d59f4e37cef1a857b2d0e82d840d1c292d62fd2eb",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018A8",
+                                                       "MethodBodySha256":  "9ac1246ecf2b168757cee67d59f4e37cef1a857b2d0e82d840d1c292d62fd2eb",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.Trim(System.ReadOnlyMemory`1\u003cchar\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.Trim(System.ReadOnlyMemory`1\u003cchar\u003e)-\u003eSystem.ReadOnlyMemory`1\u003cchar\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018B6|il:3cf36bd0a22f4d6026f5a4e86c358d2971b957cbb0399719c1b01a64cbed68c2",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018B6",
+                                                       "MethodBodySha256":  "3cf36bd0a22f4d6026f5a4e86c358d2971b957cbb0399719c1b01a64cbed68c2",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.Trim(System.ReadOnlySpan`1\u003c!!0\u003e, !!0)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.Trim(System.ReadOnlySpan`1\u003c!!0\u003e, !!0)-\u003eSystem.ReadOnlySpan`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018A0|il:92bfd769006c384831a00a8c037908806ac837b140e71f6c40a73dc545cae0f7",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018A0",
+                                                       "MethodBodySha256":  "92bfd769006c384831a00a8c037908806ac837b140e71f6c40a73dc545cae0f7",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.Trim(System.ReadOnlySpan`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.Trim(System.ReadOnlySpan`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)-\u003eSystem.ReadOnlySpan`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018AE|il:821619fce3728f1d36c3665be0031a4be6f09269f97755e9d2a5901959f5a5d6",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018AE",
+                                                       "MethodBodySha256":  "821619fce3728f1d36c3665be0031a4be6f09269f97755e9d2a5901959f5a5d6",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.Trim(System.ReadOnlySpan`1\u003cchar\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.Trim(System.ReadOnlySpan`1\u003cchar\u003e)-\u003eSystem.ReadOnlySpan`1\u003cchar\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018B9|il:eec2b3f71816f2260be525db98b54de7c7fecbf83aaa30db6a9887f7100ae21e",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018B9",
+                                                       "MethodBodySha256":  "eec2b3f71816f2260be525db98b54de7c7fecbf83aaa30db6a9887f7100ae21e",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.Trim(System.ReadOnlySpan`1\u003cchar\u003e, char)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.Trim(System.ReadOnlySpan`1\u003cchar\u003e, char)-\u003eSystem.ReadOnlySpan`1\u003cchar\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018BC|il:8a88231b003e590cf5ed38ad3311bf88208160324ff7d2303ab9ef2eeb199078",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018BC",
+                                                       "MethodBodySha256":  "8a88231b003e590cf5ed38ad3311bf88208160324ff7d2303ab9ef2eeb199078",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.Trim(System.Span`1\u003c!!0\u003e, !!0)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.Trim(System.Span`1\u003c!!0\u003e, !!0)-\u003eSystem.Span`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600189D|il:d5ec468c461bad1d2e05707ce47a3befeae7fd9dd9a25d4f9ab827345d459091",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x0600189D",
+                                                       "MethodBodySha256":  "d5ec468c461bad1d2e05707ce47a3befeae7fd9dd9a25d4f9ab827345d459091",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.Trim(System.Span`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.Trim(System.Span`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)-\u003eSystem.Span`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018AB|il:59c6516e23eadbc696f5cc808aa4a9cb9496665c79cea89fc222c8005c5445fd",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018AB",
+                                                       "MethodBodySha256":  "59c6516e23eadbc696f5cc808aa4a9cb9496665c79cea89fc222c8005c5445fd",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimEnd(System.Memory`1\u003c!!0\u003e, !!0)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimEnd(System.Memory`1\u003c!!0\u003e, !!0)-\u003eSystem.Memory`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06001899|il:b8cfabc9dbce8d113da76f94fb037f30dd96cd325617451434055669e7b0f05b",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x06001899",
+                                                       "MethodBodySha256":  "b8cfabc9dbce8d113da76f94fb037f30dd96cd325617451434055669e7b0f05b",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimEnd(System.Memory`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimEnd(System.Memory`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)-\u003eSystem.Memory`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018A7|il:366f22a9f2888e4fdb4a8d4f90b581ac068d8f93bd409684dfd1a81c38a6e156",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018A7",
+                                                       "MethodBodySha256":  "366f22a9f2888e4fdb4a8d4f90b581ac068d8f93bd409684dfd1a81c38a6e156",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimEnd(System.Memory`1\u003cchar\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimEnd(System.Memory`1\u003cchar\u003e)-\u003eSystem.Memory`1\u003cchar\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018B5|il:1c9c26caad1af74e88797ef7edb84a7d2ba89705974c6fa1b2e7a15eec8e8558",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018B5",
+                                                       "MethodBodySha256":  "1c9c26caad1af74e88797ef7edb84a7d2ba89705974c6fa1b2e7a15eec8e8558",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimEnd(System.ReadOnlyMemory`1\u003c!!0\u003e, !!0)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimEnd(System.ReadOnlyMemory`1\u003c!!0\u003e, !!0)-\u003eSystem.ReadOnlyMemory`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600189C|il:6e67e39b43afc8d32548279193769183e9976a98b068bb244daa3a3791622246",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x0600189C",
+                                                       "MethodBodySha256":  "6e67e39b43afc8d32548279193769183e9976a98b068bb244daa3a3791622246",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimEnd(System.ReadOnlyMemory`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimEnd(System.ReadOnlyMemory`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)-\u003eSystem.ReadOnlyMemory`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018AA|il:165c9d207c1bcae4d7a4291db91bbb2d44716fc2147c25707a3a2b8662c13727",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018AA",
+                                                       "MethodBodySha256":  "165c9d207c1bcae4d7a4291db91bbb2d44716fc2147c25707a3a2b8662c13727",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimEnd(System.ReadOnlyMemory`1\u003cchar\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimEnd(System.ReadOnlyMemory`1\u003cchar\u003e)-\u003eSystem.ReadOnlyMemory`1\u003cchar\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018B8|il:34babb201530646be2ce56c836aa3c3ee26527d0101f15e6a30fc07c0fe3793f",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018B8",
+                                                       "MethodBodySha256":  "34babb201530646be2ce56c836aa3c3ee26527d0101f15e6a30fc07c0fe3793f",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimEnd(System.ReadOnlySpan`1\u003c!!0\u003e, !!0)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimEnd(System.ReadOnlySpan`1\u003c!!0\u003e, !!0)-\u003eSystem.ReadOnlySpan`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018A2|il:f0fce5254738212fc63efb460ef9caf00a270b62741af575ff5a25b08a09bd06",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018A2",
+                                                       "MethodBodySha256":  "f0fce5254738212fc63efb460ef9caf00a270b62741af575ff5a25b08a09bd06",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimEnd(System.ReadOnlySpan`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimEnd(System.ReadOnlySpan`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)-\u003eSystem.ReadOnlySpan`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018B0|il:0e6259068b1638720a65d2b5d5e033f9a24003c721d998b2ecae0555d524510b",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018B0",
+                                                       "MethodBodySha256":  "0e6259068b1638720a65d2b5d5e033f9a24003c721d998b2ecae0555d524510b",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimEnd(System.ReadOnlySpan`1\u003cchar\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimEnd(System.ReadOnlySpan`1\u003cchar\u003e)-\u003eSystem.ReadOnlySpan`1\u003cchar\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018BB|il:74757476dcc90f66d7a2d0e2ac45ff2a2c0858597b01c187e91f160f5da60e49",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018BB",
+                                                       "MethodBodySha256":  "74757476dcc90f66d7a2d0e2ac45ff2a2c0858597b01c187e91f160f5da60e49",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimEnd(System.Span`1\u003c!!0\u003e, !!0)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimEnd(System.Span`1\u003c!!0\u003e, !!0)-\u003eSystem.Span`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600189F|il:761bb664a262b5805b169652545207afcd48fa71d76e1ff6fc1d554f0dbf7345",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x0600189F",
+                                                       "MethodBodySha256":  "761bb664a262b5805b169652545207afcd48fa71d76e1ff6fc1d554f0dbf7345",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimEnd(System.Span`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimEnd(System.Span`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)-\u003eSystem.Span`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018AD|il:404814c2a50b982e9a0f48e27af85f17ed929678dbdf0ee47af4f63f2475bc40",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018AD",
+                                                       "MethodBodySha256":  "404814c2a50b982e9a0f48e27af85f17ed929678dbdf0ee47af4f63f2475bc40",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimSplitEntry(System.ReadOnlySpan`1\u003cchar\u003e, int, int)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimSplitEntry(System.ReadOnlySpan`1\u003cchar\u003e, int, int)-\u003eSystem.ValueTuple`2\u003cint, int\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06001873|il:abdd091c57a3c03651703bdcb9d9a5163cceeaf758013bafa067d22d6031fb78",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x06001873",
+                                                       "MethodBodySha256":  "abdd091c57a3c03651703bdcb9d9a5163cceeaf758013bafa067d22d6031fb78",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  true,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimStart(System.Memory`1\u003c!!0\u003e, !!0)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimStart(System.Memory`1\u003c!!0\u003e, !!0)-\u003eSystem.Memory`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06001898|il:4b6395f14476173bef73c24f61d2154e69232ae16d9410c0c347ff9c1abee4f1",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x06001898",
+                                                       "MethodBodySha256":  "4b6395f14476173bef73c24f61d2154e69232ae16d9410c0c347ff9c1abee4f1",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimStart(System.Memory`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimStart(System.Memory`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)-\u003eSystem.Memory`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018A6|il:80155896cf66e59795c4f6850cf49cd89348d137e2211c198203a0925f8e8e26",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018A6",
+                                                       "MethodBodySha256":  "80155896cf66e59795c4f6850cf49cd89348d137e2211c198203a0925f8e8e26",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimStart(System.Memory`1\u003cchar\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimStart(System.Memory`1\u003cchar\u003e)-\u003eSystem.Memory`1\u003cchar\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018B4|il:88fc74af339055b74d2f101f3dbadf760ff6fd15f0eac35cd0b5df14c67078d4",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018B4",
+                                                       "MethodBodySha256":  "88fc74af339055b74d2f101f3dbadf760ff6fd15f0eac35cd0b5df14c67078d4",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimStart(System.ReadOnlyMemory`1\u003c!!0\u003e, !!0)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimStart(System.ReadOnlyMemory`1\u003c!!0\u003e, !!0)-\u003eSystem.ReadOnlyMemory`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600189B|il:00ea72c827c99581aa96a20797001fabd09f097c1929e24fd4215770b7f32855",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x0600189B",
+                                                       "MethodBodySha256":  "00ea72c827c99581aa96a20797001fabd09f097c1929e24fd4215770b7f32855",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimStart(System.ReadOnlyMemory`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimStart(System.ReadOnlyMemory`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)-\u003eSystem.ReadOnlyMemory`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018A9|il:7cddf35f9509c927714b04b28342de75203a2228cff322359203da6814132349",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018A9",
+                                                       "MethodBodySha256":  "7cddf35f9509c927714b04b28342de75203a2228cff322359203da6814132349",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimStart(System.ReadOnlyMemory`1\u003cchar\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimStart(System.ReadOnlyMemory`1\u003cchar\u003e)-\u003eSystem.ReadOnlyMemory`1\u003cchar\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018B7|il:9224d4e685aef776006edfad2e2e761bec1c5832761664deaa77bf2b1348f36f",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018B7",
+                                                       "MethodBodySha256":  "9224d4e685aef776006edfad2e2e761bec1c5832761664deaa77bf2b1348f36f",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimStart(System.ReadOnlySpan`1\u003c!!0\u003e, !!0)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimStart(System.ReadOnlySpan`1\u003c!!0\u003e, !!0)-\u003eSystem.ReadOnlySpan`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018A1|il:fa5aba650527cf42f31ae9f5615fb18087f100e88f923ab0e3f49e677a48d849",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018A1",
+                                                       "MethodBodySha256":  "fa5aba650527cf42f31ae9f5615fb18087f100e88f923ab0e3f49e677a48d849",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimStart(System.ReadOnlySpan`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimStart(System.ReadOnlySpan`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)-\u003eSystem.ReadOnlySpan`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018AF|il:eeebba79457114e4fc406a30b2d6629bd1a74620cc7327dbc78d02792a7a52b7",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018AF",
+                                                       "MethodBodySha256":  "eeebba79457114e4fc406a30b2d6629bd1a74620cc7327dbc78d02792a7a52b7",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimStart(System.ReadOnlySpan`1\u003cchar\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimStart(System.ReadOnlySpan`1\u003cchar\u003e)-\u003eSystem.ReadOnlySpan`1\u003cchar\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018BA|il:5904c3a3cc21badf2be16921bb04ce0490cebb9c6aad7663c00d76795738a8b1",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018BA",
+                                                       "MethodBodySha256":  "5904c3a3cc21badf2be16921bb04ce0490cebb9c6aad7663c00d76795738a8b1",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimStart(System.ReadOnlySpan`1\u003cchar\u003e, char)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimStart(System.ReadOnlySpan`1\u003cchar\u003e, char)-\u003eSystem.ReadOnlySpan`1\u003cchar\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018BD|il:e989263c5a7026f2bdb71c1f57b6d1ef5359b98d10001e12af32706519e8970e",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018BD",
+                                                       "MethodBodySha256":  "e989263c5a7026f2bdb71c1f57b6d1ef5359b98d10001e12af32706519e8970e",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimStart(System.Span`1\u003c!!0\u003e, !!0)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimStart(System.Span`1\u003c!!0\u003e, !!0)-\u003eSystem.Span`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600189E|il:aaac28732859a91f006e09e978303eb0426af056d92439de416a4b02ad2da891",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x0600189E",
+                                                       "MethodBodySha256":  "aaac28732859a91f006e09e978303eb0426af056d92439de416a4b02ad2da891",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.MemoryExtensions.TrimStart(System.Span`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)",
+                                                       "ExactSymbolKey":  "System.MemoryExtensions.TrimStart(System.Span`1\u003c!!0\u003e, System.ReadOnlySpan`1\u003c!!0\u003e)-\u003eSystem.Span`1\u003c!!0\u003e",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060018AC|il:3868b1d823c853e9194d8b88f23a5faf56eb6e49a3a546636ef783bdaf9e5415",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060018AC",
+                                                       "MethodBodySha256":  "3868b1d823c853e9194d8b88f23a5faf56eb6e49a3a546636ef783bdaf9e5415",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  false,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "none"
                                                    }
                                                ]
                                }

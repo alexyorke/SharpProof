@@ -457,6 +457,46 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeMemoryExtensionsSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.MemoryExtensions", limit: 80);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var generatedPureRows = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Where(row =>
+                    row.GetProperty("Classification").GetString() == "pure" &&
+                    row.GetProperty("Symbol").GetString()?.StartsWith("System.MemoryExtensions.", StringComparison.Ordinal) == true)
+                .ToArray();
+
+            Assert.That(generatedPureRows, Has.Length.EqualTo(38));
+
+            var representativePureSymbols = new[]
+            {
+                "System.MemoryExtensions.SequenceEqual(System.ReadOnlySpan`1<!!0>, System.ReadOnlySpan`1<!!0>)",
+                "System.MemoryExtensions.SequenceEqual(System.Span`1<!!0>, System.ReadOnlySpan`1<!!0>)",
+                "System.MemoryExtensions.Trim(System.ReadOnlySpan`1<char>)",
+                "System.MemoryExtensions.TrimStart(System.ReadOnlySpan`1<char>, char)",
+                "System.MemoryExtensions.TrimEnd(System.ReadOnlySpan`1<char>, char)",
+                "System.MemoryExtensions.TrimSplitEntry(System.ReadOnlySpan`1<char>, int, int)",
+            };
+
+            foreach (var symbol in representativePureSymbols)
+            {
+                Assert.That(
+                    generatedPureRows.Any(row => string.Equals(row.GetProperty("Symbol").GetString(), symbol, StringComparison.Ordinal)),
+                    Is.True,
+                    symbol);
+            }
+
+            AssertPurityClassification(summary, "System.MemoryExtensions.Trim(System.ReadOnlySpan`1<char>)", "pure");
+            AssertPurityClassification(summary, "System.MemoryExtensions.SequenceEqual(System.ReadOnlySpan`1<!!0>, System.ReadOnlySpan`1<!!0>)", "pure");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeBitOperationsDeBruijnHelpersSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Numerics.BitOperations", limit: 80);
