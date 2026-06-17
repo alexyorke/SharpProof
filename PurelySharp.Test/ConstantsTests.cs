@@ -61,10 +61,12 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void EncodingUtf8_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        public void EncodingLookupHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.Encoding.UTF8.get"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.Encoding.GetString(byte[])"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.Encoding.GetBytes(string)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.Encoding.GetEncoding(string)"));
         }
 
         [Test]
