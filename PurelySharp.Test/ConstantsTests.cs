@@ -301,12 +301,19 @@ public static class RecentCatalogSignatureSamples
         _ = BinaryPrimitives.ReadUInt32LittleEndian(bytes);
         _ = BinaryPrimitives.ReadUInt64BigEndian(bytes);
         _ = BinaryPrimitives.ReadUInt64LittleEndian(bytes);
+        _ = BinaryPrimitives.ReverseEndianness((sbyte)1);
+        _ = BinaryPrimitives.ReverseEndianness((byte)1);
         _ = BinaryPrimitives.ReverseEndianness((short)1);
         _ = BinaryPrimitives.ReverseEndianness((ushort)1);
+        _ = BinaryPrimitives.ReverseEndianness('a');
         _ = BinaryPrimitives.ReverseEndianness(1);
         _ = BinaryPrimitives.ReverseEndianness(1u);
         _ = BinaryPrimitives.ReverseEndianness(1L);
         _ = BinaryPrimitives.ReverseEndianness(1ul);
+        _ = BinaryPrimitives.ReverseEndianness((nint)1);
+        _ = BinaryPrimitives.ReverseEndianness((nuint)1);
+        _ = BinaryPrimitives.ReverseEndianness((Int128)1);
+        _ = BinaryPrimitives.ReverseEndianness((UInt128)1);
         var fromSeconds = DateTimeOffset.FromUnixTimeSeconds(0);
         var added = value.AddDays(1);
         return added.ToUnixTimeMilliseconds() + value.Offset.Ticks;
@@ -386,12 +393,28 @@ public static class RecentCatalogSignatureSamples
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.TrailingZeroCount(1u)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.TrailingZeroCount(1L)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.TrailingZeroCount(1ul)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReverseEndianness((short)1)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReverseEndianness((ushort)1)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReverseEndianness(1)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReverseEndianness(1u)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReverseEndianness(1L)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BinaryPrimitives.ReverseEndianness(1ul)"), expectedPure: true, expectedImpure: false);
+            var binaryPrimitivesReverseEndiannessExpressions = new[]
+            {
+                "BinaryPrimitives.ReverseEndianness((sbyte)1)",
+                "BinaryPrimitives.ReverseEndianness((byte)1)",
+                "BinaryPrimitives.ReverseEndianness((short)1)",
+                "BinaryPrimitives.ReverseEndianness((ushort)1)",
+                "BinaryPrimitives.ReverseEndianness('a')",
+                "BinaryPrimitives.ReverseEndianness(1)",
+                "BinaryPrimitives.ReverseEndianness(1u)",
+                "BinaryPrimitives.ReverseEndianness(1L)",
+                "BinaryPrimitives.ReverseEndianness(1ul)",
+                "BinaryPrimitives.ReverseEndianness((nint)1)",
+                "BinaryPrimitives.ReverseEndianness((nuint)1)",
+                "BinaryPrimitives.ReverseEndianness((Int128)1)",
+                "BinaryPrimitives.ReverseEndianness((UInt128)1)",
+            };
+
+            foreach (var expression in binaryPrimitivesReverseEndiannessExpressions)
+            {
+                AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, expression));
+            }
+
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "DateTimeOffset.FromUnixTimeSeconds(0)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "value.AddDays(1)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "added.ToUnixTimeMilliseconds()"), expectedPure: true, expectedImpure: false);

@@ -311,6 +311,53 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeBinaryPrimitivesReverseEndiannessSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Buffers.Binary.BinaryPrimitives.ReverseEndianness", limit: 40);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var generatedPureRows = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Where(row =>
+                    row.GetProperty("Symbol").GetString()?.StartsWith("System.Buffers.Binary.BinaryPrimitives.ReverseEndianness", StringComparison.Ordinal) == true &&
+                    string.Equals(row.GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedPureRows, Has.Length.EqualTo(13));
+            Assert.That(
+                generatedPureRows.Select(row => row.GetProperty("Symbol").GetString()),
+                Is.EquivalentTo(new[]
+                {
+                    "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(sbyte)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(short)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(int)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(long)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(nint)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(System.Int128)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(byte)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(ushort)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(char)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(uint)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(ulong)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(nuint)",
+                    "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(System.UInt128)",
+                }));
+
+            foreach (var row in generatedPureRows)
+            {
+                Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("none"));
+                Assert.That(row.GetProperty("HasUnsupportedEffects").GetBoolean(), Is.False);
+            }
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeConvertBase64Slice_TreatsRuntimeHelpersAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Convert.FromBase64", limit: 20);

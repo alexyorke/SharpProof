@@ -1348,12 +1348,6 @@ public static class Constants
 
 
 
-        "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(short)",
-        "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(ushort)",
-        "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(int)",
-        "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(uint)",
-        "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(long)",
-        "System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(ulong)",
         "System.Buffers.Text.Utf8Parser.TryParse(System.ReadOnlySpan<byte>, out int, out int)",
         "System.Collections.Generic.LinkedListNode<T>.Value.get",
         "System.Collections.Generic.SortedList<TKey, TValue>.IndexOfKey(TKey)",
