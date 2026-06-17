@@ -94,7 +94,7 @@
                                                                             "HasFreshArrayAllocationEvidence":  true,
                                                                             "HasFreshObjectAllocationEvidence":  false,
                                                                             "HasUnsupportedEffects":  false,
-                                                                            "FreshnessClassification":  "fresh_array_candidate_via_local_helpers"
+                                                                            "FreshnessClassification":  "fresh_owned_array_write"
                                                                         }
                                            },
                                            {
@@ -141,7 +141,7 @@
                                                                             "HasFreshArrayAllocationEvidence":  true,
                                                                             "HasFreshObjectAllocationEvidence":  false,
                                                                             "HasUnsupportedEffects":  false,
-                                                                            "FreshnessClassification":  "fresh_array_candidate_via_local_helpers"
+                                                                            "FreshnessClassification":  "fresh_owned_array_write"
                                                                         }
                                            }
                                        ]
@@ -213,7 +213,7 @@
                                                        "HasFreshArrayAllocationEvidence":  true,
                                                        "HasFreshObjectAllocationEvidence":  false,
                                                        "HasUnsupportedEffects":  false,
-                                                       "FreshnessClassification":  "fresh_array_candidate_via_local_helpers"
+                                                       "FreshnessClassification":  "fresh_owned_array_write"
                                                    },
                                                    {
                                                        "Symbol":  "System.String.ToCharArray(int, int)",
@@ -236,7 +236,7 @@
                                                        "HasFreshArrayAllocationEvidence":  true,
                                                        "HasFreshObjectAllocationEvidence":  false,
                                                        "HasUnsupportedEffects":  false,
-                                                       "FreshnessClassification":  "fresh_array_candidate_via_local_helpers"
+                                                       "FreshnessClassification":  "fresh_owned_array_write"
                                                    },
                                                    {
                                                        "Symbol":  "System.Convert.ToHexString(System.ReadOnlySpan`1\u003cbyte\u003e)",

@@ -679,7 +679,7 @@ public static class PurityFixture
                 var symbol = method.GetProperty("Symbol").GetString();
                 var classification = method.GetProperty("PurityClassification");
                 Assert.That(classification.GetProperty("Classification").GetString(), Is.EqualTo("pure"), symbol);
-                Assert.That(classification.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("fresh_array_candidate_via_local_helpers"), symbol);
+                Assert.That(classification.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("fresh_owned_array_write"), symbol);
                 Assert.That(classification.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("internal_only"), symbol);
             }
         }

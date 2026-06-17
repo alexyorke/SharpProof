@@ -515,6 +515,11 @@ internal static class PurityClassificationEngine
             return "fresh_owned_array_write";
         }
 
+        if (HasFreshOwnedArrayWritePattern(summary))
+        {
+            return "fresh_owned_array_write";
+        }
+
         var hasDispatchOrOpaqueCall =
             summary.Effects.Contains("virtual_call", StringComparer.Ordinal) ||
             summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
@@ -537,6 +542,35 @@ internal static class PurityClassificationEngine
         }
 
         return "fresh_array_candidate_with_unknown_escape_risk";
+    }
+
+    private static bool HasFreshOwnedArrayWritePattern(MethodEffectSummary? summary)
+    {
+        if (summary == null ||
+            !summary.Effects.Contains("allocates_array", StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        var sawSpanConstruction = false;
+        var sawSpanWrite = false;
+        foreach (var call in summary.Calls)
+        {
+            if (!sawSpanConstruction &&
+                call.StartsWith("System.Span`1<byte>.op_Implicit(!0[])", StringComparison.Ordinal))
+            {
+                sawSpanConstruction = true;
+                continue;
+            }
+
+            if (!sawSpanWrite &&
+                call.StartsWith("System.Runtime.InteropServices.MemoryMarshal.TryWrite(System.Span`1<byte>, ref ", StringComparison.Ordinal))
+            {
+                sawSpanWrite = true;
+            }
+        }
+
+        return sawSpanConstruction && sawSpanWrite;
     }
 
     private static string GetEffectVisibilityClassification(MethodEffectSummary? summary, string classification)
