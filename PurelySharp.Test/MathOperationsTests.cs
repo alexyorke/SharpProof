@@ -148,6 +148,86 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task MathCeilingDecimal_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public decimal TestMethod(decimal x)
+    {
+        return Math.Ceiling(x);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task MathAbsOverloads_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public decimal TestDecimal(decimal x)
+    {
+        return Math.Abs(x);
+    }
+
+    [EnforcePure]
+    public double TestDouble(double x)
+    {
+        return Math.Abs(x);
+    }
+
+    [EnforcePure]
+    public float TestFloat(float x)
+    {
+        return Math.Abs(x);
+    }
+
+    [EnforcePure]
+    public int TestInt(int x)
+    {
+        return Math.Abs(x);
+    }
+
+    [EnforcePure]
+    public long TestLong(long x)
+    {
+        return Math.Abs(x);
+    }
+
+    [EnforcePure]
+    public nint TestNInt(nint x)
+    {
+        return Math.Abs(x);
+    }
+
+    [EnforcePure]
+    public sbyte TestSByte(sbyte x)
+    {
+        return Math.Abs(x);
+    }
+
+    [EnforcePure]
+    public short TestShort(short x)
+    {
+        return Math.Abs(x);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }
 

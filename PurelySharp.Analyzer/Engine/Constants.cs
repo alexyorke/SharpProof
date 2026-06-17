@@ -1567,7 +1567,6 @@ public static class Constants
         "System.IO.FileInfo.Name.get",
 
         "System.Linq.Enumerable.TakeWhile<TSource>(System.Collections.Generic.IEnumerable<TSource>, System.Func<TSource, bool>)",
-        "System.Math.Ceiling(decimal)",
         "System.Net.IPAddress.Any.get",
         "System.Net.IPAddress.Loopback.get",
         "System.Net.IPAddress.IsLoopback(System.Net.IPAddress)",

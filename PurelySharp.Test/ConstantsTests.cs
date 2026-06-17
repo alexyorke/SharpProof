@@ -161,14 +161,34 @@ namespace PurelySharp.Test
             var members = new[]
             {
                 "System.Math.Abs",
-                "System.Math.Abs(double)",
-                "System.Math.Abs(int)",
                 "System.Math.Ceiling(decimal)",
                 "System.Math.Clamp",
                 "System.Math.Max",
                 "System.Math.Min",
                 "System.Math.Round",
                 "System.Math.Truncate(double)",
+            };
+
+            foreach (var member in members)
+            {
+                Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(member));
+                Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(member));
+            }
+        }
+
+        [Test]
+        public void MathAbsCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Math.Abs(System.Decimal)",
+                "System.Math.Abs(double)",
+                "System.Math.Abs(float)",
+                "System.Math.Abs(int)",
+                "System.Math.Abs(long)",
+                "System.Math.Abs(nint)",
+                "System.Math.Abs(sbyte)",
+                "System.Math.Abs(short)",
             };
 
             foreach (var member in members)
