@@ -563,7 +563,7 @@ internal static class AssemblyEffectSummarizer
                     roots.Add("metadata_only_or_external");
                     break;
                 case "reads_static_field":
-                    if (IsSafeStaticCacheRead(fieldSet))
+                    if (IsSafeStaticCacheRead(fieldSet, callSet))
                     {
                         roots.Add("safe_static_cache_read");
                     }
@@ -605,11 +605,22 @@ internal static class AssemblyEffectSummarizer
         return roots;
     }
 
-    private static bool IsSafeStaticCacheRead(IReadOnlySet<string> fields)
+    private static bool IsSafeStaticCacheRead(IReadOnlySet<string> fields, IReadOnlySet<string> calls)
     {
-        return fields.Count > 0 && fields.All(static field =>
+        if (fields.Count == 0)
+        {
+            return false;
+        }
+
+        if (fields.All(static field =>
             field.StartsWith("System.Array+EmptyArray`1", StringComparison.Ordinal) &&
-            field.EndsWith(".Value", StringComparison.Ordinal));
+            field.EndsWith(".Value", StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
+        return calls.Count == 1 && calls.Any(static call =>
+            call.StartsWith("System.ReadOnlySpan`1<byte>..ctor(void*, int)", StringComparison.Ordinal));
     }
 
     private static bool IsSafeStaticConstantRead(IReadOnlySet<string> fields)

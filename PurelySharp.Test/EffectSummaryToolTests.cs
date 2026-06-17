@@ -410,6 +410,73 @@ public static class PurityFixture
                 Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("none"));
                 Assert.That(row.GetProperty("HasUnsupportedEffects").GetBoolean(), Is.False);
             }
+        }        [Test]
+        public async Task EffectSummaryTool_RuntimeBitOperationsDeBruijnHelpersSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Numerics.BitOperations", limit: 80);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            var knownPureRows = catalogComparison.GetProperty("KnownPureMembers").EnumerateArray().ToArray();
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var generatedRows = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Where(row =>
+                    row.GetProperty("Classification").GetString() == "pure" &&
+                    (
+                        string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.LeadingZeroCount(uint)", StringComparison.Ordinal) ||
+                        string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.LeadingZeroCount(ulong)", StringComparison.Ordinal) ||
+                        string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.Log2(uint)", StringComparison.Ordinal) ||
+                        string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.Log2(ulong)", StringComparison.Ordinal) ||
+                        string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.TrailingZeroCount(int)", StringComparison.Ordinal) ||
+                        string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.TrailingZeroCount(uint)", StringComparison.Ordinal) ||
+                        string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.TrailingZeroCount(long)", StringComparison.Ordinal) ||
+                        string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.TrailingZeroCount(ulong)", StringComparison.Ordinal) ||
+                        string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.RoundUpToPowerOf2(uint)", StringComparison.Ordinal) ||
+                        string.Equals(row.GetProperty("Symbol").GetString(), "System.Numerics.BitOperations.RoundUpToPowerOf2(ulong)", StringComparison.Ordinal)))
+                .ToArray();
+
+            Assert.That(generatedRows, Has.Length.EqualTo(10));
+            Assert.That(
+                generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
+                Is.EquivalentTo(new[]
+                {
+                    "System.Numerics.BitOperations.LeadingZeroCount(uint)",
+                    "System.Numerics.BitOperations.LeadingZeroCount(ulong)",
+                    "System.Numerics.BitOperations.Log2(uint)",
+                    "System.Numerics.BitOperations.Log2(ulong)",
+                    "System.Numerics.BitOperations.TrailingZeroCount(int)",
+                    "System.Numerics.BitOperations.TrailingZeroCount(uint)",
+                    "System.Numerics.BitOperations.TrailingZeroCount(long)",
+                    "System.Numerics.BitOperations.TrailingZeroCount(ulong)",
+                    "System.Numerics.BitOperations.RoundUpToPowerOf2(uint)",
+                    "System.Numerics.BitOperations.RoundUpToPowerOf2(ulong)",
+                }));
+
+            foreach (var symbol in new[]
+            {
+                "System.Numerics.BitOperations.LeadingZeroCount(uint)",
+                "System.Numerics.BitOperations.LeadingZeroCount(ulong)",
+                "System.Numerics.BitOperations.Log2(uint)",
+                "System.Numerics.BitOperations.Log2(ulong)",
+                "System.Numerics.BitOperations.TrailingZeroCount(int)",
+                "System.Numerics.BitOperations.TrailingZeroCount(uint)",
+                "System.Numerics.BitOperations.TrailingZeroCount(long)",
+                "System.Numerics.BitOperations.TrailingZeroCount(ulong)",
+                "System.Numerics.BitOperations.RoundUpToPowerOf2(uint)",
+                "System.Numerics.BitOperations.RoundUpToPowerOf2(ulong)",
+            })
+            {
+                Assert.That(knownPureRows.Any(row => string.Equals(row.GetProperty("Symbol").GetString(), symbol, StringComparison.Ordinal)), Is.False);
+            }
+
+            foreach (var row in generatedRows)
+            {
+                Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("none"));
+                Assert.That(row.GetProperty("HasUnsupportedEffects").GetBoolean(), Is.False);
+            }
         }
 
         [Test]

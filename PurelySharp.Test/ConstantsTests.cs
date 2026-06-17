@@ -50,6 +50,34 @@ namespace PurelySharp.Test
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.ToByteArray(bool)"));
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Guid.ToByteArray()"));
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.Guid.ToByteArray(bool)"));
+        }        [Test]
+        public void BitOperationsCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Numerics.BitOperations.LeadingZeroCount(uint)",
+                "System.Numerics.BitOperations.LeadingZeroCount(ulong)",
+                "System.Numerics.BitOperations.Log2(uint)",
+                "System.Numerics.BitOperations.Log2(ulong)",
+                "System.Numerics.BitOperations.PopCount(uint)",
+                "System.Numerics.BitOperations.PopCount(ulong)",
+                "System.Numerics.BitOperations.RotateLeft(uint, int)",
+                "System.Numerics.BitOperations.RotateLeft(ulong, int)",
+                "System.Numerics.BitOperations.RotateRight(uint, int)",
+                "System.Numerics.BitOperations.RotateRight(ulong, int)",
+                "System.Numerics.BitOperations.RoundUpToPowerOf2(uint)",
+                "System.Numerics.BitOperations.RoundUpToPowerOf2(ulong)",
+                "System.Numerics.BitOperations.TrailingZeroCount(int)",
+                "System.Numerics.BitOperations.TrailingZeroCount(uint)",
+                "System.Numerics.BitOperations.TrailingZeroCount(long)",
+                "System.Numerics.BitOperations.TrailingZeroCount(ulong)",
+            };
+
+            foreach (var member in members)
+            {
+                Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(member));
+                Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(member));
+            }
         }
 
         [Test]
