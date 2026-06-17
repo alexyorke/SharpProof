@@ -1060,10 +1060,6 @@ public static class Constants
         "System.Array.Length.get",
 
 
-        "System.BitConverter.ToInt32(byte[], int)",
-        "System.BitConverter.ToDouble(byte[], int)",
-
-
         "bool.Parse(string)",
         "bool.ToString()",
 

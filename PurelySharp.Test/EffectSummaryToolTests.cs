@@ -607,15 +607,21 @@ public static class PurityFixture
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
-            var knownPureRow = catalogComparison.GetProperty("KnownPureMembers")
-                .EnumerateArray()
-                .Single(row => string.Equals(
-                    row.GetProperty("Symbol").GetString(),
-                    "System.BitConverter.ToInt32(byte[], int)",
-                    StringComparison.Ordinal));
+            var knownPureRows = catalogComparison.GetProperty("KnownPureMembers").EnumerateArray().ToArray();
 
-            Assert.That(knownPureRow.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
-            Assert.That(knownPureRow.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("none"));
+            Assert.That(
+                knownPureRows.Select(row => row.GetProperty("Symbol").GetString()),
+                Is.EquivalentTo(new[]
+                {
+                    "System.BitConverter.ToInt32(byte[], int)",
+                    "System.BitConverter.ToDouble(byte[], int)",
+                }));
+
+            foreach (var row in knownPureRows)
+            {
+                Assert.That(row.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+                Assert.That(row.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("none"));
+            }
         }
 
         [Test]

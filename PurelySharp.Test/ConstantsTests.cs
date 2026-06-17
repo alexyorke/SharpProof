@@ -140,6 +140,13 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void BitConverterReadHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.BitConverter.ToInt32(byte[], int)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.BitConverter.ToDouble(byte[], int)"));
+        }
+
+        [Test]
         public void MathCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
