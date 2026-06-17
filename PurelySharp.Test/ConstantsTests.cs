@@ -270,6 +270,8 @@ public static class RecentCatalogSignatureSamples
         _ = BitOperations.IsPow2(1u);
         _ = BitOperations.IsPow2(1L);
         _ = BitOperations.IsPow2(1ul);
+        _ = BitOperations.IsPow2((nint)1);
+        _ = BitOperations.IsPow2((nuint)1);
         _ = BitOperations.LeadingZeroCount(1u);
         _ = BitOperations.LeadingZeroCount(1ul);
         _ = BitOperations.Log2(1u);
@@ -341,10 +343,12 @@ public static class RecentCatalogSignatureSamples
                 AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, expression));
             }
 
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1u)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1L)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1ul)"), expectedPure: true, expectedImpure: false);
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1u)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1L)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2(1ul)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2((nint)1)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "BitOperations.IsPow2((nuint)1)"));
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.LeadingZeroCount(1u)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.LeadingZeroCount(1ul)"), expectedPure: true, expectedImpure: false);
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "BitOperations.Log2(1u)"), expectedPure: true, expectedImpure: false);

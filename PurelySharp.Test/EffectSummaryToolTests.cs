@@ -227,6 +227,45 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeBitOperationsIsPow2Slice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Numerics.BitOperations.IsPow2", limit: 20);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var generatedRows = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Where(row => row.GetProperty("Symbol").GetString()?.StartsWith("System.Numerics.BitOperations.IsPow2", StringComparison.Ordinal) == true)
+                .ToArray();
+
+            Assert.That(generatedRows, Has.Length.EqualTo(6));
+            Assert.That(
+                generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
+                Is.EquivalentTo(new[]
+                {
+                    "System.Numerics.BitOperations.IsPow2(int)",
+                    "System.Numerics.BitOperations.IsPow2(uint)",
+                    "System.Numerics.BitOperations.IsPow2(long)",
+                    "System.Numerics.BitOperations.IsPow2(ulong)",
+                    "System.Numerics.BitOperations.IsPow2(nint)",
+                    "System.Numerics.BitOperations.IsPow2(nuint)",
+                }));
+
+            foreach (var row in generatedRows)
+            {
+                Assert.That(row.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+                Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("none"));
+                Assert.That(row.GetProperty("HasUnsupportedEffects").GetBoolean(), Is.False);
+            }
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeConvertBase64Slice_TreatsRuntimeHelpersAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Convert.FromBase64", limit: 20);
