@@ -914,7 +914,6 @@ public static class Constants
 
 
         "bool.Parse(string)",
-        "bool.ToString()",
 
 
         "char.IsDigit(char)",
@@ -922,7 +921,6 @@ public static class Constants
         "char.IsWhiteSpace(char)",
         "char.ToLowerInvariant(char)",
         "char.ToUpperInvariant(char)",
-        "char.ToString()",
 
 
         "System.Collections.Generic.Dictionary<TKey, TValue>.ContainsKey(TKey)",
@@ -1242,7 +1240,6 @@ public static class Constants
         "char.IsSeparator(char)",
         "char.IsSymbol(char)",
         "char.IsUpper(char)",
-        "char.ToString(char)",
         "System.Collections.Generic.HashSet<T>.Contains(T)",
         "System.Collections.Generic.List<T>.BinarySearch(T)",
         "System.Collections.Generic.List<T>.Capacity.get",

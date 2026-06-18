@@ -1447,6 +1447,42 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeBooleanAndCharToStringSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(40, "System.Boolean.ToString", "System.Char.ToString");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Boolean.ToString()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Boolean.ToString()", "none");
+            AssertPurityClassification(summary, "System.Char.ToString()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Char.ToString()", "none");
+            AssertPurityClassification(summary, "System.Char.ToString(char)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Char.ToString(char)", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
+                    (symbol.StartsWith("System.Boolean.ToString", StringComparison.Ordinal) ||
+                     symbol.StartsWith("System.Char.ToString", StringComparison.Ordinal)))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EquivalentTo(new[]
+            {
+                "System.Boolean.ToString()",
+                "System.Boolean.ToString(System.IFormatProvider)",
+                "System.Char.ToString()",
+                "System.Char.ToString(System.IFormatProvider)",
+                "System.Char.ToString(char)",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeConvertToBase64Slice_TreatsRuntimeHelpersAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Convert.ToBase64String", limit: 20);
