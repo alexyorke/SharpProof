@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text;
 using System.Text.Json.Serialization;
 using PurelySharp.Analyzer.Engine;
 
@@ -138,8 +139,15 @@ internal static class PurityClassificationEngine
         var conservativeCategories = new SortedSet<string>(StringComparer.Ordinal);
 
         var treatsObjectStateAsFreshOwned = IsFreshOwnedObjectConstructor(summary);
+        var treatsVirtualDispatchAsResolved = HasOnlyResolvedVirtualCallTargets(summary, bySymbol);
         foreach (var root in summary.RootCandidates)
         {
+            if (treatsVirtualDispatchAsResolved &&
+                string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             if (string.Equals(root, "caller_visible_memory_write", StringComparison.Ordinal) &&
                 (HasFreshOwnedArrayWritePattern(summary) ||
                  HasFreshOwnedStringWritePattern(summary) ||
@@ -171,6 +179,12 @@ internal static class PurityClassificationEngine
 
         foreach (var effect in summary.Effects)
         {
+            if (treatsVirtualDispatchAsResolved &&
+                string.Equals(effect, "virtual_call", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             if (string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal) &&
                 (summary.RootCandidates.Contains("fresh_owned_memory_write", StringComparer.Ordinal) ||
                  HasFreshOwnedArrayWritePattern(summary) ||
@@ -221,23 +235,23 @@ internal static class PurityClassificationEngine
                 continue;
             }
 
-            if (!bySymbol.ContainsKey(call))
+            if (!TryResolveCallSummary(call, bySymbol, out var resolvedCallKey, out var resolvedCallSummary))
             {
                 continue;
             }
 
-            if (visiting.Contains(call))
+            if (visiting.Contains(resolvedCallKey))
             {
                 continue;
             }
 
-            var calleeClassification = ClassifyMethod(call, bySymbol, memo, visiting);
+            var calleeClassification = ClassifyMethod(resolvedCallKey, bySymbol, memo, visiting);
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal))
             {
                 impureCategories.Add("impure_callee");
                 if (blockingCallChain.Length == 0)
                 {
-                    blockingCallChain = JoinCallChain(bySymbol[call].Symbol, calleeClassification.FirstBlockingCallChain);
+                    blockingCallChain = JoinCallChain(resolvedCallSummary.Symbol, calleeClassification.FirstBlockingCallChain);
                 }
             }
             else if (string.Equals(calleeClassification.Classification, "conservative_unknown", StringComparison.Ordinal))
@@ -245,7 +259,7 @@ internal static class PurityClassificationEngine
                 conservativeCategories.Add("unknown_callee");
                 if (blockingCallChain.Length == 0)
                 {
-                    blockingCallChain = JoinCallChain(bySymbol[call].Symbol, calleeClassification.FirstBlockingCallChain);
+                    blockingCallChain = JoinCallChain(resolvedCallSummary.Symbol, calleeClassification.FirstBlockingCallChain);
                 }
             }
             else if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal))
@@ -836,6 +850,152 @@ internal static class PurityClassificationEngine
             string.Equals(field, "IsLittleEndian", StringComparison.Ordinal) ||
             field.StartsWith("System.Array+EmptyArray`1", StringComparison.Ordinal) &&
             field.EndsWith(".Value", StringComparison.Ordinal));
+    }
+
+    private static bool HasOnlyResolvedVirtualCallTargets(
+        MethodEffectSummary summary,
+        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol)
+    {
+        if (!summary.Effects.Contains("virtual_call", StringComparer.Ordinal) ||
+            summary.Calls.Length == 0 ||
+            summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
+            summary.Effects.Contains("abstract", StringComparer.Ordinal) ||
+            summary.Effects.Contains("no_il_body", StringComparer.Ordinal) ||
+            summary.RootCandidates.Contains("metadata_only_or_external", StringComparer.Ordinal) ||
+            summary.RootCandidates.Contains("pinvoke", StringComparer.Ordinal) ||
+            summary.RootCandidates.Contains("runtime_native_or_internal", StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        var sawResolvedCall = false;
+        foreach (var call in summary.Calls)
+        {
+            if (IsPurityNeutralIntrinsicHelperCall(call))
+            {
+                continue;
+            }
+
+            if (!TryResolveCallSummary(call, bySymbol, out _, out _))
+            {
+                return false;
+            }
+
+            sawResolvedCall = true;
+        }
+
+        return sawResolvedCall;
+    }
+
+    private static bool TryResolveCallSummary(
+        string call,
+        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
+        out string resolvedCallKey,
+        out MethodEffectSummary resolvedCallSummary)
+    {
+        if (bySymbol.TryGetValue(call, out resolvedCallSummary!))
+        {
+            resolvedCallKey = call;
+            return true;
+        }
+
+        var normalizedCall = NormalizeConstructedReceiverType(call);
+        if (!string.Equals(normalizedCall, call, StringComparison.Ordinal) &&
+            bySymbol.TryGetValue(normalizedCall, out resolvedCallSummary!))
+        {
+            resolvedCallKey = normalizedCall;
+            return true;
+        }
+
+        resolvedCallKey = string.Empty;
+        resolvedCallSummary = default!;
+        return false;
+    }
+
+    private static string NormalizeConstructedReceiverType(string exactSymbolKey)
+    {
+        var signatureStart = exactSymbolKey.IndexOf('(');
+        if (signatureStart <= 0)
+        {
+            return exactSymbolKey;
+        }
+
+        var methodSeparator = -1;
+        var genericDepth = 0;
+        for (var i = 0; i < signatureStart; i++)
+        {
+            var current = exactSymbolKey[i];
+            if (current == '<')
+            {
+                genericDepth++;
+                continue;
+            }
+
+            if (current == '>')
+            {
+                if (genericDepth > 0)
+                {
+                    genericDepth--;
+                }
+
+                continue;
+            }
+
+            if (current == '.' && genericDepth == 0)
+            {
+                methodSeparator = i;
+            }
+        }
+
+        if (methodSeparator <= 0)
+        {
+            return exactSymbolKey;
+        }
+
+        var receiverType = exactSymbolKey[..methodSeparator];
+        var normalizedReceiverType = StripGenericInstantiations(receiverType);
+        if (string.Equals(receiverType, normalizedReceiverType, StringComparison.Ordinal))
+        {
+            return exactSymbolKey;
+        }
+
+        return normalizedReceiverType + exactSymbolKey[methodSeparator..];
+    }
+
+    private static string StripGenericInstantiations(string text)
+    {
+        if (text.IndexOf('<') < 0)
+        {
+            return text;
+        }
+
+        var builder = new StringBuilder(text.Length);
+        var genericDepth = 0;
+        foreach (var current in text)
+        {
+            if (current == '<')
+            {
+                genericDepth++;
+                continue;
+            }
+
+            if (current == '>')
+            {
+                if (genericDepth > 0)
+                {
+                    genericDepth--;
+                }
+
+                continue;
+            }
+
+            if (genericDepth == 0)
+            {
+                builder.Append(current);
+            }
+        }
+
+        return builder.ToString();
     }
 
     private static bool HasFreshArrayAllocationEvidence(MethodEffectSummary? summary)

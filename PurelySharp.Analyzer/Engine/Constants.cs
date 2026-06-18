@@ -1009,7 +1009,6 @@ public static class Constants
 
 
         "System.Buffers.Text.Utf8Parser.TryParse(System.ReadOnlySpan<byte>, out int, out int)",
-        "System.Collections.Generic.SortedDictionary<TKey, TValue>.Count.get",
         "System.Collections.ObjectModel.KeyedCollection<TKey, TItem>.Contains(TKey)",
         "System.Drawing.Color.FromArgb(int, int, int, int)",
         "System.Drawing.Point.Point(int, int)",
