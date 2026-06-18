@@ -259,6 +259,37 @@ public class TestClass
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
 
+        [Test]
+        public async Task CoreDataAnnotationsConstructors_Diagnostic()
+        {
+            var test = @"
+using System.ComponentModel.DataAnnotations;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public RequiredAttribute {|PS0002:RequiredMethod|}()
+    {
+        return new RequiredAttribute();
+    }
+
+    [EnforcePure]
+    public StringLengthAttribute {|PS0002:StringLengthMethod|}()
+    {
+        return new StringLengthAttribute(10);
+    }
+
+    [EnforcePure]
+    public RangeAttribute {|PS0002:RangeMethod|}()
+    {
+        return new RangeAttribute(0d, 1d);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
 
     }
 }

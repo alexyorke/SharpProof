@@ -1037,6 +1037,22 @@ public static class ExceptionAccessorCatalogSignatureSamples
         }
 
         [Test]
+        public void CoreDataAnnotationsConstructors_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.ComponentModel.DataAnnotations.RangeAttribute.RangeAttribute(double, double)",
+                "System.ComponentModel.DataAnnotations.RequiredAttribute.RequiredAttribute()",
+                "System.ComponentModel.DataAnnotations.StringLengthAttribute.StringLengthAttribute(int)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void DecimalNegate_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("decimal.Negate(decimal)");
@@ -2517,6 +2533,34 @@ public static class RegularExpressionAttributeCatalogSignatureSamples
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new RegularExpressionAttribute(\"^[a-z]+$\")"));
+        }
+
+        [Test]
+        public void CoreDataAnnotationsConstructorsGeneratedPurityEntriesResolveAgainstNet80References()
+        {
+            var source = @"
+using System.ComponentModel.DataAnnotations;
+
+public static class CoreDataAnnotationsConstructorCatalogSignatureSamples
+{
+    public static int Sample()
+    {
+        var required = new RequiredAttribute();
+        var stringLength = new StringLengthAttribute(10);
+        var range = new RangeAttribute(0d, 1d);
+        return (required is null ? 0 : 1) + (stringLength is null ? 0 : 1) + (range is null ? 0 : 1);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "CoreDataAnnotationsConstructorsGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new RequiredAttribute()"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new StringLengthAttribute(10)"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new RangeAttribute(0d, 1d)"));
         }
 
         [Test]

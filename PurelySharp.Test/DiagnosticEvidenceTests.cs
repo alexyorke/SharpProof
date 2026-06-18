@@ -2505,6 +2505,100 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_CoreDataAnnotationsConstructorsAsImpureEvidence()
+        {
+            const string source = @"
+using System;
+using System.ComponentModel.DataAnnotations;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public RequiredAttribute RequiredMethod()
+    {
+        return new RequiredAttribute();
+    }
+
+    [EnforcePure]
+    public StringLengthAttribute StringLengthMethod()
+    {
+        return new StringLengthAttribute(10);
+    }
+
+    [EnforcePure]
+    public RangeAttribute RangeMethod()
+    {
+        return new RangeAttribute(0d, 1d);
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics
+                .Where(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<ObjectCreationExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "new RequiredAttribute()" ||
+                    node.ToString() == "new StringLengthAttribute(10)" ||
+                    node.ToString() == "new RangeAttribute(0d, 1d)")
+                .ToDictionary(
+                    node => node.ToString(),
+                    node => (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!);
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var resolutions = trackedMethods.ToDictionary(
+                pair => pair.Key,
+                pair =>
+                {
+                    var args = new object?[] { pair.Value.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = matched
+                        ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                        : string.Empty;
+                    return (matched, classification);
+                });
+            var impuritySymbols = purityDiagnostics
+                .Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty])
+                .ToArray();
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(3));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "generated_purity_summary" }));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "ObjectCreationPurityRule" }));
+            Assert.That(impuritySymbols, Has.Some.Contain("System.ComponentModel.DataAnnotations.RequiredAttribute.RequiredAttribute()"));
+            Assert.That(impuritySymbols, Has.Some.Contain("System.ComponentModel.DataAnnotations.StringLengthAttribute.StringLengthAttribute(int)"));
+            Assert.That(impuritySymbols, Has.Some.Contain("System.ComponentModel.DataAnnotations.RangeAttribute.RangeAttribute(double, double)"));
+            Assert.That(resolutions["new RequiredAttribute()"].matched, Is.True,
+                "Generated purity catalog should resolve RequiredAttribute..ctor().");
+            Assert.That(resolutions["new RequiredAttribute()"].classification, Is.EqualTo("impure"),
+                "RequiredAttribute..ctor() now resolves through generated impure runtime evidence.");
+            Assert.That(resolutions["new StringLengthAttribute(10)"].matched, Is.True,
+                "Generated purity catalog should resolve StringLengthAttribute..ctor(int).");
+            Assert.That(resolutions["new StringLengthAttribute(10)"].classification, Is.EqualTo("impure"),
+                "StringLengthAttribute..ctor(int) now resolves through generated impure runtime evidence.");
+            Assert.That(resolutions["new RangeAttribute(0d, 1d)"].matched, Is.True,
+                "Generated purity catalog should resolve RangeAttribute..ctor(double, double).");
+            Assert.That(resolutions["new RangeAttribute(0d, 1d)"].classification, Is.EqualTo("impure"),
+                "RangeAttribute..ctor(double, double) now resolves through generated impure runtime evidence.");
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_DecimalNegate()
         {
             const string source = @"

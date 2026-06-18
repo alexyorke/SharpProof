@@ -2909,6 +2909,41 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeCoreDataAnnotationsConstructorSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.ComponentModel.Annotations.dll",
+                120,
+                "System.ComponentModel.DataAnnotations.RequiredAttribute..ctor()",
+                "System.ComponentModel.DataAnnotations.StringLengthAttribute..ctor(int)",
+                "System.ComponentModel.DataAnnotations.RangeAttribute..ctor(double, double)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.ComponentModel.DataAnnotations.RequiredAttribute..ctor()", "impure", "global_state_read", "global_state_write");
+            AssertEffectVisibilityClassification(summary, "System.ComponentModel.DataAnnotations.RequiredAttribute..ctor()", "caller_visible");
+            AssertPurityClassification(summary, "System.ComponentModel.DataAnnotations.StringLengthAttribute..ctor(int)", "impure", "global_state_read", "global_state_write", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.ComponentModel.DataAnnotations.StringLengthAttribute..ctor(int)", "caller_visible");
+            AssertPurityClassification(summary, "System.ComponentModel.DataAnnotations.RangeAttribute..ctor(double, double)", "impure", "impure_callee", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.ComponentModel.DataAnnotations.RangeAttribute..ctor(double, double)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.ComponentModel.DataAnnotations.RequiredAttribute..ctor()"));
+            Assert.That(generatedSymbols, Does.Contain("System.ComponentModel.DataAnnotations.StringLengthAttribute..ctor(int)"));
+            Assert.That(generatedSymbols, Does.Contain("System.ComponentModel.DataAnnotations.RangeAttribute..ctor(double, double)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeDecimalNegateSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
