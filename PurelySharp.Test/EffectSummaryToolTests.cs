@@ -2043,6 +2043,55 @@ public static class PurityFixture
         }
 
         [Test]
+        public void ReviewedRuntimeArtifactSpec_CoversAllCheckedInEffectSummaryArtifacts()
+        {
+            var repositoryRoot = GetRepositoryRoot();
+            var analyzerDirectory = Path.Combine(repositoryRoot, "PurelySharp.Analyzer");
+            var reviewedSpecPath = Path.Combine(repositoryRoot, "Tools", "PurelySharp.EffectSummary", "ReviewedRuntimeArtifactSpec.json");
+
+            using var reviewedSpec = JsonDocument.Parse(File.ReadAllText(reviewedSpecPath));
+            var defaults = reviewedSpec.RootElement.GetProperty("Defaults");
+            var defaultRuntimeAssemblyName = defaults.GetProperty("RuntimeAssemblyName").GetString();
+            Assert.That(defaultRuntimeAssemblyName, Is.Not.Null.And.Not.Empty);
+
+            var artifactAssemblyByFileName = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var artifact in reviewedSpec.RootElement.GetProperty("Artifacts").EnumerateArray())
+            {
+                var outputPath = artifact.GetProperty("OutputPath").GetString();
+                Assert.That(outputPath, Is.Not.Null.And.Not.Empty);
+                var fileName = Path.GetFileName(outputPath!);
+                Assert.That(fileName, Is.Not.Null.And.Not.Empty);
+                var runtimeAssemblyName = artifact.TryGetProperty("RuntimeAssemblyName", out var runtimeAssemblyNameElement) &&
+                    runtimeAssemblyNameElement.ValueKind == JsonValueKind.String &&
+                    !string.IsNullOrWhiteSpace(runtimeAssemblyNameElement.GetString())
+                        ? runtimeAssemblyNameElement.GetString()!
+                        : defaultRuntimeAssemblyName!;
+                artifactAssemblyByFileName[fileName!] = runtimeAssemblyName;
+            }
+
+            var checkedInSummaryPaths = Directory.GetFiles(analyzerDirectory, "*.EffectSummary.json", SearchOption.TopDirectoryOnly)
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(checkedInSummaryPaths, Is.Not.Empty);
+
+            foreach (var summaryPath in checkedInSummaryPaths)
+            {
+                using var summary = JsonDocument.Parse(File.ReadAllText(summaryPath));
+                var fileName = Path.GetFileName(summaryPath);
+                Assert.That(artifactAssemblyByFileName.TryGetValue(fileName, out var reviewedRuntimeAssemblyName), Is.True, fileName);
+
+                var actualRuntimeAssemblyName = Path.GetFileName(
+                    summary.RootElement
+                        .GetProperty("Assemblies")[0]
+                        .GetProperty("AssemblyPath")
+                        .GetString());
+
+                Assert.That(reviewedRuntimeAssemblyName, Is.EqualTo(actualRuntimeAssemblyName), fileName);
+            }
+        }
+
+        [Test]
         public async Task EffectSummaryTool_ArtifactSpec_GeneratesMultipleOutputFiles()
         {
             var workingDirectory = Path.Combine(

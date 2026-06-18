@@ -146,6 +146,126 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/BooleanChar.ToString.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/BooleanChar.ToString.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Cryptography.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Cryptography.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Security.Cryptography.dll"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/DateTimeOffset.Comparison.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/DateTimeOffset.Comparison.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Enum.Parse.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Enum.Parse.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/FileNotFoundException.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/FileNotFoundException.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Guid.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Guid.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/List.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/List.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/MemoryExtensions.AsSpan.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/MemoryExtensions.AsSpan.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Path.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Path.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/String.Additional.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/String.Additional.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/String.Concat.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/String.Concat.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/String.GetHashCode.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/String.GetHashCode.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/String.InvariantCasing.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/String.InvariantCasing.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/String.IsNullOrWhiteSpace.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/String.IsNullOrWhiteSpace.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/String.Length.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/String.Length.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/String.Replace.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/String.Replace.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/String.Split.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/String.Split.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/String.Substring.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/String.Substring.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/String.Transforms.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/String.Transforms.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/String.Trim.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/String.Trim.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/StringBuilder.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/StringBuilder.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/TimeProvider.TimeZoneInfo.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/TimeProvider.TimeZoneInfo.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/TimeSpan.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/TimeSpan.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Unsafe.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Unsafe.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Uri.EscapeDataString.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Uri.EscapeDataString.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.Uri.dll"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Uri.IsWellFormedUriString.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Uri.IsWellFormedUriString.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.Uri.dll"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Uri.UnescapeDataString.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Uri.UnescapeDataString.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.Uri.dll"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/WebUtility.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/WebUtility.PurelySharp.EffectSummary.json"
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Version.PurelySharp.EffectSummary.json",
       "Limit": 80,
       "SymbolPrefixes": [
