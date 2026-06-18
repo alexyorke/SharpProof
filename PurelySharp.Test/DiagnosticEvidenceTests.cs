@@ -1177,6 +1177,106 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_FileSystemPathGettersAsMixedEvidence()
+        {
+            const string source = @"
+#nullable enable
+using System.IO;
+using System.Linq;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DirectoryInfo? ParentMethod(DirectoryInfo directory)
+    {
+        return directory.Parent;
+    }
+
+    [EnforcePure]
+    public string? DirectoryNameMethod(FileInfo file)
+    {
+        return file.DirectoryName;
+    }
+
+    [EnforcePure]
+    public string NameMethod(DirectoryInfo directory)
+    {
+        return directory.Name;
+    }
+
+    [EnforcePure]
+    public string FileNameMethod(FileInfo file)
+    {
+        return file.Name;
+    }
+
+    [EnforcePure]
+    public string ExtensionMethod(FileInfo file)
+    {
+        return file.Extension;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics
+                .Where(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedProperties = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "directory.Parent" ||
+                    node.ToString() == "file.DirectoryName" ||
+                    node.ToString() == "directory.Name" ||
+                    node.ToString() == "file.Name" ||
+                    node.ToString() == "file.Extension")
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var resolutions = trackedProperties.Select(property =>
+            {
+                var getter = ((IPropertySymbol)semanticModel.GetSymbolInfo(property).Symbol!).GetMethod!;
+                var args = new object?[] { getter.OriginalDefinition, compilation, null };
+                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                var entry = args[2]!;
+                var classification = matched
+                    ? (string)entry.GetType().GetProperty("Classification")!.GetValue(entry)!
+                    : string.Empty;
+                return (property: property.ToString(), matched, classification);
+            }).ToDictionary(result => result.property, result => (result.matched, result.classification), StringComparer.Ordinal);
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(3));
+            Assert.That(
+                purityDiagnostics.All(diagnostic =>
+                    string.Equals(
+                        diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty],
+                        "generated_purity_summary",
+                        StringComparison.Ordinal)),
+                Is.True);
+
+            Assert.That(resolutions["directory.Parent"].matched, Is.True);
+            Assert.That(resolutions["directory.Parent"].classification, Is.EqualTo("pure"));
+            Assert.That(resolutions["file.DirectoryName"].matched, Is.True);
+            Assert.That(resolutions["file.DirectoryName"].classification, Is.EqualTo("pure"));
+            Assert.That(resolutions["directory.Name"].matched, Is.True);
+            Assert.That(resolutions["directory.Name"].classification, Is.EqualTo("impure"));
+            Assert.That(resolutions["file.Name"].matched, Is.True);
+            Assert.That(resolutions["file.Name"].classification, Is.EqualTo("impure"));
+            Assert.That(resolutions["file.Extension"].matched, Is.True);
+            Assert.That(resolutions["file.Extension"].classification, Is.EqualTo("impure"));
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_EnvironmentGetFolderPathAsImpureEvidence()
         {
             const string source = @"

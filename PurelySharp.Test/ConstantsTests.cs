@@ -207,6 +207,35 @@ public static class EnvironmentCatalogSignatureSamples
         }
 
         [Test]
+        public void FileSystemPathGetters_AreSourcedFromGeneratedEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.IO;
+
+public static class FileSystemPathGetterCatalogSignatureSamples
+{
+    public static string? Sample(DirectoryInfo directory, FileInfo file)
+    {
+        _ = directory.Parent;
+        _ = file.DirectoryName;
+        return directory.Name + file.Name + file.Extension;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "FileSystemPathGetterCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "directory.Parent"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "file.DirectoryName"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "directory.Name"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "file.Name"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "file.Extension"));
+        }
+
+        [Test]
         public void WebUtilityHelpers_AreNotBackedByStaticCatalogs()
         {
             var members = new[]
@@ -856,8 +885,26 @@ public static class ExceptionAccessorCatalogSignatureSamples
         [Test]
         public void StringEnumerableJoinHelpers_AreNotBackedByStaticPureCatalogs()
         {
-            AssertNotInManualCatalogs("System.String.Join(string, System.Collections.Generic.IEnumerable<string>)");
-            AssertNotInManualCatalogs("System.String.Join<T>(string, System.Collections.Generic.IEnumerable<T>)");
+            var source = @"
+using System.Collections.Generic;
+
+public static class StringJoinCatalogSignatureSamples
+{
+    public static string Sample(IEnumerable<string> strings, IEnumerable<int> values)
+    {
+        _ = string.Join("" "", strings);
+        return string.Join("","", values);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "StringJoinCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "string.Join(\" \", strings)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "string.Join(\",\", values)"));
         }
 
         [Test]

@@ -158,6 +158,18 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/FileSystem.PathGetters.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/FileSystem.PathGetters.PurelySharp.EffectSummary.json",
+      "Limit": 60,
+      "SymbolPrefixes": [
+        "System.IO.DirectoryInfo.get_Name",
+        "System.IO.DirectoryInfo.get_Parent",
+        "System.IO.FileInfo.get_DirectoryName",
+        "System.IO.FileInfo.get_Name",
+        "System.IO.FileSystemInfo.get_Extension"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/GuardHelpers.PurelySharp.EffectSummary.json",
       "Limit": 120,
       "SymbolPrefixes": [

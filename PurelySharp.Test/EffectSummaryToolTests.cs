@@ -1216,6 +1216,49 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeFileSystemPathGetterSlice_UsesGeneratedEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                60,
+                "System.IO.DirectoryInfo.get_Name",
+                "System.IO.DirectoryInfo.get_Parent",
+                "System.IO.FileInfo.get_DirectoryName",
+                "System.IO.FileInfo.get_Name",
+                "System.IO.FileSystemInfo.get_Extension");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.IO.DirectoryInfo.get_Parent()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.IO.DirectoryInfo.get_Parent()", "internal_only");
+            AssertPurityClassification(summary, "System.IO.FileInfo.get_DirectoryName()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.IO.FileInfo.get_DirectoryName()", "none");
+            AssertPurityClassification(summary, "System.IO.DirectoryInfo.get_Name()", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.IO.DirectoryInfo.get_Name()", "caller_visible");
+            AssertPurityClassification(summary, "System.IO.FileInfo.get_Name()", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.IO.FileInfo.get_Name()", "caller_visible");
+            AssertPurityClassification(summary, "System.IO.FileSystemInfo.get_Extension()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.IO.FileSystemInfo.get_Extension()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.IO.DirectoryInfo.get_Name()"));
+            Assert.That(generatedSymbols, Does.Contain("System.IO.DirectoryInfo.get_Parent()"));
+            Assert.That(generatedSymbols, Does.Contain("System.IO.FileInfo.get_DirectoryName()"));
+            Assert.That(generatedSymbols, Does.Contain("System.IO.FileInfo.get_Name()"));
+            Assert.That(generatedSymbols, Does.Contain("System.IO.FileSystemInfo.get_Extension()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeInterfaceCollectionLookupSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

@@ -1005,7 +1005,6 @@ public static class Constants
         "System.Linq.Enumerable.ThenBy",
         "System.Linq.Enumerable.Zip",
         "System.Runtime.InteropServices.Marshal.SizeOf<T>()",
-        "string.Join(string, System.Collections.Generic.IEnumerable<string>)",
         "System.Threading.CancellationToken.None.get",
 
 
@@ -1018,11 +1017,6 @@ public static class Constants
         "System.FormattableString.Invariant(System.FormattableString)",
         "System.FormattableString.ToString(System.IFormatProvider)",
         "System.HashCode.HashCode()",
-        "System.IO.DirectoryInfo.Name.get",
-        "System.IO.DirectoryInfo.Parent.get",
-        "System.IO.FileInfo.DirectoryName.get",
-        "System.IO.FileInfo.Extension.get",
-        "System.IO.FileInfo.Name.get",
 
         "System.Linq.Enumerable.TakeWhile<TSource>(System.Collections.Generic.IEnumerable<TSource>, System.Func<TSource, bool>)",
     };

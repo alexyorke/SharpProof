@@ -869,6 +869,103 @@ public class TestClass
         }
 
         [Test]
+        public async Task DirectoryInfoParent_NoDiagnostic()
+        {
+            var test = @"
+#nullable enable
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DirectoryInfo? TestMethod(DirectoryInfo info)
+    {
+        return info.Parent;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task FileInfoDirectoryName_NoDiagnostic()
+        {
+            var test = @"
+#nullable enable
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string? TestMethod(FileInfo info)
+    {
+        return info.DirectoryName;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task DirectoryInfoName_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(DirectoryInfo info)
+    {
+        return info.Name;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task FileInfoName_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(FileInfo info)
+    {
+        return info.Name;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task FileInfoExtension_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(FileInfo info)
+    {
+        return info.Extension;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task UnusedMemoryStreamCreation_ReportsPS0002()
         {
 
