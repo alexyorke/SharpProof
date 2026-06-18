@@ -305,6 +305,10 @@ namespace PurelySharp.Analyzer
             AddSymbolKey(keys, CreateMetadataEffectSummaryKey(methodSymbol));
             AddSymbolKey(keys, CreateMetadataExactSummaryKey(methodSymbol.OriginalDefinition));
             AddSymbolKey(keys, CreateMetadataExactSummaryKey(methodSymbol));
+            AddSymbolKey(keys, CreateMetadataDefinitionEffectSummaryKey(methodSymbol.OriginalDefinition));
+            AddSymbolKey(keys, CreateMetadataDefinitionEffectSummaryKey(methodSymbol));
+            AddSymbolKey(keys, CreateMetadataDefinitionExactSummaryKey(methodSymbol.OriginalDefinition));
+            AddSymbolKey(keys, CreateMetadataDefinitionExactSummaryKey(methodSymbol));
             AddSymbolKey(keys, CreatePositionalEffectSummaryKey(methodSymbol.OriginalDefinition));
             AddSymbolKey(keys, CreatePositionalEffectSummaryKey(methodSymbol));
             AddSymbolKey(keys, CreatePositionalExactSummaryKey(methodSymbol.OriginalDefinition));
@@ -321,6 +325,8 @@ namespace PurelySharp.Analyzer
                 AddSymbolKey(keys, CreateExactSummaryKey(methodSymbol.ConstructedFrom));
                 AddSymbolKey(keys, CreateMetadataEffectSummaryKey(methodSymbol.ConstructedFrom));
                 AddSymbolKey(keys, CreateMetadataExactSummaryKey(methodSymbol.ConstructedFrom));
+                AddSymbolKey(keys, CreateMetadataDefinitionEffectSummaryKey(methodSymbol.ConstructedFrom));
+                AddSymbolKey(keys, CreateMetadataDefinitionExactSummaryKey(methodSymbol.ConstructedFrom));
                 AddSymbolKey(keys, CreatePositionalEffectSummaryKey(methodSymbol.ConstructedFrom));
                 AddSymbolKey(keys, CreatePositionalExactSummaryKey(methodSymbol.ConstructedFrom));
                 AddSymbolKey(keys, CreateMetadataPositionalEffectSummaryKey(methodSymbol.ConstructedFrom));
@@ -395,6 +401,16 @@ namespace PurelySharp.Analyzer
             return CreateMetadataSummaryKey(methodSymbol, includeReturnType: true, useOrdinalGenericParameters: true);
         }
 
+        private static string CreateMetadataDefinitionEffectSummaryKey(IMethodSymbol methodSymbol)
+        {
+            return CreateMetadataDefinitionSummaryKey(methodSymbol, includeReturnType: false);
+        }
+
+        private static string CreateMetadataDefinitionExactSummaryKey(IMethodSymbol methodSymbol)
+        {
+            return CreateMetadataDefinitionSummaryKey(methodSymbol, includeReturnType: true);
+        }
+
         private static string CreatePositionalSummaryKey(IMethodSymbol methodSymbol, bool includeReturnType)
         {
             var containingTypeName = FormatSummaryType(methodSymbol.ContainingType, useOrdinalGenericParameters: true);
@@ -443,6 +459,32 @@ namespace PurelySharp.Analyzer
                 : FormatSummaryReturnType(
                     methodSymbol,
                     useOrdinalGenericParameters,
+                    useMetadataTypeNames: true);
+            return containingTypeName + "." + methodName + "(" + parameterList + ")->" + returnType;
+        }
+
+        private static string CreateMetadataDefinitionSummaryKey(IMethodSymbol methodSymbol, bool includeReturnType)
+        {
+            var containingTypeName = GetMetadataGenericDefinitionName(methodSymbol.ContainingType);
+            var methodName = methodSymbol.MethodKind == MethodKind.Constructor
+                ? ".ctor"
+                : methodSymbol.Name;
+            var parameterList = string.Join(
+                ", ",
+                methodSymbol.Parameters.Select(parameter => FormatSummaryParameter(
+                    parameter,
+                    useOrdinalGenericParameters: true,
+                    useMetadataTypeNames: true)));
+            if (!includeReturnType)
+            {
+                return containingTypeName + "." + methodName + "(" + parameterList + ")";
+            }
+
+            var returnType = methodSymbol.MethodKind == MethodKind.Constructor
+                ? "void"
+                : FormatSummaryReturnType(
+                    methodSymbol,
+                    useOrdinalGenericParameters: true,
                     useMetadataTypeNames: true);
             return containingTypeName + "." + methodName + "(" + parameterList + ")->" + returnType;
         }

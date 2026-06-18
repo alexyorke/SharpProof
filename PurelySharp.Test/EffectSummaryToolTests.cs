@@ -1078,6 +1078,68 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeListSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Collections.Generic.List", limit: 120);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.Contains(!0)", "pure");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Count()", "pure");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Item(int)", "pure");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.Exists(System.Predicate`1<!0>)", "pure");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.Find(System.Predicate`1<!0>)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Find(System.Predicate`1<!0>)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)", "conservative_unknown", "dynamic_dispatch", "virtual_call");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)", "unknown");
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var generatedSymbols = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.Collections.Generic.List`1.", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Contains(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Count()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Item(int)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Exists(System.Predicate`1<!0>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Find(System.Predicate`1<!0>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeFileNotFoundExceptionSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.IO.FileNotFoundException", limit: 80);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.IO.FileNotFoundException..ctor(string)", "pure");
+            AssertFreshnessClassification(summary, "System.IO.FileNotFoundException..ctor(string)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.IO.FileNotFoundException..ctor(string)", "internal_only");
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var ctorEntry = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Single(entry => string.Equals(
+                    entry.GetProperty("Symbol").GetString(),
+                    "System.IO.FileNotFoundException..ctor(string)",
+                    StringComparison.Ordinal));
+
+            Assert.That(ctorEntry.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+            Assert.That(ctorEntry.GetProperty("PrimaryCategory").GetString(), Is.EqualTo("generated_purity_summary"));
+            Assert.That(ctorEntry.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("fresh_owned_object_write"));
+            Assert.That(ctorEntry.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("internal_only"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_GeneratedPurityCatalog_UsesDistinctExactKeys_ForDuplicateDisplaySymbols()
         {
             var source = """

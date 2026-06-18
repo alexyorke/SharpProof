@@ -121,6 +121,32 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ListHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Collections.Generic.List<T>.Contains(T)",
+                "System.Collections.Generic.List<T>.Count.get",
+                "System.Collections.Generic.List<T>.Find(System.Predicate<T>)",
+                "System.Collections.Generic.List<T>.Exists(System.Predicate<T>)",
+                "System.Collections.Generic.List<T>.TrueForAll(System.Predicate<T>)",
+                "System.Collections.Generic.List<T>.this[int].get",
+                "System.Collections.Generic.List<T>.get_Count()",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
+        public void FileNotFoundExceptionStringConstructor_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.IO.FileNotFoundException.FileNotFoundException(string?)");
+        }
+
+        [Test]
         public void StringPrefixSuffix_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.String.StartsWith(System.String)"));
@@ -437,13 +463,13 @@ public static class CatalogSignatureSamples
             Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback")));
 
             Assert.That(GetPropertySignature(compilation, syntaxTree, "list.Count"), Is.EqualTo("System.Collections.Generic.List<T>.Count.get"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetPropertySignature(compilation, syntaxTree, "list.Count")));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetPropertySignature(compilation, syntaxTree, "list.Count")));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "names.Contains(\"alpha\")"), Is.EqualTo("System.Collections.ObjectModel.KeyedCollection<TKey, TItem>.Contains(TKey)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "names.Contains(\"alpha\")")));
 
             Assert.That(GetObjectCreationSignature(compilation, syntaxTree, "new FileNotFoundException(\"missing.txt\")"), Is.EqualTo("System.IO.FileNotFoundException.FileNotFoundException(string?)"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetObjectCreationSignature(compilation, syntaxTree, "new FileNotFoundException(\"missing.txt\")")));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetObjectCreationSignature(compilation, syntaxTree, "new FileNotFoundException(\"missing.txt\")")));
 
             Assert.That(GetObjectCreationSignature(compilation, syntaxTree, "new string(chars)"), Is.EqualTo("string.String(System.ReadOnlySpan<char>)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetObjectCreationSignature(compilation, syntaxTree, "new string(chars)")));
@@ -522,7 +548,7 @@ public static class CatalogConflictSamples
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "list.Add(1)"), expectedPure: false, expectedImpure: true);
             AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "DateTime.Now"), expectedPure: false, expectedImpure: true);
             AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "list.Count"), expectedPure: true, expectedImpure: false);
+            AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "list.Count"), expectedPure: false, expectedImpure: false);
         }
 
         [Test]

@@ -1044,12 +1044,6 @@ public static class Constants
         "System.Collections.Generic.Comparer<T>.Default.get",
         "System.Collections.Generic.EqualityComparer<T>.Default.get",
         "System.Collections.Generic.HashSet<T>.IsSubsetOf(System.Collections.Generic.IEnumerable<T>)",
-        "System.Collections.Generic.List<T>.Contains(T)",
-        "System.Collections.Generic.List<T>.Count.get",
-        "System.Collections.Generic.List<T>.Find(System.Predicate<T>)",
-        "System.Collections.Generic.List<T>.Exists(System.Predicate<T>)",
-        "System.Collections.Generic.List<T>.TrueForAll(System.Predicate<T>)",
-        "System.Collections.Generic.List<T>.this[int].get",
         "System.Collections.Generic.Queue<T>.Peek()",
         "System.Collections.Generic.Stack<T>.Peek()",
 
@@ -1433,14 +1427,12 @@ public static class Constants
         "char.ConvertToUtf32(char, char)",
         "System.Collections.Generic.ICollection<T>.Contains(T)",
         "System.Collections.Generic.IList<T>.IndexOf(T)",
-        "System.Collections.Generic.List<T>.Contains(T)",
         "System.Collections.Generic.Queue<T>.TryPeek(out T)",
         "System.Collections.Generic.SortedSet<T>.GetViewBetween(T, T)",
         "System.ComponentModel.DataAnnotations.EmailAddressAttribute.EmailAddressAttribute()",
         "System.ComponentModel.DataAnnotations.RegularExpressionAttribute.RegularExpressionAttribute(string)",
         "decimal.Negate(decimal)",
         "double.PositiveInfinity.get",
-        "System.IO.FileNotFoundException.FileNotFoundException(string?)",
         "System.FormattableString.Format.get",
         "System.FormattableString.Invariant(System.FormattableString)",
         "System.FormattableString.ToString(System.IFormatProvider)",
@@ -1466,24 +1458,6 @@ public static class Constants
         "System.Runtime.InteropServices.MemoryMarshal.AsBytes<T>(System.Span<T>)",
         "string.IsNullOrWhiteSpace(System.ReadOnlySpan<char>)",
         "System.TimeSpan.Zero.get",
-        "System.Collections.Generic.List<T>.Find(System.Predicate<T>)",
-        "System.Collections.Generic.List<T>.get_Count()",
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         "object.ReferenceEquals(object, object)",
 
