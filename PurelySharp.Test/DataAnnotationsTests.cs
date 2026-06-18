@@ -240,6 +240,25 @@ public class TestClass
             await VerifyCS.VerifyAnalyzerAsync(test, compilerError, expectedGetDisplay, expectedPS0002);
         }
 
+        [Test]
+        public async Task RegularExpressionAttributeConstructor_Diagnostic()
+        {
+            var test = @"
+using System.ComponentModel.DataAnnotations;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public RegularExpressionAttribute {|PS0002:TestMethod|}()
+    {
+        return new RegularExpressionAttribute(""^[a-z]+$"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
 
     }
 }

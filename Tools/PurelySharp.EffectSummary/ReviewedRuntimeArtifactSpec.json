@@ -469,6 +469,14 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/RegularExpressionAttribute.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.ComponentModel.Annotations.dll",
+      "Limit": 80,
+      "SymbolPrefixes": [
+        "System.ComponentModel.DataAnnotations.RegularExpressionAttribute..ctor(string)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Decimal.Negate.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Decimal.Negate.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [

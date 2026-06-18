@@ -2454,6 +2454,57 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_RegularExpressionAttributeConstructorAsImpureEvidence()
+        {
+            const string source = @"
+using System;
+using System.ComponentModel.DataAnnotations;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public RegularExpressionAttribute TestMethod()
+    {
+        return new RegularExpressionAttribute(""^[a-z]+$"");
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethod = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<ObjectCreationExpressionSyntax>()
+                    .Single(node => node.ToString() == "new RegularExpressionAttribute(\"^[a-z]+$\")"))
+                .Symbol!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var args = new object?[] { trackedMethod.OriginalDefinition, compilation, null };
+            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+            var purityEntry = args[2]!;
+            var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
+            Assert.That(
+                diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty],
+                Does.Contain("System.ComponentModel.DataAnnotations.RegularExpressionAttribute.RegularExpressionAttribute(string)"));
+            Assert.That(matched, Is.True, "Generated purity catalog should resolve RegularExpressionAttribute..ctor(string).");
+            Assert.That(classification, Is.EqualTo("impure"),
+                "RegularExpressionAttribute..ctor(string) now resolves through generated impure runtime evidence.");
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_DecimalNegate()
         {
             const string source = @"

@@ -2881,6 +2881,34 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeRegularExpressionAttributeSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.ComponentModel.Annotations.dll",
+                80,
+                "System.ComponentModel.DataAnnotations.RegularExpressionAttribute..ctor(string)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            const string symbol = "System.ComponentModel.DataAnnotations.RegularExpressionAttribute..ctor(string)";
+            AssertPurityClassification(summary, symbol, "impure", "global_state_read", "global_state_write", "impure_callee", "object_state_write");
+            AssertEffectVisibilityClassification(summary, symbol, "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain(symbol));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeDecimalNegateSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

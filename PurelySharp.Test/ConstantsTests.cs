@@ -1023,6 +1023,20 @@ public static class ExceptionAccessorCatalogSignatureSamples
         }
 
         [Test]
+        public void RegularExpressionAttributeConstructor_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.ComponentModel.DataAnnotations.RegularExpressionAttribute.RegularExpressionAttribute(string)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void DecimalNegate_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("decimal.Negate(decimal)");
@@ -2479,6 +2493,30 @@ public static class EmailAddressCatalogSignatureSamples
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new EmailAddressAttribute()"));
+        }
+
+        [Test]
+        public void RegularExpressionAttributeConstructorGeneratedPurityEntryResolvesAgainstNet80References()
+        {
+            var source = @"
+using System.ComponentModel.DataAnnotations;
+
+public static class RegularExpressionAttributeCatalogSignatureSamples
+{
+    public static int Sample()
+    {
+        var attribute = new RegularExpressionAttribute(""^[a-z]+$"");
+        return attribute is null ? 0 : 1;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "RegularExpressionAttributeGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new RegularExpressionAttribute(\"^[a-z]+$\")"));
         }
 
         [Test]
