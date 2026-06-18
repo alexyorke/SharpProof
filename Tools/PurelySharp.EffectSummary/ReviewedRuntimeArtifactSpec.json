@@ -274,6 +274,14 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Nullable.ValueOrDefault.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Nullable.ValueOrDefault.PurelySharp.EffectSummary.json",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Nullable`1.GetValueOrDefault"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/MutableCollection.Readers.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/MutableCollection.Readers.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [
