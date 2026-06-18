@@ -4074,10 +4074,54 @@ namespace PurelySharp.Analyzer.Engine
 
         internal static bool IsInvariantCultureDeterministicParseInvocation(IInvocationOperation invocationOperation)
         {
-            return IsTimeSpanInvariantCultureParseInvocation(invocationOperation) ||
+            return IsInvariantCultureNumericParseInvocation(invocationOperation) ||
+                IsTimeSpanInvariantCultureParseInvocation(invocationOperation) ||
                 IsDateOnlyInvariantCultureParseInvocation(invocationOperation) ||
                 IsTimeOnlyInvariantCultureParseInvocation(invocationOperation) ||
                 IsDateTimeOffsetInvariantCultureParseExactInvocation(invocationOperation);
+        }
+
+        private static bool IsInvariantCultureNumericParseInvocation(IInvocationOperation invocationOperation)
+        {
+            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
+            if (targetMethod == null ||
+                targetMethod.Name != "Parse" ||
+                !IsInvariantCultureNumericParseType(targetMethod.ContainingType))
+            {
+                return false;
+            }
+
+            if (targetMethod.Parameters.Length == 2 &&
+                invocationOperation.Arguments.Length == 2 &&
+                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type))
+            {
+                return IsCultureInfoInvariantCulture(invocationOperation.Arguments[1].Value);
+            }
+
+            if (targetMethod.Parameters.Length == 3 &&
+                invocationOperation.Arguments.Length == 3 &&
+                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type) &&
+                targetMethod.Parameters[1].Type.ToDisplayString() == "System.Globalization.NumberStyles")
+            {
+                return IsCultureInfoInvariantCulture(invocationOperation.Arguments[2].Value);
+            }
+
+            return false;
+        }
+
+        private static bool IsInvariantCultureNumericParseType(ITypeSymbol? containingType)
+        {
+            return containingType?.SpecialType is SpecialType.System_Byte or
+                SpecialType.System_Decimal or
+                SpecialType.System_Double or
+                SpecialType.System_Int16 or
+                SpecialType.System_Int32 or
+                SpecialType.System_Int64 or
+                SpecialType.System_SByte or
+                SpecialType.System_Single or
+                SpecialType.System_UInt16 or
+                SpecialType.System_UInt32 or
+                SpecialType.System_UInt64;
         }
 
         private static bool IsTimeOnlyInvariantCultureParseInvocation(IInvocationOperation invocationOperation)

@@ -1518,6 +1518,48 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeConvertCurrentCultureStringSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            var symbols = new[]
+            {
+                "System.Convert.ToSingle(string)",
+                "System.Convert.ToDouble(string)",
+                "System.Convert.ToByte(string)",
+                "System.Convert.ToDateTime(string)",
+                "System.Convert.ToSByte(string)",
+                "System.Convert.ToInt16(string)",
+                "System.Convert.ToInt32(string)",
+                "System.Convert.ToInt64(string)",
+                "System.Convert.ToUInt16(string)",
+                "System.Convert.ToUInt32(string)",
+                "System.Convert.ToUInt64(string)",
+            };
+
+            using var summary = await RunRuntimeEffectSummaryAsync(120, symbols);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            foreach (var symbol in symbols)
+            {
+                AssertPurityClassification(summary, symbol, "pure");
+                AssertEffectVisibilityClassification(summary, symbol, "none");
+            }
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbols.Contains(symbol, StringComparer.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EquivalentTo(symbols));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeWebUtilitySlice_TreatsHelpersAsGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Net.WebUtility", limit: 40);
