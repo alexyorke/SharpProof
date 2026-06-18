@@ -586,6 +586,31 @@ public static class StaticCacheGetterCatalogSignatureSamples
         }
 
         [Test]
+        public void NullableComparisonHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+
+public static class NullableComparisonCatalogSignatureSamples
+{
+    public static bool Sample(int? left, int? right)
+    {
+        _ = Nullable.Compare(left, right);
+        return Nullable.Equals(left, right);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "NullableComparisonCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Nullable.Compare(left, right)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Nullable.Equals(left, right)"));
+        }
+
+        [Test]
         public void FileNotFoundExceptionStringConstructor_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.IO.FileNotFoundException.FileNotFoundException(string?)");

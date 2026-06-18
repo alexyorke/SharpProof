@@ -171,6 +171,54 @@ public class TestClass
         }
 
         [Test]
+        public async Task NullableEqualsDispatchToImpureImplementation_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public struct MutableRecord : IEquatable<MutableRecord>
+{
+    public bool Equals(MutableRecord other)
+    {
+        Console.WriteLine(""equals"");
+        return true;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool {|PS0002:TestMethod|}(MutableRecord? left, MutableRecord? right)
+    {
+        return Nullable.Equals(left, right);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task NullableEqualsForBuiltinValueTypes_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(int? left, int? right, decimal? first, decimal? second)
+    {
+        return Nullable.Equals(left, right) &&
+            Nullable.Equals(first, second);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task EqualityComparerDefaultGetHashCodeForFloatingAndDecimalValues_NoDiagnostic()
         {
             var test = @"

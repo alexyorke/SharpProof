@@ -443,6 +443,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return comparerDispatchResult;
             }
 
+            if (TryCheckNullableComparisonDispatchPurity(invocationOperation, context, out var nullableDispatchResult))
+            {
+                return nullableDispatchResult;
+            }
+
             if (TryCheckCollectionEqualityDispatchPurity(invocationOperation, context, currentState, out var collectionEqualityDispatchResult))
             {
                 return collectionEqualityDispatchResult;
@@ -1079,6 +1084,38 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             result = CheckDefaultComparisonDispatchPurity(elementType, invocationOperation, context);
             return true;
+        }
+
+        private static bool TryCheckNullableComparisonDispatchPurity(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            var methodSymbol = invocationOperation.TargetMethod;
+            if (methodSymbol.ContainingType?.ToDisplayString() != "System.Nullable" ||
+                !methodSymbol.IsGenericMethod ||
+                methodSymbol.TypeArguments.Length != 1 ||
+                methodSymbol.Parameters.Length != 2)
+            {
+                return false;
+            }
+
+            var valueType = methodSymbol.TypeArguments[0];
+            if (methodSymbol.Name == "Compare")
+            {
+                result = CheckDefaultComparisonDispatchPurity(valueType, invocationOperation, context);
+                return true;
+            }
+
+            if (methodSymbol.Name == "Equals")
+            {
+                result = CheckDefaultEqualityDispatchPurity(valueType, invocationOperation, context);
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryCheckCollectionEqualityDispatchPurity(

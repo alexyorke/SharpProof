@@ -563,6 +563,61 @@ public class TestClass
         }
 
         [Test]
+        public void GeneratedPurityCatalog_Resolves_NullableComparisonAsConservativeUnknown()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(int? left, int? right)
+    {
+        _ = Nullable.Compare(left, right);
+        return Nullable.Equals(left, right);
+    }
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var invocations = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "Nullable.Compare(left, right)" ||
+                    node.ToString() == "Nullable.Equals(left, right)")
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = invocations.ToDictionary(
+                node => node.ToString(),
+                node =>
+                {
+                    var method = (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!;
+                    var args = new object?[] { method.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = matched
+                        ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                        : string.Empty;
+                    return (matched, classification);
+                });
+
+            Assert.That(classifications["Nullable.Compare(left, right)"].matched, Is.True);
+            Assert.That(classifications["Nullable.Compare(left, right)"].classification, Is.EqualTo("conservative_unknown"));
+            Assert.That(classifications["Nullable.Equals(left, right)"].matched, Is.True);
+            Assert.That(classifications["Nullable.Equals(left, right)"].classification, Is.EqualTo("conservative_unknown"));
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_ArgumentGuardHelpersAsPureEvidence()
         {
             const string source = @"

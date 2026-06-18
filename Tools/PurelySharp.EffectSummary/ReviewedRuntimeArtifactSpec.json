@@ -265,6 +265,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Nullable.Comparison.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Nullable.Comparison.PurelySharp.EffectSummary.json",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Nullable.Compare",
+        "System.Nullable.Equals"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/MutableCollection.Readers.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/MutableCollection.Readers.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [

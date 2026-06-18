@@ -908,10 +908,6 @@ public static class Constants
 
         "System.Linq.Enumerable.Contains<TSource>(System.Collections.Generic.IEnumerable<TSource>, TSource)",
 
-        "System.Nullable.Compare<T>(T?, T?)",
-        "System.Nullable.Equals<T>(T?, T?)",
-
-
         "System.Numerics.BigInteger.Add(System.Numerics.BigInteger, System.Numerics.BigInteger)",
         "System.Numerics.Complex.Complex(double, double)",
         "System.Numerics.Complex.Abs(System.Numerics.Complex)",
