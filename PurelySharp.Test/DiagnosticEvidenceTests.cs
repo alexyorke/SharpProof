@@ -563,6 +563,55 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_IPAddressIsLoopbackAsPureEvidence()
+        {
+            const string source = @"
+using System.Net;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(IPAddress address)
+    {
+        return IPAddress.IsLoopback(address);
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var invocation = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Single(node => node.ToString() == "IPAddress.IsLoopback(address)");
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var method = (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!;
+            var args = new object?[] { method.OriginalDefinition, compilation, null };
+            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+            var purityEntry = args[2]!;
+            var classification = matched
+                ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                : string.Empty;
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow IPAddress.IsLoopback(System.Net.IPAddress).");
+            Assert.That(matched, Is.True, "Generated purity catalog should resolve IPAddress.IsLoopback(System.Net.IPAddress).");
+            Assert.That(classification, Is.EqualTo("pure"),
+                "IPAddress.IsLoopback should classify pure once loopback singleton reads are treated as safe cache reads.");
+        }
+
+        [Test]
         public void GeneratedPurityCatalog_Resolves_NullableComparisonAsConservativeUnknown()
         {
             const string source = @"
@@ -1873,6 +1922,80 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_StringBuilderLengthAndHttpResponseSuccessStatusCode()
+        {
+            const string source = @"
+using System.Net.Http;
+using System.Text;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int BuilderLengthMethod(StringBuilder builder)
+    {
+        return builder.Length;
+    }
+
+    [EnforcePure]
+    public bool HttpResponseMethod(HttpResponseMessage response)
+    {
+        return response.IsSuccessStatusCode;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedExpressions = new[]
+            {
+                "builder.Length",
+                "response.IsSuccessStatusCode",
+            };
+            var trackedMethods = trackedExpressions
+                .Select(expressionText =>
+                {
+                    var symbol = semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == expressionText))
+                        .Symbol;
+                    Assert.That(symbol, Is.Not.Null, expressionText);
+                    return ((IPropertySymbol)symbol!).GetMethod!;
+                })
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var resolutions = trackedMethods.Select(method =>
+            {
+                var args = new object?[] { method.OriginalDefinition, compilation, null };
+                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                var purityEntry = args[2]!;
+                var classification = matched
+                    ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                    : string.Empty;
+                return (matched, classification);
+            }).ToArray();
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow StringBuilder.Length and HttpResponseMessage.IsSuccessStatusCode.");
+            Assert.That(resolutions.Select(result => result.matched).ToArray(), Is.EqualTo(new[] { true, true }),
+                "Generated purity catalog should resolve StringBuilder.Length and HttpResponseMessage.IsSuccessStatusCode.");
+            Assert.That(resolutions.Select(result => result.classification).ToArray(), Is.EqualTo(new[] { "pure", "pure" }),
+                "Generated purity catalog should classify StringBuilder.Length and HttpResponseMessage.IsSuccessStatusCode as pure.");
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_BooleanCompareAndCharClassificationHelpers()
         {
             const string source = @"
@@ -2451,6 +2574,83 @@ public class TestClass
                 "Trusted generated purity should allow EmailAddressAttribute..ctor().");
             Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedMethods.Length).ToArray()),
                 "Generated purity catalog should resolve EmailAddressAttribute..ctor().");
+        }
+
+        [Test]
+        public async Task GeneratedPurityCatalog_Resolves_DateTimeToFileTimeAndMemberwiseCloneAsImpureEvidence()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class CloneableSample
+{
+    [EnforcePure]
+    public object CloneSelf()
+    {
+        return MemberwiseClone();
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public long ToFileTimeMethod(DateTime value)
+    {
+        return value.ToFileTime();
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics
+                .Where(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "MemberwiseClone()" ||
+                    node.ToString() == "value.ToFileTime()")
+                .Select(node => (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!)
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var resolutions = trackedMethods.Select(method =>
+            {
+                var args = new object?[] { method.OriginalDefinition, compilation, null };
+                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                var purityEntry = args[2]!;
+                var classification = matched
+                    ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                    : string.Empty;
+                return (matched, classification);
+            }).ToArray();
+            var impuritySymbols = purityDiagnostics
+                .Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty])
+                .ToArray();
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(2));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "generated_purity_summary" }));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "MethodInvocationPurityRule" }));
+            Assert.That(impuritySymbols, Has.Some.Contain("System.DateTime.ToFileTime()"));
+            Assert.That(impuritySymbols, Has.Some.Contain("MemberwiseClone"));
+            Assert.That(resolutions.Select(result => result.matched).ToArray(), Is.EqualTo(new[] { true, true }),
+                "Generated purity catalog should resolve DateTime.ToFileTime and MemberwiseClone.");
+            Assert.That(resolutions.Select(result => result.classification).ToArray(), Is.EqualTo(new[] { "impure", "impure" }),
+                "Generated purity catalog should classify DateTime.ToFileTime and MemberwiseClone as impure.");
         }
 
         [Test]

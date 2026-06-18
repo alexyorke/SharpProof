@@ -84,5 +84,24 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task ObjectMemberwiseClone_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class CloneableSample
+{
+    [EnforcePure]
+    public object {|PS0002:CloneSelf|}()
+    {
+        return MemberwiseClone();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

@@ -327,6 +327,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/IPAddress.IsLoopback.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/IPAddress.IsLoopback.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Net.Primitives.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Net.IPAddress.IsLoopback"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/SortedSet.GetViewBetween.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/SortedSet.GetViewBetween.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Collections.dll",
@@ -644,7 +653,28 @@
     },
     {
       "OutputPath": "PurelySharp.Analyzer/StringBuilder.PurelySharp.EffectSummary.json",
-      "SourceSummaryPath": "PurelySharp.Analyzer/StringBuilder.PurelySharp.EffectSummary.json"
+      "SourceSummaryPath": "PurelySharp.Analyzer/StringBuilder.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.Text.StringBuilder.ToString",
+        "System.Text.StringBuilder.get_Length"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/DateTime.ToFileTime.Object.MemberwiseClone.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "Limit": 120,
+      "SymbolPrefixes": [
+        "System.DateTime.ToFileTime()",
+        "System.Object.MemberwiseClone()"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/HttpResponseMessage.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Net.Http.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Net.Http.HttpResponseMessage.get_IsSuccessStatusCode()"
+      ]
     },
     {
       "OutputPath": "PurelySharp.Analyzer/TimeProvider.TimeZoneInfo.PurelySharp.EffectSummary.json",

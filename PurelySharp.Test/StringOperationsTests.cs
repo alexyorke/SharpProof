@@ -838,6 +838,26 @@ public class TestClass
         }
 
         [Test]
+        public async Task PureMethodWithStringBuilderLength_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Text;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(StringBuilder sb)
+    {
+        return sb.Length;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task PureMethodWithLocalStringBuilderToString_Diagnostic()
         {
 

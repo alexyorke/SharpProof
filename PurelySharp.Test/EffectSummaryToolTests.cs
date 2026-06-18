@@ -2518,6 +2518,88 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStringBuilderLengthSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                40,
+                "System.Text.StringBuilder.get_Length");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Text.StringBuilder.get_Length()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Text.StringBuilder.get_Length()", "none");
+
+            var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+            Assert.That(symbols, Does.Contain("System.Text.StringBuilder.get_Length()"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeDateTimeToFileTimeAndMemberwiseCloneSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                120,
+                "System.DateTime.ToFileTime()",
+                "System.Object.MemberwiseClone()");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.DateTime.ToFileTime()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.DateTime.ToFileTime()", "caller_visible");
+            AssertPurityClassification(summary, "System.Object.MemberwiseClone()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Object.MemberwiseClone()", "caller_visible");
+
+            var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+            Assert.That(symbols, Does.Contain("System.DateTime.ToFileTime()"));
+            Assert.That(symbols, Does.Contain("System.Object.MemberwiseClone()"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeHttpResponseMessageStatusCodeSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Net.Http.dll",
+                20,
+                "System.Net.Http.HttpResponseMessage.get_IsSuccessStatusCode()");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Net.Http.HttpResponseMessage.get_IsSuccessStatusCode()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Net.Http.HttpResponseMessage.get_IsSuccessStatusCode()", "none");
+
+            var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+            Assert.That(symbols, Does.Contain("System.Net.Http.HttpResponseMessage.get_IsSuccessStatusCode()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStringSplitSlice_UsesGeneratedFreshArrayEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.String.Split", limit: 80);
@@ -4330,6 +4412,30 @@ public static class PurityFixture
 
             AssertPurityClassification(summary, "System.Net.IPAddress.Parse(string)", "impure", "impure_callee");
             AssertPurityClassification(summary, "System.Net.IPAddress.Parse(System.ReadOnlySpan`1<char>)", "impure", "impure_callee");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeIPAddressIsLoopbackSlice_TreatsLoopbackSingletonCacheReadsAsPure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly("System.Net.Primitives.dll", 20, "System.Net.IPAddress.IsLoopback");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Net.IPAddress.IsLoopback(System.Net.IPAddress)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Net.IPAddress.IsLoopback(System.Net.IPAddress)", "internal_only");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Net.IPAddress.IsLoopback(System.Net.IPAddress)"));
         }
 
         [Test]

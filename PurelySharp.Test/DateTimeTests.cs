@@ -229,6 +229,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task DateTimeToFileTime_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public long {|PS0002:TestMethod|}(DateTime value)
+    {
+        return value.ToFileTime();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task DateTimeBinaryRoundTripHelpers_Diagnostic()
         {
             var test = @"

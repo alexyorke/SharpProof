@@ -985,7 +985,6 @@ public static class Constants
         "System.Collections.Generic.KeyValuePair<TKey, TValue>.KeyValuePair(TKey, TValue)",
         "System.Collections.Generic.KeyValuePair<TKey, TValue>.Key.get",
         "System.Collections.Generic.KeyValuePair<TKey, TValue>.Value.get",
-        "System.DateTime.ToFileTime()",
         "System.Decimal.Compare(decimal, decimal)",
         "System.Decimal.ToDouble(decimal)",
         "System.Decimal.ToInt32(decimal)",
@@ -1008,9 +1007,7 @@ public static class Constants
         "System.Net.IPEndPoint.IPEndPoint(System.Net.IPAddress, int)",
         "System.Runtime.InteropServices.Marshal.SizeOf<T>()",
         "string.Join(string, System.Collections.Generic.IEnumerable<string>)",
-        "System.Net.Http.HttpResponseMessage.IsSuccessStatusCode.get",
         "System.Text.Encoding.ASCII.get",
-        "System.Text.StringBuilder.Length.get",
         "System.Threading.CancellationToken.None.get",
         "System.Uri.ToString()",
 
@@ -1031,8 +1028,5 @@ public static class Constants
         "System.IO.FileInfo.Name.get",
 
         "System.Linq.Enumerable.TakeWhile<TSource>(System.Collections.Generic.IEnumerable<TSource>, System.Func<TSource, bool>)",
-        "System.Net.IPAddress.IsLoopback(System.Net.IPAddress)",
-        "object.MemberwiseClone()",
-        "string.IsNullOrWhiteSpace(System.ReadOnlySpan<char>)",
     };
 }

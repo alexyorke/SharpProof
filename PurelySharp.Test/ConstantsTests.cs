@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -740,6 +741,24 @@ public static class ExceptionAccessorCatalogSignatureSamples
         }
 
         [Test]
+        public void StringNullOrWhiteSpaceSpanOverload_IsNotOnNet80Surface_AndNotStaticCataloged()
+        {
+            var overloads = typeof(string)
+                .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Where(method => string.Equals(method.Name, nameof(string.IsNullOrWhiteSpace), StringComparison.Ordinal))
+                .Select(method => method.ToString())
+                .OrderBy(signature => signature, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(overloads, Is.EqualTo(new[]
+            {
+                "Boolean IsNullOrWhiteSpace(System.String)",
+            }));
+
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("string.IsNullOrWhiteSpace(System.ReadOnlySpan<char>)"));
+        }
+
+        [Test]
         public void StringLengthAndTrimHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
@@ -903,6 +922,36 @@ public static class ExceptionAccessorCatalogSignatureSamples
         public void StringBuilderToString_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.Text.StringBuilder.ToString()");
+        }
+
+        [Test]
+        public void StringBuilderLengthAndHttpResponseSuccessStatusCode_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Net.Http.HttpResponseMessage.IsSuccessStatusCode.get",
+                "System.Text.StringBuilder.Length.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
+        public void DateTimeToFileTimeAndMemberwiseClone_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.DateTime.ToFileTime()",
+                "object.MemberwiseClone()",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
         }
 
         [Test]
@@ -1421,6 +1470,12 @@ public class GuardSignatureSamples
             {
                 AssertNotInManualCatalogs(member);
             }
+        }
+
+        [Test]
+        public void IPAddressIsLoopback_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Net.IPAddress.IsLoopback(System.Net.IPAddress)");
         }
 
         [Test]
@@ -2258,6 +2313,29 @@ public static class RecentCatalogSignatureSamples
         }
 
         [Test]
+        public void IPAddressIsLoopbackGeneratedPurityEntriesResolveAgainstNet80References()
+        {
+            var source = @"
+using System.Net;
+
+public static class IPAddressLoopbackGeneratedCatalogSignatureSamples
+{
+    public static bool Sample(IPAddress address)
+    {
+        return IPAddress.IsLoopback(address);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "IPAddressLoopbackGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "IPAddress.IsLoopback(address)"));
+        }
+
+        [Test]
         public void DateTimeGeneratedPurityEntriesResolveAgainstNet80References()
         {
             var source = @"
@@ -2418,6 +2496,64 @@ public static class IndexHashCodeCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "hash.ToHashCode()"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Index.End"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Index.Start"));
+        }
+
+        [Test]
+        public void StringBuilderLengthAndHttpResponseSuccessStatusCodeGeneratedPurityEntriesResolveAgainstNet80References()
+        {
+            var source = @"
+using System.Net.Http;
+using System.Text;
+
+public static class StringBuilderHttpResponseCatalogSignatureSamples
+{
+    public static int Sample(StringBuilder builder, HttpResponseMessage response)
+    {
+        return builder.Length + (response.IsSuccessStatusCode ? 1 : 0);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "StringBuilderHttpResponseGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "builder.Length"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "response.IsSuccessStatusCode"));
+        }
+
+        [Test]
+        public void DateTimeToFileTimeAndMemberwiseCloneGeneratedPurityEntriesResolveAgainstNet80References()
+        {
+            var source = @"
+using System;
+
+public class CloneableSample
+{
+    public object CloneSelf()
+    {
+        return MemberwiseClone();
+    }
+}
+
+public static class DateTimeMemberwiseCloneCatalogSignatureSamples
+{
+    public static long Sample(DateTime value, CloneableSample sample)
+    {
+        _ = sample.CloneSelf();
+        return value.ToFileTime();
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "DateTimeMemberwiseCloneGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "MemberwiseClone()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.ToFileTime()"));
         }
 
         [Test]
