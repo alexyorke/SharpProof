@@ -381,6 +381,7 @@ internal static class AssemblyEffectSummarizer
         var effects = new SortedSet<string>(StringComparer.Ordinal);
         var calls = new SortedSet<string>(StringComparer.Ordinal);
         var fields = new SortedSet<string>(StringComparer.Ordinal);
+        var staticFields = new SortedSet<string>(StringComparer.Ordinal);
         var thrownExceptionTypes = new SortedSet<string>(StringComparer.Ordinal);
         string? methodBodySha256 = null;
 
@@ -411,7 +412,7 @@ internal static class AssemblyEffectSummarizer
             if (il is not null)
             {
                 methodBodySha256 = ComputeSha256(il);
-                AnalyzeIl(reader, il, body.ExceptionRegions, effects, calls, fields, thrownExceptionTypes);
+                AnalyzeIl(reader, il, body.ExceptionRegions, effects, calls, fields, staticFields, thrownExceptionTypes);
             }
         }
 
@@ -426,7 +427,7 @@ internal static class AssemblyEffectSummarizer
             MethodBodySha256: methodBodySha256,
             CacheKey: cacheKey,
             Effects: effects.ToArray(),
-            RootCandidates: GetRootCandidates(effects, calls, fields, isConstructor).ToArray(),
+            RootCandidates: GetRootCandidates(effects, calls, staticFields, isConstructor).ToArray(),
             TransitiveRootCandidates: Array.Empty<string>(),
             ThrownExceptionTypes: thrownExceptionTypes.ToArray(),
             TransitiveThrownExceptionTypes: Array.Empty<string>(),
@@ -542,13 +543,13 @@ internal static class AssemblyEffectSummarizer
     private static IEnumerable<string> GetRootCandidates(
         IEnumerable<string> effects,
         IEnumerable<string> calls,
-        IEnumerable<string> fields,
+        IEnumerable<string> staticFields,
         bool isConstructor)
     {
         var roots = new SortedSet<string>(StringComparer.Ordinal);
         var effectSet = new HashSet<string>(effects, StringComparer.Ordinal);
         var callSet = new HashSet<string>(calls, StringComparer.Ordinal);
-        var fieldSet = new HashSet<string>(fields, StringComparer.Ordinal);
+        var staticFieldSet = new HashSet<string>(staticFields, StringComparer.Ordinal);
         foreach (var effect in effects)
         {
             switch (effect)
@@ -563,11 +564,11 @@ internal static class AssemblyEffectSummarizer
                     roots.Add("metadata_only_or_external");
                     break;
                 case "reads_static_field":
-                    if (IsSafeStaticCacheRead(fieldSet, callSet))
+                    if (IsSafeStaticCacheRead(staticFieldSet, callSet))
                     {
                         roots.Add("safe_static_cache_read");
                     }
-                    else if (IsSafeStaticConstantRead(fieldSet))
+                    else if (IsSafeStaticConstantRead(staticFieldSet))
                     {
                         roots.Add("safe_static_constant_read");
                     }
@@ -627,7 +628,10 @@ internal static class AssemblyEffectSummarizer
             string.Equals(field, "System.OrdinalCaseSensitiveComparer.Instance", StringComparison.Ordinal) ||
             string.Equals(field, "System.OrdinalIgnoreCaseComparer.Instance", StringComparison.Ordinal) ||
             string.Equals(field, "System.CultureAwareComparer.InvariantCaseSensitiveInstance", StringComparison.Ordinal) ||
-            string.Equals(field, "System.CultureAwareComparer.InvariantIgnoreCaseInstance", StringComparison.Ordinal)))
+            string.Equals(field, "System.CultureAwareComparer.InvariantIgnoreCaseInstance", StringComparison.Ordinal) ||
+            string.Equals(field, "System.String.Empty", StringComparison.Ordinal) ||
+            string.Equals(field, "System.Globalization.TextInfo.Invariant", StringComparison.Ordinal) ||
+            string.Equals(field, "System.Globalization.CompareInfo.Invariant", StringComparison.Ordinal)))
         {
             return true;
         }
@@ -721,6 +725,7 @@ internal static class AssemblyEffectSummarizer
         SortedSet<string> effects,
         SortedSet<string> calls,
         SortedSet<string> fields,
+        SortedSet<string> staticFields,
         SortedSet<string> thrownExceptionTypes)
     {
         var offset = 0;
@@ -806,6 +811,7 @@ internal static class AssemblyEffectSummarizer
             {
                 effects.Add("reads_static_field");
                 AddField(reader, operandToken, fields);
+                AddField(reader, operandToken, staticFields);
             }
             else if (opCode == OpCodes.Stfld)
             {
@@ -816,6 +822,7 @@ internal static class AssemblyEffectSummarizer
             {
                 effects.Add("writes_static_field");
                 AddField(reader, operandToken, fields);
+                AddField(reader, operandToken, staticFields);
             }
             else if (opCode == OpCodes.Throw || opCode == OpCodes.Rethrow)
             {

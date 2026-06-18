@@ -1186,11 +1186,6 @@ public static class Constants
         "System.Security.Cryptography.SHA256.ComputeHash(byte[])",
 
 
-        "string.Concat(string, string)",
-        "string.Concat(params string[])",
-        "string.Replace(string, string)",
-        "string.Substring(int, int)",
-
         "System.String.Split(char)",
         "System.String.Split(char, System.StringSplitOptions)",
         "System.String.Split(params char[])",
@@ -1463,8 +1458,6 @@ public static class Constants
         "string.CompareTo(string)",
         "string.IndexOf(char)",
         "string.IndexOf(string)",
-        "string.Substring(int)",
-        "string.Substring(int, int)",
         "string.ToString()",
 
 

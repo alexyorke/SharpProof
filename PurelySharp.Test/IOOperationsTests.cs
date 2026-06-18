@@ -799,7 +799,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task PathHelpers_Diagnostic()
+        public async Task PathHelpers_MixedDiagnostics()
         {
             var test = @"
 #nullable enable
@@ -821,7 +821,7 @@ public class TestClass
     }
 
     [EnforcePure]
-    public string? {|PS0002:ChangeExtensionMethod|}(string path)
+    public string? ChangeExtensionMethod(string path)
     {
         return Path.ChangeExtension(path, "".txt"");
     }

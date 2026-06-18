@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T06:04:39.5175807+00:00",
+  "GeneratedAtUtc": "2026-06-18T06:25:47.5290662+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -162,7 +162,7 @@
           ],
           "RootCandidates": [
             "dynamic_dispatch",
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
@@ -180,16 +180,17 @@
             "System.Globalization.CompareInfo.Invariant"
           ],
           "PurityClassification": {
-            "Classification": "impure",
+            "Classification": "conservative_unknown",
             "Categories": [
-              "global_state_read"
+              "dynamic_dispatch",
+              "virtual_call"
             ],
             "FirstBlockingCallChain": [],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "caller_visible"
+            "EffectVisibilityClassification": "unknown"
           }
         },
         {
@@ -231,22 +232,10 @@
     "SchemaVersion": 3,
     "MethodCount": 6,
     "PureCount": 4,
-    "ImpureCount": 1,
-    "ConservativeUnknownCount": 1,
+    "ImpureCount": 0,
+    "ConservativeUnknownCount": 2,
     "CatalogComparison": {
-      "KnownPureMembers": [
-        {
-          "Symbol": "string.GetHashCode()",
-          "Catalog": "known_pure",
-          "Classification": "pure",
-          "Categories": [],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "none",
-          "MatchedExactSymbolKeys": [
-            "string.GetHashCode()-\u003Eint"
-          ]
-        }
-      ],
+      "KnownPureMembers": [],
       "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
@@ -304,17 +293,18 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x06000888",
         "MethodBodySha256": "5a7c1d98b9f1d6decc9f7741306d5cab06693594c78b68fabcf44c4b0c10bc74",
-        "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "dynamic_dispatch",
         "Categories": [
-          "global_state_read"
+          "dynamic_dispatch",
+          "virtual_call"
         ],
         "FirstBlockingCallChain": [],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "caller_visible"
+        "EffectVisibilityClassification": "unknown"
       },
       {
         "Symbol": "System.String.GetHashCode(System.StringComparison)",

@@ -767,7 +767,7 @@ public static class PurityFixture
 
             AssertPurityClassification(summary, "System.IO.Path.Combine(string, string)", "pure");
             AssertPurityClassification(summary, "System.IO.Path.HasExtension(string)", "pure");
-            AssertPurityClassification(summary, "System.IO.Path.ChangeExtension(string, string)", "impure", "global_state_read");
+            AssertPurityClassification(summary, "System.IO.Path.ChangeExtension(string, string)", "pure");
             AssertPurityClassification(summary, "System.IO.Path.GetDirectoryName(string)", "pure");
             AssertPurityClassification(summary, "System.IO.Path.GetExtension(string)", "conservative_unknown", "dynamic_dispatch");
             AssertPurityClassification(summary, "System.IO.Path.GetFileName(string)", "conservative_unknown", "dynamic_dispatch");
@@ -1068,9 +1068,9 @@ public static class PurityFixture
             AssertEffectVisibilityClassification(summary, "System.String.Equals(string)", "none");
             AssertPurityClassification(summary, "System.String.Equals(string, string)", "pure");
             AssertEffectVisibilityClassification(summary, "System.String.Equals(string, string)", "none");
-            AssertPurityClassification(summary, "System.String.Equals(string, System.StringComparison)", "impure", "global_state_read", "throw");
+            AssertPurityClassification(summary, "System.String.Equals(string, System.StringComparison)", "impure", "throw");
             AssertEffectVisibilityClassification(summary, "System.String.Equals(string, System.StringComparison)", "caller_visible");
-            AssertPurityClassification(summary, "System.String.Equals(string, string, System.StringComparison)", "impure", "global_state_read", "throw");
+            AssertPurityClassification(summary, "System.String.Equals(string, string, System.StringComparison)", "impure", "throw");
             AssertEffectVisibilityClassification(summary, "System.String.Equals(string, string, System.StringComparison)", "caller_visible");
         }
 
@@ -1089,7 +1089,7 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeStringInvariantCasingSlice_TreatsHelpersAsGeneratedImpureEvidence()
+        public async Task EffectSummaryTool_RuntimeStringInvariantCasingSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var lowerSummary = await RunRuntimeEffectSummaryAsync("System.String.ToLowerInvariant", limit: 10);
             using var upperSummary = await RunRuntimeEffectSummaryAsync("System.String.ToUpperInvariant", limit: 10);
@@ -1102,10 +1102,104 @@ public static class PurityFixture
             var upperCatalogComparison = upperReport.GetProperty("CatalogComparison");
             Assert.That(upperCatalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(lowerSummary, "System.String.ToLowerInvariant()", "impure", "global_state_read");
-            AssertEffectVisibilityClassification(lowerSummary, "System.String.ToLowerInvariant()", "caller_visible");
-            AssertPurityClassification(upperSummary, "System.String.ToUpperInvariant()", "impure", "global_state_read");
-            AssertEffectVisibilityClassification(upperSummary, "System.String.ToUpperInvariant()", "caller_visible");
+            AssertPurityClassification(lowerSummary, "System.String.ToLowerInvariant()", "pure");
+            AssertEffectVisibilityClassification(lowerSummary, "System.String.ToLowerInvariant()", "internal_only");
+            AssertPurityClassification(upperSummary, "System.String.ToUpperInvariant()", "pure");
+            AssertEffectVisibilityClassification(upperSummary, "System.String.ToUpperInvariant()", "internal_only");
+
+            var lowerSymbols = lowerSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.String.ToLowerInvariant", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(lowerSymbols, Is.EqualTo(new[]
+            {
+                "System.String.ToLowerInvariant()",
+            }));
+
+            var upperSymbols = upperSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.String.ToUpperInvariant", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(upperSymbols, Is.EqualTo(new[]
+            {
+                "System.String.ToUpperInvariant()",
+            }));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeStringConcatSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.String.Concat", limit: 60);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.String.Concat(string, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Concat(string, string)", "internal_only");
+            AssertPurityClassification(summary, "System.String.Concat(string[])", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Concat(string[])", "internal_only");
+
+            var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.String.Concat", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(symbols, Does.Contain("System.String.Concat(string, string)"));
+            Assert.That(symbols, Does.Contain("System.String.Concat(string[])"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeStringSubstringSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.String.Substring", limit: 20);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.String.Substring(int)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Substring(int)", "internal_only");
+            AssertPurityClassification(summary, "System.String.Substring(int, int)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Substring(int, int)", "internal_only");
+
+            var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.String.Substring", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(symbols, Does.Contain("System.String.Substring(int)"));
+            Assert.That(symbols, Does.Contain("System.String.Substring(int, int)"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeStringReplaceSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.String.Replace", limit: 20);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.String.Replace(string, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Replace(string, string)", "internal_only");
+
+            var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.String.Replace", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(symbols, Does.Contain("System.String.Replace(string, string)"));
         }
 
         [Test]
@@ -1173,7 +1267,7 @@ public static class PurityFixture
             AssertPurityClassification(summary, "System.Convert.ToBase64String(byte[], System.Base64FormattingOptions)", "impure", "impure_callee");
             AssertPurityClassification(summary, "System.Convert.ToBase64String(byte[], int, int)", "impure", "impure_callee");
             AssertPurityClassification(summary, "System.Convert.ToBase64String(byte[], int, int, System.Base64FormattingOptions)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.Convert.ToBase64String(System.ReadOnlySpan`1<byte>, System.Base64FormattingOptions)", "impure", "global_state_read", "throw");
+            AssertPurityClassification(summary, "System.Convert.ToBase64String(System.ReadOnlySpan`1<byte>, System.Base64FormattingOptions)", "impure", "throw");
 
             var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
             var symbols = generatedCatalog.GetProperty("Entries")
@@ -1193,7 +1287,7 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeConvertToHexSlice_TreatsRuntimeHelpersAsImpure()
+        public async Task EffectSummaryTool_RuntimeConvertToHexSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Convert.ToHexString", limit: 20);
 
@@ -1205,9 +1299,12 @@ public static class PurityFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Convert.ToHexString(byte[])", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.Convert.ToHexString(byte[], int, int)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.Convert.ToHexString(System.ReadOnlySpan`1<byte>)", "impure", "global_state_read");
+            AssertPurityClassification(summary, "System.Convert.ToHexString(byte[])", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Convert.ToHexString(byte[])", "none");
+            AssertPurityClassification(summary, "System.Convert.ToHexString(byte[], int, int)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Convert.ToHexString(byte[], int, int)", "none");
+            AssertPurityClassification(summary, "System.Convert.ToHexString(System.ReadOnlySpan`1<byte>)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Convert.ToHexString(System.ReadOnlySpan`1<byte>)", "internal_only");
 
             var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
             var symbols = generatedCatalog.GetProperty("Entries")

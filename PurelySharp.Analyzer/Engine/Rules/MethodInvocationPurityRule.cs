@@ -1579,12 +1579,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return true;
             }
 
-            if (methodSymbol.Name is "ToLowerInvariant" or "ToUpperInvariant" &&
-                methodSymbol.Parameters.Length == 0)
-            {
-                return true;
-            }
-
             if (methodSymbol.Name is "Contains" or "StartsWith" or "EndsWith" or "Equals")
             {
                 var comparisonParameterIndex = GetStringComparisonParameterIndex(methodSymbol);

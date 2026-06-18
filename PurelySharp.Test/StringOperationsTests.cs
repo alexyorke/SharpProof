@@ -215,6 +215,29 @@ public class TestClass
         }
 
         [Test]
+        public async Task StringConcatReplaceSubstring_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(string input, string suffix, string[] parts)
+    {
+        var combined = string.Concat(input, suffix);
+        var flattened = string.Concat(parts);
+        var replaced = combined.Replace(suffix, flattened);
+        var tail = replaced.Substring(1);
+        return tail.Substring(0, 1);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task StringStartsWithStringComparisonOrdinal_NoDiagnostic()
         {
             var test = @"

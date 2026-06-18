@@ -197,13 +197,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void StringInvariantCasingAndHashCodeHelpers_AreSourcedFromGeneratedPurityEvidence_AndSemanticRules_NotStaticCatalogs()
+        public void StringInvariantCasingAndHashCodeHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
             {
                 "string.GetHashCode()",
                 "string.ToLowerInvariant()",
                 "string.ToUpperInvariant()",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
+        public void StringConcatReplaceSubstringHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "string.Concat(string, string)",
+                "string.Concat(params string[])",
+                "string.Replace(string, string)",
+                "string.Substring(int)",
+                "string.Substring(int, int)",
             };
 
             foreach (var member in members)

@@ -213,6 +213,11 @@ internal static class PurityClassificationEngine
                 continue;
             }
 
+            if (visiting.Contains(call))
+            {
+                continue;
+            }
+
             var calleeClassification = ClassifyMethod(call, bySymbol, memo, visiting);
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal))
             {
