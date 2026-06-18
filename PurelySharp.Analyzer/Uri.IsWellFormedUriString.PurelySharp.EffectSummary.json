@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T09:16:27.0157014+00:00",
+  "GeneratedAtUtc": "2026-06-18T10:23:34.9012173+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.Uri",
@@ -50,19 +50,7 @@
     "ImpureCount": 0,
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
-      "KnownPureMembers": [
-        {
-          "Symbol": "System.Uri.IsWellFormedUriString(string, System.UriKind)",
-          "Catalog": "known_pure",
-          "Classification": "pure",
-          "Categories": [],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "none",
-          "MatchedExactSymbolKeys": [
-            "System.Uri.IsWellFormedUriString(string, System.UriKind)-\u003Ebool"
-          ]
-        }
-      ],
+      "KnownPureMembers": [],
       "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }

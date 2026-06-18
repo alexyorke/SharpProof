@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T08:45:41.5075657+00:00",
+  "GeneratedAtUtc": "2026-06-18T10:23:31.3745473+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -161,41 +161,7 @@
     "ImpureCount": 0,
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
-      "KnownPureMembers": [
-        {
-          "Symbol": "bool.ToString()",
-          "Catalog": "known_pure",
-          "Classification": "pure",
-          "Categories": [],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "none",
-          "MatchedExactSymbolKeys": [
-            "bool.ToString()-\u003Estring"
-          ]
-        },
-        {
-          "Symbol": "char.ToString()",
-          "Catalog": "known_pure",
-          "Classification": "pure",
-          "Categories": [],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "none",
-          "MatchedExactSymbolKeys": [
-            "char.ToString()-\u003Estring"
-          ]
-        },
-        {
-          "Symbol": "char.ToString(char)",
-          "Catalog": "known_pure",
-          "Classification": "pure",
-          "Categories": [],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "none",
-          "MatchedExactSymbolKeys": [
-            "char.ToString(char)-\u003Estring"
-          ]
-        }
-      ],
+      "KnownPureMembers": [],
       "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }

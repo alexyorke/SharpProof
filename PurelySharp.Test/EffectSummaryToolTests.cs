@@ -1746,6 +1746,47 @@ public static class PurityFixture
         }
 
         [Test]
+        public void CheckedInEffectSummaryArtifacts_DoNotReportCatalogOverlap()
+        {
+            var analyzerDirectory = Path.Combine(GetRepositoryRoot(), "PurelySharp.Analyzer");
+            var summaryPaths = Directory.GetFiles(analyzerDirectory, "*.EffectSummary.json", SearchOption.TopDirectoryOnly)
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(summaryPaths, Is.Not.Empty);
+            var summariesWithCatalogComparison = 0;
+
+            foreach (var summaryPath in summaryPaths)
+            {
+                using var summary = JsonDocument.Parse(File.ReadAllText(summaryPath));
+                if (!summary.RootElement.TryGetProperty("PurityReport", out var purityReport) ||
+                    purityReport.ValueKind != JsonValueKind.Object ||
+                    !purityReport.TryGetProperty("CatalogComparison", out var catalogComparison) ||
+                    catalogComparison.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                summariesWithCatalogComparison++;
+
+                Assert.That(
+                    catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(),
+                    Is.EqualTo(0),
+                    summaryPath);
+                Assert.That(
+                    catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(),
+                    Is.EqualTo(0),
+                    summaryPath);
+                Assert.That(
+                    catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(),
+                    Is.EqualTo(0),
+                    summaryPath);
+            }
+
+            Assert.That(summariesWithCatalogComparison, Is.GreaterThan(0));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeAppContextSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

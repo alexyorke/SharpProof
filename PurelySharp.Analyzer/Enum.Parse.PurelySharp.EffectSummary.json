@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T09:12:15.9863229+00:00",
+  "GeneratedAtUtc": "2026-06-18T10:23:32.2100973+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -256,19 +256,7 @@
     "ImpureCount": 0,
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
-      "KnownPureMembers": [
-        {
-          "Symbol": "System.Enum.Parse(System.Type, string)",
-          "Catalog": "known_pure",
-          "Classification": "pure",
-          "Categories": [],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "none",
-          "MatchedExactSymbolKeys": [
-            "System.Enum.Parse(System.Type, string)-\u003Eobject"
-          ]
-        }
-      ],
+      "KnownPureMembers": [],
       "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
