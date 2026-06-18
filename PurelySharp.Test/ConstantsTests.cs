@@ -280,7 +280,7 @@ public static class InterfaceCollectionLookupCatalogSignatureSamples
 {
     public static bool Sample(ICollection<int> collection, IList<int> list, int value)
     {
-        return collection.Contains(value) && list.IndexOf(value) >= 0;
+        return collection.Contains(value) && list.IndexOf(value) >= 0 && collection.Count >= 0;
     }
 }";
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
@@ -292,6 +292,7 @@ public static class InterfaceCollectionLookupCatalogSignatureSamples
 
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "collection.Contains(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "list.IndexOf(value)"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "collection.Count"));
         }
 
         [Test]
@@ -315,6 +316,34 @@ public static class SortedDictionaryCountCatalogSignatureSamples
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "values.Count"));
+        }
+
+        [Test]
+        public void KeyedCollectionContains_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Collections.ObjectModel;
+
+public sealed class NameCollection : KeyedCollection<string, string>
+{
+    protected override string GetKeyForItem(string item) => item;
+}
+
+public static class KeyedCollectionCatalogSignatureSamples
+{
+    public static bool Sample(NameCollection values, string key)
+    {
+        return values.Contains(key);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "KeyedCollectionCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.Contains(key)"));
         }
 
         [Test]
@@ -1459,7 +1488,7 @@ public static class CatalogSignatureSamples
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetPropertySignature(compilation, syntaxTree, "list.Count")));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "names.Contains(\"alpha\")"), Is.EqualTo("System.Collections.ObjectModel.KeyedCollection<TKey, TItem>.Contains(TKey)"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "names.Contains(\"alpha\")")));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "names.Contains(\"alpha\")")));
 
             Assert.That(GetObjectCreationSignature(compilation, syntaxTree, "new FileNotFoundException(\"missing.txt\")"), Is.EqualTo("System.IO.FileNotFoundException.FileNotFoundException(string?)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetObjectCreationSignature(compilation, syntaxTree, "new FileNotFoundException(\"missing.txt\")")));

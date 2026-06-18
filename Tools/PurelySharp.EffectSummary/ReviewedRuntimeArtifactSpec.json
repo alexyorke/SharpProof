@@ -210,8 +210,18 @@
       "SourceSummaryPath": "PurelySharp.Analyzer/Interface.CollectionLookup.PurelySharp.EffectSummary.json",
       "Limit": 20,
       "SymbolPrefixes": [
+        "System.Collections.Generic.ICollection`1.get_Count",
         "System.Collections.Generic.ICollection`1.Contains",
         "System.Collections.Generic.IList`1.IndexOf"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/KeyedCollection.Contains.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/KeyedCollection.Contains.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.ObjectModel.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Collections.ObjectModel.KeyedCollection`2.Contains("
       ]
     },
     {

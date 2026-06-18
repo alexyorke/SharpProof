@@ -1,0 +1,104 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-18T15:54:44.1800209+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.ObjectModel",
+      "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.ObjectModel.dll",
+      "AssemblySha256": "015061c7fea90ceaaabe2669db8b8110249295e19a6a571363c8a581ad9ba7dd",
+      "ModuleVersionId": "1a584d7d-66b9-4645-890d-058c0c7a4bc2",
+      "MethodCount": 190,
+      "EmittedMethodCount": 1,
+      "Methods": [
+        {
+          "Symbol": "System.Collections.ObjectModel.KeyedCollection\u00602.Contains(!0)",
+          "ExactSymbolKey": "System.Collections.ObjectModel.KeyedCollection\u00602.Contains(!0)-\u003Ebool",
+          "MetadataToken": "0x06000043",
+          "RelativeVirtualAddress": 28304,
+          "MethodBodySha256": "c96f647e96ed5a7e1ecaffb164bf027dfb017126a67ae6c5a1c7d839a4aceee4",
+          "CacheKey": "mvid:1a584d7d-66b9-4645-890d-058c0c7a4bc2|token:0x06000043|il:c96f647e96ed5a7e1ecaffb164bf027dfb017126a67ae6c5a1c7d839a4aceee4",
+          "Effects": [
+            "allocates_box",
+            "calls_method",
+            "reads_instance_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "Enumerator\u003C!1\u003E.MoveNext()-\u003Ebool",
+            "Enumerator\u003C!1\u003E.get_Current()-\u003E!0",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.Collections.Generic.Dictionary\u00602\u003C!0, !1\u003E.ContainsKey(!0)-\u003Ebool",
+            "System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E.Equals(!0, !0)-\u003Ebool",
+            "System.Collections.Generic.List\u00601\u003C!1\u003E.GetEnumerator()-\u003EEnumerator\u003C!0\u003E",
+            "System.Collections.ObjectModel.KeyedCollection\u00602\u003C!0, !1\u003E.GetKeyForItem(!1)-\u003E!0",
+            "System.Collections.ObjectModel.KeyedCollection\u00602\u003C!0, !1\u003E.get_Items()-\u003ESystem.Collections.Generic.List\u00601\u003C!1\u003E",
+            "System.IDisposable.Dispose()-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Collections.ObjectModel.KeyedCollection\u00602\u003C!0, !1\u003E.comparer",
+            "System.Collections.ObjectModel.KeyedCollection\u00602\u003C!0, !1\u003E.dict"
+          ],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "dynamic_dispatch",
+              "virtual_call"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 1,
+    "PureCount": 0,
+    "ImpureCount": 0,
+    "ConservativeUnknownCount": 1,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.Collections.ObjectModel.KeyedCollection\u00602.Contains(!0)",
+        "ExactSymbolKey": "System.Collections.ObjectModel.KeyedCollection\u00602.Contains(!0)-\u003Ebool",
+        "CacheKey": "mvid:1a584d7d-66b9-4645-890d-058c0c7a4bc2|token:0x06000043|il:c96f647e96ed5a7e1ecaffb164bf027dfb017126a67ae6c5a1c7d839a4aceee4",
+        "AssemblyName": "System.ObjectModel",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.ObjectModel.dll",
+        "AssemblySha256": "015061c7fea90ceaaabe2669db8b8110249295e19a6a571363c8a581ad9ba7dd",
+        "ModuleVersionId": "1a584d7d-66b9-4645-890d-058c0c7a4bc2",
+        "MetadataToken": "0x06000043",
+        "MethodBodySha256": "c96f647e96ed5a7e1ecaffb164bf027dfb017126a67ae6c5a1c7d839a4aceee4",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "dynamic_dispatch",
+        "Categories": [
+          "dynamic_dispatch",
+          "virtual_call"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      }
+    ]
+  }
+}

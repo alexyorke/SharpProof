@@ -10,7 +10,7 @@ namespace PurelySharp.Test
     public class KeyedCollectionTests
     {
         [Test]
-        public async Task KeyedCollectionContainsForBuiltinKey_NoDiagnostic()
+        public async Task KeyedCollectionContainsForBuiltinKey_Diagnostic()
         {
             var test = @"
 using System.Collections.ObjectModel;
@@ -24,7 +24,7 @@ public sealed class NameCollection : KeyedCollection<string, string>
 public class TestClass
 {
     [EnforcePure]
-    public bool TestMethod(NameCollection values, string key)
+    public bool {|PS0002:TestMethod|}(NameCollection values, string key)
     {
         return values.Contains(key);
     }

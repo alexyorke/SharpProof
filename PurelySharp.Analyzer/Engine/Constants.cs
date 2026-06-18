@@ -1009,7 +1009,6 @@ public static class Constants
 
 
         "System.Buffers.Text.Utf8Parser.TryParse(System.ReadOnlySpan<byte>, out int, out int)",
-        "System.Collections.ObjectModel.KeyedCollection<TKey, TItem>.Contains(TKey)",
         "System.Drawing.Color.FromArgb(int, int, int, int)",
         "System.Drawing.Point.Point(int, int)",
         "System.Globalization.StringInfo.ParseCombiningCharacters(string)",
@@ -1054,7 +1053,6 @@ public static class Constants
         "System.Runtime.CompilerServices.IsExternalInit",
         "System.Runtime.Serialization.DataContractAttribute.DataContractAttribute()",
         "System.Security.AllowPartiallyTrustedCallersAttribute.AllowPartiallyTrustedCallersAttribute()",
-        "System.Collections.Generic.ICollection<T>.Count.get",
         "System.Array.GetEnumerator()",
         "System.Collections.Generic.IEnumerable<T>.GetEnumerator()",
         "System.Collections.Generic.IEnumerator<T>.Current.get",
