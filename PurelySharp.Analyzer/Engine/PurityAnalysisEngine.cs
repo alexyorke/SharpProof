@@ -4091,7 +4091,8 @@ namespace PurelySharp.Analyzer.Engine
             IInvocationOperation invocationOperation,
             out string catalogSource)
         {
-            if (IsCurrentCultureSensitiveNumericParseOrFormatInvocation(invocationOperation))
+            if (IsCurrentCultureSensitiveNumericParseOrFormatInvocation(invocationOperation) ||
+                IsCurrentCultureSensitiveDateLikeParseOrFormatInvocation(invocationOperation))
             {
                 catalogSource = "current_culture_semantic_rule";
                 return true;
@@ -4172,6 +4173,59 @@ namespace PurelySharp.Analyzer.Engine
             return false;
         }
 
+        private static bool IsCurrentCultureSensitiveDateLikeParseOrFormatInvocation(IInvocationOperation invocationOperation)
+        {
+            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
+            if (targetMethod == null ||
+                !IsCultureSensitiveDateLikeType(targetMethod.ContainingType))
+            {
+                return false;
+            }
+
+            if (targetMethod.Name == "Parse" &&
+                invocationOperation.Arguments.Length == 1 &&
+                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type))
+            {
+                return true;
+            }
+
+            if (targetMethod.Name == "TryParse" &&
+                invocationOperation.Arguments.Length == 2 &&
+                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type))
+            {
+                return true;
+            }
+
+            if ((targetMethod.Name == "ParseExact" || targetMethod.Name == "TryParseExact") &&
+                IsDateOnlyOrTimeOnlyType(targetMethod.ContainingType) &&
+                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type) &&
+                IsFormatSpecifierType(targetMethod.Parameters[1].Type))
+            {
+                return invocationOperation.Arguments.Length == (targetMethod.Name == "ParseExact" ? 2 : 3);
+            }
+
+            if (targetMethod.Name == "ToString" &&
+                invocationOperation.Arguments.Length == 0)
+            {
+                return true;
+            }
+
+            if (targetMethod.Name == "ToString" &&
+                invocationOperation.Arguments.Length == 1 &&
+                targetMethod.Parameters[0].Type.SpecialType == SpecialType.System_String)
+            {
+                return true;
+            }
+
+            if (invocationOperation.Arguments.Length == 0 &&
+                targetMethod.Name is "ToLongDateString" or "ToShortDateString" or "ToLongTimeString" or "ToShortTimeString")
+            {
+                return true;
+            }
+
+            return false;
+        }
+
         private static bool IsCultureSensitiveNumericType(ITypeSymbol? containingType)
         {
             return containingType?.SpecialType is SpecialType.System_Byte or
@@ -4186,6 +4240,28 @@ namespace PurelySharp.Analyzer.Engine
                 SpecialType.System_UInt32 or
                 SpecialType.System_UInt64 ||
                 containingType?.ToDisplayString() is "System.Half" or "System.Numerics.BigInteger";
+        }
+
+        private static bool IsCultureSensitiveDateLikeType(ITypeSymbol? containingType)
+        {
+            return containingType?.ToDisplayString() is "System.DateOnly" or
+                "System.DateTime" or
+                "System.DateTimeOffset" or
+                "System.TimeOnly" or
+                "System.TimeSpan";
+        }
+
+        private static bool IsDateOnlyOrTimeOnlyType(ITypeSymbol? containingType)
+        {
+            return containingType?.ToDisplayString() is "System.DateOnly" or "System.TimeOnly";
+        }
+
+        private static bool IsFormatSpecifierType(ITypeSymbol typeSymbol)
+        {
+            return typeSymbol.SpecialType == SpecialType.System_String ||
+                IsReadOnlySpanOfChar(typeSymbol) ||
+                typeSymbol is IArrayTypeSymbol arrayType &&
+                arrayType.ElementType.SpecialType == SpecialType.System_String;
         }
 
         private static bool IsTimeOnlyInvariantCultureParseInvocation(IInvocationOperation invocationOperation)

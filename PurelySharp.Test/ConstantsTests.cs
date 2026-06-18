@@ -620,6 +620,71 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void CurrentCultureDateAndTimeHelpers_AreNotBackedBySpecificMethodCatalogEntries()
+        {
+            var members = new[]
+            {
+                "System.DateOnly.Parse(string)",
+                "System.DateOnly.Parse(System.ReadOnlySpan<char>, System.IFormatProvider?)",
+                "System.DateOnly.ParseExact(string, string)",
+                "System.DateOnly.ParseExact(string, string[])",
+                "System.DateOnly.ParseExact(System.ReadOnlySpan<char>, System.ReadOnlySpan<char>, System.IFormatProvider?, System.Globalization.DateTimeStyles)",
+                "System.DateOnly.ParseExact(System.ReadOnlySpan<char>, string[])",
+                "System.DateOnly.ToLongDateString()",
+                "System.DateOnly.ToShortDateString()",
+                "System.DateOnly.TryParse(string, out System.DateOnly)",
+                "System.DateOnly.TryParse(System.ReadOnlySpan<char>, out System.DateOnly)",
+                "System.DateOnly.TryParseExact(string, string, out System.DateOnly)",
+                "System.DateOnly.TryParseExact(System.ReadOnlySpan<char>, System.ReadOnlySpan<char>, out System.DateOnly)",
+                "System.DateOnly.TryParseExact(string, string[], out System.DateOnly)",
+                "System.DateOnly.TryParseExact(System.ReadOnlySpan<char>, string?[]?, out System.DateOnly)",
+                "System.DateOnly.ToString(string?)",
+                "System.DateOnly.ToString()",
+                "System.DateTime.Parse(string)",
+                "System.DateTime.TryParse(string, out System.DateTime)",
+                "System.DateTime.TryParse(System.ReadOnlySpan<char>, out System.DateTime)",
+                "System.DateTime.ToLongDateString()",
+                "System.DateTime.ToLongTimeString()",
+                "System.DateTime.ToShortDateString()",
+                "System.DateTime.ToShortTimeString()",
+                "System.DateTime.ToString(string)",
+                "System.DateTime.ToString()",
+                "System.DateTimeOffset.Parse(string)",
+                "System.DateTimeOffset.Parse(System.ReadOnlySpan<char>, System.IFormatProvider?)",
+                "System.DateTimeOffset.TryParse(string, out System.DateTimeOffset)",
+                "System.DateTimeOffset.TryParse(System.ReadOnlySpan<char>, out System.DateTimeOffset)",
+                "System.DateTimeOffset.ToString(string?)",
+                "System.DateTimeOffset.ToString()",
+                "System.TimeOnly.Parse(string)",
+                "System.TimeOnly.Parse(System.ReadOnlySpan<char>, System.IFormatProvider?)",
+                "System.TimeOnly.ParseExact(string, string)",
+                "System.TimeOnly.ParseExact(string, string[])",
+                "System.TimeOnly.ParseExact(System.ReadOnlySpan<char>, System.ReadOnlySpan<char>, System.IFormatProvider?, System.Globalization.DateTimeStyles)",
+                "System.TimeOnly.ParseExact(System.ReadOnlySpan<char>, string[])",
+                "System.TimeOnly.ToLongTimeString()",
+                "System.TimeOnly.ToShortTimeString()",
+                "System.TimeOnly.ToString(string?)",
+                "System.TimeOnly.ToString()",
+                "System.TimeOnly.TryParse(string, out System.TimeOnly)",
+                "System.TimeOnly.TryParse(System.ReadOnlySpan<char>, out System.TimeOnly)",
+                "System.TimeOnly.TryParseExact(string, string, out System.TimeOnly)",
+                "System.TimeOnly.TryParseExact(System.ReadOnlySpan<char>, System.ReadOnlySpan<char>, out System.TimeOnly)",
+                "System.TimeOnly.TryParseExact(string, string[], out System.TimeOnly)",
+                "System.TimeOnly.TryParseExact(System.ReadOnlySpan<char>, string?[]?, out System.TimeOnly)",
+                "System.TimeSpan.Parse(string)",
+                "System.TimeSpan.Parse(System.ReadOnlySpan<char>, System.IFormatProvider?)",
+                "System.TimeSpan.ToString()",
+                "System.TimeSpan.TryParse(string, out System.TimeSpan)",
+                "System.TimeSpan.TryParse(System.ReadOnlySpan<char>, out System.TimeSpan)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void RepresentativeCatalogSignaturesResolveAgainstNet80References()
         {
             var source = @"

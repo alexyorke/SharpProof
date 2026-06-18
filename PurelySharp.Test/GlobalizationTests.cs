@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis.Testing;
+using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using System.Globalization;
 using System.Threading.Tasks;
@@ -2972,6 +2972,26 @@ public class TestClass
         }
 
         [Test]
+        public async Task DateTimeToString_CurrentCulture_Diagnostic()
+        {
+            var test = @"
+#nullable enable
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(DateTime value)
+    {
+        return value.ToString();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task DateTimeToString_FormatString_CurrentCulture_Diagnostic()
         {
             var test = @"
@@ -3932,6 +3952,26 @@ public class TestClass
     {
         ReadOnlySpan<char> span = dateStr.AsSpan();
         return DateTimeOffset.TryParseExact(span, new[] { ""O"", ""yyyy-MM-ddTHH:mm:sszzz"" }, CultureInfo.InvariantCulture, DateTimeStyles.None, out _);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task DateTimeOffsetToString_CurrentCulture_Diagnostic()
+        {
+            var test = @"
+#nullable enable
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(DateTimeOffset value)
+    {
+        return value.ToString();
     }
 }";
 
