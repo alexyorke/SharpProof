@@ -3330,6 +3330,70 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStopwatchStateSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                16,
+                "System.Diagnostics.Stopwatch..ctor",
+                "System.Diagnostics.Stopwatch.get_Elapsed",
+                "System.Diagnostics.Stopwatch.get_ElapsedMilliseconds",
+                "System.Diagnostics.Stopwatch.get_ElapsedTicks",
+                "System.Diagnostics.Stopwatch.GetTimestamp",
+                "System.Diagnostics.Stopwatch.Start",
+                "System.Diagnostics.Stopwatch.Stop");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch..ctor()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch..ctor()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.get_Elapsed()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.get_Elapsed()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.get_ElapsedMilliseconds()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.get_ElapsedMilliseconds()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.get_ElapsedTicks()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.get_ElapsedTicks()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.Start()", "impure", "impure_callee", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.Start()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.Stop()", "impure", "impure_callee", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.Stop()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.GetTimestamp()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.GetTimestamp()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceCounter()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceCounter()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Diagnostics.Stopwatch..ctor()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Diagnostics.Stopwatch.get_Elapsed()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Diagnostics.Stopwatch.get_ElapsedMilliseconds()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Diagnostics.Stopwatch.get_ElapsedTicks()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Diagnostics.Stopwatch.GetTimestamp()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Diagnostics.Stopwatch.Start()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Diagnostics.Stopwatch.Stop()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Diagnostics.Stopwatch..ctor()",
+                "System.Diagnostics.Stopwatch.GetTimestamp()",
+                "System.Diagnostics.Stopwatch.Start()",
+                "System.Diagnostics.Stopwatch.Stop()",
+                "System.Diagnostics.Stopwatch.get_Elapsed()",
+                "System.Diagnostics.Stopwatch.get_ElapsedMilliseconds()",
+                "System.Diagnostics.Stopwatch.get_ElapsedTicks()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeOperatingSystemSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

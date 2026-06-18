@@ -964,6 +964,39 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void StopwatchStateHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+using System.Diagnostics;
+
+public static class StopwatchCatalogSignatureSamples
+{
+    public static long Sample(Stopwatch stopwatch)
+    {
+        stopwatch.Start();
+        stopwatch.Stop();
+        _ = stopwatch.Elapsed;
+        _ = stopwatch.ElapsedMilliseconds;
+        return stopwatch.ElapsedTicks + new Stopwatch().ElapsedTicks;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "StopwatchCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new Stopwatch()"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "stopwatch.Elapsed"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "stopwatch.ElapsedMilliseconds"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "stopwatch.ElapsedTicks"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "stopwatch.Start()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "stopwatch.Stop()"));
+        }
+
+        [Test]
         public void OperatingSystemAndApplicationModelPureHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
