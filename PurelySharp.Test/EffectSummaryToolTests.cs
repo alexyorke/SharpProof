@@ -928,8 +928,51 @@ public static class PurityFixture
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.String.IsNullOrEmpty", limit: 10);
 
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
             AssertPurityClassification(summary, "System.String.IsNullOrEmpty(string)", "pure");
             AssertEffectVisibilityClassification(summary, "System.String.IsNullOrEmpty(string)", "none");
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var symbols = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.String.IsNullOrEmpty", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(symbols, Is.EqualTo(new[]
+            {
+                "System.String.IsNullOrEmpty(string)",
+            }));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeStringIsNullOrWhiteSpaceSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.String.IsNullOrWhiteSpace", limit: 10);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.String.IsNullOrWhiteSpace(string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.IsNullOrWhiteSpace(string)", "none");
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var symbols = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.String.IsNullOrWhiteSpace", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(symbols, Is.EqualTo(new[]
+            {
+                "System.String.IsNullOrWhiteSpace(string)",
+            }));
         }
 
         [Test]
@@ -941,6 +984,19 @@ public static class PurityFixture
             AssertEffectVisibilityClassification(summary, "System.StringComparer.get_Ordinal()", "internal_only");
             AssertPurityClassification(summary, "System.StringComparer.get_OrdinalIgnoreCase()", "pure");
             AssertEffectVisibilityClassification(summary, "System.StringComparer.get_OrdinalIgnoreCase()", "internal_only");
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var symbols = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.StringComparer.get_Ordinal", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(symbols, Is.EquivalentTo(new[]
+            {
+                "System.StringComparer.get_Ordinal()",
+                "System.StringComparer.get_OrdinalIgnoreCase()",
+            }));
         }
 
         [Test]

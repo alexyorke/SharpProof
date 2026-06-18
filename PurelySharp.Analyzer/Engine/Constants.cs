@@ -1188,8 +1188,6 @@ public static class Constants
 
         "string.Concat(string, string)",
         "string.Concat(params string[])",
-        "string.IsNullOrEmpty(string)",
-        "string.IsNullOrWhiteSpace(string)",
         "string.Replace(string, string)",
         "string.Substring(int, int)",
         "string.Trim()",
@@ -1222,7 +1220,6 @@ public static class Constants
 
 
         "System.StringComparer.InvariantCultureIgnoreCase.Compare(string, string)",
-        "System.StringComparer.Ordinal.get",
         "System.StringComparer.Ordinal.Equals(string, string)",
 
 
@@ -1477,8 +1474,6 @@ public static class Constants
         "string.GetHashCode()",
         "string.IndexOf(char)",
         "string.IndexOf(string)",
-        "string.IsNullOrEmpty(string)",
-        "string.IsNullOrWhiteSpace(string)",
         "string.Length.get",
         "string.Substring(int)",
         "string.Substring(int, int)",

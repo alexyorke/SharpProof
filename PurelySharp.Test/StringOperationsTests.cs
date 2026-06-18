@@ -99,6 +99,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task StringIsNullOrWhiteSpace_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(string input)
+    {
+        return string.IsNullOrWhiteSpace(input);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task StringStartsWithStringComparisonOrdinal_NoDiagnostic()
         {
             var test = @"
