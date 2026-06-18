@@ -1074,9 +1074,11 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public long TestMethod(ReadOnlySequence<int> value)
+    public int TestMethod(ReadOnlySequence<int> value)
     {
-        return value.Length + (value.IsEmpty ? 0L : 1L);
+        var start = value.Start;
+        var end = value.End;
+        return value.IsEmpty ? 0 : value.Length > 0 ? 1 : 2;
     }
 }";
 
@@ -1090,6 +1092,18 @@ public class TestClass
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var trackedMethods = new IMethodSymbol[]
             {
+                ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<MemberAccessExpressionSyntax>()
+                        .Single(node => node.ToString() == "value.Start"))
+                    .Symbol!).GetMethod!,
+                ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<MemberAccessExpressionSyntax>()
+                        .Single(node => node.ToString() == "value.End"))
+                    .Symbol!).GetMethod!,
                 ((IPropertySymbol)semanticModel.GetSymbolInfo(
                     syntaxTree.GetRoot()
                         .DescendantNodes()

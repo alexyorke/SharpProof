@@ -1111,8 +1111,6 @@ public static class Constants
         "System.Array.GetLength(int)",
         "System.Array.IndexOf<T>(T[], T)",
         "System.Array.LastIndexOf<T>(T[], T)",
-        "System.Buffers.ReadOnlySequence<T>.End.get",
-        "System.Buffers.ReadOnlySequence<T>.Start.get",
         "char.ConvertFromUtf32(int)",
         "System.Collections.Generic.ICollection<T>.Contains(T)",
         "System.Collections.Generic.IList<T>.IndexOf(T)",

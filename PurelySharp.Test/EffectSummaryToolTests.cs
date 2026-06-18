@@ -2094,8 +2094,10 @@ public static class PurityFixture
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Memory.dll",
                 60,
+                "System.Buffers.ReadOnlySequence`1.get_End",
                 "System.Buffers.ReadOnlySequence`1.get_IsEmpty",
-                "System.Buffers.ReadOnlySequence`1.get_Length");
+                "System.Buffers.ReadOnlySequence`1.get_Length",
+                "System.Buffers.ReadOnlySequence`1.get_Start");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -2105,8 +2107,10 @@ public static class PurityFixture
 
             var representativeSymbols = new[]
             {
+                "System.Buffers.ReadOnlySequence`1.get_End()",
                 "System.Buffers.ReadOnlySequence`1.get_IsEmpty()",
                 "System.Buffers.ReadOnlySequence`1.get_Length()",
+                "System.Buffers.ReadOnlySequence`1.get_Start()",
             };
 
             foreach (var symbol in representativeSymbols)

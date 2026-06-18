@@ -526,8 +526,10 @@ public static class MutableCollectionCatalogSignatureSamples
         {
             var members = new[]
             {
+                "System.Buffers.ReadOnlySequence<T>.End.get",
                 "System.Buffers.ReadOnlySequence<T>.IsEmpty.get",
                 "System.Buffers.ReadOnlySequence<T>.Length.get",
+                "System.Buffers.ReadOnlySequence<T>.Start.get",
             };
 
             foreach (var member in members)
@@ -1806,9 +1808,11 @@ using System.Buffers;
 
 public static class ReadOnlySequenceCatalogSignatureSamples
 {
-    public static long Sample(ReadOnlySequence<int> value)
+    public static int Sample(ReadOnlySequence<int> value)
     {
-        return value.Length + (value.IsEmpty ? 0L : 1L);
+        var start = value.Start;
+        var end = value.End;
+        return value.IsEmpty ? 0 : value.Length > 0 ? 1 : 2;
     }
 }";
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
@@ -1818,6 +1822,8 @@ public static class ReadOnlySequenceCatalogSignatureSamples
                 GetTrustedPlatformReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Start"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.End"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Length"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.IsEmpty"));
         }
