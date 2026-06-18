@@ -4962,6 +4962,54 @@
                                                        "EffectVisibilityClassification":  "internal_only"
                                                    },
                                                    {
+                                                       "Symbol":  "System.TimeSpan..ctor(long)",
+                                                       "ExactSymbolKey":  "System.TimeSpan..ctor(long)-\u003evoid",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060022E5|il:82e1d692824e8e55d343b25987ef7d691d0c5743e92311404ec253d1e5c36398",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060022E5",
+                                                       "MethodBodySha256":  "82e1d692824e8e55d343b25987ef7d691d0c5743e92311404ec253d1e5c36398",
+                                                       "Classification":  "pure",
+                                                       "PrimaryCategory":  "generated_purity_summary",
+                                                       "Categories":  [
+
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  true,
+                                                       "HasUnsupportedEffects":  false,
+                                                       "FreshnessClassification":  "fresh_owned_object_write",
+                                                       "EffectVisibilityClassification":  "internal_only"
+                                                   },
+                                                   {
+                                                       "Symbol":  "System.TimeSpan.Add(System.TimeSpan)",
+                                                       "ExactSymbolKey":  "System.TimeSpan.Add(System.TimeSpan)-\u003eSystem.TimeSpan",
+                                                       "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060022F9|il:33dd53cd7412217fa10d9446856364bf5fcfb4748a3cf3f0de855d105011b6f4",
+                                                       "AssemblyName":  "System.Private.CoreLib",
+                                                       "AssemblyPath":  "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+                                                       "AssemblySha256":  "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+                                                       "ModuleVersionId":  "3e106481-9524-4ebf-a276-c71cb5b3f877",
+                                                       "MetadataToken":  "0x060022F9",
+                                                       "MethodBodySha256":  "33dd53cd7412217fa10d9446856364bf5fcfb4748a3cf3f0de855d105011b6f4",
+                                                       "Classification":  "impure",
+                                                       "PrimaryCategory":  "throw",
+                                                       "Categories":  [
+                                                                          "throw"
+                                                                      ],
+                                                       "FirstBlockingCallChain":  [
+
+                                                                                  ],
+                                                       "HasFreshArrayAllocationEvidence":  false,
+                                                       "HasFreshObjectAllocationEvidence":  true,
+                                                       "HasUnsupportedEffects":  true,
+                                                       "FreshnessClassification":  "none",
+                                                       "EffectVisibilityClassification":  "caller_visible"
+                                                   },
+                                                   {
                                                        "Symbol":  "System.Version..ctor(int, int)",
                                                        "ExactSymbolKey":  "System.Version..ctor(int, int)-\u003evoid",
                                                        "CacheKey":  "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600289D|il:a0a737d481291434f85b0d032effefd6cc5448baab389f9addc980e5910a4e21",

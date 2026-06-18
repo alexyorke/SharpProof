@@ -1250,11 +1250,6 @@ public static class Constants
         "System.Threading.Tasks.Task.CompletedTask.get",
         "System.Threading.Tasks.Task.FromResult<TResult>(TResult)",
 
-
-        "System.TimeSpan.TimeSpan(long)",
-        "System.TimeSpan.Add(System.TimeSpan)",
-
-
         "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)",
 
 

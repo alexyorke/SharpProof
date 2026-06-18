@@ -844,6 +844,19 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeTimeSpanSlice_TreatsConstructorAsPureAndAddAsImpure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.TimeSpan", limit: 80);
+
+            AssertPurityClassification(summary, "System.TimeSpan..ctor(long)", "pure");
+            AssertFreshnessClassification(summary, "System.TimeSpan..ctor(long)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.TimeSpan..ctor(long)", "internal_only");
+
+            AssertPurityClassification(summary, "System.TimeSpan.Add(System.TimeSpan)", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.TimeSpan.Add(System.TimeSpan)", "caller_visible");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeUnsafeSlice_TreatsReadUnalignedAsPureAndWriteUnalignedAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Runtime.CompilerServices.Unsafe", limit: 80);
