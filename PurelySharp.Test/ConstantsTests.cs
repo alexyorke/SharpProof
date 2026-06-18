@@ -768,6 +768,13 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void TimeSpanComparisonAndFactoryHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.TimeSpan.CompareTo(System.TimeSpan)");
+            AssertNotInManualCatalogs("System.TimeSpan.FromDays(double)");
+        }
+
+        [Test]
         public void RepresentativeCatalogSignaturesResolveAgainstNet80References()
         {
             var source = @"

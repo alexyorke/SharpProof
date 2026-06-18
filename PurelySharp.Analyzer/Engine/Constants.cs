@@ -1208,8 +1208,6 @@ public static class Constants
         "System.Text.Encoding.ASCII.get",
         "System.Text.StringBuilder.Length.get",
         "System.Threading.CancellationToken.None.get",
-        "System.TimeSpan.CompareTo(System.TimeSpan)",
-        "System.TimeSpan.FromDays(double)",
         "System.Uri.ToString()",
 
 

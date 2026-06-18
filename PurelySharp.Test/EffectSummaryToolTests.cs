@@ -879,6 +879,50 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeTimeSpanComparisonAndFactorySlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                limit: 40,
+                "System.TimeSpan.CompareTo",
+                "System.TimeSpan.FromDays");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+
+            var knownPureRows = catalogComparison.GetProperty("KnownPureMembers")
+                .EnumerateArray()
+                .Where(row => row.GetProperty("Symbol").GetString() is string symbol &&
+                    (string.Equals(symbol, "System.TimeSpan.CompareTo(System.TimeSpan)", StringComparison.Ordinal) ||
+                     string.Equals(symbol, "System.TimeSpan.FromDays(double)", StringComparison.Ordinal)))
+                .ToArray();
+
+            Assert.That(knownPureRows, Is.Empty);
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.TimeSpan.CompareTo(System.TimeSpan)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.TimeSpan.CompareTo(System.TimeSpan)", "none");
+            AssertPurityClassification(summary, "System.TimeSpan.FromDays(double)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.TimeSpan.FromDays(double)", "none");
+            AssertPurityClassification(summary, "System.TimeSpan.CompareTo(object)", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.TimeSpan.CompareTo(object)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) &&
+                    symbol.StartsWith("System.TimeSpan.", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EquivalentTo(new[]
+            {
+                "System.TimeSpan.CompareTo(object)",
+                "System.TimeSpan.CompareTo(System.TimeSpan)",
+                "System.TimeSpan.FromDays(double)",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeUnsafeSlice_TreatsReadUnalignedAsPureAndWriteUnalignedAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Runtime.CompilerServices.Unsafe", limit: 80);
