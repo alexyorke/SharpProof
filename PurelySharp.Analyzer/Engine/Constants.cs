@@ -34,7 +34,6 @@ public static class Constants
         "System.Activator.CreateInstance<T>()",
         "System.Activator.CreateInstance(System.Type)",
         "System.Activator.CreateInstance(System.Type, params object[])",
-        "System.AppDomain.FriendlyName.get",
         "System.Array.AsReadOnly<T>(T[])",
         "System.Array.ConvertAll<TInput, TOutput>(TInput[], System.Converter<TInput, TOutput>)",
         "System.Array.Reverse(System.Array)",

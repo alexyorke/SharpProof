@@ -952,6 +952,12 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void AppDomainFriendlyName_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.AppDomain.FriendlyName.get");
+        }
+
+        [Test]
         public void OperatingSystemAndApplicationModelPureHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

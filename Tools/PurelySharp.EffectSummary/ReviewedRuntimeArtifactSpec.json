@@ -70,6 +70,13 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/AppDomain.FriendlyName.PurelySharp.EffectSummary.json",
+      "Limit": 8,
+      "SymbolPrefixes": [
+        "System.AppDomain.get_FriendlyName"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Environment.PurelySharp.EffectSummary.json",
       "Limit": 48,
       "SymbolPrefixes": [
