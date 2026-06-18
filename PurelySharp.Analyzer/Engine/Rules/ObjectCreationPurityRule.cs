@@ -118,19 +118,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             {
                 PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Checking Constructor: {constructorSymbol.ToDisplayString()}");
 
-                if (PurityAnalysisEngine.IsKnownPureBCLMember(constructorSymbol))
-                {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a known-pure BCL member; skipping recursive callee analysis.");
-                    return PurityAnalysisResult.Pure;
-                }
-
-                if (IsKnownPureStringBuilderConstructor(constructorSymbol) ||
-                    IsKnownPureStringReadOnlySpanConstructor(constructorSymbol))
-                {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a reviewed pure constructor.");
-                    return PurityAnalysisResult.Pure;
-                }
-
                 var cctorResult = PurityAnalysisEngine.CheckStaticConstructorPurity(constructorSymbol.ContainingType, context, currentState);
                 if (!cctorResult.IsPure)
                 {
@@ -156,13 +143,26 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         return PurityAnalysisResult.Impure(
                             objectCreationOperation.Syntax,
                             PurityAnalysisEngine.PurityEvidence.Create(
-                                generatedPurity.PrimaryCategory,
-                                ruleName: nameof(ObjectCreationPurityRule),
-                                operation: objectCreationOperation,
-                                syntaxNode: objectCreationOperation.Syntax,
-                                symbol: constructorSymbol,
+                            generatedPurity.PrimaryCategory,
+                            ruleName: nameof(ObjectCreationPurityRule),
+                            operation: objectCreationOperation,
+                            syntaxNode: objectCreationOperation.Syntax,
+                            symbol: constructorSymbol,
                                 catalogSource: "generated_purity_summary"));
                     }
+                }
+
+                if (PurityAnalysisEngine.IsKnownPureBCLMember(constructorSymbol))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a known-pure BCL member; skipping recursive callee analysis.");
+                    return PurityAnalysisResult.Pure;
+                }
+
+                if (IsKnownPureStringBuilderConstructor(constructorSymbol) ||
+                    IsKnownPureStringReadOnlySpanConstructor(constructorSymbol))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a reviewed pure constructor.");
+                    return PurityAnalysisResult.Pure;
                 }
 
                 var constructorPurity = PurityAnalysisEngine.GetCalleePurity(constructorSymbol, context);

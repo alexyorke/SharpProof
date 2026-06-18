@@ -193,6 +193,31 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinition) ?? "known_impure"));
             }
 
+            if (originalDefinition.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
+                    originalDefinition,
+                    context.SemanticModel.Compilation,
+                    out var generatedPurity))
+            {
+                if (generatedPurity.IsPure)
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                }
+
+                if (generatedPurity.IsImpure)
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        interpolation.Syntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            generatedPurity.PrimaryCategory,
+                            nameof(InterpolatedStringPurityRule),
+                            interpolation,
+                            syntaxNode: interpolation.Syntax,
+                            symbol: originalDefinition,
+                            catalogSource: "generated_purity_summary"));
+                }
+            }
+
             if (PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinition))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;

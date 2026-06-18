@@ -621,6 +621,42 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_EffectSummary_OverridesKnownPureWebUtilityClassification_WhenGeneratedSummaryIsImpure()
+        {
+            var identity = GetAssemblyIdentity(typeof(System.Net.WebUtility).Assembly.Location);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+using System.Net;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(string value)
+    {
+        return WebUtility.HtmlEncode(value);
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "System.Net.WebUtility.HtmlEncode(string)",
+                            "impure",
+                            """[ "global_state_write" ]"""))
+                });
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+        }
+
+        [Test]
         public async Task Ps0002_EffectSummary_WithTrustedGeneratedPureConstructorClassification_SuppressesUnknownExternalCall()
         {
             const string boundarySource = """
@@ -712,6 +748,43 @@ public class TestClass
                             "ImpureConstructorBoundary.ImpureConstructorBoundary(int)"))
                 },
                 ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+        }
+
+        [Test]
+        public async Task Ps0002_EffectSummary_OverridesReviewedPureStringBuilderConstructor_WhenGeneratedSummaryIsImpure()
+        {
+            var identity = GetAssemblyIdentity(typeof(System.Text.StringBuilder).Assembly.Location);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+using System.Text;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public StringBuilder TestMethod()
+    {
+        return new StringBuilder();
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "System.Text.StringBuilder..ctor()",
+                            "impure",
+                            """[ "global_state_write" ]""",
+                            "System.Text.StringBuilder.StringBuilder()"))
+                });
 
             var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId);
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));

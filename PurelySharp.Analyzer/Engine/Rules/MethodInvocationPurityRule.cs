@@ -394,7 +394,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     }
 
                     if (argument.Parameter.RefKind == RefKind.Out &&
-                        (PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol) ||
+                        ((hasTrustedGeneratedPurity && generatedPurity.IsPure) ||
+                         PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol) ||
                          IsDispatchAnalyzedOutArgumentMethod(invokedMethodSymbol)))
                     {
                         PurityAnalysisEngine.LogDebug($"  [MIR]   Skipping purity check for local/discard out argument target '{argument.Syntax}' on dispatch-analyzed member {originalDefinitionSymbol.ToDisplayString()}.");
@@ -507,14 +508,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
 
-            PurityAnalysisEngine.LogDebug($"  [MIR] Checking IsKnownPureBCLMember with signature: '{originalDefinitionSymbol.ToDisplayString()}'");
-            if (PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol))
-            {
-                PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (Known Pure BCL)");
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-
             bool isExplicitlyPure = PurityAnalysisEngine.IsPureEnforced(
                 invokedMethodSymbol,
                 context.EnforcePureAttributeSymbol,
@@ -552,6 +545,13 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: originalDefinitionSymbol,
                             catalogSource: "generated_purity_summary"));
                 }
+            }
+
+            PurityAnalysisEngine.LogDebug($"  [MIR] Checking IsKnownPureBCLMember with signature: '{originalDefinitionSymbol.ToDisplayString()}'");
+            if (PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol))
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (Known Pure BCL)");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
             if (PurityAnalysisEngine.IsInImpureNamespaceOrType(originalDefinitionSymbol) && !isExplicitlyPure)

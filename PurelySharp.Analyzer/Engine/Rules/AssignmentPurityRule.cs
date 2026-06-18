@@ -230,6 +230,31 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IOperation operation,
             PurityAnalysisContext context)
         {
+            if (operatorMethod.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
+                    operatorMethod.OriginalDefinition,
+                    context.SemanticModel.Compilation,
+                    out var generatedPurity))
+            {
+                if (generatedPurity.IsPure)
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                }
+
+                if (generatedPurity.IsImpure)
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        operation.Syntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            generatedPurity.PrimaryCategory,
+                            nameof(AssignmentPurityRule),
+                            operation,
+                            syntaxNode: operation.Syntax,
+                            symbol: operatorMethod.OriginalDefinition,
+                            catalogSource: "generated_purity_summary"));
+                }
+            }
+
             if (PurityAnalysisEngine.IsKnownPureBCLMember(operatorMethod) ||
                 PurityAnalysisEngine.HasPureExternalAttribute(operatorMethod))
             {
