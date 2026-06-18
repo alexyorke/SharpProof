@@ -740,6 +740,21 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeGuidCoreSlice_ClassifiesComparisonsParsingAndFormattingPrecisely()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Guid", limit: 80);
+
+            AssertPurityClassification(summary, "System.Guid.Equals(System.Guid)", "pure");
+            AssertPurityClassification(summary, "System.Guid.CompareTo(System.Guid)", "pure");
+            AssertPurityClassification(summary, "System.Guid.Parse(string)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Guid.ParseExact(string, string)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Guid.TryParse(string, ref System.Guid)", "impure", "caller_visible_memory_write", "impure_callee");
+            AssertPurityClassification(summary, "System.Guid.TryParseExact(string, string, ref System.Guid)", "impure", "caller_visible_memory_write", "impure_callee");
+            AssertPurityClassification(summary, "System.Guid.ToString()", "conservative_unknown", "unknown_callee");
+            AssertPurityClassification(summary, "System.Guid.ToString(string)", "conservative_unknown", "unknown_callee");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeDateTimeOffsetSlice_TreatsAddMethodsFactoriesAndDerivedHelpersDifferently()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.DateTimeOffset", limit: 20);

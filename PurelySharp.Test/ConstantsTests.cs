@@ -507,6 +507,8 @@ public static class RecentCatalogSignatureSamples
         _ = Guid.ParseExact(text, ""D"");
         _ = Guid.TryParse(text, out var parsed);
         _ = Guid.TryParseExact(text, ""D"", out parsed);
+        _ = guid.Equals(Guid.Empty);
+        _ = guid.CompareTo(Guid.Empty);
         _ = guid.ToString(""N"");
         var chars = text.ToCharArray();
         ReadOnlySpan<char> charSpan = text.AsSpan();
@@ -605,6 +607,8 @@ public static class RecentCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Guid.ParseExact(text, \"D\")"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Guid.TryParse(text, out var parsed)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Guid.TryParseExact(text, \"D\", out parsed)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "guid.Equals(Guid.Empty)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "guid.CompareTo(Guid.Empty)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "guid.ToString(\"N\")"));
             AssertCatalogMembership(GetObjectCreationSignature(compilation, syntaxTree, "new string(charSpan)"), expectedPure: true, expectedImpure: false);
             var bitConverterGetBytesExpressions = new[]
