@@ -96,6 +96,46 @@ public class TestClass
         }
 
         [Test]
+        public async Task KnownPureEnumTryParseWithNamedLocalOut_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(string input)
+    {
+        var parsed = DayOfWeek.Sunday;
+        return Enum.TryParse<DayOfWeek>(input, out parsed);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task KnownPureEnumTryParseIgnoreCaseWithNamedLocalOut_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(string input)
+    {
+        var parsed = DayOfWeek.Sunday;
+        return Enum.TryParse<DayOfWeek>(input, true, out parsed);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task KnownPureBoolTryParseNullableStringWithDiscardOut_NoDiagnostic()
         {
             var test = @"
@@ -280,5 +320,4 @@ public class TestClass
         }
     }
 }
-
 

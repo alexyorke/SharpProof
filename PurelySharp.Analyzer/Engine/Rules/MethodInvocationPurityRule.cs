@@ -465,9 +465,9 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return stringComparisonResult;
             }
 
-            if (TryCheckBooleanParsePurity(invocationOperation, out var booleanParseResult))
+            if (TryCheckSemanticallyPureParsePurity(invocationOperation, out var semanticParseResult))
             {
-                return booleanParseResult;
+                return semanticParseResult;
             }
 
             if (PurityAnalysisEngine.HasPureExternalAttribute(originalDefinitionSymbol))
@@ -761,7 +761,9 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static bool IsSemanticallyPureOutArgumentMethod(IMethodSymbol methodSymbol)
         {
-            return IsBooleanTryParseMethod(methodSymbol.OriginalDefinition);
+            var originalDefinition = methodSymbol.OriginalDefinition;
+            return IsBooleanTryParseMethod(originalDefinition) ||
+                IsEnumTryParseMethod(originalDefinition);
         }
 
         private static bool IsKnownDelegateInvokingBclMethod(IMethodSymbol methodSymbol)
@@ -1626,7 +1628,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return false;
         }
 
-        private static bool TryCheckBooleanParsePurity(
+        private static bool TryCheckSemanticallyPureParsePurity(
             IInvocationOperation invocationOperation,
             out PurityAnalysisEngine.PurityAnalysisResult result)
         {
@@ -1638,19 +1640,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return false;
             }
 
-            if (IsBooleanParseMethod(methodSymbol) &&
-                invocationOperation.Arguments.Length == 1)
-            {
-                return true;
-            }
-
-            if (IsBooleanTryParseMethod(methodSymbol) &&
-                invocationOperation.Arguments.Length == 2)
-            {
-                return true;
-            }
-
-            return false;
+            return IsBooleanParseMethod(methodSymbol) ||
+                IsBooleanTryParseMethod(methodSymbol) ||
+                IsEnumTryParseMethod(methodSymbol) ||
+                IsIPAddressParseMethod(methodSymbol);
         }
 
         private static bool IsBooleanParseMethod(IMethodSymbol methodSymbol)
@@ -1669,6 +1662,37 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 IsStringOrReadOnlySpanOfChar(methodSymbol.Parameters[0].Type) &&
                 methodSymbol.Parameters[1].RefKind == RefKind.Out &&
                 methodSymbol.Parameters[1].Type.SpecialType == SpecialType.System_Boolean;
+        }
+
+        private static bool IsEnumTryParseMethod(IMethodSymbol methodSymbol)
+        {
+            if (methodSymbol.ContainingType?.ToDisplayString() != "System.Enum" ||
+                methodSymbol.Name != "TryParse" ||
+                !methodSymbol.IsGenericMethod ||
+                methodSymbol.TypeParameters.Length != 1 ||
+                methodSymbol.Parameters.Length is not (2 or 3) ||
+                !IsStringOrReadOnlySpanOfChar(methodSymbol.Parameters[0].Type))
+            {
+                return false;
+            }
+
+            if (methodSymbol.Parameters.Length == 3 &&
+                methodSymbol.Parameters[1].Type.SpecialType != SpecialType.System_Boolean)
+            {
+                return false;
+            }
+
+            var outParameter = methodSymbol.Parameters[methodSymbol.Parameters.Length - 1];
+            return outParameter.RefKind == RefKind.Out &&
+                SymbolEqualityComparer.Default.Equals(outParameter.Type, methodSymbol.TypeParameters[0]);
+        }
+
+        private static bool IsIPAddressParseMethod(IMethodSymbol methodSymbol)
+        {
+            return methodSymbol.ContainingType?.ToDisplayString() == "System.Net.IPAddress" &&
+                methodSymbol.Name == "Parse" &&
+                methodSymbol.Parameters.Length == 1 &&
+                IsStringOrReadOnlySpanOfChar(methodSymbol.Parameters[0].Type);
         }
 
         private static int GetStringComparisonParameterIndex(IMethodSymbol methodSymbol)

@@ -1483,6 +1483,46 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeEnumTryParseSlice_UsesSemanticHandlingInsteadOfManualCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(80, "System.Enum.TryParse");
+
+            var knownPureRows = summary.RootElement.GetProperty("PurityReport")
+                .GetProperty("CatalogComparison")
+                .GetProperty("KnownPureMembers")
+                .EnumerateArray()
+                .Where(row => row.GetProperty("Symbol").GetString() is string symbol &&
+                    symbol.StartsWith("System.Enum.TryParse", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(knownPureRows, Is.Empty);
+
+            AssertPurityClassification(summary, "System.Enum.TryParse(string, ref !!0)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Enum.TryParse(string, bool, ref !!0)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Enum.TryParse(System.ReadOnlySpan`1<char>, ref !!0)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Enum.TryParse(System.ReadOnlySpan`1<char>, bool, ref !!0)", "impure", "impure_callee");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeIPAddressParseSlice_UsesSemanticHandlingInsteadOfManualCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly("System.Net.Primitives.dll", 80, "System.Net.IPAddress");
+
+            var knownPureRows = summary.RootElement.GetProperty("PurityReport")
+                .GetProperty("CatalogComparison")
+                .GetProperty("KnownPureMembers")
+                .EnumerateArray()
+                .Where(row => row.GetProperty("Symbol").GetString() is string symbol &&
+                    symbol.StartsWith("System.Net.IPAddress.Parse", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(knownPureRows, Is.Empty);
+
+            AssertPurityClassification(summary, "System.Net.IPAddress.Parse(string)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Net.IPAddress.Parse(System.ReadOnlySpan`1<char>)", "impure", "impure_callee");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeConvertToBase64Slice_TreatsRuntimeHelpersAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Convert.ToBase64String", limit: 20);
@@ -1979,6 +2019,19 @@ public static class CallvirtFixture
 
         private static async Task<JsonDocument> RunRuntimeEffectSummaryAsync(int limit, params string[] symbolPrefixes)
         {
+            return await RunRuntimeEffectSummaryAsyncCore(limit, null, symbolPrefixes);
+        }
+
+        private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(string runtimeAssemblyName, int limit, params string[] symbolPrefixes)
+        {
+            return RunRuntimeEffectSummaryAsyncCore(limit, runtimeAssemblyName, symbolPrefixes);
+        }
+
+        private static async Task<JsonDocument> RunRuntimeEffectSummaryAsyncCore(
+            int limit,
+            string? runtimeAssemblyName,
+            params string[] symbolPrefixes)
+        {
             if (symbolPrefixes.Length == 0)
             {
                 throw new ArgumentException("At least one symbol prefix is required.", nameof(symbolPrefixes));
@@ -1999,6 +2052,11 @@ public static class CallvirtFixture
             startInfo.ArgumentList.Add("--");
             startInfo.ArgumentList.Add("--framework");
             startInfo.ArgumentList.Add("net8.0");
+            if (!string.IsNullOrWhiteSpace(runtimeAssemblyName))
+            {
+                startInfo.ArgumentList.Add("--runtime-assembly");
+                startInfo.ArgumentList.Add(runtimeAssemblyName);
+            }
             foreach (var symbolPrefix in symbolPrefixes)
             {
                 startInfo.ArgumentList.Add("--symbol-prefix");

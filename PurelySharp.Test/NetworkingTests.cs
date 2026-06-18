@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis.Testing;
+using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using System.Net;
 using System.Net.Sockets;
@@ -180,6 +180,26 @@ public class TestClass
 {
     [EnforcePure]
     public IPAddress TestMethod(string value)
+    {
+        return IPAddress.Parse(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task IPAddressParseReadOnlySpan_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using System.Net;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public IPAddress TestMethod(ReadOnlySpan<char> value)
     {
         return IPAddress.Parse(value);
     }
