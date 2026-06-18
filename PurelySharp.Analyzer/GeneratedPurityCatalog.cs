@@ -881,6 +881,7 @@ namespace PurelySharp.Analyzer
                 "System.Boolean" => "bool",
                 "System.Byte" => "byte",
                 "System.Char" => "char",
+                "System.Decimal" => "decimal",
                 "System.Double" => "double",
                 "System.Int16" => "short",
                 "System.Int32" => "int",
@@ -1001,8 +1002,10 @@ namespace PurelySharp.Analyzer
                 _ => typeCode.ToString(),
             };
             public string GetSZArrayType(string elementType) => elementType + "[]";
-            public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind) => GetTypeName(metadataReader, handle);
-            public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind) => GetTypeReferenceName(metadataReader, handle);
+            public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind)
+                => NormalizeExactTypeName(GetTypeName(metadataReader, handle));
+            public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind)
+                => NormalizeExactTypeName(GetTypeReferenceName(metadataReader, handle));
             public string GetTypeFromSpecification(MetadataReader metadataReader, object? genericContext, TypeSpecificationHandle handle, byte rawTypeKind)
                 => metadataReader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
         }

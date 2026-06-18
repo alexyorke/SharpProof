@@ -557,6 +557,12 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void DecimalNegate_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("decimal.Negate(decimal)");
+        }
+
+        [Test]
         public void BooleanParseHelpers_AreHandledSemantically_NotStaticCatalogs()
         {
             var members = new[]
@@ -1861,6 +1867,28 @@ public static class EmailAddressCatalogSignatureSamples
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new EmailAddressAttribute()"));
+        }
+
+        [Test]
+        public void DecimalNegateGeneratedPurityEntryResolvesAgainstNet80References()
+        {
+            var source = @"
+public static class DecimalNegateCatalogSignatureSamples
+{
+    public static int Sample(decimal value)
+    {
+        var negated = decimal.Negate(value);
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "DecimalNegateGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "decimal.Negate(value)"));
         }
 
         private static void AssertCatalogMembership(string signature, bool expectedPure, bool expectedImpure)

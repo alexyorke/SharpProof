@@ -1784,13 +1784,14 @@ internal static class AssemblyEffectSummarizer
         }
     }
 
-    private static string NormalizeExactTypeName(string typeName)
+    internal static string NormalizeExactTypeName(string typeName)
     {
         return typeName switch
         {
             "System.Boolean" => "bool",
             "System.Byte" => "byte",
             "System.Char" => "char",
+            "System.Decimal" => "decimal",
             "System.Double" => "double",
             "System.Int16" => "short",
             "System.Int32" => "int",
@@ -1910,12 +1911,12 @@ internal sealed class TypeNameProvider : ISignatureTypeProvider<string, object?>
 
     public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind)
     {
-        return AssemblyEffectSummarizer.GetTypeName(metadataReader, handle);
+        return AssemblyEffectSummarizer.NormalizeExactTypeName(AssemblyEffectSummarizer.GetTypeName(metadataReader, handle));
     }
 
     public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind)
     {
-        return AssemblyEffectSummarizer.GetTypeReferenceName(metadataReader, handle);
+        return AssemblyEffectSummarizer.NormalizeExactTypeName(AssemblyEffectSummarizer.GetTypeReferenceName(metadataReader, handle));
     }
 
     public string GetTypeFromSpecification(

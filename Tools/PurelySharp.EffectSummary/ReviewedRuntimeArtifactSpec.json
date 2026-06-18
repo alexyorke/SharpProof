@@ -221,6 +221,13 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Decimal.Negate.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Decimal.Negate.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.Decimal.Negate"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json"
     },

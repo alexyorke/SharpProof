@@ -1119,7 +1119,6 @@ public static class Constants
         "System.Collections.Generic.Queue<T>.TryPeek(out T)",
         "System.Collections.Generic.SortedSet<T>.GetViewBetween(T, T)",
         "System.ComponentModel.DataAnnotations.RegularExpressionAttribute.RegularExpressionAttribute(string)",
-        "decimal.Negate(decimal)",
         "double.PositiveInfinity.get",
         "System.FormattableString.Format.get",
         "System.FormattableString.Invariant(System.FormattableString)",
