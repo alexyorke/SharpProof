@@ -151,6 +151,7 @@ public static class EnvironmentCatalogSignatureSamples
         {
             var members = new[]
             {
+                "System.Environment.CommandLine.get",
                 "System.Environment.GetEnvironmentVariable(string)",
                 "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)",
                 "System.Environment.MachineName.get",
@@ -163,6 +164,7 @@ public static class EnvironmentCatalogSignatureSamples
                 "System.Environment.UserDomainName.get",
                 "System.Environment.UserInteractive.get",
                 "System.Environment.UserName.get",
+                "System.Environment.Version.get",
                 "System.Environment.WorkingSet.get",
             };
 
@@ -1095,6 +1097,12 @@ public static class StopwatchCatalogSignatureSamples
             {
                 AssertNotInManualCatalogs(member);
             }
+        }
+
+        [Test]
+        public void TypeGetTypeFromHandle_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)");
         }
 
         [Test]

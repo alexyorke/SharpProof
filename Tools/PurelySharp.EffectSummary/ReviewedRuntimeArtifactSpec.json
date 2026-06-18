@@ -106,7 +106,7 @@
     },
     {
       "OutputPath": "PurelySharp.Analyzer/Environment.PurelySharp.EffectSummary.json",
-      "Limit": 48,
+      "Limit": 120,
       "SymbolPrefixes": [
         "System.Environment.get_NewLine",
         "System.Environment.get_Is64BitProcess",
@@ -124,8 +124,10 @@
         "System.Environment.get_UserDomainName",
         "System.Environment.get_WorkingSet",
         "System.Environment.GetEnvironmentVariable",
+        "System.Environment.get_CommandLine",
         "System.Environment.get_UserInteractive",
-        "System.Environment.get_UserName"
+        "System.Environment.get_UserName",
+        "System.Environment.get_Version"
       ]
     },
     {
