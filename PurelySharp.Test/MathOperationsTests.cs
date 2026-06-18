@@ -12,7 +12,7 @@ namespace PurelySharp.Test
     public class MathOperationsTests
     {
         [Test]
-        public async Task ComplexNestedExpressions_Diagnostic()
+        public async Task ComplexNestedExpressions_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -23,7 +23,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public double {|PS0002:TestMethod|}(double x, double y, double z)
+    public double TestMethod(double x, double y, double z)
     {
         var a = Math.Sin(x) * Math.Cos(y);
         var b = Math.Pow(Math.E, z) / Math.PI; // Pure: Math.E/PI allowed
@@ -36,7 +36,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task SimpleMathMethod_Diagnostic()
+        public async Task SimpleMathMethod_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -47,7 +47,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public double {|PS0002:TestMethod|}(double x)
+    public double TestMethod(double x)
     {
         return Math.Sin(x);
     }
@@ -78,7 +78,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task MathMethodChain_Diagnostic()
+        public async Task MathMethodChain_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -89,7 +89,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public double {|PS0002:TestMethod|}(double x)
+    public double TestMethod(double x)
     {
         return Math.Sin(Math.Cos(x));
     }
@@ -100,7 +100,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task MathDoubleHelpers_Diagnostic()
+        public async Task MathDoubleHelpers_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -109,19 +109,19 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public double {|PS0002:CeilingMethod|}(double x)
+    public double CeilingMethod(double x)
     {
         return Math.Ceiling(x);
     }
 
     [EnforcePure]
-    public double {|PS0002:FloorMethod|}(double x)
+    public double FloorMethod(double x)
     {
         return Math.Floor(x);
     }
 
     [EnforcePure]
-    public double {|PS0002:TruncateMethod|}(double x)
+    public double TruncateMethod(double x)
     {
         return Math.Truncate(x);
     }

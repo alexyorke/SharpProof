@@ -650,11 +650,11 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void MathConstants_AreExplicitlyCataloged()
+        public void MathConstants_AreSourcedFromFieldSemantics_NotStaticCatalogs()
         {
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain("System.Math.E"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain("System.Math.PI"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain("System.Math.Tau"));
+            AssertNotInManualCatalogs("System.Math.E");
+            AssertNotInManualCatalogs("System.Math.PI");
+            AssertNotInManualCatalogs("System.Math.Tau");
         }
 
         [Test]

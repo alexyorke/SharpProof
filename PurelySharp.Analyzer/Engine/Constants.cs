@@ -992,11 +992,6 @@ public static class Constants
 
         "System.Linq.Enumerable.Contains<TSource>(System.Collections.Generic.IEnumerable<TSource>, TSource)",
 
-
-
-        "System.Math.E",
-        "System.Math.PI",
-        "System.Math.Tau",
         "System.Nullable.Compare<T>(T?, T?)",
         "System.Nullable.Equals<T>(T?, T?)",
 

@@ -935,7 +935,7 @@ namespace PurelySharp.Analyzer.Engine
                     return PurityAnalysisResult.Pure;
                 }
 
-                if (IsInConfiguredImpureNamespaceOrType(methodSymbol))
+                if (IsInConfiguredImpureNamespaceOrType(methodSymbol) && !IsConfiguredKnownPureMember(methodSymbol))
                 {
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is in a configured impure namespace/type.");
                     var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
@@ -3003,6 +3003,7 @@ namespace PurelySharp.Analyzer.Engine
 
         internal static bool IsInImpureNamespaceOrType(ISymbol symbol) => ImpurityCatalog.IsInImpureNamespaceOrType(symbol);
         internal static bool IsInConfiguredImpureNamespaceOrType(ISymbol symbol) => ImpurityCatalog.IsInConfiguredImpureNamespaceOrType(symbol);
+        internal static bool IsConfiguredKnownPureMember(ISymbol symbol) => ImpurityCatalog.IsConfiguredKnownPureMember(symbol);
 
 
 

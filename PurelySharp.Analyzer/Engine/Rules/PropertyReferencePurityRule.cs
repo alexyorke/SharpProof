@@ -85,7 +85,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: "known_impure_member"));
             }
 
-            if (PurityAnalysisEngine.IsInConfiguredImpureNamespaceOrType(propertySymbol))
+            if (PurityAnalysisEngine.IsInConfiguredImpureNamespaceOrType(propertySymbol) &&
+                !PurityAnalysisEngine.IsConfiguredKnownPureMember(propertySymbol))
             {
                 PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is in a known impure namespace or type. Impure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(

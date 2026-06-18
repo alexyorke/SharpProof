@@ -522,7 +522,9 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 invokedMethodSymbol,
                 context.EnforcePureAttributeSymbol,
                 context.PureAttributeSymbol);
-            if (PurityAnalysisEngine.IsInConfiguredImpureNamespaceOrType(originalDefinitionSymbol) && !isExplicitlyPure)
+            if (PurityAnalysisEngine.IsInConfiguredImpureNamespaceOrType(originalDefinitionSymbol) &&
+                !isExplicitlyPure &&
+                !PurityAnalysisEngine.IsConfiguredKnownPureMember(originalDefinitionSymbol))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (In configured impure NS/Type and not explicitly Pure)");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
