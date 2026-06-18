@@ -1279,10 +1279,14 @@ namespace PurelySharp.Analyzer.Engine
                                 continue;
                             }
 
+                            var hasSemanticKnownImpureCatalogSource = TryGetSemanticKnownImpureCatalogSource(
+                                invocationOp,
+                                out var semanticKnownImpureCatalogSource);
                             if (invocationOp.TargetMethod != null &&
-                                IsKnownImpure(invocationOp.TargetMethod.OriginalDefinition) &&
+                                (hasSemanticKnownImpureCatalogSource ||
+                                 (IsKnownImpure(invocationOp.TargetMethod.OriginalDefinition) &&
+                                  !IsInvariantCultureDeterministicParseInvocation(invocationOp))) &&
                                 !IsArrayAsReadOnlyOwnedLocalArrayInvocation(invocationOp, postCfgReturnState) &&
-                                !IsInvariantCultureDeterministicParseInvocation(invocationOp) &&
                                 !IsTransientCharArrayConsumedByStringConstructor(invocationOp, semanticModel))
                             {
                                 LogDebug($"{indent}    Post-CFG: Found Known Impure Invocation IMPURE: {invocationOp.Syntax} calling {invocationOp.TargetMethod.ToDisplayString()}");
@@ -1294,7 +1298,9 @@ namespace PurelySharp.Analyzer.Engine
                                         "MethodInvocationPurityRule",
                                         invocationOp,
                                         symbol: targetMethod,
-                                        catalogSource: GetKnownImpureMemberSource(targetMethod) ?? "known_impure"));
+                                        catalogSource: hasSemanticKnownImpureCatalogSource
+                                            ? semanticKnownImpureCatalogSource
+                                            : GetKnownImpureMemberSource(targetMethod) ?? "known_impure"));
                                 goto PostCfgChecksDone;
                             }
                         }
@@ -4081,12 +4087,26 @@ namespace PurelySharp.Analyzer.Engine
                 IsDateTimeOffsetInvariantCultureParseExactInvocation(invocationOperation);
         }
 
+        internal static bool TryGetSemanticKnownImpureCatalogSource(
+            IInvocationOperation invocationOperation,
+            out string catalogSource)
+        {
+            if (IsCurrentCultureSensitiveNumericParseOrFormatInvocation(invocationOperation))
+            {
+                catalogSource = "current_culture_semantic_rule";
+                return true;
+            }
+
+            catalogSource = string.Empty;
+            return false;
+        }
+
         private static bool IsInvariantCultureNumericParseInvocation(IInvocationOperation invocationOperation)
         {
             var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
             if (targetMethod == null ||
                 targetMethod.Name != "Parse" ||
-                !IsInvariantCultureNumericParseType(targetMethod.ContainingType))
+                !IsCultureSensitiveNumericType(targetMethod.ContainingType))
             {
                 return false;
             }
@@ -4109,7 +4129,50 @@ namespace PurelySharp.Analyzer.Engine
             return false;
         }
 
-        private static bool IsInvariantCultureNumericParseType(ITypeSymbol? containingType)
+        private static bool IsCurrentCultureSensitiveNumericParseOrFormatInvocation(IInvocationOperation invocationOperation)
+        {
+            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
+            if (targetMethod == null ||
+                !IsCultureSensitiveNumericType(targetMethod.ContainingType))
+            {
+                return false;
+            }
+
+            if (targetMethod.Name == "Parse" &&
+                targetMethod.Parameters.Length == 1 &&
+                invocationOperation.Arguments.Length == 1 &&
+                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type))
+            {
+                return true;
+            }
+
+            if (targetMethod.Name == "TryParse" &&
+                targetMethod.Parameters.Length == 2 &&
+                invocationOperation.Arguments.Length == 2 &&
+                IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type))
+            {
+                return true;
+            }
+
+            if (targetMethod.Name == "ToString" &&
+                targetMethod.Parameters.Length == 0 &&
+                invocationOperation.Arguments.Length == 0)
+            {
+                return true;
+            }
+
+            if (targetMethod.Name == "ToString" &&
+                targetMethod.Parameters.Length == 1 &&
+                invocationOperation.Arguments.Length == 1 &&
+                targetMethod.Parameters[0].Type.SpecialType == SpecialType.System_String)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsCultureSensitiveNumericType(ITypeSymbol? containingType)
         {
             return containingType?.SpecialType is SpecialType.System_Byte or
                 SpecialType.System_Decimal or
@@ -4121,7 +4184,8 @@ namespace PurelySharp.Analyzer.Engine
                 SpecialType.System_Single or
                 SpecialType.System_UInt16 or
                 SpecialType.System_UInt32 or
-                SpecialType.System_UInt64;
+                SpecialType.System_UInt64 ||
+                containingType?.ToDisplayString() is "System.Half" or "System.Numerics.BigInteger";
         }
 
         private static bool IsTimeOnlyInvariantCultureParseInvocation(IInvocationOperation invocationOperation)

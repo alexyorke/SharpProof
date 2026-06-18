@@ -479,6 +479,19 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return arrayAsReadOnlyResult;
             }
 
+            if (PurityAnalysisEngine.TryGetSemanticKnownImpureCatalogSource(invocationOperation, out var semanticCatalogSource))
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (semantic current-culture-sensitive invocation)");
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    invocationOperation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        "catalog_hit",
+                        nameof(MethodInvocationPurityRule),
+                        invocationOperation,
+                        symbol: originalDefinitionSymbol,
+                        catalogSource: semanticCatalogSource));
+            }
+
             if (PurityAnalysisEngine.IsInvariantCultureDeterministicParseInvocation(invocationOperation))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (deterministic parse with CultureInfo.InvariantCulture)");

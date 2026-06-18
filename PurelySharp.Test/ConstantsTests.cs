@@ -547,6 +547,79 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void CurrentCultureNumericParseAndFormatHelpers_AreHandledSemantically_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "byte.Parse(string)",
+                "byte.TryParse(System.ReadOnlySpan<char>, out byte)",
+                "byte.ToString(string?)",
+                "byte.ToString()",
+                "decimal.Parse(string)",
+                "decimal.TryParse(System.ReadOnlySpan<char>, out decimal)",
+                "decimal.ToString(string?)",
+                "decimal.ToString()",
+                "double.Parse(string)",
+                "double.TryParse(string, out double)",
+                "double.TryParse(System.ReadOnlySpan<char>, out double)",
+                "double.ToString(string?)",
+                "double.ToString()",
+                "float.Parse(string)",
+                "float.TryParse(string, out float)",
+                "float.TryParse(System.ReadOnlySpan<char>, out float)",
+                "float.ToString(string?)",
+                "float.ToString()",
+                "int.Parse(string)",
+                "int.TryParse(string, out int)",
+                "int.TryParse(System.ReadOnlySpan<char>, out int)",
+                "int.ToString(string?)",
+                "int.ToString()",
+                "long.Parse(string)",
+                "long.TryParse(System.ReadOnlySpan<char>, out long)",
+                "long.ToString(string?)",
+                "long.ToString()",
+                "short.Parse(string)",
+                "short.TryParse(string, out short)",
+                "short.TryParse(System.ReadOnlySpan<char>, out short)",
+                "short.ToString(string?)",
+                "short.ToString()",
+                "sbyte.Parse(string)",
+                "sbyte.TryParse(string, out sbyte)",
+                "sbyte.TryParse(System.ReadOnlySpan<char>, out sbyte)",
+                "sbyte.ToString(string?)",
+                "sbyte.ToString()",
+                "ushort.Parse(string)",
+                "ushort.TryParse(string, out ushort)",
+                "ushort.TryParse(System.ReadOnlySpan<char>, out ushort)",
+                "ushort.ToString(string?)",
+                "ushort.ToString()",
+                "uint.Parse(string)",
+                "uint.TryParse(string, out uint)",
+                "uint.TryParse(System.ReadOnlySpan<char>, out uint)",
+                "uint.ToString(string?)",
+                "uint.ToString()",
+                "ulong.Parse(string)",
+                "ulong.TryParse(string, out ulong)",
+                "ulong.TryParse(System.ReadOnlySpan<char>, out ulong)",
+                "ulong.ToString(string?)",
+                "ulong.ToString()",
+                "System.Half.Parse(string)",
+                "System.Half.TryParse(string, out System.Half)",
+                "System.Half.TryParse(System.ReadOnlySpan<char>, out System.Half)",
+                "System.Half.ToString(string?)",
+                "System.Half.ToString()",
+                "System.Numerics.BigInteger.Parse(string)",
+                "System.Numerics.BigInteger.TryParse(string, out System.Numerics.BigInteger)",
+                "System.Numerics.BigInteger.TryParse(System.ReadOnlySpan<char>, out System.Numerics.BigInteger)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void RepresentativeCatalogSignaturesResolveAgainstNet80References()
         {
             var source = @"
