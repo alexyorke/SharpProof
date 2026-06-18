@@ -925,6 +925,147 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeDateTimeStablePureSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                40,
+                "System.DateTime..ctor(long)",
+                "System.DateTime..ctor(int, int, int)",
+                "System.DateTime.IsLeapYear(int)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.DateTime..ctor(long)", "pure");
+            AssertFreshnessClassification(summary, "System.DateTime..ctor(long)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.DateTime..ctor(long)", "internal_only");
+            AssertPurityClassification(summary, "System.DateTime..ctor(int, int, int)", "pure");
+            AssertFreshnessClassification(summary, "System.DateTime..ctor(int, int, int)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.DateTime..ctor(int, int, int)", "internal_only");
+            AssertPurityClassification(summary, "System.DateTime.IsLeapYear(int)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.DateTime.IsLeapYear(int)", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => symbol != null)
+                .ToHashSet(StringComparer.Ordinal);
+
+            Assert.That(generatedSymbols, Does.Contain("System.DateTime..ctor(long)"));
+            Assert.That(generatedSymbols, Does.Contain("System.DateTime..ctor(int, int, int)"));
+            Assert.That(generatedSymbols, Does.Contain("System.DateTime.IsLeapYear(int)"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeDateTimeOffsetStablePureSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                80,
+                "System.DateTimeOffset..ctor(long, System.TimeSpan)",
+                "System.DateTimeOffset.get_DateTime",
+                "System.DateTimeOffset.get_Day",
+                "System.DateTimeOffset.get_DayOfWeek",
+                "System.DateTimeOffset.get_DayOfYear",
+                "System.DateTimeOffset.get_Hour",
+                "System.DateTimeOffset.get_Millisecond",
+                "System.DateTimeOffset.get_Minute",
+                "System.DateTimeOffset.get_Month",
+                "System.DateTimeOffset.get_Offset",
+                "System.DateTimeOffset.get_Second",
+                "System.DateTimeOffset.get_Ticks",
+                "System.DateTimeOffset.get_UtcDateTime",
+                "System.DateTimeOffset.get_UtcTicks",
+                "System.DateTimeOffset.get_Year");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.DateTimeOffset..ctor(long, System.TimeSpan)", "pure");
+            AssertFreshnessClassification(summary, "System.DateTimeOffset..ctor(long, System.TimeSpan)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.DateTimeOffset..ctor(long, System.TimeSpan)", "internal_only");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_DateTime()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_Day()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_DayOfWeek()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_DayOfYear()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_Hour()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_Millisecond()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_Minute()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_Month()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_Offset()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_Second()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_Ticks()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_UtcDateTime()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_UtcTicks()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_Year()", "pure");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => symbol != null)
+                .ToHashSet(StringComparer.Ordinal);
+
+            Assert.That(generatedSymbols, Does.Contain("System.DateTimeOffset..ctor(long, System.TimeSpan)"));
+            Assert.That(generatedSymbols, Does.Contain("System.DateTimeOffset.get_DateTime()"));
+            Assert.That(generatedSymbols, Does.Contain("System.DateTimeOffset.get_Offset()"));
+            Assert.That(generatedSymbols, Does.Contain("System.DateTimeOffset.get_UtcDateTime()"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeDateTimeOffsetAdditionalPureSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                80,
+                "System.DateTimeOffset.Add(System.TimeSpan)",
+                "System.DateTimeOffset.AddDays(double)",
+                "System.DateTimeOffset.AddHours(double)",
+                "System.DateTimeOffset.AddMilliseconds(double)",
+                "System.DateTimeOffset.AddMinutes(double)",
+                "System.DateTimeOffset.AddMonths(int)",
+                "System.DateTimeOffset.AddSeconds(double)",
+                "System.DateTimeOffset.AddTicks(long)",
+                "System.DateTimeOffset.AddYears(int)",
+                "System.DateTimeOffset.ToUnixTimeMilliseconds()",
+                "System.DateTimeOffset.ToUnixTimeSeconds()");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.DateTimeOffset.Add(System.TimeSpan)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddDays(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddHours(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddMilliseconds(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddMinutes(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddMonths(int)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddSeconds(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddTicks(long)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddYears(int)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.ToUnixTimeMilliseconds()", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.ToUnixTimeSeconds()", "pure");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => symbol != null)
+                .ToHashSet(StringComparer.Ordinal);
+
+            Assert.That(generatedSymbols, Does.Contain("System.DateTimeOffset.Add(System.TimeSpan)"));
+            Assert.That(generatedSymbols, Does.Contain("System.DateTimeOffset.AddMonths(int)"));
+            Assert.That(generatedSymbols, Does.Contain("System.DateTimeOffset.ToUnixTimeSeconds()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeVersionSlice_TreatsIntegerConstructorsAsFreshOwnedPure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Version", limit: 40);
@@ -1088,6 +1229,30 @@ public static class PurityFixture
                 "System.TimeSpan.CompareTo(System.TimeSpan)",
                 "System.TimeSpan.FromDays(double)",
             }));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeTimeSpanTicksSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(20, "System.TimeSpan.get_Ticks");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.TimeSpan.get_Ticks()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.TimeSpan.get_Ticks()", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => symbol != null)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[] { "System.TimeSpan.get_Ticks()" }));
         }
 
         [Test]

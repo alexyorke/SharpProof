@@ -56,6 +56,69 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/DateTime.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/DateTime.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.DateTime.get_Date",
+        "System.DateTime.get_Month",
+        "System.DateTime.get_Ticks",
+        "System.DateTime.get_Year"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/DateTime.Comparison.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/DateTime.Comparison.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.DateTime..ctor(long)",
+        "System.DateTime..ctor(int, int, int)",
+        "System.DateTime.IsLeapYear(int)"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/DateTimeOffset.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/DateTimeOffset.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.DateTimeOffset..ctor(long, System.TimeSpan)",
+        "System.DateTimeOffset.get_DateTime",
+        "System.DateTimeOffset.get_Day",
+        "System.DateTimeOffset.get_DayOfWeek",
+        "System.DateTimeOffset.get_DayOfYear",
+        "System.DateTimeOffset.get_Hour",
+        "System.DateTimeOffset.get_Millisecond",
+        "System.DateTimeOffset.get_Minute",
+        "System.DateTimeOffset.get_Month",
+        "System.DateTimeOffset.get_Offset",
+        "System.DateTimeOffset.get_Second",
+        "System.DateTimeOffset.get_Ticks",
+        "System.DateTimeOffset.get_UtcDateTime",
+        "System.DateTimeOffset.get_UtcTicks",
+        "System.DateTimeOffset.get_Year"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/DateTimeOffset.Additional.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/DateTimeOffset.Additional.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.DateTimeOffset.Add(System.TimeSpan)",
+        "System.DateTimeOffset.AddDays(double)",
+        "System.DateTimeOffset.AddHours(double)",
+        "System.DateTimeOffset.AddMilliseconds(double)",
+        "System.DateTimeOffset.AddMinutes(double)",
+        "System.DateTimeOffset.AddMonths(int)",
+        "System.DateTimeOffset.AddSeconds(double)",
+        "System.DateTimeOffset.AddTicks(long)",
+        "System.DateTimeOffset.AddYears(int)",
+        "System.DateTimeOffset.ToUnixTimeMilliseconds()",
+        "System.DateTimeOffset.ToUnixTimeSeconds()"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/TimeSpan.Ticks.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.TimeSpan.get_Ticks"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Version.PurelySharp.EffectSummary.json",
       "Limit": 80,
       "SymbolPrefixes": [

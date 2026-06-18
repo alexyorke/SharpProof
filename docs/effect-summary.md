@@ -116,8 +116,9 @@ dotnet run --project Tools\PurelySharp.EffectSummary -- --artifact-spec Tools\Pu
 ```
 
 `ReviewedRuntimeArtifactSpec.json` is a starter checked-in recipe for reviewed
-runtime slices such as `AppContext`, `AppDomain`, `Environment`,
-`OperatingSystem`, `Version`, and the root `PurelySharp.EffectSummary.json`.
+runtime slices such as `AppContext`, `AppDomain`, `DateTime`,
+`DateTimeOffset`, `TimeSpan`, `Environment`, `OperatingSystem`, `Version`,
+and the root `PurelySharp.EffectSummary.json`.
 Spec entries can also reuse the symbol set from an existing summary via
 `SourceSummaryPath`, which is how the root artifact is refreshed without
 duplicating its full reviewed symbol list in the spec.

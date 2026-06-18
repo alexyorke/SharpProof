@@ -935,25 +935,6 @@ public static class Constants
 
 
 
-        "System.DateTime.DateTime(long)",
-        "System.DateTime.DateTime(int, int, int)",
-        "System.DateTime.IsLeapYear(int)",
-        "System.DateTimeOffset.DateTimeOffset(long, System.TimeSpan)",
-        "System.DateTimeOffset.DateTime.get",
-        "System.DateTimeOffset.Day.get",
-        "System.DateTimeOffset.DayOfWeek.get",
-        "System.DateTimeOffset.DayOfYear.get",
-        "System.DateTimeOffset.Hour.get",
-        "System.DateTimeOffset.Millisecond.get",
-        "System.DateTimeOffset.Minute.get",
-        "System.DateTimeOffset.Month.get",
-        "System.DateTimeOffset.Second.get",
-        "System.DateTimeOffset.Ticks.get",
-        "System.DateTimeOffset.UtcDateTime.get",
-        "System.DateTimeOffset.UtcTicks.get",
-        "System.DateTimeOffset.Year.get",
-
-
         "System.DBNull.Value.get",
 
 
