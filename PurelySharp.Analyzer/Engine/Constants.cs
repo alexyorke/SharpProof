@@ -1103,9 +1103,6 @@ public static class Constants
         "System.AggregateException.AggregateException(System.Collections.Generic.IEnumerable<System.Exception>)",
         "System.AggregateException.Flatten()",
         "System.Array.BinarySearch(System.Array, object)",
-        "System.Array.Find<T>(T[], System.Predicate<T>)",
-        "System.Array.FindIndex<T>(T[], System.Predicate<T>)",
-
         "System.Array.GetLength(int)",
         "System.Array.IndexOf<T>(T[], T)",
         "System.Array.LastIndexOf<T>(T[], T)",

@@ -145,6 +145,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ArrayFindHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+
+public static class ArrayFindCatalogSignatureSamples
+{
+    public static int Sample(int[] values)
+    {
+        _ = Array.Find(values, static value => value > 0);
+        return Array.FindIndex(values, static value => value > 0);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ArrayFindCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Array.Find(values, static value => value > 0)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Array.FindIndex(values, static value => value > 0)"));
+        }
+
+        [Test]
         public void ListHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

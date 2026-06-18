@@ -1384,6 +1384,75 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_ArrayFindAndFindIndex()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int FindMethod(int[] values)
+    {
+        return Array.Find(values, static value => value > 0);
+    }
+
+    [EnforcePure]
+    public int FindIndexMethod(int[] values)
+    {
+        return Array.FindIndex(values, static value => value > 0);
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var invocationNodes = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "Array.Find(values, static value => value > 0)" ||
+                    node.ToString() == "Array.FindIndex(values, static value => value > 0)")
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = invocationNodes.ToDictionary(
+                node => node.ToString(),
+                node =>
+                {
+                    var method = (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!;
+                    var args = new object?[] { method.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = matched
+                        ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                        : string.Empty;
+                    return (matched, classification);
+                });
+
+            Assert.That(
+                diagnostics.Count(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.EqualTo(2),
+                "Runtime-derived array summaries should no longer allow Array.Find or Array.FindIndex as hard-coded pure helpers.");
+            Assert.That(classifications["Array.Find(values, static value => value > 0)"].matched, Is.True,
+                "Generated purity catalog should resolve Array.Find.");
+            Assert.That(classifications["Array.Find(values, static value => value > 0)"].classification, Is.EqualTo("impure"),
+                "Generated purity catalog should classify Array.Find as impure.");
+            Assert.That(classifications["Array.FindIndex(values, static value => value > 0)"].matched, Is.True,
+                "Generated purity catalog should resolve Array.FindIndex.");
+            Assert.That(classifications["Array.FindIndex(values, static value => value > 0)"].classification, Is.EqualTo("conservative_unknown"),
+                "Generated purity catalog should classify Array.FindIndex as conservative_unknown.");
+        }
+
+        [Test]
         public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPureMethodFallback()
         {
             const string source = @"
@@ -1560,6 +1629,30 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Collections.Generic.Queue<T>.TryPeek(out T)"));
+        }
+
+        [Test]
+        public async Task Ps0002_ArrayFind_UsesGeneratedPurityCatalogSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(int[] values)
+    {
+        return Array.Find(values, static value => value > 0);
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("caller_visible_memory_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Array.Find"));
         }
 
         [Test]

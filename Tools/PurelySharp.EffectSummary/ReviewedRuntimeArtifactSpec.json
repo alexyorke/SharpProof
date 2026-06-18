@@ -13,6 +13,15 @@
       "SourceSummaryPath": "PurelySharp.Analyzer/PurelySharp.EffectSummary.json"
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Array.Find.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Array.Find.PurelySharp.EffectSummary.json",
+      "Limit": 40,
+      "SymbolPrefixes": [
+        "System.Array.Find(",
+        "System.Array.FindIndex("
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/AppContext.PurelySharp.EffectSummary.json",
       "Limit": 100,
       "SymbolPrefixes": [
