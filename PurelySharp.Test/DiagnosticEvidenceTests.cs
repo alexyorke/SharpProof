@@ -747,6 +747,86 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_DateTimeStableGetterMembers()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(DateTime value)
+    {
+        var day = value.Day;
+        var dayOfWeek = value.DayOfWeek;
+        var dayOfYear = value.DayOfYear;
+        var hour = value.Hour;
+        var kind = value.Kind;
+        var millisecond = value.Millisecond;
+        var minute = value.Minute;
+        var month = value.Month;
+        var second = value.Second;
+        var ticks = value.Ticks;
+        var timeOfDay = value.TimeOfDay;
+        return day;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedExpressions = new[]
+            {
+                "value.Day",
+                "value.DayOfWeek",
+                "value.DayOfYear",
+                "value.Hour",
+                "value.Kind",
+                "value.Millisecond",
+                "value.Minute",
+                "value.Month",
+                "value.Second",
+                "value.Ticks",
+                "value.TimeOfDay",
+            };
+            var trackedMethods = trackedExpressions
+                .Select(expressionText =>
+                {
+                    var symbol = semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == expressionText))
+                        .Symbol;
+                    Assert.That(symbol, Is.Not.Null, expressionText);
+                    return ((IPropertySymbol)symbol!).GetMethod!;
+                })
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var matched = trackedMethods.Select(method =>
+            {
+                var args = new object?[] { method.OriginalDefinition, compilation, null };
+                return (bool)tryGetPurity.Invoke(catalog, args)!;
+            }).ToArray();
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow the tracked DateTime stable getters.");
+            Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedExpressions.Length).ToArray()),
+                "Generated purity catalog should resolve the tracked DateTime getter members.");
+        }
+
+        [Test]
         public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPureMethodFallback()
         {
             const string source = @"

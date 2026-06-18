@@ -624,6 +624,17 @@ public static class MutableCollectionCatalogSignatureSamples
                 "System.DateTime.DateTime(long)",
                 "System.DateTime.DateTime(int, int, int)",
                 "System.DateTime.IsLeapYear(int)",
+                "System.DateTime.Day.get",
+                "System.DateTime.DayOfWeek.get",
+                "System.DateTime.DayOfYear.get",
+                "System.DateTime.Hour.get",
+                "System.DateTime.Kind.get",
+                "System.DateTime.Millisecond.get",
+                "System.DateTime.Minute.get",
+                "System.DateTime.Month.get",
+                "System.DateTime.Second.get",
+                "System.DateTime.Ticks.get",
+                "System.DateTime.TimeOfDay.get",
                 "System.DateTimeOffset.DateTimeOffset(long, System.TimeSpan)",
                 "System.DateTimeOffset.DateTime.get",
                 "System.DateTimeOffset.Day.get",
@@ -1531,6 +1542,17 @@ public static class DateTimeCatalogSignatureSamples
         _ = value.Equals(value);
         _ = DateTime.Equals(value, value);
         _ = DateTime.DaysInMonth(2000, 2);
+        _ = value.Day;
+        _ = value.DayOfWeek;
+        _ = value.DayOfYear;
+        _ = value.Hour;
+        _ = value.Kind;
+        _ = value.Millisecond;
+        _ = value.Minute;
+        _ = value.Month;
+        _ = value.Second;
+        _ = value.Ticks;
+        _ = value.TimeOfDay;
         _ = value.Subtract(value);
         _ = value.ToBinary();
         return value;
@@ -1559,6 +1581,17 @@ public static class DateTimeCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.Equals(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTime.Equals(value, value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTime.DaysInMonth(2000, 2)"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Day"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.DayOfWeek"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.DayOfYear"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Hour"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Kind"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Millisecond"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Minute"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Month"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Second"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Ticks"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.TimeOfDay"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.Subtract(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.ToBinary()"));
         }

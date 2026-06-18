@@ -75,6 +75,23 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/DateTime.Getters.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/DateTime.Getters.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.DateTime.get_Day",
+        "System.DateTime.get_DayOfWeek",
+        "System.DateTime.get_DayOfYear",
+        "System.DateTime.get_Hour",
+        "System.DateTime.get_Kind",
+        "System.DateTime.get_Millisecond",
+        "System.DateTime.get_Minute",
+        "System.DateTime.get_Month",
+        "System.DateTime.get_Second",
+        "System.DateTime.get_Ticks",
+        "System.DateTime.get_TimeOfDay"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/DateTimeOffset.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/DateTimeOffset.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [

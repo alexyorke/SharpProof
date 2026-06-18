@@ -999,6 +999,58 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeDateTimeGetterSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                80,
+                "System.DateTime.get_Day",
+                "System.DateTime.get_DayOfWeek",
+                "System.DateTime.get_DayOfYear",
+                "System.DateTime.get_Hour",
+                "System.DateTime.get_Kind",
+                "System.DateTime.get_Millisecond",
+                "System.DateTime.get_Minute",
+                "System.DateTime.get_Month",
+                "System.DateTime.get_Second",
+                "System.DateTime.get_Ticks",
+                "System.DateTime.get_TimeOfDay");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var representativeSymbols = new[]
+            {
+                "System.DateTime.get_Day()",
+                "System.DateTime.get_DayOfWeek()",
+                "System.DateTime.get_Hour()",
+                "System.DateTime.get_Kind()",
+                "System.DateTime.get_Ticks()",
+                "System.DateTime.get_TimeOfDay()",
+            };
+
+            foreach (var symbol in representativeSymbols)
+            {
+                AssertPurityClassification(summary, symbol, "pure");
+                AssertEffectVisibilityClassification(summary, symbol, "none");
+            }
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            foreach (var symbol in representativeSymbols)
+            {
+                Assert.That(generatedSymbols, Does.Contain(symbol));
+            }
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeDateTimeOffsetStablePureSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(

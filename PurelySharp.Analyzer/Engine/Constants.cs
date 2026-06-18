@@ -1118,19 +1118,6 @@ public static class Constants
 
         "System.Collections.Generic.List<T>.FindIndex(System.Predicate<T>)",
         "System.Collections.Generic.List<T>.FindLast(System.Predicate<T>)",
-        "System.DateTime.Day.get",
-        "System.DateTime.DayOfWeek.get",
-        "System.DateTime.DayOfYear.get",
-        "System.DateTime.Hour.get",
-        "System.DateTime.Kind.get",
-        "System.DateTime.Millisecond.get",
-        "System.DateTime.Minute.get",
-        "System.DateTime.Month.get",
-        "System.DateTime.Second.get",
-        "System.DateTime.Ticks.get",
-        "System.DateTime.TimeOfDay.get",
-
-
         "System.Array.GetLength(int)",
         "System.Array.IndexOf<T>(T[], T)",
         "System.Array.LastIndexOf<T>(T[], T)",
