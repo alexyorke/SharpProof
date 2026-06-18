@@ -1015,16 +1015,6 @@ public static class Constants
 
     public static readonly HashSet<string> KnownFreshOwnedArrayReturningMembers = new HashSet<string>(StringComparer.Ordinal)
     {
-        "System.Security.Cryptography.SHA1.HashData(byte[])",
-        "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan<byte>)",
-        "System.Security.Cryptography.MD5.HashData(byte[])",
-        "System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan<byte>)",
-        "System.Security.Cryptography.SHA256.HashData(byte[])",
-        "System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan<byte>)",
-        "System.Security.Cryptography.SHA384.HashData(byte[])",
-        "System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan<byte>)",
-        "System.Security.Cryptography.SHA512.HashData(byte[])",
-        "System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan<byte>)",
     };
 
     public static readonly HashSet<string> KnownPureBCLMembers = new HashSet<string>(StringComparer.Ordinal)
@@ -1208,18 +1198,8 @@ public static class Constants
         "System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan<byte>, System.ReadOnlySpan<byte>)",
         "System.Security.Cryptography.Aes.DecryptCbc(byte[], byte[], byte[], System.Security.Cryptography.PaddingMode)",
         "System.Security.Cryptography.Aes.EncryptCbc(byte[], byte[], byte[], System.Security.Cryptography.PaddingMode)",
-        "System.Security.Cryptography.SHA1.HashData(byte[])",
-        "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan<byte>)",
-        "System.Security.Cryptography.MD5.HashData(byte[])",
-        "System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan<byte>)",
         "System.Security.Cryptography.MD5.ComputeHash(byte[])",
-        "System.Security.Cryptography.SHA256.HashData(byte[])",
-        "System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan<byte>)",
         "System.Security.Cryptography.SHA256.ComputeHash(byte[])",
-        "System.Security.Cryptography.SHA384.HashData(byte[])",
-        "System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan<byte>)",
-        "System.Security.Cryptography.SHA512.HashData(byte[])",
-        "System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan<byte>)",
 
 
         "string.Concat(string, string)",

@@ -413,44 +413,44 @@ public static class CatalogSignatureSamples
             Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "CryptographicOperations.FixedTimeEquals(left, right)")));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.SHA1.HashData(byte[])"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)")));
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)")));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)")));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.SHA256.HashData(byte[])"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(bytes)")));
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(bytes)")));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(bytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(bytes)")));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.MD5.HashData(byte[])"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(bytes)")));
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(bytes)")));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(bytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(bytes)")));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.SHA384.HashData(byte[])"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(bytes)")));
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(bytes)")));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(bytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(bytes)")));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.SHA512.HashData(byte[])"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(bytes)")));
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(bytes)")));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(bytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(bytes)")));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(spanBytes)"), Is.EqualTo("System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan<byte>)"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(spanBytes)")));
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(spanBytes)")));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(spanBytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(spanBytes)")));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(spanBytes)"), Is.EqualTo("System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan<byte>)"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(spanBytes)")));
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(spanBytes)")));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(spanBytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA256.HashData(spanBytes)")));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(spanBytes)"), Is.EqualTo("System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan<byte>)"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(spanBytes)")));
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(spanBytes)")));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(spanBytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "MD5.HashData(spanBytes)")));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(spanBytes)"), Is.EqualTo("System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan<byte>)"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(spanBytes)")));
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(spanBytes)")));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(spanBytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA384.HashData(spanBytes)")));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(spanBytes)"), Is.EqualTo("System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan<byte>)"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(spanBytes)")));
-            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(spanBytes)")));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(spanBytes)")));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA512.HashData(spanBytes)")));
         }
 
         [Test]

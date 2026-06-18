@@ -184,6 +184,8 @@ internal static class PurityClassificationEngine
         }
 
         string[] blockingCallChain = Array.Empty<string>();
+        var freshOwnedArrayCalleeSeen = false;
+        var freshOwnedObjectCalleeSeen = false;
         foreach (var call in summary.Calls)
         {
             if (IsPurityNeutralIntrinsicHelperCall(call))
@@ -213,11 +215,38 @@ internal static class PurityClassificationEngine
                     blockingCallChain = JoinCallChain(bySymbol[call].Symbol, calleeClassification.FirstBlockingCallChain);
                 }
             }
+            else if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal))
+            {
+                if (string.Equals(calleeClassification.FreshnessClassification, "fresh_owned_array_write", StringComparison.Ordinal))
+                {
+                    freshOwnedArrayCalleeSeen = true;
+                }
+
+                if (string.Equals(calleeClassification.FreshnessClassification, "fresh_owned_object_write", StringComparison.Ordinal))
+                {
+                    freshOwnedObjectCalleeSeen = true;
+                }
+            }
         }
 
         visiting.Remove(symbol);
-
         MethodPurityClassification result;
+
+        if (HasAllocateUninitializedArrayWrapperPattern(summary))
+        {
+            result = new MethodPurityClassification(
+                Classification: "pure",
+                Categories: Array.Empty<string>(),
+                FirstBlockingCallChain: Array.Empty<string>(),
+                HasFreshArrayAllocationEvidence: true,
+                HasFreshObjectAllocationEvidence: summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
+                HasUnsupportedEffects: false,
+                FreshnessClassification: "fresh_owned_array_write",
+                EffectVisibilityClassification: "internal_only");
+            memo[symbol] = result;
+            return result;
+        }
+
         if (impureCategories.Count > 0)
         {
             result = new MethodPurityClassification(
@@ -244,15 +273,35 @@ internal static class PurityClassificationEngine
         }
         else
         {
+            var freshnessClassification = GetFreshnessClassification(summary, "pure");
+            if (string.Equals(freshnessClassification, "none", StringComparison.Ordinal))
+            {
+                if (freshOwnedArrayCalleeSeen)
+                {
+                    freshnessClassification = "fresh_owned_array_write";
+                }
+                else if (freshOwnedObjectCalleeSeen)
+                {
+                    freshnessClassification = "fresh_owned_object_write";
+                }
+            }
+
+            var effectVisibilityClassification = GetEffectVisibilityClassification(summary, "pure");
+            if (string.Equals(effectVisibilityClassification, "none", StringComparison.Ordinal) &&
+                !string.Equals(freshnessClassification, "none", StringComparison.Ordinal))
+            {
+                effectVisibilityClassification = "internal_only";
+            }
+
             result = new MethodPurityClassification(
                 Classification: "pure",
                 Categories: Array.Empty<string>(),
                 FirstBlockingCallChain: Array.Empty<string>(),
-                HasFreshArrayAllocationEvidence: summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
+                HasFreshArrayAllocationEvidence: HasFreshArrayAllocationEvidence(summary) || freshOwnedArrayCalleeSeen,
                 HasFreshObjectAllocationEvidence: summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
                 HasUnsupportedEffects: false,
-                FreshnessClassification: GetFreshnessClassification(summary, "pure"),
-                EffectVisibilityClassification: GetEffectVisibilityClassification(summary, "pure"));
+                FreshnessClassification: freshnessClassification,
+                EffectVisibilityClassification: effectVisibilityClassification);
         }
 
         memo[symbol] = result;
@@ -500,7 +549,7 @@ internal static class PurityClassificationEngine
                 : "fresh_object_candidate_requires_non_pure_resolution";
         }
 
-        if (!summary.Effects.Contains("allocates_array", StringComparer.Ordinal))
+        if (!HasFreshArrayAllocationEvidence(summary))
         {
             return "none";
         }
@@ -546,31 +595,67 @@ internal static class PurityClassificationEngine
 
     private static bool HasFreshOwnedArrayWritePattern(MethodEffectSummary? summary)
     {
-        if (summary == null ||
-            !summary.Effects.Contains("allocates_array", StringComparer.Ordinal))
+        if (summary == null)
         {
             return false;
         }
 
-        var sawSpanConstruction = false;
-        var sawSpanWrite = false;
-        foreach (var call in summary.Calls)
+        if (summary.Effects.Contains("allocates_array", StringComparer.Ordinal))
         {
-            if (!sawSpanConstruction &&
-                call.StartsWith("System.Span`1<byte>.op_Implicit(!0[])", StringComparison.Ordinal))
+            var sawSpanConstruction = false;
+            var sawSpanWrite = false;
+            foreach (var call in summary.Calls)
             {
-                sawSpanConstruction = true;
-                continue;
+                if (!sawSpanConstruction &&
+                    call.StartsWith("System.Span`1<byte>.op_Implicit(!0[])", StringComparison.Ordinal))
+                {
+                    sawSpanConstruction = true;
+                    continue;
+                }
+
+                if (!sawSpanWrite &&
+                    call.StartsWith("System.Runtime.InteropServices.MemoryMarshal.TryWrite(System.Span`1<byte>, ref ", StringComparison.Ordinal))
+                {
+                    sawSpanWrite = true;
+                }
             }
 
-            if (!sawSpanWrite &&
-                call.StartsWith("System.Runtime.InteropServices.MemoryMarshal.TryWrite(System.Span`1<byte>, ref ", StringComparison.Ordinal))
-            {
-                sawSpanWrite = true;
-            }
+            return sawSpanConstruction && sawSpanWrite;
         }
 
-        return sawSpanConstruction && sawSpanWrite;
+        return HasAllocateUninitializedArrayWrapperPattern(summary);
+    }
+
+    private static bool HasFreshArrayAllocationEvidence(MethodEffectSummary? summary)
+    {
+        return summary != null &&
+            (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) ||
+             HasAllocateUninitializedArrayWrapperPattern(summary));
+    }
+
+    private static bool HasAllocateUninitializedArrayWrapperPattern(MethodEffectSummary summary)
+    {
+        if (!summary.Calls.Any(static call =>
+                call.StartsWith("System.GC.AllocateUninitializedArray(int, bool)", StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        if (!summary.Calls.Any(static call =>
+                call.StartsWith("System.MemoryExtensions.AsSpan(", StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        var methodBaseSymbol = GetMethodBaseSymbol(summary.Symbol);
+        return summary.Calls.Any(call =>
+            call.StartsWith(methodBaseSymbol + "(", StringComparison.Ordinal));
+    }
+
+    private static string GetMethodBaseSymbol(string symbol)
+    {
+        var openParenIndex = symbol.IndexOf('(');
+        return openParenIndex >= 0 ? symbol.Substring(0, openParenIndex) : symbol;
     }
 
     private static string GetEffectVisibilityClassification(MethodEffectSummary? summary, string classification)
@@ -591,9 +676,15 @@ internal static class PurityClassificationEngine
         }
 
         if (summary.RootCandidates.Contains("fresh_owned_memory_write", StringComparer.Ordinal) ||
+            summary.RootCandidates.Contains("fresh_owned_array_write", StringComparer.Ordinal) ||
             summary.RootCandidates.Contains("fresh_owned_object_write", StringComparer.Ordinal) ||
             summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
             summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal))
+        {
+            return "internal_only";
+        }
+
+        if (HasFreshArrayAllocationEvidence(summary) && string.Equals(classification, "pure", StringComparison.Ordinal))
         {
             return "internal_only";
         }

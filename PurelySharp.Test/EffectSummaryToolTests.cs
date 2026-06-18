@@ -603,6 +603,39 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeSha256HashDataSlice_TreatsFreshArrayWrapperAsPure()
+        {
+            using var summary = await RunEffectSummaryAsync(
+                typeof(System.Security.Cryptography.SHA256).Assembly.Location,
+                includeTransitiveRoots: true,
+                classifyPurity: true,
+                compareManualCatalogs: true);
+
+            var methods = FindMethodsByPrefix(summary, "System.Security.Cryptography.SHA256.HashData");
+            Assert.That(methods.Length, Is.GreaterThanOrEqualTo(5));
+
+            var byteArrayOverloads = methods.Where(method =>
+                method.GetProperty("Symbol").GetString() is
+                    "System.Security.Cryptography.SHA256.HashData(byte[])"
+                    or "System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan`1<byte>)")
+                .ToArray();
+
+            Assert.That(byteArrayOverloads, Has.Length.EqualTo(2));
+            Assert.That(
+                byteArrayOverloads.All(method =>
+                    method.GetProperty("PurityClassification").GetProperty("Classification").GetString() == "pure"),
+                Is.True);
+            Assert.That(
+                byteArrayOverloads.All(method =>
+                    method.GetProperty("PurityClassification").GetProperty("FreshnessClassification").GetString() == "fresh_owned_array_write"),
+                Is.True);
+            Assert.That(
+                byteArrayOverloads.All(method =>
+                    method.GetProperty("PurityClassification").GetProperty("EffectVisibilityClassification").GetString() == "internal_only"),
+                Is.True);
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeBitConverterReadSlice_TreatsIntrinsicHelpersAsPure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.BitConverter.ToInt32", limit: 20);
