@@ -242,6 +242,11 @@ internal sealed class CliOptions
             options.SymbolPrefixes.AddRange(artifact.SymbolPrefixes);
         }
 
+        if (!string.IsNullOrWhiteSpace(artifact.SourceSummaryPath))
+        {
+            options.SymbolPrefixes.AddRange(ArtifactSpecSymbolSource.LoadSymbols(artifact.SourceSummaryPath!));
+        }
+
         if (options.CompareManualCatalogs)
         {
             options.IncludePurityClassification = true;
@@ -318,6 +323,8 @@ internal sealed class ArtifactSpecEntry
 {
     public string? OutputPath { get; set; }
 
+    public string? SourceSummaryPath { get; set; }
+
     public string? Framework { get; set; }
 
     public string? RuntimeAssemblyName { get; set; }
@@ -337,6 +344,70 @@ internal sealed class ArtifactSpecEntry
     public bool? IncludePurityClassification { get; set; }
 
     public bool? CompareManualCatalogs { get; set; }
+}
+
+internal static class ArtifactSpecSymbolSource
+{
+    public static IReadOnlyList<string> LoadSymbols(string path)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        var symbols = new HashSet<string>(StringComparer.Ordinal);
+
+        if (document.RootElement.TryGetProperty("GeneratedPurityCatalog", out var generatedPurityCatalog) &&
+            generatedPurityCatalog.ValueKind == JsonValueKind.Object &&
+            generatedPurityCatalog.TryGetProperty("Entries", out var entriesElement) &&
+            entriesElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var entryElement in entriesElement.EnumerateArray())
+            {
+                var symbol = GetTrimmedStringProperty(entryElement, "Symbol");
+                if (!string.IsNullOrWhiteSpace(symbol))
+                {
+                    symbols.Add(symbol);
+                }
+            }
+        }
+
+        if (symbols.Count == 0 &&
+            document.RootElement.TryGetProperty("Assemblies", out var assembliesElement) &&
+            assembliesElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var assemblyElement in assembliesElement.EnumerateArray())
+            {
+                if (!assemblyElement.TryGetProperty("Methods", out var methodsElement) ||
+                    methodsElement.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                foreach (var methodElement in methodsElement.EnumerateArray())
+                {
+                    var symbol = GetTrimmedStringProperty(methodElement, "Symbol");
+                    if (!string.IsNullOrWhiteSpace(symbol))
+                    {
+                        symbols.Add(symbol);
+                    }
+                }
+            }
+        }
+
+        if (symbols.Count == 0)
+        {
+            throw new InvalidOperationException($"Artifact source summary '{path}' did not contain any symbols.");
+        }
+
+        return symbols.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray();
+    }
+
+    private static string? GetTrimmedStringProperty(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        return property.GetString()?.Trim();
+    }
 }
 
 internal static class RuntimeAssemblyResolver

@@ -9,6 +9,10 @@
   },
   "Artifacts": [
     {
+      "OutputPath": "PurelySharp.Analyzer/PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/PurelySharp.EffectSummary.json"
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/AppContext.PurelySharp.EffectSummary.json",
       "Limit": 100,
       "SymbolPrefixes": [

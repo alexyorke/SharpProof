@@ -1978,6 +1978,86 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_ReusesReviewedSymbolSet()
+        {
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-artifact-source-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var seedOutputPath = Path.Combine(workingDirectory, "seed.PurelySharp.EffectSummary.json");
+            var regeneratedOutputPath = Path.Combine(workingDirectory, "regenerated.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            await RunEffectSummaryToolAsync(
+                "--framework",
+                "net8.0",
+                "--runtime-assembly",
+                "System.Private.CoreLib.dll",
+                "--symbol-prefix",
+                "System.Version..ctor(int, int)",
+                "--symbol-prefix",
+                "System.Version.get_Major",
+                "--include-callees",
+                "--classify-purity",
+                "--compare-manual-catalogs",
+                "--limit",
+                "20",
+                "--output",
+                seedOutputPath);
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Defaults = new
+                    {
+                        Framework = "net8.0",
+                        RuntimeAssemblyName = "System.Private.CoreLib.dll",
+                        IncludeCallees = true,
+                        IncludePurityClassification = true,
+                        CompareManualCatalogs = true,
+                    },
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = regeneratedOutputPath,
+                            SourceSummaryPath = seedOutputPath,
+                            Limit = 20,
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
+
+            using var seedSummary = JsonDocument.Parse(await File.ReadAllTextAsync(seedOutputPath));
+            using var regeneratedSummary = JsonDocument.Parse(await File.ReadAllTextAsync(regeneratedOutputPath));
+
+            var seedSymbols = seedSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+            var regeneratedSymbols = regeneratedSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(regeneratedSymbols, Is.EqualTo(seedSymbols));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeAppContextSlice_UsesGeneratedPurityAndImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
