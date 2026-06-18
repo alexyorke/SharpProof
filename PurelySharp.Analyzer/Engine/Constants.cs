@@ -1119,7 +1119,6 @@ public static class Constants
         "System.Collections.Generic.IList<T>.IndexOf(T)",
         "System.Collections.Generic.Queue<T>.TryPeek(out T)",
         "System.Collections.Generic.SortedSet<T>.GetViewBetween(T, T)",
-        "System.ComponentModel.DataAnnotations.EmailAddressAttribute.EmailAddressAttribute()",
         "System.ComponentModel.DataAnnotations.RegularExpressionAttribute.RegularExpressionAttribute(string)",
         "decimal.Negate(decimal)",
         "double.PositiveInfinity.get",

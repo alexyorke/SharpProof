@@ -213,6 +213,14 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/EmailAddressAttribute.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/EmailAddressAttribute.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.ComponentModel.Annotations.dll",
+      "SymbolPrefixes": [
+        "System.ComponentModel.DataAnnotations.EmailAddressAttribute..ctor()"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json"
     },

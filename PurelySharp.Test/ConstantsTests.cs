@@ -537,6 +537,20 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void EmailAddressConstructor_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.ComponentModel.DataAnnotations.EmailAddressAttribute.EmailAddressAttribute()",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void BooleanParseHelpers_AreHandledSemantically_NotStaticCatalogs()
         {
             var members = new[]
@@ -1794,6 +1808,30 @@ public static class ReadOnlySequenceCatalogSignatureSamples
 
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Length"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.IsEmpty"));
+        }
+
+        [Test]
+        public void EmailAddressConstructorGeneratedPurityEntryResolvesAgainstNet80References()
+        {
+            var source = @"
+using System.ComponentModel.DataAnnotations;
+
+public static class EmailAddressCatalogSignatureSamples
+{
+    public static int Sample()
+    {
+        var attribute = new EmailAddressAttribute();
+        return attribute is null ? 0 : 1;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "EmailAddressGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new EmailAddressAttribute()"));
         }
 
         private static void AssertCatalogMembership(string signature, bool expectedPure, bool expectedImpure)

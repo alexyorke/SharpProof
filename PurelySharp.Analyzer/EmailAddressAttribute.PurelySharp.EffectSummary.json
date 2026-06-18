@@ -1,0 +1,84 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-18T14:11:13.3078182+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.ComponentModel.Annotations",
+      "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.ComponentModel.Annotations.dll",
+      "AssemblySha256": "9f8d4aaea363b146b5484e663d817f0390ff20583b397c124411c50210338ae3",
+      "ModuleVersionId": "0aa36e89-1ccc-4191-bc0c-1d66b204a18d",
+      "MethodCount": 493,
+      "EmittedMethodCount": 1,
+      "Methods": [
+        {
+          "Symbol": "System.ComponentModel.DataAnnotations.EmailAddressAttribute..ctor()",
+          "ExactSymbolKey": "System.ComponentModel.DataAnnotations.EmailAddressAttribute..ctor()-\u003Evoid",
+          "MetadataToken": "0x060000C9",
+          "RelativeVirtualAddress": 84436,
+          "MethodBodySha256": "f2dd4384893fff9168823541d4529a6efc234dbfa858c00c6084465cf41e1b30",
+          "CacheKey": "mvid:0aa36e89-1ccc-4191-bc0c-1d66b204a18d|token:0x060000C9|il:f2dd4384893fff9168823541d4529a6efc234dbfa858c00c6084465cf41e1b30",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ComponentModel.DataAnnotations.DataTypeAttribute..ctor(System.ComponentModel.DataAnnotations.DataType)-\u003Evoid",
+            "System.ComponentModel.DataAnnotations.ValidationAttribute.set_DefaultErrorMessage(string)-\u003Evoid",
+            "System.SR.get_EmailAddressAttribute_Invalid()-\u003Estring"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 1,
+    "PureCount": 1,
+    "ImpureCount": 0,
+    "ConservativeUnknownCount": 0,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.ComponentModel.DataAnnotations.EmailAddressAttribute..ctor()",
+        "ExactSymbolKey": "System.ComponentModel.DataAnnotations.EmailAddressAttribute..ctor()-\u003Evoid",
+        "CacheKey": "mvid:0aa36e89-1ccc-4191-bc0c-1d66b204a18d|token:0x060000C9|il:f2dd4384893fff9168823541d4529a6efc234dbfa858c00c6084465cf41e1b30",
+        "AssemblyName": "System.ComponentModel.Annotations",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.ComponentModel.Annotations.dll",
+        "AssemblySha256": "9f8d4aaea363b146b5484e663d817f0390ff20583b397c124411c50210338ae3",
+        "ModuleVersionId": "0aa36e89-1ccc-4191-bc0c-1d66b204a18d",
+        "MetadataToken": "0x060000C9",
+        "MethodBodySha256": "f2dd4384893fff9168823541d4529a6efc234dbfa858c00c6084465cf41e1b30",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      }
+    ]
+  }
+}
