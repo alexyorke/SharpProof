@@ -1139,9 +1139,13 @@ public static class PurityFixture
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
-                20,
+                80,
+                "System.Exception.GetClassName",
                 "System.Exception.get_HResult",
-                "System.Exception.get_InnerException");
+                "System.Exception.get_InnerException",
+                "System.Exception.get_Message",
+                "System.Object.GetType",
+                "System.Type.ToString");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -1151,6 +1155,14 @@ public static class PurityFixture
 
             AssertPurityClassification(
                 summary,
+                "System.Exception.GetClassName()",
+                "pure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Exception.GetClassName()",
+                "none");
+            AssertPurityClassification(
+                summary,
                 "System.Exception.get_HResult()",
                 "pure");
             AssertEffectVisibilityClassification(
@@ -1165,6 +1177,30 @@ public static class PurityFixture
                 summary,
                 "System.Exception.get_InnerException()",
                 "none");
+            AssertPurityClassification(
+                summary,
+                "System.Exception.get_Message()",
+                "pure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Exception.get_Message()",
+                "internal_only");
+            AssertPurityClassification(
+                summary,
+                "System.Object.GetType()",
+                "pure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Object.GetType()",
+                "none");
+            AssertPurityClassification(
+                summary,
+                "System.Type.ToString()",
+                "pure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Type.ToString()",
+                "none");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -1173,8 +1209,10 @@ public static class PurityFixture
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .ToArray();
 
+            Assert.That(generatedSymbols, Does.Contain("System.Exception.GetClassName()"));
             Assert.That(generatedSymbols, Does.Contain("System.Exception.get_HResult()"));
             Assert.That(generatedSymbols, Does.Contain("System.Exception.get_InnerException()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Exception.get_Message()"));
         }
 
         [Test]

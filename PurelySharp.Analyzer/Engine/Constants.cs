@@ -1042,8 +1042,5 @@ public static class Constants
         "System.Net.IPAddress.IsLoopback(System.Net.IPAddress)",
         "object.MemberwiseClone()",
         "string.IsNullOrWhiteSpace(System.ReadOnlySpan<char>)",
-
-        // Exception guard helpers considered pure (diverging without side effects)
-        "System.Exception.Message.get",
     };
 }

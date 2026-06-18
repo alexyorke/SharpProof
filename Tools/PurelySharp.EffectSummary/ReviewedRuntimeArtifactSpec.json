@@ -284,10 +284,14 @@
     {
       "OutputPath": "PurelySharp.Analyzer/Exception.Accessors.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Exception.Accessors.PurelySharp.EffectSummary.json",
-      "Limit": 20,
+      "Limit": 80,
       "SymbolPrefixes": [
+        "System.Exception.GetClassName",
         "System.Exception.get_HResult",
-        "System.Exception.get_InnerException"
+        "System.Exception.get_InnerException",
+        "System.Exception.get_Message",
+        "System.Object.GetType",
+        "System.Type.ToString"
       ]
     },
     {

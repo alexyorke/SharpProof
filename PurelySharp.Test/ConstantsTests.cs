@@ -644,6 +644,7 @@ public static class ExceptionAccessorCatalogSignatureSamples
 {
     public static int Sample(Exception error)
     {
+        _ = error.Message;
         _ = error.InnerException;
         return error.HResult;
     }
@@ -655,6 +656,7 @@ public static class ExceptionAccessorCatalogSignatureSamples
                 GetTrustedPlatformReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "error.Message"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "error.InnerException"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "error.HResult"));
         }

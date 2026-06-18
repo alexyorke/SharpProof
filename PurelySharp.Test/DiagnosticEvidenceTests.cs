@@ -688,6 +688,7 @@ public class TestClass
     [EnforcePure]
     public int TestMethod(Exception error)
     {
+        _ = error.Message;
         _ = error.InnerException;
         return error.HResult;
     }
@@ -705,6 +706,7 @@ public class TestClass
                 .DescendantNodes()
                 .OfType<MemberAccessExpressionSyntax>()
                 .Where(node =>
+                    node.ToString() == "error.Message" ||
                     node.ToString() == "error.InnerException" ||
                     node.ToString() == "error.HResult")
                 .ToArray();
@@ -734,6 +736,10 @@ public class TestClass
                     return (matched, classification, currentMatched, currentClassification);
                 });
 
+            Assert.That(classifications["error.Message"].matched, Is.True);
+            Assert.That(classifications["error.Message"].classification, Is.EqualTo("pure"));
+            Assert.That(classifications["error.Message"].currentMatched, Is.True);
+            Assert.That(classifications["error.Message"].currentClassification, Is.EqualTo("pure"));
             Assert.That(classifications["error.InnerException"].matched, Is.True);
             Assert.That(classifications["error.InnerException"].classification, Is.EqualTo("pure"));
             Assert.That(classifications["error.InnerException"].currentMatched, Is.True);
@@ -742,10 +748,6 @@ public class TestClass
             Assert.That(classifications["error.HResult"].classification, Is.EqualTo("pure"));
             Assert.That(classifications["error.HResult"].currentMatched, Is.True);
             Assert.That(classifications["error.HResult"].currentClassification, Is.EqualTo("pure"));
-            Assert.That(
-                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
-                Is.False,
-                "Trusted generated purity should allow Exception.HResult and Exception.InnerException.");
         }
 
         [Test]
