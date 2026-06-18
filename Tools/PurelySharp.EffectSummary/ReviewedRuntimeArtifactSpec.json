@@ -147,6 +147,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/FileSystem.State.PurelySharp.EffectSummary.json",
+      "Limit": 120,
+      "SymbolPrefixes": [
+        "System.IO.Directory.CreateDirectory(string)",
+        "System.IO.Directory.Exists(string)",
+        "System.IO.File.Exists(string)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/OperatingSystem.PurelySharp.EffectSummary.json",
       "Limit": 120,
       "SymbolPrefixes": [

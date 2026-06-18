@@ -1095,5 +1095,71 @@ public class TestClass
                                     .WithArguments("TestMethod");
             await VerifyCS.VerifyAnalyzerAsync(test, expected19);
         }
+
+        [Test]
+        public async Task IoDirectoryExists_ShouldBeImpure_Test1()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(string path)
+    {
+        return Directory.Exists(path);
+    }
+}";
+
+            var expected20 = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                    .WithSpan(8, 17, 8, 27)
+                                    .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected20);
+        }
+
+        [Test]
+        public async Task IoFileExists_ShouldBeImpure_Test1()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(string path)
+    {
+        return File.Exists(path);
+    }
+}";
+
+            var expected21 = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                    .WithSpan(8, 17, 8, 27)
+                                    .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected21);
+        }
+
+        [Test]
+        public async Task IoDirectoryCreateDirectory_ShouldBeImpure_Test1()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DirectoryInfo TestMethod(string path)
+    {
+        return Directory.CreateDirectory(path);
+    }
+}";
+
+            var expected22 = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                    .WithSpan(8, 26, 8, 36)
+                                    .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected22);
+        }
     }
 }

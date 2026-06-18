@@ -182,6 +182,22 @@ public static class EnvironmentCatalogSignatureSamples
         }
 
         [Test]
+        public void FileSystemStateHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.IO.Directory.CreateDirectory(string)",
+                "System.IO.Directory.Exists(string)",
+                "System.IO.File.Exists(string)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void WebUtilityHelpers_AreNotBackedByStaticCatalogs()
         {
             var members = new[]
