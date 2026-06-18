@@ -38,6 +38,14 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Contract.PurelySharp.EffectSummary.json",
+      "Limit": 40,
+      "SymbolPrefixes": [
+        "System.Diagnostics.Contracts.Contract.Ensures",
+        "System.Diagnostics.Contracts.Contract.Requires"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/AppContext.PurelySharp.EffectSummary.json",
       "Limit": 100,
       "SymbolPrefixes": [

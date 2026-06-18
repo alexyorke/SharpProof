@@ -923,11 +923,6 @@ public static class Constants
 
 
 
-
-        "System.Diagnostics.Contracts.Contract.Ensures(bool)",
-        "System.Diagnostics.Contracts.Contract.Requires(bool)",
-
-
         "System.Globalization.CultureInfo.InvariantCulture.get",
         "System.Globalization.CultureInfo.Name.get",
 

@@ -457,6 +457,13 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void ContractHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Diagnostics.Contracts.Contract.Ensures(bool)");
+            AssertNotInManualCatalogs("System.Diagnostics.Contracts.Contract.Requires(bool)");
+        }
+
+        [Test]
         public void TupleArraySegmentAndReferenceEqualsHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("object.ReferenceEquals(object, object)"));

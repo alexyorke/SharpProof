@@ -795,6 +795,49 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeContractSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                40,
+                "System.Diagnostics.Contracts.Contract.Ensures",
+                "System.Diagnostics.Contracts.Contract.Requires");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var contractMethods = FindMethodsByPrefix(summary, "System.Diagnostics.Contracts.Contract.")
+                .Where(method =>
+                {
+                    var symbol = method.GetProperty("Symbol").GetString();
+                    return symbol is not null &&
+                        (symbol.StartsWith("System.Diagnostics.Contracts.Contract.Ensures", StringComparison.Ordinal) ||
+                         symbol.StartsWith("System.Diagnostics.Contracts.Contract.Requires", StringComparison.Ordinal));
+                })
+                .ToArray();
+            Assert.That(contractMethods, Is.Not.Empty);
+
+            foreach (var method in contractMethods)
+            {
+                var classification = method.GetProperty("PurityClassification");
+                Assert.That(classification.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+                Assert.That(classification.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("none"));
+            }
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Diagnostics.Contracts.Contract.Ensures(bool)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Diagnostics.Contracts.Contract.Requires(bool)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeArrayBinarySearchSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
