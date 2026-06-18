@@ -487,6 +487,22 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void IndexAndHashCodeHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.HashCode.ToHashCode()",
+                "System.Index.End.get",
+                "System.Index.Start.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void BooleanParseHelpers_AreHandledSemantically_NotStaticCatalogs()
         {
             var members = new[]
@@ -1659,6 +1675,35 @@ public static class BooleanCharCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsSeparator(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsSymbol(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsUpper(value)"));
+        }
+
+        [Test]
+        public void IndexAndHashCodeGeneratedPurityEntriesResolveAgainstNet80References()
+        {
+            var source = @"
+using System;
+
+public static class IndexHashCodeCatalogSignatureSamples
+{
+    public static int Sample()
+    {
+        HashCode hash = default;
+        var end = Index.End;
+        var start = Index.Start;
+        _ = hash.ToHashCode();
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "IndexHashCodeGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "hash.ToHashCode()"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Index.End"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Index.Start"));
         }
 
         private static void AssertCatalogMembership(string signature, bool expectedPure, bool expectedImpure)

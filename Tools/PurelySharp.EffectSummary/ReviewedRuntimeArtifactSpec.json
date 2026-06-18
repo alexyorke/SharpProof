@@ -183,6 +183,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/IndexHashCode.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/IndexHashCode.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.HashCode.ToHashCode()",
+        "System.Index.get_End",
+        "System.Index.get_Start"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json"
     },

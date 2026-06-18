@@ -905,6 +905,75 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_IndexAndHashCodeHelpers()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        HashCode hash = default;
+        var end = Index.End;
+        var start = Index.Start;
+        return hash.ToHashCode();
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var hashCode = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "hash.ToHashCode()"))
+                .Symbol!;
+            var endGetter = ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<MemberAccessExpressionSyntax>()
+                    .Single(node => node.ToString() == "Index.End"))
+                .Symbol!).GetMethod!;
+            var startGetter = ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<MemberAccessExpressionSyntax>()
+                    .Single(node => node.ToString() == "Index.Start"))
+                .Symbol!).GetMethod!;
+            var trackedMethods = new[]
+            {
+                hashCode.OriginalDefinition,
+                endGetter.OriginalDefinition,
+                startGetter.OriginalDefinition,
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var matched = trackedMethods.Select(method =>
+            {
+                var args = new object?[] { method, compilation, null };
+                return (bool)tryGetPurity.Invoke(catalog, args)!;
+            }).ToArray();
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow Index.End, Index.Start, and HashCode.ToHashCode.");
+            Assert.That(matched, Is.EqualTo(new[] { true, true, true }),
+                "Generated purity catalog should resolve the tracked index and hash helpers.");
+        }
+
+        [Test]
         public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPureMethodFallback()
         {
             const string source = @"
