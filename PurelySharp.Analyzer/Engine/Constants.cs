@@ -237,7 +237,6 @@ public static class Constants
         "System.IO.MemoryStream.ToArray()",
         "System.IO.StringReader.StringReader(string)",
         "object.GetType()",
-        "object.ToString()",
         "System.Environment.CurrentManagedThreadId.get",
         "System.Environment.ExitCode.get",
         "System.Environment.Exit(int)",
@@ -685,7 +684,6 @@ public static class Constants
 
         "System.GC.SuppressFinalize(object)",
 
-        "System.IDisposable.Dispose()",
         "System.IServiceProvider.GetService(System.Type)",
         "System.IO.File.Copy(string, string)",
         "System.IO.File.Move(string, string)",
@@ -1065,16 +1063,5 @@ public static class Constants
         // Exception guard helpers considered pure (diverging without side effects)
         "System.Exception.Message.get",
         "System.ArgumentNullException.ArgumentNullException(string)",
-        "System.ArgumentNullException.ThrowIfNull(object)",
-        "System.ArgumentNullException.ThrowIfNull(object, string)",
-        "System.ArgumentException.ThrowIfNullOrEmpty(string)",
-        "System.ArgumentException.ThrowIfNullOrWhiteSpace(string)",
-        "System.ArgumentOutOfRangeException.ThrowIfNegative<T>(T)",
-        "System.ArgumentOutOfRangeException.ThrowIfZero<T>(T)",
-        "System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero<T>(T)",
-        "System.ArgumentOutOfRangeException.ThrowIfLessThan<T>(T, T)",
-        "System.ArgumentOutOfRangeException.ThrowIfLessThanOrEqual<T>(T, T)",
-        "System.ArgumentOutOfRangeException.ThrowIfGreaterThan<T>(T, T)",
-        "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual<T>(T, T)",
     };
 }

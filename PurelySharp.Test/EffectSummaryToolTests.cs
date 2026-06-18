@@ -715,25 +715,16 @@ public static class PurityFixture
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
-            Assert.That(
-                catalogComparison.GetProperty("KnownPureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "System.ArgumentNullException.ThrowIfNull(object, string)" }));
-            Assert.That(
-                catalogComparison.GetProperty("KnownImpureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "System.Runtime.InteropServices.SafeHandle.Dispose()" }));
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(
                 summary,
                 "System.Array.Find(!!0[], System.Predicate`1<!!0>)",
                 "impure",
-                "caller_visible_memory_write");
+                "caller_visible_memory_write",
+                "impure_callee");
             AssertEffectVisibilityClassification(
                 summary,
                 "System.Array.Find(!!0[], System.Predicate`1<!!0>)",
@@ -741,12 +732,12 @@ public static class PurityFixture
             AssertPurityClassification(
                 summary,
                 "System.Array.FindIndex(!!0[], System.Predicate`1<!!0>)",
-                "conservative_unknown",
-                "unknown_callee");
+                "impure",
+                "impure_callee");
             AssertEffectVisibilityClassification(
                 summary,
                 "System.Array.FindIndex(!!0[], System.Predicate`1<!!0>)",
-                "unknown");
+                "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -773,33 +764,19 @@ public static class PurityFixture
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
-            Assert.That(
-                catalogComparison.GetProperty("KnownPureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "System.ArgumentNullException.ThrowIfNull(object, string)" }));
-            Assert.That(
-                catalogComparison.GetProperty("KnownImpureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .OrderBy(symbol => symbol, StringComparer.Ordinal)
-                    .ToArray(),
-                Is.EqualTo(new[]
-                {
-                    "System.IDisposable.Dispose()",
-                    "object.ToString()",
-                }));
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(
                 summary,
                 "System.Array.IndexOf(System.Array, object)",
-                "pure");
+                "impure",
+                "impure_callee");
             AssertEffectVisibilityClassification(
                 summary,
                 "System.Array.IndexOf(System.Array, object)",
-                "none");
+                "caller_visible");
             AssertPurityClassification(
                 summary,
                 "System.Array.get_Length()",
@@ -840,18 +817,8 @@ public static class PurityFixture
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
-            Assert.That(
-                catalogComparison.GetProperty("KnownPureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "System.ArgumentNullException.ThrowIfNull(object, string)" }));
-            Assert.That(
-                catalogComparison.GetProperty("KnownImpureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "System.Runtime.InteropServices.SafeHandle.Dispose()" }));
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             var contractMethods = FindMethodsByPrefix(summary, "System.Diagnostics.Contracts.Contract.")
@@ -868,8 +835,11 @@ public static class PurityFixture
             foreach (var method in contractMethods)
             {
                 var classification = method.GetProperty("PurityClassification");
-                Assert.That(classification.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
-                Assert.That(classification.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("none"));
+                Assert.That(classification.GetProperty("Classification").GetString(), Is.EqualTo("conservative_unknown"));
+                Assert.That(
+                    classification.GetProperty("Categories").EnumerateArray().Select(category => category.GetString()).ToArray(),
+                    Is.EqualTo(new[] { "unknown_callee" }));
+                Assert.That(classification.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("unknown"));
             }
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -893,23 +863,8 @@ public static class PurityFixture
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
-            Assert.That(
-                catalogComparison.GetProperty("KnownPureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "System.ArgumentNullException.ThrowIfNull(object, string)" }));
-            Assert.That(
-                catalogComparison.GetProperty("KnownImpureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .OrderBy(symbol => symbol, StringComparer.Ordinal)
-                    .ToArray(),
-                Is.EqualTo(new[]
-                {
-                    "System.IDisposable.Dispose()",
-                    "object.ToString()",
-                }));
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(
@@ -949,18 +904,8 @@ public static class PurityFixture
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
-            Assert.That(
-                catalogComparison.GetProperty("KnownPureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "System.ArgumentNullException.ThrowIfNull(object, string)" }));
-            Assert.That(
-                catalogComparison.GetProperty("KnownImpureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "System.Runtime.InteropServices.SafeHandle.Dispose()" }));
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(
@@ -994,23 +939,8 @@ public static class PurityFixture
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
-            Assert.That(
-                catalogComparison.GetProperty("KnownPureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "System.ArgumentNullException.ThrowIfNull(object, string)" }));
-            Assert.That(
-                catalogComparison.GetProperty("KnownImpureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .OrderBy(symbol => symbol, StringComparer.Ordinal)
-                    .ToArray(),
-                Is.EqualTo(new[]
-                {
-                    "System.IDisposable.Dispose()",
-                    "object.ToString()",
-                }));
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(
@@ -1054,12 +984,7 @@ public static class PurityFixture
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
-            Assert.That(
-                catalogComparison.GetProperty("KnownImpureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "object.ToString()" }));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(
@@ -1115,12 +1040,7 @@ public static class PurityFixture
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
-            Assert.That(
-                catalogComparison.GetProperty("KnownImpureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "object.ToString()" }));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(
@@ -1429,12 +1349,7 @@ public static class PurityFixture
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
-            Assert.That(
-                catalogComparison.GetProperty("KnownPureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "System.ArgumentNullException.ThrowIfNull(object, string)" }));
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(
                 catalogComparison.GetProperty("KnownImpureMembers")
                     .EnumerateArray()
@@ -3312,12 +3227,7 @@ public static class PurityFixture
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
-            Assert.That(
-                catalogComparison.GetProperty("KnownPureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "System.ArgumentNullException.ThrowIfNull(object, string)" }));
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(
                 catalogComparison.GetProperty("KnownImpureMembers")
                     .EnumerateArray()
@@ -3632,12 +3542,7 @@ public static class PurityFixture
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
-            Assert.That(
-                catalogComparison.GetProperty("KnownImpureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "object.ToString()" }));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.Environment.get_CurrentDirectory()", "impure", "impure_callee");
@@ -3689,12 +3594,7 @@ public static class PurityFixture
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
-            Assert.That(
-                catalogComparison.GetProperty("KnownImpureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "object.ToString()" }));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.Environment.get_MachineName()", "impure", "throw");
@@ -3798,23 +3698,8 @@ public static class PurityFixture
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
-            Assert.That(
-                catalogComparison.GetProperty("KnownPureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "System.ArgumentNullException.ThrowIfNull(object, string)" }));
-            Assert.That(
-                catalogComparison.GetProperty("KnownImpureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .OrderBy(symbol => symbol, StringComparer.Ordinal)
-                    .ToArray(),
-                Is.EqualTo(new[]
-                {
-                    "System.IDisposable.Dispose()",
-                    "object.ToString()",
-                }));
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariable(string)", "impure", "impure_callee");
@@ -3893,6 +3778,87 @@ public static class PurityFixture
                 "System.IO.Directory.CreateDirectory(string)",
                 "System.IO.Directory.Exists(string)",
                 "System.IO.File.Exists(string)",
+            }));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeArgumentGuardHelperSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                120,
+                "System.ArgumentNullException.ThrowIfNull",
+                "System.ArgumentException.ThrowIfNullOrEmpty",
+                "System.ArgumentException.ThrowIfNullOrWhiteSpace",
+                "System.ArgumentOutOfRangeException.ThrowIfNegative",
+                "System.ArgumentOutOfRangeException.ThrowIfZero",
+                "System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero",
+                "System.ArgumentOutOfRangeException.ThrowIfLessThan",
+                "System.ArgumentOutOfRangeException.ThrowIfLessThanOrEqual",
+                "System.ArgumentOutOfRangeException.ThrowIfGreaterThan",
+                "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.ArgumentNullException.ThrowIfNull(object, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentNullException.ThrowIfNull(object, string)", "none");
+            AssertPurityClassification(summary, "System.ArgumentException.ThrowIfNullOrEmpty(string, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentException.ThrowIfNullOrEmpty(string, string)", "none");
+            AssertPurityClassification(summary, "System.ArgumentException.ThrowIfNullOrWhiteSpace(string, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentException.ThrowIfNullOrWhiteSpace(string, string)", "none");
+            AssertPurityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfNegative(!!0, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfNegative(!!0, string)", "none");
+            AssertPurityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfZero(!!0, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfZero(!!0, string)", "none");
+            AssertPurityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero(!!0, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero(!!0, string)", "none");
+            AssertPurityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfLessThan(!!0, !!0, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfLessThan(!!0, !!0, string)", "none");
+            AssertPurityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(!!0, !!0, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(!!0, !!0, string)", "none");
+            AssertPurityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfGreaterThan(!!0, !!0, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfGreaterThan(!!0, !!0, string)", "none");
+            AssertPurityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(!!0, !!0, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(!!0, !!0, string)", "none");
+            AssertPurityClassification(summary, "System.ArgumentNullException.ThrowIfNull(void*, string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentNullException.ThrowIfNull(void*, string)", "caller_visible");
+            AssertPurityClassification(summary, "System.ArgumentNullException.ThrowIfNull(nint, string)", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentNullException.ThrowIfNull(nint, string)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.ArgumentNullException.ThrowIfNull(object, string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.ArgumentException.ThrowIfNullOrEmpty(string, string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.ArgumentException.ThrowIfNullOrWhiteSpace(string, string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.ArgumentOutOfRangeException.ThrowIfNegative(!!0, string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.ArgumentOutOfRangeException.ThrowIfZero(!!0, string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero(!!0, string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.ArgumentOutOfRangeException.ThrowIfLessThan(!!0, !!0, string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(!!0, !!0, string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.ArgumentOutOfRangeException.ThrowIfGreaterThan(!!0, !!0, string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(!!0, !!0, string)", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.ArgumentException.ThrowIfNullOrEmpty(string, string)",
+                "System.ArgumentException.ThrowIfNullOrWhiteSpace(string, string)",
+                "System.ArgumentNullException.ThrowIfNull(object, string)",
+                "System.ArgumentOutOfRangeException.ThrowIfGreaterThan(!!0, !!0, string)",
+                "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(!!0, !!0, string)",
+                "System.ArgumentOutOfRangeException.ThrowIfLessThan(!!0, !!0, string)",
+                "System.ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(!!0, !!0, string)",
+                "System.ArgumentOutOfRangeException.ThrowIfNegative(!!0, string)",
+                "System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero(!!0, string)",
+                "System.ArgumentOutOfRangeException.ThrowIfZero(!!0, string)",
             }));
         }
 

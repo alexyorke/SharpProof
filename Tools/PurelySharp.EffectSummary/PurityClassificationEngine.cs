@@ -140,6 +140,7 @@ internal static class PurityClassificationEngine
 
         var treatsObjectStateAsFreshOwned = IsFreshOwnedObjectConstructor(summary);
         var treatsVirtualDispatchAsResolved = HasOnlyResolvedVirtualCallTargets(summary, bySymbol);
+        var treatsArgumentGuardThrowHelpersAsPure = IsPureArgumentGuardWrapper(summary.Symbol);
         foreach (var root in summary.RootCandidates)
         {
             if (treatsVirtualDispatchAsResolved &&
@@ -257,6 +258,12 @@ internal static class PurityClassificationEngine
             var calleeClassification = ClassifyMethod(resolvedCallKey, bySymbol, memo, visiting);
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal))
             {
+                if (treatsArgumentGuardThrowHelpersAsPure &&
+                    IsArgumentGuardThrowHelper(resolvedCallSummary.Symbol))
+                {
+                    continue;
+                }
+
                 impureCategories.Add("impure_callee");
                 if (blockingCallChain.Length == 0)
                 {
@@ -1196,6 +1203,31 @@ internal static class PurityClassificationEngine
     {
         return callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) && callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal);
+    }
+
+    private static bool IsPureArgumentGuardWrapper(string symbol)
+    {
+        var methodBaseSymbol = GetMethodBaseSymbol(symbol);
+        if (!methodBaseSymbol.StartsWith("System.Argument", StringComparison.Ordinal) ||
+            !methodBaseSymbol.Contains(".ThrowIf", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return !symbol.Contains('*', StringComparison.Ordinal) &&
+            !symbol.Contains("nint", StringComparison.Ordinal);
+    }
+
+    private static bool IsArgumentGuardThrowHelper(string symbol)
+    {
+        var methodBaseSymbol = GetMethodBaseSymbol(symbol);
+        if (!methodBaseSymbol.StartsWith("System.Argument", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return methodBaseSymbol.Contains(".Throw", StringComparison.Ordinal) &&
+            !methodBaseSymbol.Contains(".ThrowIf", StringComparison.Ordinal);
     }
 }
 

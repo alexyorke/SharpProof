@@ -156,6 +156,22 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/GuardHelpers.PurelySharp.EffectSummary.json",
+      "Limit": 120,
+      "SymbolPrefixes": [
+        "System.ArgumentNullException.ThrowIfNull",
+        "System.ArgumentException.ThrowIfNullOrEmpty",
+        "System.ArgumentException.ThrowIfNullOrWhiteSpace",
+        "System.ArgumentOutOfRangeException.ThrowIfNegative",
+        "System.ArgumentOutOfRangeException.ThrowIfZero",
+        "System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero",
+        "System.ArgumentOutOfRangeException.ThrowIfLessThan",
+        "System.ArgumentOutOfRangeException.ThrowIfLessThanOrEqual",
+        "System.ArgumentOutOfRangeException.ThrowIfGreaterThan",
+        "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/OperatingSystem.PurelySharp.EffectSummary.json",
       "Limit": 120,
       "SymbolPrefixes": [

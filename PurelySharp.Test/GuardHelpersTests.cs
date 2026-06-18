@@ -20,6 +20,12 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
+    public void CheckObject(object value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+    }
+
+    [EnforcePure]
     public void CheckString(string s)
     {
         ArgumentException.ThrowIfNullOrEmpty(s);

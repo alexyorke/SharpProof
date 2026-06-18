@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T19:14:41.6135813+00:00",
+  "GeneratedAtUtc": "2026-06-18T19:51:55.9397476+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -3679,50 +3679,8 @@
     "ImpureCount": 57,
     "ConservativeUnknownCount": 10,
     "CatalogComparison": {
-      "KnownPureMembers": [
-        {
-          "Symbol": "System.ArgumentNullException.ThrowIfNull(object, string)",
-          "Catalog": "known_pure",
-          "Classification": "pure",
-          "Categories": [],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "none",
-          "MatchedExactSymbolKeys": [
-            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid"
-          ]
-        }
-      ],
-      "KnownImpureMembers": [
-        {
-          "Symbol": "System.IDisposable.Dispose()",
-          "Catalog": "known_impure",
-          "Classification": "conservative_unknown",
-          "Categories": [
-            "abstract",
-            "metadata_only_or_external",
-            "no_il_body"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "unknown",
-          "MatchedExactSymbolKeys": [
-            "System.IDisposable.Dispose()-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "object.ToString()",
-          "Catalog": "known_impure",
-          "Classification": "conservative_unknown",
-          "Categories": [
-            "dynamic_dispatch",
-            "virtual_call"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "unknown",
-          "MatchedExactSymbolKeys": [
-            "object.ToString()-\u003Estring"
-          ]
-        }
-      ],
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
   },

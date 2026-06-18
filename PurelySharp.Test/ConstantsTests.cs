@@ -175,6 +175,13 @@ public static class EnvironmentCatalogSignatureSamples
         }
 
         [Test]
+        public void AbstractDispatchFallbacks_AreNotBackedByManualImpureCatalogEntries()
+        {
+            AssertNotInManualCatalogs("object.ToString()");
+            AssertNotInManualCatalogs("System.IDisposable.Dispose()");
+        }
+
+        [Test]
         public void DirectoryCurrentDirectoryHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.IO.Directory.GetCurrentDirectory()");
@@ -1119,6 +1126,67 @@ public static class StopwatchCatalogSignatureSamples
         public void TypeGetTypeFromHandle_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)");
+        }
+
+        [Test]
+        public void ArgumentGuardHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var legacyMembers = new[]
+            {
+                "System.ArgumentNullException.ThrowIfNull(object)",
+                "System.ArgumentNullException.ThrowIfNull(object, string)",
+                "System.ArgumentException.ThrowIfNullOrEmpty(string)",
+                "System.ArgumentException.ThrowIfNullOrWhiteSpace(string)",
+                "System.ArgumentOutOfRangeException.ThrowIfNegative<T>(T)",
+                "System.ArgumentOutOfRangeException.ThrowIfZero<T>(T)",
+                "System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero<T>(T)",
+                "System.ArgumentOutOfRangeException.ThrowIfLessThan<T>(T, T)",
+                "System.ArgumentOutOfRangeException.ThrowIfLessThanOrEqual<T>(T, T)",
+                "System.ArgumentOutOfRangeException.ThrowIfGreaterThan<T>(T, T)",
+                "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual<T>(T, T)",
+            };
+
+            foreach (var member in legacyMembers)
+            {
+                Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(member), member);
+            }
+
+            var source = @"
+using System;
+
+public class GuardSignatureSamples
+{
+    public void Sample(string text, int number, object value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentException.ThrowIfNullOrEmpty(text);
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        ArgumentOutOfRangeException.ThrowIfNegative(number);
+        ArgumentOutOfRangeException.ThrowIfZero(number);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(number);
+        ArgumentOutOfRangeException.ThrowIfLessThan(number, 0);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(number, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(number, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(number, 0);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GuardHelperCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "ArgumentNullException.ThrowIfNull(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "ArgumentException.ThrowIfNullOrEmpty(text)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "ArgumentException.ThrowIfNullOrWhiteSpace(text)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "ArgumentOutOfRangeException.ThrowIfNegative(number)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "ArgumentOutOfRangeException.ThrowIfZero(number)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "ArgumentOutOfRangeException.ThrowIfNegativeOrZero(number)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "ArgumentOutOfRangeException.ThrowIfLessThan(number, 0)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(number, 0)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "ArgumentOutOfRangeException.ThrowIfGreaterThan(number, 0)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(number, 0)"));
         }
 
         [Test]

@@ -496,6 +496,61 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_ArgumentGuardHelpersAsPureEvidence()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text, int number, object value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentException.ThrowIfNullOrEmpty(text);
+        ArgumentOutOfRangeException.ThrowIfNegative(number);
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "ArgumentNullException.ThrowIfNull(value)" ||
+                    node.ToString() == "ArgumentException.ThrowIfNullOrEmpty(text)" ||
+                    node.ToString() == "ArgumentOutOfRangeException.ThrowIfNegative(number)")
+                .Select(node => (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!)
+                .Select(symbol => symbol.OriginalDefinition)
+                .OrderBy(symbol => symbol.ToDisplayString(), StringComparer.Ordinal)
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var matched = trackedMethods.Select(method =>
+            {
+                var args = new object?[] { method, compilation, null };
+                return (bool)tryGetPurity.Invoke(catalog, args)!;
+            }).ToArray();
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow the argument guard helpers backed by runtime summaries.");
+            Assert.That(matched, Is.EqualTo(new[] { true, true, true }),
+                "Generated purity catalog should resolve the tracked argument guard helpers to their runtime implementation assembly.");
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_EnvironmentCurrentDirectoryAsImpureEvidence()
         {
             const string source = @"
