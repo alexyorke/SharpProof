@@ -465,6 +465,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return stringComparisonResult;
             }
 
+            if (TryCheckStringEnumerableJoinPurity(invocationOperation, context, currentState, out var stringEnumerableJoinResult))
+            {
+                return stringEnumerableJoinResult;
+            }
+
             if (TryCheckSemanticallyPureParsePurity(invocationOperation, out var semanticParseResult))
             {
                 return semanticParseResult;
@@ -796,6 +801,51 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     "TrueForAll",
                 _ => false
             };
+        }
+
+        private static bool TryCheckStringEnumerableJoinPurity(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            var methodSymbol = invocationOperation.TargetMethod.OriginalDefinition;
+            if (!IsStringEnumerableJoinOverload(methodSymbol))
+            {
+                return false;
+            }
+
+            var enumerableArgument = invocationOperation.Arguments[1].Value;
+            var enumerablePurity = CheckLinqSourceEnumeratorPurity(enumerableArgument, context, currentState);
+            if (!enumerablePurity.IsPure)
+            {
+                result = enumerablePurity;
+                return true;
+            }
+
+            return true;
+        }
+
+        private static bool IsStringEnumerableJoinOverload(IMethodSymbol methodSymbol)
+        {
+            if (methodSymbol.Name != "Join" ||
+                methodSymbol.ContainingType?.SpecialType != SpecialType.System_String ||
+                methodSymbol.IsGenericMethod ||
+                methodSymbol.Parameters.Length != 2)
+            {
+                return false;
+            }
+
+            if (methodSymbol.Parameters[0].Type.SpecialType != SpecialType.System_String)
+            {
+                return false;
+            }
+
+            return methodSymbol.Parameters[1].Type is INamedTypeSymbol enumerableType &&
+                enumerableType.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T &&
+                enumerableType.TypeArguments[0].SpecialType == SpecialType.System_String;
         }
 
         private static INamedTypeSymbol? GetTrackedLocalReceiverType(

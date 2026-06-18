@@ -992,10 +992,6 @@ public static class Constants
         "System.Security.Cryptography.MD5.ComputeHash(byte[])",
         "System.Security.Cryptography.SHA256.ComputeHash(byte[])",
 
-
-        "System.String.Join(string, System.Collections.Generic.IEnumerable<string>)",
-        "System.String.Join<T>(string, System.Collections.Generic.IEnumerable<T>)",
-
         "string.String(System.ReadOnlySpan<char>)",
 
 

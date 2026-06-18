@@ -139,6 +139,13 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/String.Join.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/String.Join.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.String.Join"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Version.PurelySharp.EffectSummary.json",
       "Limit": 80,
       "SymbolPrefixes": [

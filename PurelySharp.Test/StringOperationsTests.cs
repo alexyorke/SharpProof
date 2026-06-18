@@ -885,5 +885,37 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task StringJoinWithImpureEnumerable_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public sealed class ImpureEnumerable : IEnumerable<string>
+{
+    public IEnumerator<string> GetEnumerator()
+    {
+        _ = DateTime.Now;
+        return ((IEnumerable<string>)Array.Empty<string>()).GetEnumerator();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(ImpureEnumerable values)
+    {
+        return string.Join("" "", values);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

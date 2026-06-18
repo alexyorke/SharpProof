@@ -320,6 +320,13 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void StringEnumerableJoinHelpers_AreNotBackedByStaticPureCatalogs()
+        {
+            AssertNotInManualCatalogs("System.String.Join(string, System.Collections.Generic.IEnumerable<string>)");
+            AssertNotInManualCatalogs("System.String.Join<T>(string, System.Collections.Generic.IEnumerable<T>)");
+        }
+
+        [Test]
         public void StringIndexOfCloneCompareToAndToStringHelpers_AreSourcedFromGeneratedPurityEvidence_AndSemanticRules_NotStaticCatalogs()
         {
             var members = new[]
