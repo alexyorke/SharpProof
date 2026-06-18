@@ -33,6 +33,8 @@ namespace PurelySharp.Analyzer
             new ConcurrentDictionary<string, ActualAssemblyIdentity?>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, ImmutableDictionary<string, ActualMethodIdentity>> MethodIdentityCache =
             new ConcurrentDictionary<string, ImmutableDictionary<string, ActualMethodIdentity>>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, string?> RuntimeImplementationAssemblyPathCache =
+            new ConcurrentDictionary<string, string?>(StringComparer.Ordinal);
 
         private readonly ImmutableDictionary<string, ImmutableArray<SummaryEntry>> _entriesBySymbol;
 
@@ -242,6 +244,17 @@ namespace PurelySharp.Analyzer
             IMethodSymbol methodSymbol,
             Compilation compilation)
         {
+            var implementationPath = TryResolveRuntimeImplementationAssemblyPath(methodSymbol);
+            if (!string.IsNullOrWhiteSpace(implementationPath))
+            {
+                var path = implementationPath!;
+                if (File.Exists(path) &&
+                    TryResolveMethodIdentityFromPath(methodSymbol, path, out var implementationIdentity))
+                {
+                    return implementationIdentity;
+                }
+            }
+
             if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
             {
                 return null;
@@ -262,7 +275,8 @@ namespace PurelySharp.Analyzer
                     return null;
                 }
 
-                var methodMap = MethodIdentityCache.GetOrAdd(referencePath, static path => LoadMethodIdentities(path));
+                var path = referencePath!;
+                var methodMap = MethodIdentityCache.GetOrAdd(path, static resolvedPath => LoadMethodIdentities(resolvedPath));
                 foreach (var key in GetSymbolKeys(methodSymbol))
                 {
                     if (methodMap.TryGetValue(key, out var identity))
@@ -275,6 +289,30 @@ namespace PurelySharp.Analyzer
             }
 
             return null;
+        }
+
+        private static bool TryResolveMethodIdentityFromPath(
+            IMethodSymbol methodSymbol,
+            string assemblyPath,
+            out ActualMethodIdentity identity)
+        {
+            identity = null!;
+            if (string.IsNullOrWhiteSpace(assemblyPath) || !File.Exists(assemblyPath))
+            {
+                return false;
+            }
+
+            var methodMap = MethodIdentityCache.GetOrAdd(assemblyPath, static path => LoadMethodIdentities(path));
+            foreach (var key in GetSymbolKeys(methodSymbol))
+            {
+                if (methodMap.TryGetValue(key, out var foundIdentity))
+                {
+                    identity = foundIdentity;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static ImmutableDictionary<string, ActualMethodIdentity> LoadMethodIdentities(string path)
@@ -549,6 +587,17 @@ namespace PurelySharp.Analyzer
             IMethodSymbol methodSymbol,
             Compilation compilation)
         {
+            var implementationPath = TryResolveRuntimeImplementationAssemblyPath(methodSymbol);
+            if (!string.IsNullOrWhiteSpace(implementationPath))
+            {
+                var path = implementationPath!;
+                if (File.Exists(path) &&
+                    TryResolveMethodIdentityFromPath(methodSymbol, path, out _))
+                {
+                    return AssemblyIdentityCache.GetOrAdd(path, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
+                }
+            }
+
             if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
             {
                 return null;
@@ -569,10 +618,99 @@ namespace PurelySharp.Analyzer
                     return null;
                 }
 
-                return AssemblyIdentityCache.GetOrAdd(referencePath, static path => ActualAssemblyIdentity.FromFile(path));
+                var path = referencePath!;
+                return AssemblyIdentityCache.GetOrAdd(path, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
             }
 
             return null;
+        }
+
+        private static string? TryResolveRuntimeImplementationAssemblyPath(IMethodSymbol methodSymbol)
+        {
+            var cacheKey = CreateEffectSummaryKey(methodSymbol.OriginalDefinition);
+            return RuntimeImplementationAssemblyPathCache.GetOrAdd(cacheKey, _ => ResolveRuntimeImplementationAssemblyPath(methodSymbol));
+        }
+
+        private static string? ResolveRuntimeImplementationAssemblyPath(IMethodSymbol methodSymbol)
+        {
+            var coreLibPath = typeof(object).Assembly.Location;
+            if (!string.IsNullOrWhiteSpace(coreLibPath) &&
+                File.Exists(coreLibPath) &&
+                TryResolveMethodIdentityFromPath(methodSymbol, coreLibPath, out _))
+            {
+                return coreLibPath;
+            }
+
+            var assemblyName = methodSymbol.ContainingAssembly?.Identity.Name;
+            if (!string.IsNullOrWhiteSpace(assemblyName))
+            {
+                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    if (!string.Equals(assembly.GetName().Name, assemblyName, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    var location = assembly.Location;
+                    if (!string.IsNullOrWhiteSpace(location) &&
+                        File.Exists(location) &&
+                        TryResolveMethodIdentityFromPath(methodSymbol, location, out _))
+                    {
+                        return location;
+                    }
+                }
+            }
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var location = assembly.Location;
+                if (string.IsNullOrWhiteSpace(location) ||
+                    !File.Exists(location) ||
+                    string.Equals(location, coreLibPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (TryResolveMethodIdentityFromPath(methodSymbol, location, out _))
+                {
+                    return location;
+                }
+            }
+
+            foreach (var trustedPlatformAssemblyPath in GetTrustedPlatformAssemblyPaths())
+            {
+                if (string.Equals(trustedPlatformAssemblyPath, coreLibPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (TryResolveMethodIdentityFromPath(methodSymbol, trustedPlatformAssemblyPath, out _))
+                {
+                    return trustedPlatformAssemblyPath;
+                }
+            }
+
+            return null;
+        }
+
+        private static IEnumerable<string> GetTrustedPlatformAssemblyPaths()
+        {
+            var trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
+            if (!string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
+            {
+                return trustedPlatformAssemblies
+                    .Split(Path.PathSeparator)
+                    .Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                    .Distinct(StringComparer.OrdinalIgnoreCase);
+            }
+
+            var runtimeDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location);
+            if (string.IsNullOrWhiteSpace(runtimeDirectory) || !Directory.Exists(runtimeDirectory))
+            {
+                return Array.Empty<string>();
+            }
+
+            return Directory.EnumerateFiles(runtimeDirectory, "*.dll", SearchOption.TopDirectoryOnly);
         }
 
         private sealed class SummaryEntry

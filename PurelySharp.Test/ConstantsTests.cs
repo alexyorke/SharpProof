@@ -377,6 +377,12 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void UriIsWellFormedUriString_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Uri.IsWellFormedUriString(string, System.UriKind)");
+        }
+
+        [Test]
         public void IPAddressParseHelpers_AreHandledSemantically_NotStaticCatalogs()
         {
             var members = new[]
