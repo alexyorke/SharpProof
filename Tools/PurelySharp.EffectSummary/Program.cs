@@ -59,6 +59,8 @@ internal static class EffectSummaryCli
                 path,
                 options.Limit,
                 options.SymbolPrefixes,
+                options.ExactSymbols,
+                options.ExactSymbolKeys,
                 options.IncludeCallees,
                 options.MaxDepth,
                 options.IncludeTransitiveRoots))
@@ -136,6 +138,10 @@ internal sealed class CliOptions
     public List<string> AssemblyPaths { get; } = new();
 
     public List<string> SymbolPrefixes { get; } = new();
+
+    public List<string> ExactSymbols { get; } = new();
+
+    public List<string> ExactSymbolKeys { get; } = new();
 
     public string? ArtifactSpecPath { get; private set; }
 
@@ -244,7 +250,9 @@ internal sealed class CliOptions
 
         if (!string.IsNullOrWhiteSpace(artifact.SourceSummaryPath))
         {
-            options.SymbolPrefixes.AddRange(ArtifactSpecSymbolSource.LoadSymbols(artifact.SourceSummaryPath!));
+            var sourceSymbols = ArtifactSpecSymbolSource.LoadSymbols(artifact.SourceSummaryPath!);
+            options.ExactSymbols.AddRange(sourceSymbols.Symbols);
+            options.ExactSymbolKeys.AddRange(sourceSymbols.ExactSymbolKeys);
         }
 
         if (options.CompareManualCatalogs)
@@ -348,10 +356,11 @@ internal sealed class ArtifactSpecEntry
 
 internal static class ArtifactSpecSymbolSource
 {
-    public static IReadOnlyList<string> LoadSymbols(string path)
+    public static ArtifactSpecSymbolSet LoadSymbols(string path)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         var symbols = new HashSet<string>(StringComparer.Ordinal);
+        var exactSymbolKeys = new HashSet<string>(StringComparer.Ordinal);
 
         if (document.RootElement.TryGetProperty("GeneratedPurityCatalog", out var generatedPurityCatalog) &&
             generatedPurityCatalog.ValueKind == JsonValueKind.Object &&
@@ -364,6 +373,12 @@ internal static class ArtifactSpecSymbolSource
                 if (!string.IsNullOrWhiteSpace(symbol))
                 {
                     symbols.Add(symbol);
+                }
+
+                var exactSymbolKey = GetTrimmedStringProperty(entryElement, "ExactSymbolKey");
+                if (!string.IsNullOrWhiteSpace(exactSymbolKey))
+                {
+                    exactSymbolKeys.Add(exactSymbolKey);
                 }
             }
         }
@@ -387,6 +402,12 @@ internal static class ArtifactSpecSymbolSource
                     {
                         symbols.Add(symbol);
                     }
+
+                    var exactSymbolKey = GetTrimmedStringProperty(methodElement, "ExactSymbolKey");
+                    if (!string.IsNullOrWhiteSpace(exactSymbolKey))
+                    {
+                        exactSymbolKeys.Add(exactSymbolKey);
+                    }
                 }
             }
         }
@@ -396,7 +417,9 @@ internal static class ArtifactSpecSymbolSource
             throw new InvalidOperationException($"Artifact source summary '{path}' did not contain any symbols.");
         }
 
-        return symbols.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray();
+        return new ArtifactSpecSymbolSet(
+            Symbols: symbols.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray(),
+            ExactSymbolKeys: exactSymbolKeys.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray());
     }
 
     private static string? GetTrimmedStringProperty(JsonElement element, string propertyName)
@@ -409,6 +432,10 @@ internal static class ArtifactSpecSymbolSource
         return property.GetString()?.Trim();
     }
 }
+
+internal sealed record ArtifactSpecSymbolSet(
+    string[] Symbols,
+    string[] ExactSymbolKeys);
 
 internal static class RuntimeAssemblyResolver
 {
@@ -481,6 +508,8 @@ internal static class AssemblyEffectSummarizer
         string assemblyPath,
         int? limit,
         IReadOnlyList<string> symbolPrefixes,
+        IReadOnlyList<string> exactSymbols,
+        IReadOnlyList<string> exactSymbolKeys,
         bool includeCallees,
         int maxDepth,
         bool includeTransitiveRoots)
@@ -511,7 +540,14 @@ internal static class AssemblyEffectSummarizer
             allSummaries = AddTransitiveRootCandidates(allSummaries);
         }
 
-        var summaries = SelectSummaries(allSummaries, symbolPrefixes, includeCallees, maxDepth, limit);
+        var summaries = SelectSummaries(
+            allSummaries,
+            symbolPrefixes,
+            exactSymbols,
+            exactSymbolKeys,
+            includeCallees,
+            maxDepth,
+            limit);
 
         return new AssemblyEffectReport(
             AssemblyName: assemblyName,
@@ -532,18 +568,32 @@ internal static class AssemblyEffectSummarizer
     private static MethodEffectSummary[] SelectSummaries(
         IReadOnlyList<MethodEffectSummary> allSummaries,
         IReadOnlyList<string> symbolPrefixes,
+        IReadOnlyList<string> exactSymbols,
+        IReadOnlyList<string> exactSymbolKeys,
         bool includeCallees,
         int maxDepth,
         int? limit)
     {
-        IEnumerable<MethodEffectSummary> selected;
-        if (!includeCallees || symbolPrefixes.Count == 0)
+        var hasPrefixRoots = symbolPrefixes.Count > 0;
+        var hasExactRoots = exactSymbols.Count > 0 || exactSymbolKeys.Count > 0;
+
+        IEnumerable<MethodEffectSummary> selected = Array.Empty<MethodEffectSummary>();
+        if (hasPrefixRoots)
         {
-            selected = allSummaries.Where(summary => MatchesSymbolPrefix(summary.Symbol, symbolPrefixes));
+            selected = !includeCallees
+                ? allSummaries.Where(summary => MatchesSymbolPrefix(summary.Symbol, symbolPrefixes))
+                : SelectWithCallees(allSummaries, symbolPrefixes, maxDepth);
         }
-        else
+        else if (!hasExactRoots)
         {
-            selected = SelectWithCallees(allSummaries, symbolPrefixes, maxDepth);
+            selected = allSummaries;
+        }
+
+        if (hasExactRoots)
+        {
+            selected = UnionByExactSymbolKey(
+                selected,
+                SelectExactSummaries(allSummaries, exactSymbols, exactSymbolKeys));
         }
 
         if (limit is not null)
@@ -554,29 +604,68 @@ internal static class AssemblyEffectSummarizer
         return selected.ToArray();
     }
 
+    private static IEnumerable<MethodEffectSummary> SelectExactSummaries(
+        IReadOnlyList<MethodEffectSummary> allSummaries,
+        IReadOnlyList<string> exactSymbols,
+        IReadOnlyList<string> exactSymbolKeys)
+    {
+        var exactSymbolSet = exactSymbols.Count == 0
+            ? null
+            : new HashSet<string>(exactSymbols, StringComparer.Ordinal);
+        var exactSymbolKeySet = exactSymbolKeys.Count == 0
+            ? null
+            : new HashSet<string>(exactSymbolKeys, StringComparer.Ordinal);
+
+        return allSummaries.Where(summary =>
+            (exactSymbolSet != null && exactSymbolSet.Contains(summary.Symbol)) ||
+            (exactSymbolKeySet != null && exactSymbolKeySet.Contains(summary.ExactSymbolKey)));
+    }
+
+    private static IEnumerable<MethodEffectSummary> UnionByExactSymbolKey(
+        IEnumerable<MethodEffectSummary> first,
+        IEnumerable<MethodEffectSummary> second)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var summary in first)
+        {
+            if (seen.Add(summary.ExactSymbolKey))
+            {
+                yield return summary;
+            }
+        }
+
+        foreach (var summary in second)
+        {
+            if (seen.Add(summary.ExactSymbolKey))
+            {
+                yield return summary;
+            }
+        }
+    }
+
     private static IEnumerable<MethodEffectSummary> SelectWithCallees(
         IReadOnlyList<MethodEffectSummary> allSummaries,
         IReadOnlyList<string> symbolPrefixes,
         int maxDepth)
     {
         var bySymbol = allSummaries
-            .GroupBy(summary => summary.Symbol, StringComparer.Ordinal)
+            .GroupBy(summary => summary.ExactSymbolKey, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
         var included = new HashSet<string>(StringComparer.Ordinal);
-        var queue = new Queue<(string Symbol, int Depth)>();
+        var queue = new Queue<(string ExactSymbolKey, int Depth)>();
         foreach (var summary in allSummaries.Where(summary => MatchesSymbolPrefix(summary.Symbol, symbolPrefixes)))
         {
-            if (included.Add(summary.Symbol))
+            if (included.Add(summary.ExactSymbolKey))
             {
-                queue.Enqueue((summary.Symbol, 0));
+                queue.Enqueue((summary.ExactSymbolKey, 0));
             }
         }
 
         while (queue.Count > 0)
         {
-            var (symbol, depth) = queue.Dequeue();
-            if (depth >= maxDepth || !bySymbol.TryGetValue(symbol, out var summary))
+            var (exactSymbolKey, depth) = queue.Dequeue();
+            if (depth >= maxDepth || !bySymbol.TryGetValue(exactSymbolKey, out var summary))
             {
                 continue;
             }
@@ -590,7 +679,7 @@ internal static class AssemblyEffectSummarizer
             }
         }
 
-        return allSummaries.Where(summary => included.Contains(summary.Symbol));
+        return allSummaries.Where(summary => included.Contains(summary.ExactSymbolKey));
     }
 
     private static MethodEffectSummary SummarizeMethod(

@@ -258,7 +258,6 @@ public static class Constants
         "System.Environment.SetEnvironmentVariable(string, string, System.EnvironmentVariableTarget)",
         "System.Environment.TickCount.get",
         "System.Environment.TickCount64.get",
-        "System.Environment.UserName.get",
         "System.Environment.Version.get",
         "System.GC.Collect()",
         "System.GC.GetTotalMemory(bool)",

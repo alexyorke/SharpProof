@@ -162,6 +162,7 @@ public static class EnvironmentCatalogSignatureSamples
                 "System.Environment.SystemPageSize.get",
                 "System.Environment.UserDomainName.get",
                 "System.Environment.UserInteractive.get",
+                "System.Environment.UserName.get",
                 "System.Environment.WorkingSet.get",
             };
 
