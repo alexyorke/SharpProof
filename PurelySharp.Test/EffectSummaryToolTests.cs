@@ -3253,6 +3253,30 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeUriToStringSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly("System.Private.Uri.dll", 40, "System.Uri.ToString");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Uri.ToString()", "impure", "impure_callee", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Uri.ToString()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => string.Equals(symbol, "System.Uri.ToString()", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[] { "System.Uri.ToString()" }));
+        }
+
+        [Test]
         public void CheckedInEffectSummaryArtifacts_DoNotReportCatalogOverlap()
         {
             var analyzerDirectory = Path.Combine(GetRepositoryRoot(), "PurelySharp.Analyzer");
@@ -4440,6 +4464,33 @@ public static class PurityFixture
                 .ToArray();
 
             Assert.That(generatedSymbols, Does.Contain("System.Net.IPAddress.IsLoopback(System.Net.IPAddress)"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeIPEndPointConstructorSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Net.Primitives.dll",
+                20,
+                "System.Net.IPEndPoint..ctor(System.Net.IPAddress, int)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Net.IPEndPoint..ctor(System.Net.IPAddress, int)", "impure", "object_state_write", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Net.IPEndPoint..ctor(System.Net.IPAddress, int)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => string.Equals(symbol, "System.Net.IPEndPoint..ctor(System.Net.IPAddress, int)", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[] { "System.Net.IPEndPoint..ctor(System.Net.IPAddress, int)" }));
         }
 
         [Test]

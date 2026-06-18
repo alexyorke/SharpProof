@@ -1,0 +1,196 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-18T23:39:49.6759196+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.Net.Primitives",
+      "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Net.Primitives.dll",
+      "AssemblySha256": "ffb439ee971575c80749639eaa2593194de95dfc18eaaaa4011df9a39fb64181",
+      "ModuleVersionId": "09288294-7c42-4cbc-a39b-f12de6d4d538",
+      "MethodCount": 470,
+      "EmittedMethodCount": 3,
+      "Methods": [
+        {
+          "Symbol": "System.Net.EndPoint..ctor()",
+          "ExactSymbolKey": "System.Net.EndPoint..ctor()-\u003Evoid",
+          "MetadataToken": "0x060000E8",
+          "RelativeVirtualAddress": 111620,
+          "MethodBodySha256": "1ac913b9c2c29ae234dbbf5116c9c73e5371614da65f528fdeed8cc8c5cdf2a4",
+          "CacheKey": "mvid:09288294-7c42-4cbc-a39b-f12de6d4d538|token:0x060000E8|il:1ac913b9c2c29ae234dbbf5116c9c73e5371614da65f528fdeed8cc8c5cdf2a4",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "object..ctor()-\u003Evoid"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Net.IPEndPoint..ctor(System.Net.IPAddress, int)",
+          "ExactSymbolKey": "System.Net.IPEndPoint..ctor(System.Net.IPAddress, int)-\u003Evoid",
+          "MetadataToken": "0x0600014F",
+          "RelativeVirtualAddress": 117156,
+          "MethodBodySha256": "4c313453b4cb92fb251210d626b6bd1ba14c7cac65a21e7ceb6dd726ac687f35",
+          "CacheKey": "mvid:09288294-7c42-4cbc-a39b-f12de6d4d538|token:0x0600014F|il:4c313453b4cb92fb251210d626b6bd1ba14c7cac65a21e7ceb6dd726ac687f35",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "object_state_write",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentOutOfRangeException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.ArgumentOutOfRangeException..ctor(string)-\u003Evoid",
+            "System.Net.EndPoint..ctor()-\u003Evoid",
+            "System.Net.TcpValidationHelpers.ValidatePortNumber(int)-\u003Ebool"
+          ],
+          "Fields": [
+            "System.Net.IPEndPoint._address",
+            "System.Net.IPEndPoint._port"
+          ],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "object_state_write",
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Net.TcpValidationHelpers.ValidatePortNumber(int)",
+          "ExactSymbolKey": "System.Net.TcpValidationHelpers.ValidatePortNumber(int)-\u003Ebool",
+          "MetadataToken": "0x0600019B",
+          "RelativeVirtualAddress": 122140,
+          "MethodBodySha256": "3653fba84b873d97e1dcb6d0cbd1f4a3e6552c93396c838817805a7258cda2d6",
+          "CacheKey": "mvid:09288294-7c42-4cbc-a39b-f12de6d4d538|token:0x0600019B|il:3653fba84b873d97e1dcb6d0cbd1f4a3e6552c93396c838817805a7258cda2d6",
+          "Effects": [],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 3,
+    "PureCount": 2,
+    "ImpureCount": 1,
+    "ConservativeUnknownCount": 0,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.Net.EndPoint..ctor()",
+        "ExactSymbolKey": "System.Net.EndPoint..ctor()-\u003Evoid",
+        "CacheKey": "mvid:09288294-7c42-4cbc-a39b-f12de6d4d538|token:0x060000E8|il:1ac913b9c2c29ae234dbbf5116c9c73e5371614da65f528fdeed8cc8c5cdf2a4",
+        "AssemblyName": "System.Net.Primitives",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Net.Primitives.dll",
+        "AssemblySha256": "ffb439ee971575c80749639eaa2593194de95dfc18eaaaa4011df9a39fb64181",
+        "ModuleVersionId": "09288294-7c42-4cbc-a39b-f12de6d4d538",
+        "MetadataToken": "0x060000E8",
+        "MethodBodySha256": "1ac913b9c2c29ae234dbbf5116c9c73e5371614da65f528fdeed8cc8c5cdf2a4",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Net.IPEndPoint..ctor(System.Net.IPAddress, int)",
+        "ExactSymbolKey": "System.Net.IPEndPoint..ctor(System.Net.IPAddress, int)-\u003Evoid",
+        "CacheKey": "mvid:09288294-7c42-4cbc-a39b-f12de6d4d538|token:0x0600014F|il:4c313453b4cb92fb251210d626b6bd1ba14c7cac65a21e7ceb6dd726ac687f35",
+        "AssemblyName": "System.Net.Primitives",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Net.Primitives.dll",
+        "AssemblySha256": "ffb439ee971575c80749639eaa2593194de95dfc18eaaaa4011df9a39fb64181",
+        "ModuleVersionId": "09288294-7c42-4cbc-a39b-f12de6d4d538",
+        "MetadataToken": "0x0600014F",
+        "MethodBodySha256": "4c313453b4cb92fb251210d626b6bd1ba14c7cac65a21e7ceb6dd726ac687f35",
+        "Classification": "impure",
+        "PrimaryCategory": "object_state_write",
+        "Categories": [
+          "object_state_write",
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Net.TcpValidationHelpers.ValidatePortNumber(int)",
+        "ExactSymbolKey": "System.Net.TcpValidationHelpers.ValidatePortNumber(int)-\u003Ebool",
+        "CacheKey": "mvid:09288294-7c42-4cbc-a39b-f12de6d4d538|token:0x0600019B|il:3653fba84b873d97e1dcb6d0cbd1f4a3e6552c93396c838817805a7258cda2d6",
+        "AssemblyName": "System.Net.Primitives",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Net.Primitives.dll",
+        "AssemblySha256": "ffb439ee971575c80749639eaa2593194de95dfc18eaaaa4011df9a39fb64181",
+        "ModuleVersionId": "09288294-7c42-4cbc-a39b-f12de6d4d538",
+        "MetadataToken": "0x0600019B",
+        "MethodBodySha256": "3653fba84b873d97e1dcb6d0cbd1f4a3e6552c93396c838817805a7258cda2d6",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      }
+    ]
+  }
+}

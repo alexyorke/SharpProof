@@ -227,15 +227,23 @@ public class TestClass
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
 
+        [Test]
+        public async Task IPEndPointConstructor_Diagnostic()
+        {
+            var test = @"
+using System.Net;
+using PurelySharp.Attributes;
 
+public class TestClass
+{
+    [EnforcePure]
+    public IPEndPoint {|PS0002:TestMethod|}(IPAddress address)
+    {
+        return new IPEndPoint(address, 80);
+    }
+}";
 
-
-
-
-
-
-
-
-
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

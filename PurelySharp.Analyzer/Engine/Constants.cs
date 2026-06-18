@@ -1004,11 +1004,9 @@ public static class Constants
         "System.Linq.Enumerable.Take<TSource>(System.Collections.Generic.IEnumerable<TSource>, int)",
         "System.Linq.Enumerable.ThenBy",
         "System.Linq.Enumerable.Zip",
-        "System.Net.IPEndPoint.IPEndPoint(System.Net.IPAddress, int)",
         "System.Runtime.InteropServices.Marshal.SizeOf<T>()",
         "string.Join(string, System.Collections.Generic.IEnumerable<string>)",
         "System.Threading.CancellationToken.None.get",
-        "System.Uri.ToString()",
 
 
         "System.AggregateException.AggregateException(System.Collections.Generic.IEnumerable<System.Exception>)",

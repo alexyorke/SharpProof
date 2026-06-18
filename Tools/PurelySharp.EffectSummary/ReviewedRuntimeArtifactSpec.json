@@ -337,6 +337,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/IPEndPoint.Constructor.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/IPEndPoint.Constructor.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Net.Primitives.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Net.IPEndPoint..ctor(System.Net.IPAddress, int)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/SortedSet.GetViewBetween.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/SortedSet.GetViewBetween.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Collections.dll",
@@ -703,6 +712,15 @@
       "OutputPath": "PurelySharp.Analyzer/Uri.UnescapeDataString.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Uri.UnescapeDataString.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Private.Uri.dll"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Uri.ToString.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Uri.ToString.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.Uri.dll",
+      "Limit": 40,
+      "SymbolPrefixes": [
+        "System.Uri.ToString"
+      ]
     },
     {
       "OutputPath": "PurelySharp.Analyzer/WebUtility.PurelySharp.EffectSummary.json",

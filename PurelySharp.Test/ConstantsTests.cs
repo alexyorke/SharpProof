@@ -1180,6 +1180,29 @@ public static class ExceptionAccessorCatalogSignatureSamples
         }
 
         [Test]
+        public void UriToString_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+
+public static class UriCatalogSignatureSamples
+{
+    public static string Sample(Uri value)
+    {
+        return value.ToString();
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "UriToStringCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.ToString()"));
+        }
+
+        [Test]
         public void AppContextImpureHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.AppContext.BaseDirectory.get");
@@ -1480,6 +1503,29 @@ public class GuardSignatureSamples
         public void IPAddressIsLoopback_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.Net.IPAddress.IsLoopback(System.Net.IPAddress)");
+        }
+
+        [Test]
+        public void IPEndPointConstructor_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Net;
+
+public static class IPEndPointCatalogSignatureSamples
+{
+    public static IPEndPoint Sample(IPAddress address)
+    {
+        return new IPEndPoint(address, 80);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "IPEndPointCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new IPEndPoint(address, 80)"));
         }
 
         [Test]
