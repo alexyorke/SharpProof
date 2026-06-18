@@ -1135,6 +1135,49 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeExceptionAccessorSlice_UsesGeneratedPureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.Exception.get_HResult",
+                "System.Exception.get_InnerException");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(
+                summary,
+                "System.Exception.get_HResult()",
+                "pure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Exception.get_HResult()",
+                "none");
+            AssertPurityClassification(
+                summary,
+                "System.Exception.get_InnerException()",
+                "pure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Exception.get_InnerException()",
+                "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Exception.get_HResult()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Exception.get_InnerException()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeInterfaceCollectionLookupSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

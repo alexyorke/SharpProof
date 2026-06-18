@@ -282,6 +282,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Exception.Accessors.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Exception.Accessors.PurelySharp.EffectSummary.json",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Exception.get_HResult",
+        "System.Exception.get_InnerException"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/MutableCollection.Readers.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/MutableCollection.Readers.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [

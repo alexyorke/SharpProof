@@ -2736,6 +2736,12 @@ namespace PurelySharp.Analyzer.Engine
                 return PurityAnalysisResult.Pure;
             }
 
+            if (operation.Kind == OperationKind.Discard)
+            {
+                LogDebug("    [CSO] Discard is parent-handled by assignment, deconstruction, or argument analysis.");
+                return PurityAnalysisResult.Pure;
+            }
+
             _firstRuleByOperationKind.TryGetValue(operation.Kind, out var applicableRule);
 
             if (applicableRule != null)

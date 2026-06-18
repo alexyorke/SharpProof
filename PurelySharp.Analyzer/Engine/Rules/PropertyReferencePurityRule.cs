@@ -66,7 +66,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     out generatedPurity);
             var allowsKnownPureFallback = !hasTrustedGeneratedPurity;
             var requiresDispatchCheck = getterSymbol != null &&
-                IsPotentiallyDispatchedProperty(propertySymbol) &&
+                IsPotentiallyDispatchedProperty(propertySymbol, context.SemanticModel.Compilation) &&
                 !(allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol));
             var dispatchGetterWasProvenPure = false;
 
@@ -1007,21 +1007,32 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 SpecialType.System_String;
         }
 
-        private static bool IsPotentiallyDispatchedGetter(IMethodSymbol getterSymbol)
+        private static bool IsPotentiallyDispatchedGetter(IMethodSymbol getterSymbol, Compilation compilation)
         {
-            return getterSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
-                   getterSymbol.IsVirtual ||
-                   getterSymbol.IsAbstract ||
-                   getterSymbol.IsOverride;
+            if (getterSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
+                getterSymbol.IsAbstract)
+            {
+                return true;
+            }
+
+            if (!getterSymbol.IsVirtual && !getterSymbol.IsOverride)
+            {
+                return false;
+            }
+
+            if (GeneratedPurityCatalog.TryCanMetadataMethodBeOverridden(getterSymbol, compilation, out var canBeOverridden))
+            {
+                return canBeOverridden;
+            }
+
+            return !getterSymbol.IsSealed;
         }
 
-        private static bool IsPotentiallyDispatchedProperty(IPropertySymbol propertySymbol)
+        private static bool IsPotentiallyDispatchedProperty(IPropertySymbol propertySymbol, Compilation compilation)
         {
             return propertySymbol.ContainingType?.TypeKind == TypeKind.Interface ||
-                   propertySymbol.IsVirtual ||
                    propertySymbol.IsAbstract ||
-                   propertySymbol.IsOverride ||
-                   (propertySymbol.GetMethod != null && IsPotentiallyDispatchedGetter(propertySymbol.GetMethod));
+                   (propertySymbol.GetMethod != null && IsPotentiallyDispatchedGetter(propertySymbol.GetMethod, compilation));
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckDispatchedGetterPurity(
@@ -1040,7 +1051,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 : GetKnownReceiverType(propertyReferenceOperation.Instance);
 
             if (!hasExactReceiverType &&
-                CanDispatchToUnknownGetterTarget(propertyReferenceOperation.Property, knownReceiverType))
+                CanDispatchToUnknownGetterTarget(
+                    propertyReferenceOperation.Property,
+                    knownReceiverType,
+                    context.SemanticModel.Compilation))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     propertyReferenceOperation.Syntax,
@@ -1087,7 +1101,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static bool CanDispatchToUnknownGetterTarget(
             IPropertySymbol propertySymbol,
-            INamedTypeSymbol? knownReceiverType)
+            INamedTypeSymbol? knownReceiverType,
+            Compilation compilation)
         {
             if (knownReceiverType == null)
             {
@@ -1101,7 +1116,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (knownReceiverType.TypeKind == TypeKind.Class &&
                 !knownReceiverType.IsSealed &&
-                IsPotentiallyDispatchedProperty(propertySymbol))
+                IsPotentiallyDispatchedProperty(propertySymbol, compilation))
             {
                 return true;
             }

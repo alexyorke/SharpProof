@@ -35,6 +35,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="PurelySharp.EffectSummary.json" />
+    <EmbeddedResource Include="*.PurelySharp.EffectSummary.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\PurelySharp.Attributes\PurelySharp.Attributes.csproj" />
     <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
     

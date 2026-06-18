@@ -107,7 +107,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IImplicitIndexerReferenceOperation implicitIndexerReferenceOperation,
             PurityAnalysisContext context)
         {
-            var getter = ResolveGetter(propertySymbol, receiverType, hasStableConcreteReceiver);
+            var getter = ResolveGetter(
+                propertySymbol,
+                receiverType,
+                hasStableConcreteReceiver,
+                context.SemanticModel.Compilation);
             if (getter == null)
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -132,7 +136,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IImplicitIndexerReferenceOperation implicitIndexerReferenceOperation,
             PurityAnalysisContext context)
         {
-            var targetMethod = ResolveMethod(methodSymbol, receiverType, hasStableConcreteReceiver);
+            var targetMethod = ResolveMethod(
+                methodSymbol,
+                receiverType,
+                hasStableConcreteReceiver,
+                context.SemanticModel.Compilation);
             if (targetMethod == null)
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -153,14 +161,15 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static IMethodSymbol? ResolveGetter(
             IPropertySymbol propertySymbol,
             INamedTypeSymbol? receiverType,
-            bool hasStableConcreteReceiver)
+            bool hasStableConcreteReceiver,
+            Compilation compilation)
         {
             if (propertySymbol.GetMethod == null)
             {
                 return null;
             }
 
-            if (!IsPotentiallyDispatchedGetter(propertySymbol.GetMethod))
+            if (!IsPotentiallyDispatchedGetter(propertySymbol.GetMethod, compilation))
             {
                 return propertySymbol.GetMethod.OriginalDefinition;
             }
@@ -204,9 +213,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static IMethodSymbol? ResolveMethod(
             IMethodSymbol methodSymbol,
             INamedTypeSymbol? receiverType,
-            bool hasStableConcreteReceiver)
+            bool hasStableConcreteReceiver,
+            Compilation compilation)
         {
-            if (!IsPotentiallyDispatchedMethod(methodSymbol))
+            if (!IsPotentiallyDispatchedMethod(methodSymbol, compilation))
             {
                 return methodSymbol.OriginalDefinition;
             }
@@ -256,20 +266,46 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return receiverType;
         }
 
-        private static bool IsPotentiallyDispatchedGetter(IMethodSymbol getterSymbol)
+        private static bool IsPotentiallyDispatchedGetter(IMethodSymbol getterSymbol, Compilation compilation)
         {
-            return getterSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
-                   getterSymbol.IsVirtual ||
-                   getterSymbol.IsAbstract ||
-                   getterSymbol.IsOverride;
+            if (getterSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
+                getterSymbol.IsAbstract)
+            {
+                return true;
+            }
+
+            if (!getterSymbol.IsVirtual && !getterSymbol.IsOverride)
+            {
+                return false;
+            }
+
+            if (GeneratedPurityCatalog.TryCanMetadataMethodBeOverridden(getterSymbol, compilation, out var canBeOverridden))
+            {
+                return canBeOverridden;
+            }
+
+            return !getterSymbol.IsSealed;
         }
 
-        private static bool IsPotentiallyDispatchedMethod(IMethodSymbol methodSymbol)
+        private static bool IsPotentiallyDispatchedMethod(IMethodSymbol methodSymbol, Compilation compilation)
         {
-            return methodSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
-                   methodSymbol.IsVirtual ||
-                   methodSymbol.IsAbstract ||
-                   methodSymbol.IsOverride;
+            if (methodSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
+                methodSymbol.IsAbstract)
+            {
+                return true;
+            }
+
+            if (!methodSymbol.IsVirtual && !methodSymbol.IsOverride)
+            {
+                return false;
+            }
+
+            if (GeneratedPurityCatalog.TryCanMetadataMethodBeOverridden(methodSymbol, compilation, out var canBeOverridden))
+            {
+                return canBeOverridden;
+            }
+
+            return !methodSymbol.IsSealed;
         }
 
         private static IPropertySymbol GetRootOverriddenProperty(IPropertySymbol propertySymbol)

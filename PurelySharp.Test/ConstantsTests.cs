@@ -635,6 +635,31 @@ public static class NullableGetValueOrDefaultCatalogSignatureSamples
         }
 
         [Test]
+        public void ExceptionStateAccessors_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+
+public static class ExceptionAccessorCatalogSignatureSamples
+{
+    public static int Sample(Exception error)
+    {
+        _ = error.InnerException;
+        return error.HResult;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ExceptionAccessorCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "error.InnerException"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "error.HResult"));
+        }
+
+        [Test]
         public void FileNotFoundExceptionStringConstructor_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.IO.FileNotFoundException.FileNotFoundException(string?)");

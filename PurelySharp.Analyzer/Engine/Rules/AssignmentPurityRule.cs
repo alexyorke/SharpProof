@@ -589,6 +589,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
         {
             switch (targetOperation.Kind)
             {
+                case OperationKind.Discard:
+                    PurityAnalysisEngine.LogDebug(" Assignment Target: Discard - Pure Target");
+                    return true;
+
                 case OperationKind.LocalReference:
                     if (targetOperation is ILocalReferenceOperation localRef &&
                         IsRefLocalAliasToExternallyVisibleStorage(localRef.Local, context, currentState))

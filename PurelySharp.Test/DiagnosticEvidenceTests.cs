@@ -677,6 +677,78 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_ExceptionStateAccessorsAsPureEvidence()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(Exception error)
+    {
+        _ = error.InnerException;
+        return error.HResult;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var memberAccesses = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "error.InnerException" ||
+                    node.ToString() == "error.HResult")
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var currentProperty = catalogType.GetProperty("Current", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var currentCatalog = currentProperty.GetValue(null)!;
+            var classifications = memberAccesses.ToDictionary(
+                node => node.ToString(),
+                node =>
+                {
+                    var property = (IPropertySymbol)semanticModel.GetSymbolInfo(node).Symbol!;
+                    var args = new object?[] { property.GetMethod!.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = matched
+                        ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                        : string.Empty;
+                    var currentArgs = new object?[] { property.GetMethod!.OriginalDefinition, compilation, null };
+                    var currentMatched = (bool)tryGetPurity.Invoke(currentCatalog, currentArgs)!;
+                    var currentPurityEntry = currentArgs[2]!;
+                    var currentClassification = currentMatched
+                        ? (string)currentPurityEntry.GetType().GetProperty("Classification")!.GetValue(currentPurityEntry)!
+                        : string.Empty;
+                    return (matched, classification, currentMatched, currentClassification);
+                });
+
+            Assert.That(classifications["error.InnerException"].matched, Is.True);
+            Assert.That(classifications["error.InnerException"].classification, Is.EqualTo("pure"));
+            Assert.That(classifications["error.InnerException"].currentMatched, Is.True);
+            Assert.That(classifications["error.InnerException"].currentClassification, Is.EqualTo("pure"));
+            Assert.That(classifications["error.HResult"].matched, Is.True);
+            Assert.That(classifications["error.HResult"].classification, Is.EqualTo("pure"));
+            Assert.That(classifications["error.HResult"].currentMatched, Is.True);
+            Assert.That(classifications["error.HResult"].currentClassification, Is.EqualTo("pure"));
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow Exception.HResult and Exception.InnerException.");
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_ArgumentGuardHelpersAsPureEvidence()
         {
             const string source = @"

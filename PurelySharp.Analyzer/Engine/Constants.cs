@@ -972,8 +972,6 @@ public static class Constants
         "System.ComponentModel.DataAnnotations.RangeAttribute.RangeAttribute(double, double)",
         "System.ComponentModel.DescriptionAttribute.DescriptionAttribute(string)",
         "System.Diagnostics.ConditionalAttribute.ConditionalAttribute(string)",
-        "System.Exception.HResult.get",
-        "System.Exception.InnerException.get",
         "System.Globalization.CompareInfo.Compare(string, string)",
         "System.HashCode.Combine<T1, T2>(T1, T2)",
         "System.IO.Pipelines.Pipe.Pipe(System.IO.Pipelines.PipeOptions)",

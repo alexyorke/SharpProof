@@ -265,7 +265,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             var dispatchWasProvenPure = false;
-            if (IsPotentiallyDispatchedMethod(invokedMethodSymbol)
+            if (IsPotentiallyDispatchedMethod(invokedMethodSymbol, context.SemanticModel.Compilation)
                 && (invokedMethodSymbol.IsStatic
                     ? invocationOperation.Instance == null
                     : invocationOperation.Instance != null
@@ -700,12 +700,25 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return false;
         }
 
-        private static bool IsPotentiallyDispatchedMethod(IMethodSymbol methodSymbol)
+        private static bool IsPotentiallyDispatchedMethod(IMethodSymbol methodSymbol, Compilation compilation)
         {
-            return methodSymbol.ContainingType?.TypeKind == TypeKind.Interface
-                || methodSymbol.IsVirtual
-                || methodSymbol.IsAbstract
-                || methodSymbol.IsOverride;
+            if (methodSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
+                methodSymbol.IsAbstract)
+            {
+                return true;
+            }
+
+            if (!methodSymbol.IsVirtual && !methodSymbol.IsOverride)
+            {
+                return false;
+            }
+
+            if (GeneratedPurityCatalog.TryCanMetadataMethodBeOverridden(methodSymbol, compilation, out var canBeOverridden))
+            {
+                return canBeOverridden;
+            }
+
+            return !methodSymbol.IsSealed;
         }
 
         private static bool IsPureOutArgumentTarget(IOperation? operation)

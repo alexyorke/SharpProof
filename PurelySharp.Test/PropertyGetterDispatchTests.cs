@@ -261,6 +261,26 @@ public class TestClass
         }
 
         [Test]
+        public async Task FinalVirtualFrameworkPropertyGetter_OnBaseTypedReceiver_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int Read(Exception error)
+    {
+        _ = error.InnerException;
+        return error.HResult;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task InterfacePropertyGetter_OnConditionalSealedImplementationBranches_NoDiagnostic()
         {
             var test = @"

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
@@ -19,6 +20,8 @@ namespace PurelySharp.Analyzer
     {
         private const string SummaryFileName = "PurelySharp.EffectSummary.json";
         private static readonly AsyncLocal<GeneratedPurityCatalog?> CurrentCatalog = new AsyncLocal<GeneratedPurityCatalog?>();
+        private static readonly Lazy<GeneratedPurityCatalog> BuiltInCatalog =
+            new Lazy<GeneratedPurityCatalog>(CreateBuiltInCatalog, LazyThreadSafetyMode.ExecutionAndPublication);
         private static readonly SymbolDisplayFormat EffectSummaryContainingTypeFormat = new SymbolDisplayFormat(
             typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
             genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
@@ -48,7 +51,7 @@ namespace PurelySharp.Analyzer
             _entriesBySymbol = entriesBySymbol;
         }
 
-        public static GeneratedPurityCatalog Current => CurrentCatalog.Value ?? Empty;
+        public static GeneratedPurityCatalog Current => CurrentCatalog.Value ?? BuiltInCatalog.Value;
 
         public static GeneratedPurityCatalog FromOptions(AnalyzerOptions options, CancellationToken cancellationToken)
         {
@@ -78,44 +81,23 @@ namespace PurelySharp.Analyzer
                 }
             }
 
-            var builtInSummaryDirectory = Path.GetDirectoryName(typeof(GeneratedPurityCatalog).Assembly.Location);
-            if (!string.IsNullOrWhiteSpace(builtInSummaryDirectory))
+            LoadBuiltInEntries(entriesBySymbol);
+
+            if (entriesBySymbol.Count == 0)
             {
-                var builtInSummaryPath = Path.Combine(builtInSummaryDirectory, SummaryFileName);
-                if (File.Exists(builtInSummaryPath))
-                {
-                    foreach (var entry in ParseEntries(File.ReadAllText(builtInSummaryPath)))
-                    {
-                        if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
-                        {
-                            builder = ImmutableArray.CreateBuilder<SummaryEntry>();
-                            entriesBySymbol.Add(entry.Symbol, builder);
-                        }
-
-                        builder.Add(entry);
-                    }
-                }
-
-                foreach (var domainSummaryPath in Directory.EnumerateFiles(builtInSummaryDirectory, "*." + SummaryFileName, SearchOption.TopDirectoryOnly))
-                {
-                    if (string.Equals(Path.GetFileName(domainSummaryPath), SummaryFileName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    foreach (var entry in ParseEntries(File.ReadAllText(domainSummaryPath)))
-                    {
-                        if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
-                        {
-                            builder = ImmutableArray.CreateBuilder<SummaryEntry>();
-                            entriesBySymbol.Add(entry.Symbol, builder);
-                        }
-
-                        builder.Add(entry);
-                    }
-                }
+                return Empty;
             }
 
+            return new GeneratedPurityCatalog(entriesBySymbol.ToImmutableDictionary(
+                item => item.Key,
+                item => item.Value.ToImmutable(),
+                StringComparer.Ordinal));
+        }
+
+        private static GeneratedPurityCatalog CreateBuiltInCatalog()
+        {
+            var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
+            LoadBuiltInEntries(entriesBySymbol);
             if (entriesBySymbol.Count == 0)
             {
                 return Empty;
@@ -190,11 +172,116 @@ namespace PurelySharp.Analyzer
             return TryGetPurity(staticConstructor.OriginalDefinition, compilation, out classification);
         }
 
+        internal static bool TryCanMetadataMethodBeOverridden(IMethodSymbol methodSymbol, Compilation compilation, out bool canBeOverridden)
+        {
+            canBeOverridden = false;
+            if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
+            {
+                return false;
+            }
+
+            var actualMethodIdentity = TryResolveActualMethodIdentity(methodSymbol, compilation);
+            if (actualMethodIdentity == null)
+            {
+                return false;
+            }
+
+            canBeOverridden = actualMethodIdentity.CanBeOverridden;
+            return true;
+        }
+
         private static bool IsSummaryFile(string path)
         {
             var fileName = Path.GetFileName(path);
             return string.Equals(fileName, SummaryFileName, StringComparison.OrdinalIgnoreCase) ||
                 fileName.EndsWith("." + SummaryFileName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void LoadBuiltInEntries(
+            Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol)
+        {
+            var summaryDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            AddSummaryDirectory(summaryDirectories, Path.GetDirectoryName(typeof(GeneratedPurityCatalog).Assembly.Location));
+            AddSummaryDirectory(summaryDirectories, AppContext.BaseDirectory);
+            foreach (var summaryDirectory in summaryDirectories)
+            {
+                LoadBuiltInSummaryEntries(entriesBySymbol, summaryDirectory);
+            }
+
+            LoadEmbeddedSummaryEntries(entriesBySymbol);
+        }
+
+        private static void AddSummaryDirectory(HashSet<string> directories, string? path)
+        {
+            if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+            {
+                directories.Add(path);
+            }
+        }
+
+        private static void LoadBuiltInSummaryEntries(
+            Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol,
+            string summaryDirectory)
+        {
+            var builtInSummaryPath = Path.Combine(summaryDirectory, SummaryFileName);
+            if (File.Exists(builtInSummaryPath))
+            {
+                AddParsedEntries(entriesBySymbol, File.ReadAllText(builtInSummaryPath));
+            }
+
+            foreach (var domainSummaryPath in Directory.EnumerateFiles(summaryDirectory, "*." + SummaryFileName, SearchOption.TopDirectoryOnly))
+            {
+                if (string.Equals(Path.GetFileName(domainSummaryPath), SummaryFileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                AddParsedEntries(entriesBySymbol, File.ReadAllText(domainSummaryPath));
+            }
+        }
+
+        private static void LoadEmbeddedSummaryEntries(
+            Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol)
+        {
+            var assembly = typeof(GeneratedPurityCatalog).Assembly;
+            foreach (var resourceName in assembly.GetManifestResourceNames())
+            {
+                if (!IsSummaryResource(resourceName))
+                {
+                    continue;
+                }
+
+                using var stream = assembly.GetManifestResourceStream(resourceName);
+                if (stream == null)
+                {
+                    continue;
+                }
+
+                using var reader = new StreamReader(stream);
+                AddParsedEntries(entriesBySymbol, reader.ReadToEnd());
+            }
+        }
+
+        private static void AddParsedEntries(
+            Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol,
+            string json)
+        {
+            foreach (var entry in ParseEntries(json))
+            {
+                if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
+                {
+                    builder = ImmutableArray.CreateBuilder<SummaryEntry>();
+                    entriesBySymbol.Add(entry.Symbol, builder);
+                }
+
+                builder.Add(entry);
+            }
+        }
+
+        private static bool IsSummaryResource(string resourceName)
+        {
+            return resourceName.EndsWith("." + SummaryFileName, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(resourceName, SummaryFileName, StringComparison.OrdinalIgnoreCase);
         }
 
         private static IEnumerable<SummaryEntry> ParseEntries(string json)
@@ -761,7 +848,7 @@ namespace PurelySharp.Analyzer
                 }
 
                 var token = "0x" + MetadataTokens.GetToken(handle).ToString("X8");
-                var identity = new ActualMethodIdentity(token, methodBodySha256);
+                var identity = new ActualMethodIdentity(token, methodBodySha256, definition.Attributes);
                 foreach (var key in GetMethodKeys(metadataReader, handle))
                 {
                     builder[key] = identity;
@@ -1519,14 +1606,20 @@ namespace PurelySharp.Analyzer
 
         private sealed class ActualMethodIdentity
         {
-            public ActualMethodIdentity(string metadataToken, string? methodBodySha256)
+            public ActualMethodIdentity(string metadataToken, string? methodBodySha256, MethodAttributes attributes)
             {
                 MetadataToken = metadataToken;
                 MethodBodySha256 = methodBodySha256;
+                Attributes = attributes;
             }
 
             public string MetadataToken { get; }
             public string? MethodBodySha256 { get; }
+            public MethodAttributes Attributes { get; }
+            public bool CanBeOverridden =>
+                Attributes.HasFlag(MethodAttributes.Virtual) &&
+                !Attributes.HasFlag(MethodAttributes.Final) &&
+                !Attributes.HasFlag(MethodAttributes.Static);
         }
 
         private sealed class ActualAssemblyIdentity
