@@ -1950,6 +1950,56 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeBooleanCompareAndCharHelperSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                120,
+                "System.Boolean.CompareTo(bool)",
+                "System.Char.ConvertToUtf32(char, char)",
+                "System.Char.GetNumericValue(char)",
+                "System.Char.IsControl(char)",
+                "System.Char.IsLower(char)",
+                "System.Char.IsNumber(char)",
+                "System.Char.IsPunctuation(char)",
+                "System.Char.IsSeparator(char)",
+                "System.Char.IsSymbol(char)",
+                "System.Char.IsUpper(char)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var representativeSymbols = new[]
+            {
+                "System.Boolean.CompareTo(bool)",
+                "System.Char.ConvertToUtf32(char, char)",
+                "System.Char.GetNumericValue(char)",
+                "System.Char.IsControl(char)",
+                "System.Char.IsUpper(char)",
+            };
+
+            foreach (var symbol in representativeSymbols)
+            {
+                AssertPurityClassification(summary, symbol, "pure");
+                AssertEffectVisibilityClassification(summary, symbol, "none");
+            }
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            foreach (var symbol in representativeSymbols)
+            {
+                Assert.That(generatedSymbols, Does.Contain(symbol));
+            }
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeEnumTryParseSlice_UsesSemanticHandlingInsteadOfManualCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(80, "System.Enum.TryParse");

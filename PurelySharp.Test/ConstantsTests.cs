@@ -464,6 +464,29 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void BooleanCompareAndCharClassificationHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "bool.CompareTo(bool)",
+                "char.ConvertToUtf32(char, char)",
+                "char.GetNumericValue(char)",
+                "char.IsControl(char)",
+                "char.IsLower(char)",
+                "char.IsNumber(char)",
+                "char.IsPunctuation(char)",
+                "char.IsSeparator(char)",
+                "char.IsSymbol(char)",
+                "char.IsUpper(char)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void BooleanParseHelpers_AreHandledSemantically_NotStaticCatalogs()
         {
             var members = new[]
@@ -1594,6 +1617,48 @@ public static class DateTimeCatalogSignatureSamples
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.TimeOfDay"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.Subtract(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.ToBinary()"));
+        }
+
+        [Test]
+        public void BooleanAndCharGeneratedPurityEntriesResolveAgainstNet80References()
+        {
+            var source = @"
+using System;
+
+public static class BooleanCharCatalogSignatureSamples
+{
+    public static int Sample(bool left, bool right, char value, char other)
+    {
+        _ = left.CompareTo(right);
+        _ = char.ConvertToUtf32(value, other);
+        _ = char.GetNumericValue(value);
+        _ = char.IsControl(value);
+        _ = char.IsLower(value);
+        _ = char.IsNumber(value);
+        _ = char.IsPunctuation(value);
+        _ = char.IsSeparator(value);
+        _ = char.IsSymbol(value);
+        _ = char.IsUpper(value);
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "BooleanCharGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "left.CompareTo(right)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.ConvertToUtf32(value, other)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.GetNumericValue(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsControl(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsLower(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsNumber(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsPunctuation(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsSeparator(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsSymbol(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsUpper(value)"));
         }
 
         private static void AssertCatalogMembership(string signature, bool expectedPure, bool expectedImpure)

@@ -167,6 +167,22 @@
       "SourceSummaryPath": "PurelySharp.Analyzer/BooleanChar.ToString.PurelySharp.EffectSummary.json"
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/BooleanChar.Helpers.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/BooleanChar.Helpers.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.Boolean.CompareTo(bool)",
+        "System.Char.ConvertToUtf32(char, char)",
+        "System.Char.GetNumericValue(char)",
+        "System.Char.IsControl(char)",
+        "System.Char.IsLower(char)",
+        "System.Char.IsNumber(char)",
+        "System.Char.IsPunctuation(char)",
+        "System.Char.IsSeparator(char)",
+        "System.Char.IsSymbol(char)",
+        "System.Char.IsUpper(char)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json"
     },

@@ -827,6 +827,84 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_BooleanCompareAndCharClassificationHelpers()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(bool left, bool right, char value, char other)
+    {
+        var compare = left.CompareTo(right);
+        var codePoint = char.ConvertToUtf32(value, other);
+        var numeric = char.GetNumericValue(value);
+        var isControl = char.IsControl(value);
+        var isLower = char.IsLower(value);
+        var isNumber = char.IsNumber(value);
+        var isPunctuation = char.IsPunctuation(value);
+        var isSeparator = char.IsSeparator(value);
+        var isSymbol = char.IsSymbol(value);
+        var isUpper = char.IsUpper(value);
+        return compare;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedExpressions = new[]
+            {
+                "left.CompareTo(right)",
+                "char.ConvertToUtf32(value, other)",
+                "char.GetNumericValue(value)",
+                "char.IsControl(value)",
+                "char.IsLower(value)",
+                "char.IsNumber(value)",
+                "char.IsPunctuation(value)",
+                "char.IsSeparator(value)",
+                "char.IsSymbol(value)",
+                "char.IsUpper(value)",
+            };
+            var trackedMethods = trackedExpressions
+                .Select(expressionText =>
+                {
+                    var symbol = semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == expressionText))
+                        .Symbol;
+                    Assert.That(symbol, Is.Not.Null, expressionText);
+                    return (IMethodSymbol)symbol!;
+                })
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var matched = trackedMethods.Select(method =>
+            {
+                var args = new object?[] { method.OriginalDefinition, compilation, null };
+                return (bool)tryGetPurity.Invoke(catalog, args)!;
+            }).ToArray();
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow the tracked bool and char helper methods.");
+            Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedExpressions.Length).ToArray()),
+                "Generated purity catalog should resolve the tracked bool and char helper members.");
+        }
+
+        [Test]
         public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPureMethodFallback()
         {
             const string source = @"
