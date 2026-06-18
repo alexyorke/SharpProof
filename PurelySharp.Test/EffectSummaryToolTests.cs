@@ -3534,8 +3534,9 @@ public static class PurityFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch..ctor()", "impure", "impure_callee");
-            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch..ctor()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch..ctor()", "pure");
+            AssertFreshnessClassification(summary, "System.Diagnostics.Stopwatch..ctor()", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch..ctor()", "internal_only");
             AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.get_Elapsed()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.get_Elapsed()", "caller_visible");
             AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.get_ElapsedMilliseconds()", "impure", "impure_callee");
@@ -3544,6 +3545,8 @@ public static class PurityFixture
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.get_ElapsedTicks()", "caller_visible");
             AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.get_IsRunning()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.get_IsRunning()", "none");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.Reset()", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.Reset()", "caller_visible");
             AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.Start()", "impure", "impure_callee", "object_state_write");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.Start()", "caller_visible");
             AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.Stop()", "impure", "impure_callee", "object_state_write");
@@ -4399,10 +4402,19 @@ public static class PurityFixture
         public async Task EffectSummaryTool_RuntimePureConstructorsSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(
-                40,
+                80,
+                "System.ArgumentNullException..ctor(string)",
                 "System.ArgumentOutOfRangeException..ctor(string)",
                 "System.AttributeUsageAttribute..ctor(System.AttributeTargets)",
-                "System.BadImageFormatException..ctor(string)");
+                "System.BadImageFormatException..ctor(string)",
+                "System.ObjectDisposedException..ctor(string)");
+
+            AssertPurityClassification(summary, "System.Exception.set_HResult(int)", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Exception.set_HResult(int)", "caller_visible");
+
+            AssertPurityClassification(summary, "System.ArgumentNullException..ctor(string)", "pure");
+            AssertFreshnessClassification(summary, "System.ArgumentNullException..ctor(string)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentNullException..ctor(string)", "internal_only");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -4417,6 +4429,10 @@ public static class PurityFixture
             AssertFreshnessClassification(summary, "System.BadImageFormatException..ctor(string)", "fresh_owned_object_write");
             AssertEffectVisibilityClassification(summary, "System.BadImageFormatException..ctor(string)", "internal_only");
 
+            AssertPurityClassification(summary, "System.ObjectDisposedException..ctor(string)", "pure");
+            AssertFreshnessClassification(summary, "System.ObjectDisposedException..ctor(string)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.ObjectDisposedException..ctor(string)", "internal_only");
+
             AssertPurityClassification(summary, "System.AttributeUsageAttribute..ctor(System.AttributeTargets)", "pure");
             AssertFreshnessClassification(summary, "System.AttributeUsageAttribute..ctor(System.AttributeTargets)", "fresh_owned_object_write");
             AssertEffectVisibilityClassification(summary, "System.AttributeUsageAttribute..ctor(System.AttributeTargets)", "internal_only");
@@ -4428,9 +4444,11 @@ public static class PurityFixture
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .ToArray();
 
+            Assert.That(generatedSymbols, Does.Contain("System.ArgumentNullException..ctor(string)"));
             Assert.That(generatedSymbols, Does.Contain("System.ArgumentOutOfRangeException..ctor(string)"));
             Assert.That(generatedSymbols, Does.Contain("System.BadImageFormatException..ctor(string)"));
             Assert.That(generatedSymbols, Does.Contain("System.AttributeUsageAttribute..ctor(System.AttributeTargets)"));
+            Assert.That(generatedSymbols, Does.Contain("System.ObjectDisposedException..ctor(string)"));
         }
 
         [Test]

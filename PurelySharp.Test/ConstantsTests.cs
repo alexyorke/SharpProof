@@ -668,9 +668,11 @@ public static class ExceptionAccessorCatalogSignatureSamples
         [Test]
         public void PureExceptionAndAttributeConstructors_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
+            AssertNotInManualCatalogs("System.ArgumentNullException.ArgumentNullException(string)");
             AssertNotInManualCatalogs("System.ArgumentOutOfRangeException.ArgumentOutOfRangeException(string)");
             AssertNotInManualCatalogs("System.AttributeUsageAttribute.AttributeUsageAttribute(System.AttributeTargets)");
             AssertNotInManualCatalogs("System.BadImageFormatException.BadImageFormatException(string)");
+            AssertNotInManualCatalogs("System.ObjectDisposedException.ObjectDisposedException(string)");
         }
 
         [Test]

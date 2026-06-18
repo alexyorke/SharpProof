@@ -489,9 +489,11 @@
       "OutputPath": "PurelySharp.Analyzer/PureConstructors.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/PureConstructors.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [
+        "System.ArgumentNullException..ctor(string)",
         "System.ArgumentOutOfRangeException..ctor(string)",
         "System.AttributeUsageAttribute..ctor(System.AttributeTargets)",
-        "System.BadImageFormatException..ctor(string)"
+        "System.BadImageFormatException..ctor(string)",
+        "System.ObjectDisposedException..ctor(string)"
       ]
     },
     {

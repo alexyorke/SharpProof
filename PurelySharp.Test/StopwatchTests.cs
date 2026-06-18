@@ -29,7 +29,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task StopwatchConstructor_Diagnostic()
+        public async Task StopwatchConstructor_NoDiagnostic()
         {
             var test = @"
 using System.Diagnostics;
@@ -38,7 +38,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public Stopwatch {|PS0002:TestMethod|}()
+    public Stopwatch TestMethod()
     {
         return new Stopwatch();
     }

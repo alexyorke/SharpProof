@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T18:17:47.0236104+00:00",
+  "GeneratedAtUtc": "2026-06-18T21:57:19.9966113+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -86,18 +86,14 @@
           ],
           "Fields": [],
           "PurityClassification": {
-            "Classification": "impure",
-            "Categories": [
-              "impure_callee"
-            ],
-            "FirstBlockingCallChain": [
-              "System.Diagnostics.Stopwatch.Reset()"
-            ],
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": false,
-            "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "caller_visible"
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
           }
         },
         {
@@ -169,8 +165,10 @@
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.Diagnostics.Stopwatch..ctor()",
-              "System.Diagnostics.Stopwatch.Reset()"
+              "System.Diagnostics.Stopwatch.Start()",
+              "System.Diagnostics.Stopwatch.GetTimestamp()",
+              "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
+              "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -554,8 +552,8 @@
   "PurityReport": {
     "SchemaVersion": 3,
     "MethodCount": 15,
-    "PureCount": 3,
-    "ImpureCount": 12,
+    "PureCount": 4,
+    "ImpureCount": 11,
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
       "KnownPureMembers": [],
@@ -576,19 +574,15 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x06007C02",
         "MethodBodySha256": "7f23a71ac279302aec55aff366ac131658ce85f44d4b4b5996563cc7e0c70d61",
-        "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
-        "Categories": [
-          "impure_callee"
-        ],
-        "FirstBlockingCallChain": [
-          "System.Diagnostics.Stopwatch.Reset()"
-        ],
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": false,
-        "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "caller_visible"
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
       },
       {
         "Symbol": "System.Diagnostics.Stopwatch.GetElapsedDateTimeTicks()",
@@ -758,8 +752,10 @@
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.Diagnostics.Stopwatch..ctor()",
-          "System.Diagnostics.Stopwatch.Reset()"
+          "System.Diagnostics.Stopwatch.Start()",
+          "System.Diagnostics.Stopwatch.GetTimestamp()",
+          "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
+          "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,

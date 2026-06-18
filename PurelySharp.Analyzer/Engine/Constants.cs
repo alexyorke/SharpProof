@@ -1014,7 +1014,6 @@ public static class Constants
         "System.Linq.Enumerable.ThenBy",
         "System.Linq.Enumerable.Zip",
         "System.Net.IPEndPoint.IPEndPoint(System.Net.IPAddress, int)",
-        "System.ObjectDisposedException.ObjectDisposedException(string)",
         "System.Runtime.InteropServices.Marshal.SizeOf<T>()",
         "string.Join(string, System.Collections.Generic.IEnumerable<string>)",
         "System.Net.Http.HttpResponseMessage.IsSuccessStatusCode.get",
@@ -1048,6 +1047,5 @@ public static class Constants
 
         // Exception guard helpers considered pure (diverging without side effects)
         "System.Exception.Message.get",
-        "System.ArgumentNullException.ArgumentNullException(string)",
     };
 }

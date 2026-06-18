@@ -88,6 +88,8 @@ internal static class PurityClassificationEngine
             .GroupBy(method => method.ExactSymbolKey, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
         var memo = new Dictionary<string, MethodPurityClassification>(StringComparer.Ordinal);
+        var freshOwnedInitializationMemo = new Dictionary<string, bool>(StringComparer.Ordinal);
+        var validationThrowHelperMemo = new Dictionary<string, bool>(StringComparer.Ordinal);
         var visiting = new HashSet<string>(StringComparer.Ordinal);
 
         return assembly with
@@ -95,7 +97,13 @@ internal static class PurityClassificationEngine
             Methods = assembly.Methods
                 .Select(method => method with
                 {
-                    PurityClassification = ClassifyMethod(method.ExactSymbolKey, bySymbol, memo, visiting)
+                    PurityClassification = ClassifyMethod(
+                        method.ExactSymbolKey,
+                        bySymbol,
+                        memo,
+                        freshOwnedInitializationMemo,
+                        validationThrowHelperMemo,
+                        visiting)
                 })
                 .ToArray()
         };
@@ -105,6 +113,8 @@ internal static class PurityClassificationEngine
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
         Dictionary<string, MethodPurityClassification> memo,
+        Dictionary<string, bool> freshOwnedInitializationMemo,
+        Dictionary<string, bool> validationThrowHelperMemo,
         HashSet<string> visiting)
     {
         if (memo.TryGetValue(symbol, out var cached))
@@ -256,13 +266,35 @@ internal static class PurityClassificationEngine
                 continue;
             }
 
-            var calleeClassification = ClassifyMethod(resolvedCallKey, bySymbol, memo, visiting);
+            var calleeClassification = ClassifyMethod(
+                resolvedCallKey,
+                bySymbol,
+                memo,
+                freshOwnedInitializationMemo,
+                validationThrowHelperMemo,
+                visiting);
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal))
             {
                 if (((treatsArgumentGuardThrowHelpersAsPure &&
                       IsArgumentGuardThrowHelper(resolvedCallSummary.Symbol)) ||
                      (treatsDelegateDispatchAsSemantic &&
-                      IsSemanticallyNeutralValidationThrowHelper(resolvedCallSummary.Symbol))))
+                      IsSemanticallyNeutralValidationThrowHelper(resolvedCallSummary.Symbol))) ||
+                    (treatsObjectStateAsFreshOwned &&
+                     IsFreshOwnedObjectInitializationCompatible(
+                         resolvedCallKey,
+                         bySymbol,
+                         memo,
+                         freshOwnedInitializationMemo,
+                         validationThrowHelperMemo,
+                         visiting)) ||
+                    (treatsObjectStateAsFreshOwned &&
+                     IsValidationThrowHelperCompatible(
+                         resolvedCallKey,
+                         bySymbol,
+                         memo,
+                         freshOwnedInitializationMemo,
+                         validationThrowHelperMemo,
+                         visiting)))
                 {
                     continue;
                 }
@@ -1077,6 +1109,258 @@ internal static class PurityClassificationEngine
         var methodBaseSymbol = GetMethodBaseSymbol(summary.Symbol);
         return summary.Calls.Any(call =>
             call.StartsWith(methodBaseSymbol + "(", StringComparison.Ordinal));
+    }
+
+    private static bool IsFreshOwnedObjectInitializationCompatible(
+        string symbol,
+        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
+        Dictionary<string, MethodPurityClassification> memo,
+        Dictionary<string, bool> freshOwnedInitializationMemo,
+        Dictionary<string, bool> validationThrowHelperMemo,
+        HashSet<string> purityVisiting)
+    {
+        if (freshOwnedInitializationMemo.TryGetValue(symbol, out var cached))
+        {
+            return cached;
+        }
+
+        var compatibilityVisiting = new HashSet<string>(StringComparer.Ordinal);
+        var compatible = IsFreshOwnedObjectInitializationCompatibleCore(
+            symbol,
+            bySymbol,
+            memo,
+            freshOwnedInitializationMemo,
+            validationThrowHelperMemo,
+            purityVisiting,
+            compatibilityVisiting);
+        freshOwnedInitializationMemo[symbol] = compatible;
+        return compatible;
+    }
+
+    private static bool IsFreshOwnedObjectInitializationCompatibleCore(
+        string symbol,
+        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
+        Dictionary<string, MethodPurityClassification> memo,
+        Dictionary<string, bool> freshOwnedInitializationMemo,
+        Dictionary<string, bool> validationThrowHelperMemo,
+        HashSet<string> purityVisiting,
+        HashSet<string> compatibilityVisiting)
+    {
+        if (freshOwnedInitializationMemo.TryGetValue(symbol, out var cached))
+        {
+            return cached;
+        }
+
+        if (!bySymbol.TryGetValue(symbol, out var summary))
+        {
+            return false;
+        }
+
+        if (!compatibilityVisiting.Add(symbol))
+        {
+            return false;
+        }
+
+        foreach (var root in summary.RootCandidates)
+        {
+            if (InternalOnlyRoots.Contains(root) ||
+                string.Equals(root, "object_state_write", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            compatibilityVisiting.Remove(symbol);
+            return false;
+        }
+
+        foreach (var effect in summary.Effects)
+        {
+            if (string.Equals(effect, "writes_instance_field", StringComparison.Ordinal) ||
+                SafeEffects.Contains(effect))
+            {
+                continue;
+            }
+
+            compatibilityVisiting.Remove(symbol);
+            return false;
+        }
+
+        foreach (var call in summary.Calls)
+        {
+            if (IsPurityNeutralIntrinsicHelperCall(call))
+            {
+                continue;
+            }
+
+            if (!TryResolveCallSummary(call, bySymbol, out var resolvedCallKey, out _))
+            {
+                if (TryClassifyUnresolvedInteropBoundaryCall(call, out _))
+                {
+                    compatibilityVisiting.Remove(symbol);
+                    return false;
+                }
+
+                continue;
+            }
+
+            var calleeClassification = ClassifyMethod(
+                resolvedCallKey,
+                bySymbol,
+                memo,
+                freshOwnedInitializationMemo,
+                validationThrowHelperMemo,
+                purityVisiting);
+            if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal) &&
+                IsFreshOwnedObjectInitializationCompatibleCore(
+                    resolvedCallKey,
+                    bySymbol,
+                    memo,
+                    freshOwnedInitializationMemo,
+                    validationThrowHelperMemo,
+                    purityVisiting,
+                    compatibilityVisiting))
+            {
+                continue;
+            }
+
+            compatibilityVisiting.Remove(symbol);
+            return false;
+        }
+
+        compatibilityVisiting.Remove(symbol);
+        freshOwnedInitializationMemo[symbol] = true;
+        return true;
+    }
+
+    private static bool IsValidationThrowHelperCompatible(
+        string symbol,
+        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
+        Dictionary<string, MethodPurityClassification> memo,
+        Dictionary<string, bool> freshOwnedInitializationMemo,
+        Dictionary<string, bool> validationThrowHelperMemo,
+        HashSet<string> purityVisiting)
+    {
+        if (validationThrowHelperMemo.TryGetValue(symbol, out var cached))
+        {
+            return cached;
+        }
+
+        var compatibilityVisiting = new HashSet<string>(StringComparer.Ordinal);
+        var compatible = IsValidationThrowHelperCompatibleCore(
+            symbol,
+            bySymbol,
+            memo,
+            freshOwnedInitializationMemo,
+            validationThrowHelperMemo,
+            purityVisiting,
+            compatibilityVisiting);
+        validationThrowHelperMemo[symbol] = compatible;
+        return compatible;
+    }
+
+    private static bool IsValidationThrowHelperCompatibleCore(
+        string symbol,
+        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
+        Dictionary<string, MethodPurityClassification> memo,
+        Dictionary<string, bool> freshOwnedInitializationMemo,
+        Dictionary<string, bool> validationThrowHelperMemo,
+        HashSet<string> purityVisiting,
+        HashSet<string> compatibilityVisiting)
+    {
+        if (validationThrowHelperMemo.TryGetValue(symbol, out var cached))
+        {
+            return cached;
+        }
+
+        if (!bySymbol.TryGetValue(symbol, out var summary))
+        {
+            return false;
+        }
+
+        if (!compatibilityVisiting.Add(symbol))
+        {
+            return false;
+        }
+
+        foreach (var root in summary.RootCandidates)
+        {
+            if (string.Equals(root, "throw", StringComparison.Ordinal) ||
+                InternalOnlyRoots.Contains(root))
+            {
+                continue;
+            }
+
+            compatibilityVisiting.Remove(symbol);
+            return false;
+        }
+
+        foreach (var effect in summary.Effects)
+        {
+            if (string.Equals(effect, "throws", StringComparison.Ordinal) ||
+                SafeEffects.Contains(effect))
+            {
+                continue;
+            }
+
+            compatibilityVisiting.Remove(symbol);
+            return false;
+        }
+
+        foreach (var call in summary.Calls)
+        {
+            if (IsPurityNeutralIntrinsicHelperCall(call))
+            {
+                continue;
+            }
+
+            if (!TryResolveCallSummary(call, bySymbol, out var resolvedCallKey, out _))
+            {
+                if (TryClassifyUnresolvedInteropBoundaryCall(call, out _))
+                {
+                    compatibilityVisiting.Remove(symbol);
+                    return false;
+                }
+
+                continue;
+            }
+
+            var calleeClassification = ClassifyMethod(
+                resolvedCallKey,
+                bySymbol,
+                memo,
+                freshOwnedInitializationMemo,
+                validationThrowHelperMemo,
+                purityVisiting);
+            if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal) &&
+                IsValidationThrowHelperCompatibleCore(
+                    resolvedCallKey,
+                    bySymbol,
+                    memo,
+                    freshOwnedInitializationMemo,
+                    validationThrowHelperMemo,
+                    purityVisiting,
+                    compatibilityVisiting))
+            {
+                continue;
+            }
+
+            compatibilityVisiting.Remove(symbol);
+            return false;
+        }
+
+        compatibilityVisiting.Remove(symbol);
+        validationThrowHelperMemo[symbol] = true;
+        return true;
     }
 
     private static bool IsFreshOwnedObjectConstructor(MethodEffectSummary summary)
