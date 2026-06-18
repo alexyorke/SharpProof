@@ -1023,6 +1023,22 @@ public static class ExceptionAccessorCatalogSignatureSamples
         }
 
         [Test]
+        public void CoreComponentModelAttributeConstructors_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.ComponentModel.BrowsableAttribute.BrowsableAttribute(bool)",
+                "System.ComponentModel.DescriptionAttribute.DescriptionAttribute(string)",
+                "System.Diagnostics.ConditionalAttribute.ConditionalAttribute(string)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void RegularExpressionAttributeConstructor_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             var members = new[]
@@ -2509,6 +2525,36 @@ public static class EmailAddressCatalogSignatureSamples
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new EmailAddressAttribute()"));
+        }
+
+        [Test]
+        public void CoreComponentModelAttributeConstructorsGeneratedPurityEntriesResolveAgainstNet80References()
+        {
+            var source = @"
+using System;
+using System.ComponentModel;
+using System.Diagnostics;
+
+public static class CoreComponentModelAttributeConstructorCatalogSignatureSamples
+{
+    public static int Sample()
+    {
+        var browsable = new BrowsableAttribute(true);
+        var description = new DescriptionAttribute(""sample"");
+        var conditional = new ConditionalAttribute(""DEBUG"");
+        return (browsable is null ? 0 : 1) + (description is null ? 0 : 1) + (conditional is null ? 0 : 1);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "CoreComponentModelAttributeConstructorsGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new BrowsableAttribute(true)"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new DescriptionAttribute(\"sample\")"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new ConditionalAttribute(\"DEBUG\")"));
         }
 
         [Test]

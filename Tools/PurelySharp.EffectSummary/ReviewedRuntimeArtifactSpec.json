@@ -487,6 +487,23 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/ComponentModel.AttributeConstructors.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.ComponentModel.Primitives.dll",
+      "Limit": 40,
+      "SymbolPrefixes": [
+        "System.ComponentModel.BrowsableAttribute..ctor(bool)",
+        "System.ComponentModel.DescriptionAttribute..ctor(string)"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/ConditionalAttribute.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Diagnostics.ConditionalAttribute..ctor(string)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Decimal.Negate.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Decimal.Negate.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [

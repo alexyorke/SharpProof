@@ -2881,6 +2881,59 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeCoreComponentModelAttributeSlices_UseGeneratedPurityCatalogEntries()
+        {
+            using var componentSummary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.ComponentModel.Primitives.dll",
+                40,
+                "System.ComponentModel.BrowsableAttribute..ctor(bool)",
+                "System.ComponentModel.DescriptionAttribute..ctor(string)");
+            using var conditionalSummary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.Diagnostics.ConditionalAttribute..ctor(string)");
+
+            var componentReport = componentSummary.RootElement.GetProperty("PurityReport");
+            var componentCatalogComparison = componentReport.GetProperty("CatalogComparison");
+            Assert.That(componentCatalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(componentCatalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(componentCatalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(componentSummary, "System.ComponentModel.BrowsableAttribute..ctor(bool)", "pure");
+            AssertEffectVisibilityClassification(componentSummary, "System.ComponentModel.BrowsableAttribute..ctor(bool)", "internal_only");
+            AssertPurityClassification(componentSummary, "System.ComponentModel.DescriptionAttribute..ctor(string)", "pure");
+            AssertEffectVisibilityClassification(componentSummary, "System.ComponentModel.DescriptionAttribute..ctor(string)", "internal_only");
+
+            var componentGeneratedSymbols = componentSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
+                .ToArray();
+
+            Assert.That(componentGeneratedSymbols, Does.Contain("System.ComponentModel.BrowsableAttribute..ctor(bool)"));
+            Assert.That(componentGeneratedSymbols, Does.Contain("System.ComponentModel.DescriptionAttribute..ctor(string)"));
+
+            var conditionalReport = conditionalSummary.RootElement.GetProperty("PurityReport");
+            var conditionalCatalogComparison = conditionalReport.GetProperty("CatalogComparison");
+            Assert.That(conditionalCatalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(conditionalCatalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(conditionalCatalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(conditionalSummary, "System.Diagnostics.ConditionalAttribute..ctor(string)", "pure");
+            AssertEffectVisibilityClassification(conditionalSummary, "System.Diagnostics.ConditionalAttribute..ctor(string)", "internal_only");
+
+            var conditionalGeneratedSymbols = conditionalSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
+                .ToArray();
+
+            Assert.That(conditionalGeneratedSymbols, Does.Contain("System.Diagnostics.ConditionalAttribute..ctor(string)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeRegularExpressionAttributeSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
