@@ -3312,6 +3312,78 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeEnvironmentProcessStateSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                120,
+                "System.Environment.get_MachineName",
+                "System.Environment.get_OSVersion",
+                "System.Environment.get_ProcessId",
+                "System.Environment.get_ProcessorCount",
+                "System.Environment.get_ProcessPath",
+                "System.Environment.get_SystemDirectory",
+                "System.Environment.get_SystemPageSize",
+                "System.Environment.get_UserDomainName",
+                "System.Environment.get_WorkingSet");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Environment.get_MachineName()", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_MachineName()", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.get_OSVersion()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_OSVersion()", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.get_ProcessId()", "impure", "global_state_read", "global_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_ProcessId()", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.get_ProcessorCount()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_ProcessorCount()", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.get_ProcessPath()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_ProcessPath()", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.get_SystemDirectory()", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_SystemDirectory()", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.get_SystemPageSize()", "impure", "global_state_read", "global_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_SystemPageSize()", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.get_UserDomainName()", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_UserDomainName()", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.get_WorkingSet()", "impure", "caller_visible_memory_write", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_WorkingSet()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Environment.get_MachineName()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.get_OSVersion()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.get_ProcessId()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.get_ProcessorCount()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.get_ProcessPath()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.get_SystemDirectory()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.get_SystemPageSize()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.get_UserDomainName()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.get_WorkingSet()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Environment.get_MachineName()",
+                "System.Environment.get_OSVersion()",
+                "System.Environment.get_ProcessId()",
+                "System.Environment.get_ProcessPath()",
+                "System.Environment.get_ProcessorCount()",
+                "System.Environment.get_SystemDirectory()",
+                "System.Environment.get_SystemPageSize()",
+                "System.Environment.get_UserDomainName()",
+                "System.Environment.get_WorkingSet()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeTimeProviderAndTimeZoneInfoSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

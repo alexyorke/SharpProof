@@ -78,7 +78,16 @@
         "System.Environment.get_Is64BitOperatingSystem",
         "System.Environment.get_CurrentDirectory",
         "System.Environment.set_CurrentDirectory",
-        "System.Environment.GetFolderPath"
+        "System.Environment.GetFolderPath",
+        "System.Environment.get_MachineName",
+        "System.Environment.get_OSVersion",
+        "System.Environment.get_ProcessId",
+        "System.Environment.get_ProcessorCount",
+        "System.Environment.get_ProcessPath",
+        "System.Environment.get_SystemDirectory",
+        "System.Environment.get_SystemPageSize",
+        "System.Environment.get_UserDomainName",
+        "System.Environment.get_WorkingSet"
       ]
     },
     {

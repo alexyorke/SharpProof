@@ -147,6 +147,28 @@ public static class EnvironmentCatalogSignatureSamples
         }
 
         [Test]
+        public void EnvironmentProcessStateHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Environment.MachineName.get",
+                "System.Environment.OSVersion.get",
+                "System.Environment.ProcessId.get",
+                "System.Environment.ProcessorCount.get",
+                "System.Environment.ProcessPath.get",
+                "System.Environment.SystemDirectory.get",
+                "System.Environment.SystemPageSize.get",
+                "System.Environment.UserDomainName.get",
+                "System.Environment.WorkingSet.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void WebUtilityHelpers_AreNotBackedByStaticCatalogs()
         {
             var members = new[]
