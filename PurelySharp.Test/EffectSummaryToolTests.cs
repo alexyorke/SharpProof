@@ -642,20 +642,31 @@ public static class PurityFixture
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
-            var knownPureRows = catalogComparison.GetProperty("KnownPureMembers").EnumerateArray().ToArray();
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var generatedRows = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Where(row =>
+                    string.Equals(row.GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal) &&
+                    (
+                        string.Equals(row.GetProperty("Symbol").GetString(), "System.BitConverter.ToInt32(byte[], int)", StringComparison.Ordinal) ||
+                        string.Equals(row.GetProperty("Symbol").GetString(), "System.BitConverter.ToInt32(System.ReadOnlySpan`1<byte>)", StringComparison.Ordinal)))
+                .ToArray();
 
             Assert.That(
-                knownPureRows.Select(row => row.GetProperty("Symbol").GetString()),
+                generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
                 Is.EquivalentTo(new[]
                 {
                     "System.BitConverter.ToInt32(byte[], int)",
                     "System.BitConverter.ToInt32(System.ReadOnlySpan`1<byte>)",
                 }));
 
-            foreach (var row in knownPureRows)
+            foreach (var row in generatedRows)
             {
-                Assert.That(row.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
                 Assert.That(row.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("none"));
+                Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("none"));
             }
         }
 
@@ -666,20 +677,31 @@ public static class PurityFixture
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
-            var knownPureRows = catalogComparison.GetProperty("KnownPureMembers").EnumerateArray().ToArray();
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var generatedRows = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Where(row =>
+                    string.Equals(row.GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal) &&
+                    (
+                        string.Equals(row.GetProperty("Symbol").GetString(), "System.BitConverter.ToDouble(byte[], int)", StringComparison.Ordinal) ||
+                        string.Equals(row.GetProperty("Symbol").GetString(), "System.BitConverter.ToDouble(System.ReadOnlySpan`1<byte>)", StringComparison.Ordinal)))
+                .ToArray();
 
             Assert.That(
-                knownPureRows.Select(row => row.GetProperty("Symbol").GetString()),
+                generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
                 Is.EquivalentTo(new[]
                 {
                     "System.BitConverter.ToDouble(byte[], int)",
                     "System.BitConverter.ToDouble(System.ReadOnlySpan`1<byte>)",
                 }));
 
-            foreach (var row in knownPureRows)
+            foreach (var row in generatedRows)
             {
-                Assert.That(row.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
                 Assert.That(row.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("none"));
+                Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("none"));
             }
         }
 

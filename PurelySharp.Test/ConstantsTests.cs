@@ -178,7 +178,13 @@ namespace PurelySharp.Test
         public void BitConverterReadHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.BitConverter.ToInt32(byte[], int)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.BitConverter.ToInt32(System.ReadOnlySpan<byte>)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.BitConverter.ToDouble(byte[], int)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.BitConverter.ToDouble(System.ReadOnlySpan<byte>)"));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.BitConverter.ToInt32(byte[], int)"));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.BitConverter.ToInt32(System.ReadOnlySpan<byte>)"));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.BitConverter.ToDouble(byte[], int)"));
+            Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain("System.BitConverter.ToDouble(System.ReadOnlySpan<byte>)"));
         }
 
         [Test]
