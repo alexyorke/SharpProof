@@ -68,6 +68,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var requiresDispatchCheck = getterSymbol != null &&
                 IsPotentiallyDispatchedProperty(propertySymbol) &&
                 !(allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol));
+            var dispatchGetterWasProvenPure = false;
 
             if (isPureEnforcedProperty && !requiresDispatchCheck)
             {
@@ -136,6 +137,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     return dispatchResult;
                 }
 
+                dispatchGetterWasProvenPure = true;
                 if (isPureEnforcedProperty)
                 {
                     PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} has [EnforcePure] and dispatched getter candidates were pure. Assuming Pure.");
@@ -229,6 +231,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     bool isValueStruct = paramRef.Parameter.Type.IsValueType && !paramRef.Parameter.Type.IsReferenceType;
                     PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance is ParameterReference '{paramRef.Parameter.Name}', RefKind={paramRef.Parameter.RefKind}, IsValueStruct={isValueStruct}");
 
+                    if (dispatchGetterWasProvenPure)
+                    {
+                        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                    }
 
                     if (propertySymbol.GetMethod != null)
                     {
@@ -244,6 +250,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 }
                 else if (instanceOperation is IInstanceReferenceOperation instanceRef && instanceRef.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance)
                 {
+                    if (dispatchGetterWasProvenPure)
+                    {
+                        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                    }
 
                     bool isReadonlyStruct = context.ContainingMethodSymbol?.ContainingType is { IsReadOnly: true, IsValueType: true };
 
@@ -296,6 +306,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     {
                         PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance expression for '{propertySymbol.Name}' is impure. Propagating.");
                         return instanceExprResult;
+                    }
+
+                    if (dispatchGetterWasProvenPure)
+                    {
+                        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                     }
 
                     string instancePureSig = propertySymbol.OriginalDefinition.ToDisplayString();

@@ -264,7 +264,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-
+            var dispatchWasProvenPure = false;
             if (IsPotentiallyDispatchedMethod(invokedMethodSymbol)
                 && (invokedMethodSymbol.IsStatic
                     ? invocationOperation.Instance == null
@@ -291,6 +291,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 {
                     return dispatchResult;
                 }
+
+                dispatchWasProvenPure = true;
             }
 
 
@@ -614,6 +616,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     context.ContainingMethodSymbol.OriginalDefinition))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] Direct self-recursive invocation is purity-neutral.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            if (dispatchWasProvenPure)
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (dispatch candidates were proven pure after receiver and argument validation)");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 

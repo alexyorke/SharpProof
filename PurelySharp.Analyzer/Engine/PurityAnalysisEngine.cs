@@ -1048,6 +1048,28 @@ namespace PurelySharp.Analyzer.Engine
 
                 if (methodSymbol.IsAbstract || bodySyntaxNode == null)
                 {
+                    if (methodSymbol.DeclaringSyntaxReferences.Length > 0 &&
+                        methodSymbol.ContainingType?.Locations.Any(location => !location.IsInMetadata) == true &&
+                        (methodSymbol.IsAbstract || methodSymbol.ContainingType?.TypeKind == TypeKind.Interface))
+                    {
+                        LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is a source contract without an explicit body. Deferring validation to dispatch or implementation sites.");
+                        purityCache[methodSymbol] = PurityAnalysisResult.Pure;
+                        LogDebug($"{indent}<< Exit DeterminePurity (Source Contract Without Body): {methodSymbol.ToDisplayString()}");
+                        return PurityAnalysisResult.Pure;
+                    }
+
+                    if (methodSymbol.MethodKind == MethodKind.PropertyGet &&
+                        methodSymbol.DeclaringSyntaxReferences.Length > 0 &&
+                        methodSymbol.ContainingType?.Locations.Any(location => !location.IsInMetadata) == true &&
+                        !methodSymbol.IsAbstract &&
+                        methodSymbol.ContainingType?.TypeKind != TypeKind.Interface)
+                    {
+                        LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is a source property getter without an explicit body. Treating as pure.");
+                        purityCache[methodSymbol] = PurityAnalysisResult.Pure;
+                        LogDebug($"{indent}<< Exit DeterminePurity (Source Auto Getter): {methodSymbol.ToDisplayString()}");
+                        return PurityAnalysisResult.Pure;
+                    }
+
                     if (methodSymbol.MethodKind == MethodKind.Constructor &&
                         !methodSymbol.IsExtern &&
                         methodSymbol.ContainingType?.Locations.Any(location => !location.IsInMetadata) == true)
@@ -1055,17 +1077,6 @@ namespace PurelySharp.Analyzer.Engine
                         LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is a source constructor without an explicit body. Treating as pure.");
                         purityCache[methodSymbol] = PurityAnalysisResult.Pure;
                         LogDebug($"{indent}<< Exit DeterminePurity (Source Constructor Without Body): {methodSymbol.ToDisplayString()}");
-                        return PurityAnalysisResult.Pure;
-                    }
-
-                    if (methodSymbol.MethodKind == MethodKind.PropertyGet &&
-                        !methodSymbol.IsAbstract &&
-                        methodSymbol.ContainingType?.TypeKind != TypeKind.Interface &&
-                        methodSymbol.DeclaringSyntaxReferences.Length > 0)
-                    {
-                        LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is a source property getter without an explicit body. Treating as pure.");
-                        purityCache[methodSymbol] = PurityAnalysisResult.Pure;
-                        LogDebug($"{indent}<< Exit DeterminePurity (Source Auto Getter): {methodSymbol.ToDisplayString()}");
                         return PurityAnalysisResult.Pure;
                     }
 
@@ -2767,7 +2778,17 @@ namespace PurelySharp.Analyzer.Engine
 
 
 
-        internal static bool IsKnownPureBCLMember(ISymbol symbol) => ImpurityCatalog.IsKnownPureBCLMember(symbol);
+        internal static bool IsKnownPureBCLMember(ISymbol symbol) =>
+            IsTriviallyPureObjectConstructor(symbol) ||
+            ImpurityCatalog.IsKnownPureBCLMember(symbol);
+
+        private static bool IsTriviallyPureObjectConstructor(ISymbol symbol)
+        {
+            return symbol is IMethodSymbol methodSymbol &&
+                methodSymbol.MethodKind == MethodKind.Constructor &&
+                methodSymbol.Parameters.Length == 0 &&
+                methodSymbol.ContainingType?.SpecialType == SpecialType.System_Object;
+        }
         internal static bool IsStrictPurityProfile => ImpurityCatalog.IsStrictPurityProfile;
 
         internal static bool IsKnownPureBCLArrayFactoryOperation(IOperation? operation, out IMethodSymbol factoryMethod)
