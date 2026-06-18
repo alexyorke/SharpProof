@@ -943,6 +943,7 @@ internal static class AssemblyEffectSummarizer
             string.Equals(field, "System.CultureAwareComparer.InvariantCaseSensitiveInstance", StringComparison.Ordinal) ||
             string.Equals(field, "System.CultureAwareComparer.InvariantIgnoreCaseInstance", StringComparison.Ordinal) ||
             string.Equals(field, "System.String.Empty", StringComparison.Ordinal) ||
+            string.Equals(field, "System.Text.ASCIIEncoding.s_default", StringComparison.Ordinal) ||
             string.Equals(field, "System.UriHelper.Unreserved", StringComparison.Ordinal) ||
             string.Equals(field, "System.Globalization.TextInfo.Invariant", StringComparison.Ordinal) ||
             string.Equals(field, "System.Globalization.CompareInfo.Invariant", StringComparison.Ordinal) ||

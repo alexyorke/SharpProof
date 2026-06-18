@@ -323,6 +323,7 @@
         "System.Collections.Generic.Comparer`1.get_Default",
         "System.Collections.Generic.EqualityComparer`1.get_Default",
         "System.Globalization.CultureInfo.get_InvariantCulture",
+        "System.Text.Encoding.get_ASCII",
         "System.Threading.Tasks.Task.get_CompletedTask"
       ]
     },

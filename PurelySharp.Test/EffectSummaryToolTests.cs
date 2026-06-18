@@ -1455,6 +1455,7 @@ public static class PurityFixture
                 "System.Collections.Generic.Comparer`1.get_Default",
                 "System.Collections.Generic.EqualityComparer`1.get_Default",
                 "System.Globalization.CultureInfo.get_InvariantCulture",
+                "System.Text.Encoding.get_ASCII",
                 "System.Threading.Tasks.Task.get_CompletedTask");
 
             var report = summary.RootElement.GetProperty("PurityReport");
@@ -1469,6 +1470,8 @@ public static class PurityFixture
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.EqualityComparer`1.get_Default()", "internal_only");
             AssertPurityClassification(summary, "System.Globalization.CultureInfo.get_InvariantCulture()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Globalization.CultureInfo.get_InvariantCulture()", "internal_only");
+            AssertPurityClassification(summary, "System.Text.Encoding.get_ASCII()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Text.Encoding.get_ASCII()", "internal_only");
             AssertPurityClassification(summary, "System.Threading.Tasks.Task.get_CompletedTask()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Threading.Tasks.Task.get_CompletedTask()", "internal_only");
 
@@ -1482,6 +1485,7 @@ public static class PurityFixture
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Comparer`1.get_Default()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.EqualityComparer`1.get_Default()"));
             Assert.That(generatedSymbols, Does.Contain("System.Globalization.CultureInfo.get_InvariantCulture()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Text.Encoding.get_ASCII()"));
             Assert.That(generatedSymbols, Does.Contain("System.Threading.Tasks.Task.get_CompletedTask()"));
         }
 

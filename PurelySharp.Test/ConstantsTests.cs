@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -562,6 +563,7 @@ public static class MutableCollectionCatalogSignatureSamples
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
+using System.Text;
 
 public static class StaticCacheGetterCatalogSignatureSamples
 {
@@ -570,6 +572,7 @@ public static class StaticCacheGetterCatalogSignatureSamples
         _ = Comparer<int>.Default;
         _ = EqualityComparer<int>.Default;
         _ = Task.CompletedTask;
+        _ = Encoding.ASCII;
         return CultureInfo.InvariantCulture;
     }
 }";
@@ -583,6 +586,7 @@ public static class StaticCacheGetterCatalogSignatureSamples
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Comparer<int>.Default"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "EqualityComparer<int>.Default"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Task.CompletedTask"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Encoding.ASCII"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "CultureInfo.InvariantCulture"));
         }
 

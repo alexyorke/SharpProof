@@ -1007,7 +1007,6 @@ public static class Constants
         "System.Net.IPEndPoint.IPEndPoint(System.Net.IPAddress, int)",
         "System.Runtime.InteropServices.Marshal.SizeOf<T>()",
         "string.Join(string, System.Collections.Generic.IEnumerable<string>)",
-        "System.Text.Encoding.ASCII.get",
         "System.Threading.CancellationToken.None.get",
         "System.Uri.ToString()",
 

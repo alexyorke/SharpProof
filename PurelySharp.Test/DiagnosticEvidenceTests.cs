@@ -8,6 +8,7 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -502,6 +503,7 @@ public class TestClass
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
+using System.Text;
 using PurelySharp.Attributes;
 
 public class TestClass
@@ -512,8 +514,9 @@ public class TestClass
         _ = Comparer<int>.Default;
         _ = EqualityComparer<int>.Default;
         _ = Task.CompletedTask;
+        _ = Encoding.ASCII;
         _ = CultureInfo.InvariantCulture;
-        return 4;
+        return 5;
     }
 }";
 
@@ -532,6 +535,7 @@ public class TestClass
                     node.ToString() == "Comparer<int>.Default" ||
                     node.ToString() == "EqualityComparer<int>.Default" ||
                     node.ToString() == "Task.CompletedTask" ||
+                    node.ToString() == "Encoding.ASCII" ||
                     node.ToString() == "CultureInfo.InvariantCulture")
                 .ToArray();
             var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
@@ -558,6 +562,8 @@ public class TestClass
             Assert.That(classifications["EqualityComparer<int>.Default"].classification, Is.EqualTo("pure"));
             Assert.That(classifications["Task.CompletedTask"].matched, Is.True);
             Assert.That(classifications["Task.CompletedTask"].classification, Is.EqualTo("pure"));
+            Assert.That(classifications["Encoding.ASCII"].matched, Is.True);
+            Assert.That(classifications["Encoding.ASCII"].classification, Is.EqualTo("pure"));
             Assert.That(classifications["CultureInfo.InvariantCulture"].matched, Is.True);
             Assert.That(classifications["CultureInfo.InvariantCulture"].classification, Is.EqualTo("pure"));
         }

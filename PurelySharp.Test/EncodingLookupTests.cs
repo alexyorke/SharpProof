@@ -66,6 +66,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task EncodingAsciiGetter_NoDiagnostic()
+        {
+            var test = @"
+using System.Text;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Encoding TestMethod()
+    {
+        return Encoding.ASCII;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task EncodingUtf8GetString_Diagnostic()
         {
             var test = @"
