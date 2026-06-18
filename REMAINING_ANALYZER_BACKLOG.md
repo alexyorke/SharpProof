@@ -133,16 +133,9 @@ Current state:
   - `SHA512.HashData(System.ReadOnlySpan<byte>)`
   - `MD5.HashData(byte[])`
   - `MD5.HashData(System.ReadOnlySpan<byte>)`
-- Reviewed trusted fresh-array producers still maintained in the hand-reviewed policy layer include:
-  - `Convert.FromBase64String(string)`
-  - `Convert.FromBase64CharArray(char[], int, int)`
-  - `Convert.FromHexString(string)`
-  - `Guid.ToByteArray()`
-  - `Guid.ToByteArray(bool)`
-  - `string.ToCharArray()`
-  - reviewed primitive `BitConverter.GetBytes(...)` overloads for `bool`,
-    `char`, `short`, `ushort`, `int`, `uint`, `float`, `long`, `ulong`, and
-    `double`
+- The hand-maintained fresh-array catalog is currently empty; fresh-array trust
+  now comes from bundled generated summaries plus the explicit `Array.Empty()`
+  special case.
 - Signature validation exists in `ConstantsTests`.
 - Catalog proof now also explicitly locks `string(ReadOnlySpan<char>)` as a
   reviewed pure materialization path, separate from the fresh-array subset.
