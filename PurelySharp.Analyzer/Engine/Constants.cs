@@ -986,7 +986,6 @@ public static class Constants
         "System.Security.Claims.ClaimsPrincipal.IsInRole(string)",
 
 
-        "System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan<byte>, System.ReadOnlySpan<byte>)",
         "System.Security.Cryptography.Aes.DecryptCbc(byte[], byte[], byte[], System.Security.Cryptography.PaddingMode)",
         "System.Security.Cryptography.Aes.EncryptCbc(byte[], byte[], byte[], System.Security.Cryptography.PaddingMode)",
         "System.Security.Cryptography.MD5.ComputeHash(byte[])",

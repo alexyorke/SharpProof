@@ -664,6 +664,44 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeCryptographicOperationsFixedTimeEqualsSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Security.Cryptography.dll",
+                20,
+                "System.Security.Cryptography.CryptographicOperations.FixedTimeEquals");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(
+                summary,
+                "System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan`1<byte>, System.ReadOnlySpan`1<byte>)",
+                "pure");
+            AssertFreshnessClassification(
+                summary,
+                "System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan`1<byte>, System.ReadOnlySpan`1<byte>)",
+                "none");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan`1<byte>, System.ReadOnlySpan`1<byte>)",
+                "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(
+                generatedSymbols,
+                Does.Contain("System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan`1<byte>, System.ReadOnlySpan`1<byte>)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeBitConverterReadSlice_TreatsIntrinsicHelpersAsPure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.BitConverter.ToInt32", limit: 20);

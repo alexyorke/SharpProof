@@ -139,6 +139,12 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void CryptographyHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan<byte>, System.ReadOnlySpan<byte>)");
+        }
+
+        [Test]
         public void ListHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
@@ -1105,7 +1111,7 @@ public static class CatalogSignatureSamples
             Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetObjectCreationSignature(compilation, syntaxTree, "new string(chars)")));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "CryptographicOperations.FixedTimeEquals(left, right)"), Is.EqualTo("System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan<byte>, System.ReadOnlySpan<byte>)"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "CryptographicOperations.FixedTimeEquals(left, right)")));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "CryptographicOperations.FixedTimeEquals(left, right)"));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.SHA1.HashData(byte[])"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)")));
