@@ -1904,6 +1904,7 @@ public class TestClass
 }";
 
             var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var compilation = CSharpCompilation.Create(
                 "GeneratedPurityProbe",
@@ -1929,8 +1930,9 @@ public class TestClass
                 "char.ToLowerInvariant(value)",
                 "char.ToUpperInvariant(value)",
             };
-            var trackedMethods = trackedExpressions
-                .Select(expressionText =>
+            var classifications = trackedExpressions.ToDictionary(
+                expressionText => expressionText,
+                expressionText =>
                 {
                     var symbol = semanticModel.GetSymbolInfo(
                         syntaxTree.GetRoot()
@@ -1940,24 +1942,87 @@ public class TestClass
                         .Symbol;
                     Assert.That(symbol, Is.Not.Null, expressionText);
                     return (IMethodSymbol)symbol!;
-                })
-                .ToArray();
+                });
             var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
             var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
             var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
             var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
-            var matched = trackedMethods.Select(method =>
-            {
-                var args = new object?[] { method.OriginalDefinition, compilation, null };
-                return (bool)tryGetPurity.Invoke(catalog, args)!;
-            }).ToArray();
+            var resolutions = classifications.ToDictionary(
+                pair => pair.Key,
+                pair =>
+                {
+                    var args = new object?[] { pair.Value.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2];
+                    var classification = matched
+                        ? (string)purityEntry!.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                        : string.Empty;
+                    return (matched, classification);
+                });
+            var pureTrackedExpressions = trackedExpressions
+                .Where(expressionText => expressionText != "char.ConvertToUtf32(value, other)")
+                .ToArray();
 
-            Assert.That(
-                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
-                Is.False,
-                "Trusted generated purity should allow the tracked bool and char helper methods.");
-            Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedExpressions.Length).ToArray()),
-                "Generated purity catalog should resolve the tracked bool and char helper members.");
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("char.ConvertToUtf32(char, char)"));
+            foreach (var expressionText in pureTrackedExpressions)
+            {
+                Assert.That(resolutions[expressionText].matched, Is.True, "Generated purity catalog should resolve " + expressionText + ".");
+                Assert.That(resolutions[expressionText].classification, Is.EqualTo("pure"),
+                    expressionText + " should remain a generated pure helper.");
+            }
+
+            Assert.That(resolutions["char.ConvertToUtf32(value, other)"].matched, Is.True,
+                "Generated purity catalog should resolve char.ConvertToUtf32(value, other).");
+            Assert.That(resolutions["char.ConvertToUtf32(value, other)"].classification, Is.EqualTo("impure"),
+                "char.ConvertToUtf32(char, char) now flows through generated impure evidence.");
+        }
+
+        [Test]
+        public async Task GeneratedPurityCatalog_Resolves_CharConvertFromUtf32AsImpureEvidence()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(int codePoint)
+    {
+        return char.ConvertFromUtf32(codePoint);
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var invocation = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Single(node => node.ToString() == "char.ConvertFromUtf32(codePoint)");
+            var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
+            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+            var purityEntry = args[2]!;
+            var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("char.ConvertFromUtf32(int)"));
+            Assert.That(matched, Is.True, "Generated purity catalog should resolve char.ConvertFromUtf32(int).");
+            Assert.That(classification, Is.EqualTo("impure"),
+                "char.ConvertFromUtf32 can throw for invalid code points and should remain generated impure.");
         }
 
         [Test]

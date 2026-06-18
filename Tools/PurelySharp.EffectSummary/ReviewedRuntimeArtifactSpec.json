@@ -411,6 +411,7 @@
       "SourceSummaryPath": "PurelySharp.Analyzer/BooleanChar.Helpers.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [
         "System.Boolean.CompareTo(bool)",
+        "System.Char.ConvertFromUtf32(int)",
         "System.Char.ConvertToUtf32(char, char)",
         "System.Char.GetNumericValue(char)",
         "System.Char.IsControl(char)",

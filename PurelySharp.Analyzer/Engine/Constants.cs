@@ -1025,7 +1025,6 @@ public static class Constants
         "System.AggregateException.Flatten()",
         "System.Array.IndexOf<T>(T[], T)",
         "System.Array.LastIndexOf<T>(T[], T)",
-        "char.ConvertFromUtf32(int)",
         "System.ComponentModel.DataAnnotations.RegularExpressionAttribute.RegularExpressionAttribute(string)",
         "double.PositiveInfinity.get",
         "System.FormattableString.Format.get",

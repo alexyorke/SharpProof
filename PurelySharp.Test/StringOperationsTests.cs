@@ -118,6 +118,44 @@ public class TestClass
         }
 
         [Test]
+        public async Task CharConvertFromUtf32_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(int codePoint)
+    {
+        return char.ConvertFromUtf32(codePoint);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task CharConvertToUtf32_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(char highSurrogate, char lowSurrogate)
+    {
+        return char.ConvertToUtf32(highSurrogate, lowSurrogate);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task StringLengthAndTrimHelpers_NoDiagnostic()
         {
             var test = @"

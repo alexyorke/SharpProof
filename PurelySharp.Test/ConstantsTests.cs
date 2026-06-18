@@ -927,6 +927,7 @@ public static class ExceptionAccessorCatalogSignatureSamples
             var members = new[]
             {
                 "bool.CompareTo(bool)",
+                "char.ConvertFromUtf32(int)",
                 "char.ConvertToUtf32(char, char)",
                 "char.GetNumericValue(char)",
                 "char.IsControl(char)",
@@ -2298,9 +2299,10 @@ using System;
 
 public static class BooleanCharCatalogSignatureSamples
 {
-    public static int Sample(bool left, bool right, char value, char other)
+    public static int Sample(bool left, bool right, char value, char other, int codePoint)
     {
         _ = left.CompareTo(right);
+        _ = char.ConvertFromUtf32(codePoint);
         _ = char.ConvertToUtf32(value, other);
         _ = char.GetNumericValue(value);
         _ = char.IsControl(value);
@@ -2326,6 +2328,7 @@ public static class BooleanCharCatalogSignatureSamples
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "left.CompareTo(right)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.ConvertFromUtf32(codePoint)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.ConvertToUtf32(value, other)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.GetNumericValue(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsControl(value)"));

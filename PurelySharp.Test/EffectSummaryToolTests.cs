@@ -2656,8 +2656,9 @@ public static class PurityFixture
         public async Task EffectSummaryTool_RuntimeBooleanCompareAndCharHelperSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(
-                120,
+                140,
                 "System.Boolean.CompareTo(bool)",
+                "System.Char.ConvertFromUtf32(int)",
                 "System.Char.ConvertToUtf32(char, char)",
                 "System.Char.GetNumericValue(char)",
                 "System.Char.IsControl(char)",
@@ -2679,10 +2680,14 @@ public static class PurityFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
+            AssertPurityClassification(summary, "System.Char.ConvertFromUtf32(int)", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Char.ConvertFromUtf32(int)", "caller_visible");
+            AssertPurityClassification(summary, "System.Char.ConvertToUtf32(char, char)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Char.ConvertToUtf32(char, char)", "caller_visible");
+
             var representativeSymbols = new[]
             {
                 "System.Boolean.CompareTo(bool)",
-                "System.Char.ConvertToUtf32(char, char)",
                 "System.Char.GetNumericValue(char)",
                 "System.Char.IsControl(char)",
                 "System.Char.IsUpper(char)",
@@ -2708,6 +2713,9 @@ public static class PurityFixture
             {
                 Assert.That(generatedSymbols, Does.Contain(symbol));
             }
+
+            Assert.That(generatedSymbols, Does.Contain("System.Char.ConvertFromUtf32(int)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Char.ConvertToUtf32(char, char)"));
         }
 
         [Test]
