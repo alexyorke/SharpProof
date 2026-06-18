@@ -136,6 +136,34 @@ public class TestClass
         }
 
         [Test]
+        public async Task EnumTypeBasedParse_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public enum LogLevel
+{
+    Debug,
+    Info,
+    Warning,
+    Error,
+    Critical
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public LogLevel TestMethod(string levelName)
+    {
+        return (LogLevel)Enum.Parse(typeof(LogLevel), levelName);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task EnumFlagOperations_NoDiagnostic()
         {
             var test = @"

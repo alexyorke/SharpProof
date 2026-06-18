@@ -371,6 +371,12 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void EnumParseHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Enum.Parse(System.Type, string)");
+        }
+
+        [Test]
         public void IPAddressParseHelpers_AreHandledSemantically_NotStaticCatalogs()
         {
             var members = new[]
