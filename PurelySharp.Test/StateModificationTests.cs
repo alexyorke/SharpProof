@@ -434,6 +434,86 @@ public class TestClass
         }
 
         [Test]
+        public async Task PureMethodWithQueuePeek_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(Queue<int> values)
+    {
+        return values.Peek();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task PureMethodWithQueueContains_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(Queue<int> values, int value)
+    {
+        return values.Contains(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task PureMethodWithStackPeek_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(Stack<int> values)
+    {
+        return values.Peek();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task PureMethodWithStackContains_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(Stack<int> values, int value)
+    {
+        return values.Contains(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task StaticReadonlyFieldModification_Diagnostic()
         {
             var test = @"

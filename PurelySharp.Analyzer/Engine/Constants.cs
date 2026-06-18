@@ -874,15 +874,11 @@ public static class Constants
         "char.ToUpperInvariant(char)",
 
 
-        "System.Collections.Generic.Dictionary<TKey, TValue>.ContainsKey(TKey)",
         "System.Collections.Generic.Dictionary<TKey, TValue>.ContainsValue(TValue)",
         "System.Collections.Generic.Dictionary<TKey, TValue>.TryGetValue(TKey, out TValue)",
-        "System.Collections.Generic.Dictionary<TKey, TValue>.Count.get",
         "System.Collections.Generic.Comparer<T>.Default.get",
         "System.Collections.Generic.EqualityComparer<T>.Default.get",
         "System.Collections.Generic.HashSet<T>.IsSubsetOf(System.Collections.Generic.IEnumerable<T>)",
-        "System.Collections.Generic.Queue<T>.Peek()",
-        "System.Collections.Generic.Stack<T>.Peek()",
 
 
         "System.Collections.Immutable.ImmutableList<T>.Add(T)",
@@ -1152,16 +1148,10 @@ public static class Constants
         "char.IsSeparator(char)",
         "char.IsSymbol(char)",
         "char.IsUpper(char)",
-        "System.Collections.Generic.HashSet<T>.Contains(T)",
-        "System.Collections.Generic.List<T>.BinarySearch(T)",
         "System.Collections.Generic.List<T>.Capacity.get",
 
         "System.Collections.Generic.List<T>.FindIndex(System.Predicate<T>)",
         "System.Collections.Generic.List<T>.FindLast(System.Predicate<T>)",
-        "System.Collections.Generic.List<T>.IndexOf(T)",
-        "System.Collections.Generic.List<T>.LastIndexOf(T)",
-        "System.Collections.Generic.Queue<T>.Contains(T)",
-        "System.Collections.Generic.Stack<T>.Contains(T)",
         "System.DateTime.Day.get",
         "System.DateTime.DayOfWeek.get",
         "System.DateTime.DayOfYear.get",

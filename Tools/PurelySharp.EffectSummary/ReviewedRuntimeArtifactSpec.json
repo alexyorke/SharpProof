@@ -119,6 +119,26 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/MutableCollection.Readers.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/MutableCollection.Readers.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.Collections.Generic.Dictionary`2.get_Count",
+        "System.Collections.Generic.Dictionary`2.ContainsKey",
+        "System.Collections.Generic.HashSet`1.Contains",
+        "System.Collections.Generic.Queue`1.Contains",
+        "System.Collections.Generic.Queue`1.Peek"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Stack.Readers.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Stack.Readers.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Collections.dll",
+      "SymbolPrefixes": [
+        "System.Collections.Generic.Stack`1.Contains",
+        "System.Collections.Generic.Stack`1.Peek"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Version.PurelySharp.EffectSummary.json",
       "Limit": 80,
       "SymbolPrefixes": [

@@ -2654,6 +2654,72 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeMutableCollectionReadSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                160,
+                "System.Collections.Generic.Dictionary`2.get_Count",
+                "System.Collections.Generic.Dictionary`2.ContainsKey",
+                "System.Collections.Generic.HashSet`1.Contains",
+                "System.Collections.Generic.Queue`1.Contains",
+                "System.Collections.Generic.Queue`1.Peek");
+            using var stackSummary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Collections.dll",
+                80,
+                "System.Collections.Generic.Stack`1.Contains",
+                "System.Collections.Generic.Stack`1.Peek");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var stackReport = stackSummary.RootElement.GetProperty("PurityReport");
+            var stackCatalogComparison = stackReport.GetProperty("CatalogComparison");
+            Assert.That(stackCatalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(stackCatalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(stackCatalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Collections.Generic.Dictionary`2.ContainsKey(!0)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Dictionary`2.ContainsKey(!0)", "none");
+            AssertPurityClassification(summary, "System.Collections.Generic.Dictionary`2.get_Count()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Dictionary`2.get_Count()", "none");
+            AssertPurityClassification(summary, "System.Collections.Generic.HashSet`1.Contains(!0)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.HashSet`1.Contains(!0)", "none");
+            AssertPurityClassification(summary, "System.Collections.Generic.Queue`1.Contains(!0)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Queue`1.Contains(!0)", "none");
+            AssertPurityClassification(summary, "System.Collections.Generic.Queue`1.Peek()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Queue`1.Peek()", "none");
+            AssertPurityClassification(stackSummary, "System.Collections.Generic.Stack`1.Contains(!0)", "pure");
+            AssertEffectVisibilityClassification(stackSummary, "System.Collections.Generic.Stack`1.Contains(!0)", "none");
+            AssertPurityClassification(stackSummary, "System.Collections.Generic.Stack`1.Peek()", "pure");
+            AssertEffectVisibilityClassification(stackSummary, "System.Collections.Generic.Stack`1.Peek()", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Dictionary`2.ContainsKey(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Dictionary`2.get_Count()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.HashSet`1.Contains(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Queue`1.Contains(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Queue`1.Peek()"));
+
+            var stackGeneratedSymbols = stackSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(stackGeneratedSymbols, Does.Contain("System.Collections.Generic.Stack`1.Contains(!0)"));
+            Assert.That(stackGeneratedSymbols, Does.Contain("System.Collections.Generic.Stack`1.Peek()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeFileNotFoundExceptionSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.IO.FileNotFoundException", limit: 80);

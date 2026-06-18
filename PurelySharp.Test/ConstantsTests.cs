@@ -159,6 +159,54 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void MutableCollectionReadHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Collections.Generic;
+
+public static class MutableCollectionCatalogSignatureSamples
+{
+    public static int Sample(
+        Dictionary<string, int> dictionary,
+        HashSet<int> set,
+        Queue<int> queue,
+        Stack<int> stack,
+        List<int> list,
+        string key,
+        int value)
+    {
+        _ = dictionary.ContainsKey(key);
+        _ = dictionary.Count;
+        _ = set.Contains(value);
+        _ = queue.Contains(value);
+        _ = queue.Peek();
+        _ = stack.Contains(value);
+        _ = stack.Peek();
+        _ = list.BinarySearch(value);
+        _ = list.IndexOf(value);
+        return list.LastIndexOf(value);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "MutableCollectionCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "dictionary.ContainsKey(key)"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "dictionary.Count"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "set.Contains(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "queue.Contains(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "queue.Peek()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "stack.Contains(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "stack.Peek()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "list.BinarySearch(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "list.IndexOf(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "list.LastIndexOf(value)"));
+        }
+
+        [Test]
         public void FileNotFoundExceptionStringConstructor_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.IO.FileNotFoundException.FileNotFoundException(string?)");
