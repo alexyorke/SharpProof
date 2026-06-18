@@ -84,6 +84,13 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Stopwatch.StaticFields.PurelySharp.EffectSummary.json",
+      "Limit": 12,
+      "SymbolPrefixes": [
+        "System.Diagnostics.Stopwatch..cctor"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Stopwatch.State.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Stopwatch.GetTimestamp.PurelySharp.EffectSummary.json",
       "Limit": 16,

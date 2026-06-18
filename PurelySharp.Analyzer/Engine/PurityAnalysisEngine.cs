@@ -2967,6 +2967,14 @@ namespace PurelySharp.Analyzer.Engine
             return GeneratedPurityCatalog.Current.TryGetPurity(methodSymbol, compilation, out purity);
         }
 
+        internal static bool TryGetTrustedGeneratedFieldPurity(
+            IFieldSymbol fieldSymbol,
+            Compilation compilation,
+            out GeneratedPurityCatalog.PurityEntry purity)
+        {
+            return GeneratedPurityCatalog.Current.TryGetFieldPurity(fieldSymbol, compilation, out purity);
+        }
+
         internal static bool HasTrustedGeneratedPurityCoverage(
             IMethodSymbol methodSymbol,
             Compilation compilation)

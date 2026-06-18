@@ -3399,6 +3399,42 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStopwatchStaticConstructorSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                12,
+                "System.Diagnostics.Stopwatch..cctor");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch..cctor()", "impure", "global_state_read", "global_state_write", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch..cctor()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceFrequency()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceFrequency()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Diagnostics.Stopwatch..cctor()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Diagnostics.Stopwatch.QueryPerformanceFrequency()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Diagnostics.Stopwatch..cctor()",
+                "System.Diagnostics.Stopwatch.QueryPerformanceFrequency()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeOperatingSystemSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

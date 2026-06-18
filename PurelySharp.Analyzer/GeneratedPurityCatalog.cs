@@ -169,6 +169,27 @@ namespace PurelySharp.Analyzer
             return false;
         }
 
+        public bool TryGetFieldPurity(IFieldSymbol fieldSymbol, Compilation compilation, out PurityEntry classification)
+        {
+            classification = default;
+            if (fieldSymbol.Locations.FirstOrDefault()?.IsInMetadata != true || !fieldSymbol.IsStatic)
+            {
+                return false;
+            }
+
+            var staticConstructor = fieldSymbol.ContainingType?
+                .GetMembers(".cctor")
+                .OfType<IMethodSymbol>()
+                .FirstOrDefault();
+            if (staticConstructor == null)
+            {
+                var staticConstructorKeys = GetStaticConstructorKeys(fieldSymbol.ContainingType);
+                return TryGetTrustedPurityByMethodKeys(fieldSymbol.ContainingAssembly, staticConstructorKeys, compilation, out classification);
+            }
+
+            return TryGetPurity(staticConstructor.OriginalDefinition, compilation, out classification);
+        }
+
         private static bool IsSummaryFile(string path)
         {
             var fileName = Path.GetFileName(path);
@@ -690,6 +711,30 @@ namespace PurelySharp.Analyzer
             return false;
         }
 
+        private static bool TryResolveMethodIdentityFromPath(
+            IEnumerable<string> methodKeys,
+            string assemblyPath,
+            out ActualMethodIdentity identity)
+        {
+            identity = null!;
+            if (string.IsNullOrWhiteSpace(assemblyPath) || !File.Exists(assemblyPath))
+            {
+                return false;
+            }
+
+            var implementationMethodMap = MethodIdentityCache.GetOrAdd(assemblyPath, static path => LoadMethodIdentities(path));
+            foreach (var key in methodKeys)
+            {
+                if (implementationMethodMap.TryGetValue(key, out var foundIdentity))
+                {
+                    identity = foundIdentity;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static ImmutableDictionary<string, ActualMethodIdentity> LoadMethodIdentities(string path)
         {
             using var stream = File.OpenRead(path);
@@ -1077,23 +1122,118 @@ namespace PurelySharp.Analyzer
             return null;
         }
 
+        private bool TryGetTrustedPurityByMethodKeys(
+            IAssemblySymbol? containingAssembly,
+            ImmutableArray<string> methodKeys,
+            Compilation compilation,
+            out PurityEntry classification)
+        {
+            classification = default;
+            if (containingAssembly == null || methodKeys.IsDefaultOrEmpty)
+            {
+                return false;
+            }
+
+            var implementationPath = TryResolveRuntimeImplementationAssemblyPath(containingAssembly, methodKeys, methodKeys[0]);
+            if (!string.IsNullOrWhiteSpace(implementationPath))
+            {
+                var path = implementationPath!;
+                if (File.Exists(path) &&
+                    TryResolveMethodIdentityFromPath(methodKeys, path, out var implementationIdentity))
+                {
+                    var assemblyIdentity = AssemblyIdentityCache.GetOrAdd(path, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
+                    if (TryMatchTrustedEntry(methodKeys, assemblyIdentity, implementationIdentity, out classification))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            foreach (var reference in compilation.References.OfType<PortableExecutableReference>())
+            {
+                var assemblySymbol = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
+                if (assemblySymbol == null ||
+                    !SymbolEqualityComparer.Default.Equals(assemblySymbol, containingAssembly))
+                {
+                    continue;
+                }
+
+                var referencePath = reference.FilePath;
+                if (string.IsNullOrWhiteSpace(referencePath) || !File.Exists(referencePath))
+                {
+                    return false;
+                }
+
+                var path = referencePath!;
+                var assemblyIdentity = AssemblyIdentityCache.GetOrAdd(path, static resolvedPath => ActualAssemblyIdentity.FromFile(resolvedPath));
+                if (TryResolveMethodIdentityFromPath(methodKeys, path, out var referenceIdentity) &&
+                    TryMatchTrustedEntry(methodKeys, assemblyIdentity, referenceIdentity, out classification))
+                {
+                    return true;
+                }
+
+                return false;
+            }
+
+            return false;
+        }
+
+        private bool TryMatchTrustedEntry(
+            IEnumerable<string> methodKeys,
+            ActualAssemblyIdentity? actualAssemblyIdentity,
+            ActualMethodIdentity? actualMethodIdentity,
+            out PurityEntry classification)
+        {
+            classification = default;
+            foreach (var key in methodKeys)
+            {
+                if (!_entriesBySymbol.TryGetValue(key, out var entries))
+                {
+                    continue;
+                }
+
+                foreach (var entry in entries)
+                {
+                    if (!entry.IsTrustedFor(actualAssemblyIdentity, actualMethodIdentity))
+                    {
+                        continue;
+                    }
+
+                    classification = entry.Classification;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static string? TryResolveRuntimeImplementationAssemblyPath(IMethodSymbol methodSymbol)
         {
             var cacheKey = CreateMetadataDefinitionExactSummaryKey(methodSymbol.OriginalDefinition);
-            return RuntimeImplementationAssemblyPathCache.GetOrAdd(cacheKey, _ => ResolveRuntimeImplementationAssemblyPath(methodSymbol));
+            return RuntimeImplementationAssemblyPathCache.GetOrAdd(cacheKey, _ => ResolveRuntimeImplementationAssemblyPath(GetSymbolKeys(methodSymbol), methodSymbol.ContainingAssembly));
         }
 
-        private static string? ResolveRuntimeImplementationAssemblyPath(IMethodSymbol methodSymbol)
+        private static string? TryResolveRuntimeImplementationAssemblyPath(
+            IAssemblySymbol? containingAssembly,
+            ImmutableArray<string> methodKeys,
+            string cacheKey)
+        {
+            return RuntimeImplementationAssemblyPathCache.GetOrAdd(cacheKey, _ => ResolveRuntimeImplementationAssemblyPath(methodKeys, containingAssembly));
+        }
+
+        private static string? ResolveRuntimeImplementationAssemblyPath(
+            IEnumerable<string> methodKeys,
+            IAssemblySymbol? containingAssembly)
         {
             var coreLibPath = typeof(object).Assembly.Location;
             if (!string.IsNullOrWhiteSpace(coreLibPath) &&
                 File.Exists(coreLibPath) &&
-                TryResolveMethodIdentityFromPath(methodSymbol, coreLibPath, out _))
+                TryResolveMethodIdentityFromPath(methodKeys, coreLibPath, out _))
             {
                 return coreLibPath;
             }
 
-            var assemblyName = methodSymbol.ContainingAssembly?.Identity.Name;
+            var assemblyName = containingAssembly?.Identity.Name;
             if (!string.IsNullOrWhiteSpace(assemblyName))
             {
                 foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
@@ -1106,7 +1246,7 @@ namespace PurelySharp.Analyzer
                     var location = assembly.Location;
                     if (!string.IsNullOrWhiteSpace(location) &&
                         File.Exists(location) &&
-                        TryResolveMethodIdentityFromPath(methodSymbol, location, out _))
+                        TryResolveMethodIdentityFromPath(methodKeys, location, out _))
                     {
                         return location;
                     }
@@ -1123,7 +1263,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                if (TryResolveMethodIdentityFromPath(methodSymbol, location, out _))
+                if (TryResolveMethodIdentityFromPath(methodKeys, location, out _))
                 {
                     return location;
                 }
@@ -1136,7 +1276,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                if (TryResolveMethodIdentityFromPath(methodSymbol, trustedPlatformAssemblyPath, out _))
+                if (TryResolveMethodIdentityFromPath(methodKeys, trustedPlatformAssemblyPath, out _))
                 {
                     return trustedPlatformAssemblyPath;
                 }
@@ -1163,6 +1303,34 @@ namespace PurelySharp.Analyzer
             }
 
             return Directory.EnumerateFiles(runtimeDirectory, "*.dll", SearchOption.TopDirectoryOnly);
+        }
+
+        private static ImmutableArray<string> GetStaticConstructorKeys(ITypeSymbol? typeSymbol)
+        {
+            if (typeSymbol == null)
+            {
+                return ImmutableArray<string>.Empty;
+            }
+
+            var keys = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+            AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: false, useOrdinalGenericParameters: false, useMetadataTypeNames: false));
+            AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: true, useOrdinalGenericParameters: false, useMetadataTypeNames: false));
+            AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: false, useOrdinalGenericParameters: true, useMetadataTypeNames: false));
+            AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: true, useOrdinalGenericParameters: true, useMetadataTypeNames: false));
+            AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: false, useOrdinalGenericParameters: true, useMetadataTypeNames: true));
+            AddSymbolKey(keys, CreateStaticConstructorKey(typeSymbol, includeReturnType: true, useOrdinalGenericParameters: true, useMetadataTypeNames: true));
+            return keys.ToImmutableArray();
+        }
+
+        private static string CreateStaticConstructorKey(
+            ITypeSymbol typeSymbol,
+            bool includeReturnType,
+            bool useOrdinalGenericParameters,
+            bool useMetadataTypeNames)
+        {
+            var containingTypeName = FormatSummaryType(typeSymbol, useOrdinalGenericParameters, useMetadataTypeNames);
+            var key = containingTypeName + "..cctor()";
+            return includeReturnType ? key + "->void" : key;
         }
 
         private sealed class SummaryEntry
@@ -1194,6 +1362,13 @@ namespace PurelySharp.Analyzer
                     return false;
                 }
 
+                return IsTrustedFor(actualAssemblyIdentity, actualMethodIdentity);
+            }
+
+            public bool IsTrustedFor(
+                ActualAssemblyIdentity? actualAssemblyIdentity,
+                ActualMethodIdentity? actualMethodIdentity)
+            {
                 return AssemblyIdentity != null &&
                     AssemblyIdentity.IsComplete &&
                     MethodIdentity != null &&

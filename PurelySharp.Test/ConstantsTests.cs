@@ -999,6 +999,13 @@ public static class StopwatchCatalogSignatureSamples
         }
 
         [Test]
+        public void StopwatchStaticFields_AreSourcedFromGeneratedStaticConstructorEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Diagnostics.Stopwatch.Frequency");
+            AssertNotInManualCatalogs("System.Diagnostics.Stopwatch.IsHighResolution");
+        }
+
+        [Test]
         public void OperatingSystemAndApplicationModelPureHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

@@ -65,6 +65,19 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (fieldSymbol.IsStatic)
             {
+                GeneratedPurityCatalog.PurityEntry generatedPurity = default;
+                var hasTrustedGeneratedFieldPurity = fieldSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                    PurityAnalysisEngine.TryGetTrustedGeneratedFieldPurity(
+                        fieldSymbol.OriginalDefinition,
+                        context.SemanticModel.Compilation,
+                        out generatedPurity);
+
+                if (hasTrustedGeneratedFieldPurity && generatedPurity.IsImpure)
+                {
+                    PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static field '{fieldSymbol.Name}' is trusted impure from generated purity summary.");
+                    return ImpureFieldRead(fieldReferenceOperation, generatedPurity.PrimaryCategory, "generated_purity_summary");
+                }
+
                 var staticCtorResult = PurityAnalysisEngine.CheckStaticConstructorPurity(fieldSymbol.ContainingType, context, currentState);
                 if (!staticCtorResult.IsPure)
                 {
@@ -80,6 +93,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     {
                         PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static readonly field '{fieldSymbol.Name}' is explicitly known impure.");
                         return ImpureFieldRead(fieldReferenceOperation, "known_impure_member");
+                    }
+
+                    if (hasTrustedGeneratedFieldPurity && generatedPurity.IsPure)
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static readonly field '{fieldSymbol.Name}' is trusted pure from generated purity summary.");
+                        return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                     }
 
                     PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static readonly field '{fieldSymbol.Name}' - Pure");
@@ -214,6 +233,22 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 fieldReferenceOperation.Syntax,
                 PurityAnalysisEngine.PurityEvidence.Create(
                     "mutable_state_read",
+                    ruleName: nameof(FieldReferencePurityRule),
+                    operation: fieldReferenceOperation,
+                    syntaxNode: fieldReferenceOperation.Syntax,
+                    symbol: fieldReferenceOperation.Field,
+                    catalogSource: catalogSource));
+        }
+
+        private static PurityAnalysisEngine.PurityAnalysisResult ImpureFieldRead(
+            IFieldReferenceOperation fieldReferenceOperation,
+            string category,
+            string? catalogSource)
+        {
+            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                fieldReferenceOperation.Syntax,
+                PurityAnalysisEngine.PurityEvidence.Create(
+                    category,
                     ruleName: nameof(FieldReferencePurityRule),
                     operation: fieldReferenceOperation,
                     syntaxNode: fieldReferenceOperation.Syntax,
