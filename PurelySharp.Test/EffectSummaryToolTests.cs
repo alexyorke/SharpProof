@@ -3330,7 +3330,7 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeStopwatchStateSlice_UsesGeneratedImpureEvidence()
+        public async Task EffectSummaryTool_RuntimeStopwatchStateSlice_UsesGeneratedEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
@@ -3339,6 +3339,7 @@ public static class PurityFixture
                 "System.Diagnostics.Stopwatch.get_Elapsed",
                 "System.Diagnostics.Stopwatch.get_ElapsedMilliseconds",
                 "System.Diagnostics.Stopwatch.get_ElapsedTicks",
+                "System.Diagnostics.Stopwatch.get_IsRunning",
                 "System.Diagnostics.Stopwatch.GetTimestamp",
                 "System.Diagnostics.Stopwatch.Start",
                 "System.Diagnostics.Stopwatch.Stop");
@@ -3357,6 +3358,8 @@ public static class PurityFixture
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.get_ElapsedMilliseconds()", "caller_visible");
             AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.get_ElapsedTicks()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.get_ElapsedTicks()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.get_IsRunning()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.get_IsRunning()", "none");
             AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.Start()", "impure", "impure_callee", "object_state_write");
             AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.Start()", "caller_visible");
             AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.Stop()", "impure", "impure_callee", "object_state_write");
@@ -3375,6 +3378,7 @@ public static class PurityFixture
                     string.Equals(symbol, "System.Diagnostics.Stopwatch.get_Elapsed()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Diagnostics.Stopwatch.get_ElapsedMilliseconds()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Diagnostics.Stopwatch.get_ElapsedTicks()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Diagnostics.Stopwatch.get_IsRunning()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Diagnostics.Stopwatch.GetTimestamp()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Diagnostics.Stopwatch.Start()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Diagnostics.Stopwatch.Stop()", StringComparison.Ordinal))
@@ -3390,6 +3394,7 @@ public static class PurityFixture
                 "System.Diagnostics.Stopwatch.get_Elapsed()",
                 "System.Diagnostics.Stopwatch.get_ElapsedMilliseconds()",
                 "System.Diagnostics.Stopwatch.get_ElapsedTicks()",
+                "System.Diagnostics.Stopwatch.get_IsRunning()",
             }));
         }
 
@@ -3452,6 +3457,7 @@ public static class PurityFixture
                 "System.Private.CoreLib.dll",
                 40,
                 "System.Environment.get_NewLine",
+                "System.Environment.get_HasShutdownStarted",
                 "System.Environment.get_Is64BitProcess",
                 "System.Environment.get_Is64BitOperatingSystem");
 
@@ -3463,6 +3469,8 @@ public static class PurityFixture
 
             AssertPurityClassification(summary, "System.Environment.get_NewLine()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_NewLine()", "none");
+            AssertPurityClassification(summary, "System.Environment.get_HasShutdownStarted()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_HasShutdownStarted()", "none");
             AssertPurityClassification(summary, "System.Environment.get_Is64BitProcess()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_Is64BitProcess()", "none");
             AssertPurityClassification(summary, "System.Environment.get_Is64BitOperatingSystem()", "pure");
@@ -3474,6 +3482,7 @@ public static class PurityFixture
                 .Select(entry => entry.GetProperty("Symbol").GetString())
                 .Where(symbol =>
                     string.Equals(symbol, "System.Environment.get_NewLine()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.get_HasShutdownStarted()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Environment.get_Is64BitProcess()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Environment.get_Is64BitOperatingSystem()", StringComparison.Ordinal))
                 .OrderBy(symbol => symbol, StringComparer.Ordinal)
@@ -3481,6 +3490,7 @@ public static class PurityFixture
 
             Assert.That(generatedSymbols, Is.EqualTo(new[]
             {
+                "System.Environment.get_HasShutdownStarted()",
                 "System.Environment.get_Is64BitOperatingSystem()",
                 "System.Environment.get_Is64BitProcess()",
                 "System.Environment.get_NewLine()",

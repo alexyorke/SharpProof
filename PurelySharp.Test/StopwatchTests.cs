@@ -10,7 +10,7 @@ namespace PurelySharp.Test
     public class StopwatchTests
     {
         [Test]
-        public async Task StopwatchIsRunning_Diagnostic()
+        public async Task StopwatchIsRunning_NoDiagnostic()
         {
             var test = @"
 using System.Diagnostics;
@@ -19,7 +19,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(Stopwatch stopwatch)
+    public bool TestMethod(Stopwatch stopwatch)
     {
         return stopwatch.IsRunning;
     }

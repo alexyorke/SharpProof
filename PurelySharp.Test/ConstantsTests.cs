@@ -964,7 +964,7 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
-        public void StopwatchStateHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        public void StopwatchMembers_AreSourcedFromGeneratedEvidence_NotStaticCatalogs()
         {
             var source = @"
 using System;
@@ -978,6 +978,7 @@ public static class StopwatchCatalogSignatureSamples
         stopwatch.Stop();
         _ = stopwatch.Elapsed;
         _ = stopwatch.ElapsedMilliseconds;
+        _ = stopwatch.IsRunning;
         return stopwatch.ElapsedTicks + new Stopwatch().ElapsedTicks;
     }
 }";
@@ -992,6 +993,7 @@ public static class StopwatchCatalogSignatureSamples
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "stopwatch.Elapsed"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "stopwatch.ElapsedMilliseconds"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "stopwatch.ElapsedTicks"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "stopwatch.IsRunning"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "stopwatch.Start()"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "stopwatch.Stop()"));
         }
@@ -1040,6 +1042,7 @@ public static class StopwatchCatalogSignatureSamples
             {
                 "System.Environment.Is64BitOperatingSystem.get",
                 "System.Environment.Is64BitProcess.get",
+                "System.Environment.HasShutdownStarted.get",
                 "System.Environment.NewLine.get",
             };
 

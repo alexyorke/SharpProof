@@ -92,6 +92,7 @@
         "System.Diagnostics.Stopwatch.get_Elapsed",
         "System.Diagnostics.Stopwatch.get_ElapsedMilliseconds",
         "System.Diagnostics.Stopwatch.get_ElapsedTicks",
+        "System.Diagnostics.Stopwatch.get_IsRunning",
         "System.Diagnostics.Stopwatch.Start",
         "System.Diagnostics.Stopwatch.Stop"
       ]
@@ -118,6 +119,13 @@
         "System.Environment.GetEnvironmentVariable",
         "System.Environment.get_UserInteractive",
         "System.Environment.get_UserName"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Environment.HasShutdownStarted.PurelySharp.EffectSummary.json",
+      "Limit": 4,
+      "SymbolPrefixes": [
+        "System.Environment.get_HasShutdownStarted"
       ]
     },
     {

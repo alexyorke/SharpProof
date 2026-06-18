@@ -213,7 +213,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task Environment_HasShutdownStarted_Diagnostic()
+        public async Task Environment_HasShutdownStarted_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -222,7 +222,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}()
+    public bool TestMethod()
     {
         return Environment.HasShutdownStarted;
     }
