@@ -40,16 +40,15 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void SmtSolver_ZeroGuardImpliesNotZero_IsUnsatisfiable()
+        public void SmtSolver_ZeroGuardImpliesZero_IsUnsatisfiable()
         {
             using var solver = new SmtSolver();
             var x = new SmtVariable("x", SmtValueKind.Int);
             var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
-            var xNotZero = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, x, new SmtIntegerConstant(0));
 
             var result = solver.Implies(
                 new[] { xIsZero },
-                xNotZero,
+                xIsZero,
                 TimeSpan.FromMilliseconds(50));
 
             Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));

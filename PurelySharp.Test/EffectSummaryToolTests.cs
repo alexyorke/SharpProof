@@ -752,6 +752,49 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeArrayIndexOfLengthSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                40,
+                "System.Array.IndexOf(System.Array, object)",
+                "System.Array.get_Length");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(
+                summary,
+                "System.Array.IndexOf(System.Array, object)",
+                "pure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Array.IndexOf(System.Array, object)",
+                "none");
+            AssertPurityClassification(
+                summary,
+                "System.Array.get_Length()",
+                "pure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Array.get_Length()",
+                "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Array.IndexOf(System.Array, object)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Array.get_Length()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeArrayBinarySearchSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

@@ -170,6 +170,30 @@ public static class ArrayFindCatalogSignatureSamples
         }
 
         [Test]
+        public void ArrayIndexOfAndLengthHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+
+public static class ArrayIndexOfLengthCatalogSignatureSamples
+{
+    public static int Sample(Array values, object target)
+    {
+        return Array.IndexOf(values, target) + values.Length;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ArrayIndexOfLengthCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Array.IndexOf(values, target)"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "values.Length"));
+        }
+
+        [Test]
         public void ArrayBinarySearchHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"

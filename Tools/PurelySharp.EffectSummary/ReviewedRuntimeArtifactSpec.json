@@ -30,6 +30,14 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Array.IndexOfLength.PurelySharp.EffectSummary.json",
+      "Limit": 40,
+      "SymbolPrefixes": [
+        "System.Array.IndexOf(System.Array, object)",
+        "System.Array.get_Length"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/AppContext.PurelySharp.EffectSummary.json",
       "Limit": 100,
       "SymbolPrefixes": [

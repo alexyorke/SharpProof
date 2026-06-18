@@ -1463,6 +1463,64 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_ArrayIndexOfAndLength()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(Array values, object target)
+    {
+        return Array.IndexOf(values, target) + values.Length;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<SyntaxNode>()
+                .Where(node =>
+                    node is InvocationExpressionSyntax invocation && invocation.ToString() == "Array.IndexOf(values, target)" ||
+                    node is MemberAccessExpressionSyntax memberAccess && memberAccess.ToString() == "values.Length")
+                .Select(node => node switch
+                {
+                    InvocationExpressionSyntax => semanticModel.GetSymbolInfo(node).Symbol as IMethodSymbol,
+                    MemberAccessExpressionSyntax => (semanticModel.GetSymbolInfo(node).Symbol as IPropertySymbol)?.GetMethod,
+                    _ => null,
+                })
+                .Where(method => method is not null)
+                .Select(method => method!)
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var matched = trackedMethods.Select(method =>
+            {
+                var args = new object?[] { method.OriginalDefinition, compilation, null };
+                return (bool)tryGetPurity.Invoke(catalog, args)!;
+            }).ToArray();
+
+            Assert.That(trackedMethods, Has.Length.EqualTo(2));
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow Array.IndexOf and Array.Length.");
+            Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedMethods.Length).ToArray()),
+                "Generated purity catalog should resolve Array.IndexOf and Array.Length.");
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_ArrayBinarySearch()
         {
             const string source = @"
