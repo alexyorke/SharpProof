@@ -783,6 +783,36 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeGuidNewGuidSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.Guid.NewGuid");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Guid.NewGuid()", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Guid.NewGuid()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => string.Equals(symbol, "System.Guid.NewGuid()", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Guid.NewGuid()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimePathCoreSlice_SeparatesPureAndConservativeStringWrappers()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.IO.Path", limit: 80);
@@ -794,6 +824,53 @@ public static class PurityFixture
             AssertPurityClassification(summary, "System.IO.Path.GetExtension(string)", "pure");
             AssertPurityClassification(summary, "System.IO.Path.GetFileName(string)", "pure");
             AssertPurityClassification(summary, "System.IO.Path.GetFileNameWithoutExtension(string)", "pure");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimePathEnvironmentSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                80,
+                "System.IO.Path.GetFullPath",
+                "System.IO.Path.GetRandomFileName",
+                "System.IO.Path.GetTempFileName",
+                "System.IO.Path.GetTempPath");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.IO.Path.GetFullPath(string)", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.IO.Path.GetFullPath(string)", "caller_visible");
+            AssertPurityClassification(summary, "System.IO.Path.GetRandomFileName()", "impure", "global_state_read", "global_state_write");
+            AssertEffectVisibilityClassification(summary, "System.IO.Path.GetRandomFileName()", "caller_visible");
+            AssertPurityClassification(summary, "System.IO.Path.GetTempFileName()", "impure", "caller_visible_memory_write", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.IO.Path.GetTempFileName()", "caller_visible");
+            AssertPurityClassification(summary, "System.IO.Path.GetTempPath()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.IO.Path.GetTempPath()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.IO.Path.GetFullPath(string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.IO.Path.GetRandomFileName()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.IO.Path.GetTempFileName()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.IO.Path.GetTempPath()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.IO.Path.GetFullPath(string)",
+                "System.IO.Path.GetRandomFileName()",
+                "System.IO.Path.GetTempFileName()",
+                "System.IO.Path.GetTempPath()",
+            }));
         }
 
         [Test]

@@ -33,7 +33,7 @@ namespace PurelySharp.Test
         public void GuidCatalog_UsesGeneratedEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownImpureTypeNames, Does.Not.Contain("System.Guid"));
-            Assert.That(Constants.KnownImpureMethods, Does.Contain("System.Guid.NewGuid()"));
+            AssertNotInManualCatalogs("System.Guid.NewGuid()");
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.CompareTo(System.Guid)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.Equals(System.Guid)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Guid.Guid(byte[])"));
@@ -93,6 +93,24 @@ namespace PurelySharp.Test
                 "System.IO.Path.GetFileNameWithoutExtension(string?)",
                 "System.IO.Path.HasExtension(string)",
                 "System.IO.Path.HasExtension(string?)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
+        public void GuidNewGuidAndPathEnvironmentHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Guid.NewGuid()",
+                "System.IO.Path.GetFullPath(string)",
+                "System.IO.Path.GetRandomFileName()",
+                "System.IO.Path.GetTempFileName()",
+                "System.IO.Path.GetTempPath()",
             };
 
             foreach (var member in members)

@@ -308,7 +308,6 @@ public static class Constants
         "System.Globalization.CultureInfo.DefaultThreadCurrentUICulture.get",
         "System.Globalization.CultureInfo.InstalledUICulture.get",
         "System.Globalization.RegionInfo.CurrentRegion.get",
-        "System.Guid.NewGuid()",
         "System.IO.Directory.CreateDirectory(string)",
         "System.IO.Directory.Exists(string)",
         "System.IO.DriveInfo.TotalSize.get",
@@ -321,9 +320,6 @@ public static class Constants
         "System.IO.File.WriteAllText(string, string)",
         "System.IO.File.WriteAllBytes(string, byte[])",
         "System.IO.MemoryStream.Write(byte[], int, int)",
-        "System.IO.Path.GetRandomFileName()",
-        "System.IO.Path.GetTempFileName()",
-        "System.IO.Path.GetTempPath()",
         "System.IO.Stream.Flush()",
         "System.IO.Stream.Read(byte[], int, int)",
         "System.IO.Stream.Seek(long, System.IO.SeekOrigin)",
@@ -808,7 +804,6 @@ public static class Constants
         "System.Collections.Generic.Queue<T>.Clear()",
         "System.Collections.Generic.Stack<T>.Clear()",
         "System.Exception.Source.set",
-        "System.IO.Path.GetFullPath(string)",
 
 
         "System.Activator.CreateInstanceFrom(string, string)",

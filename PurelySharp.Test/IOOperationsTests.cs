@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using System.Threading.Tasks;
@@ -739,7 +739,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task PathGetExtension_Diagnostic()
+        public async Task PathGetExtension_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -749,7 +749,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string? {|PS0002:TestMethod|}(string path)
+    public string? TestMethod(string path)
     {
         return Path.GetExtension(path);
     }
@@ -759,7 +759,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task PathGetFileNameWithoutExtension_Diagnostic()
+        public async Task PathGetFileNameWithoutExtension_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -769,7 +769,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string? {|PS0002:TestMethod|}(string path)
+    public string? TestMethod(string path)
     {
         return Path.GetFileNameWithoutExtension(path);
     }
@@ -799,7 +799,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task PathHelpers_MixedDiagnostics()
+        public async Task PathHelpers_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -809,13 +809,13 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string? {|PS0002:DirectoryNameMethod|}(string path)
+    public string? DirectoryNameMethod(string path)
     {
         return Path.GetDirectoryName(path);
     }
 
     [EnforcePure]
-    public string? {|PS0002:FileNameMethod|}(string path)
+    public string? FileNameMethod(string path)
     {
         return Path.GetFileName(path);
     }
