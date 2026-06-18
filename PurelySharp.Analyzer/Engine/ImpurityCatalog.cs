@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using PurelySharp.Analyzer.Configuration;
@@ -92,13 +94,13 @@ namespace PurelySharp.Analyzer.Engine
 			}
 
 			PurityAnalysisEngine.LogDebug($"    [IsKnownPure] Checking HashSet.Contains for signature: \"{signature}\"");
-			bool isKnownPure = Constants.KnownPureBCLMembers.Contains(signature) || ExtraPureMethods.Contains(signature);
+			bool isKnownPure = MatchesKnownPureSignature(signature);
 			PurityAnalysisEngine.LogDebug($"    [IsKnownPure] HashSet.Contains result: {isKnownPure}");
 
 			if (!isKnownPure && symbol is IMethodSymbol methodSymbol && methodSymbol.IsGenericMethod)
 			{
 				signature = methodSymbol.ConstructedFrom.ToDisplayString();
-				isKnownPure = Constants.KnownPureBCLMembers.Contains(signature) || ExtraPureMethods.Contains(signature);
+				isKnownPure = MatchesKnownPureSignature(signature);
 			}
 			else if (!isKnownPure && symbol is IPropertySymbol propertySymbol && propertySymbol.ContainingType.IsGenericType)
 			{
@@ -110,7 +112,7 @@ namespace PurelySharp.Analyzer.Engine
 				{
 					signature = $"{propertySymbol.ContainingType.ConstructedFrom.ToDisplayString()}.{propertySymbol.Name}.get";
 				}
-				isKnownPure = Constants.KnownPureBCLMembers.Contains(signature) || ExtraPureMethods.Contains(signature);
+				isKnownPure = MatchesKnownPureSignature(signature);
 			}
 
 			if (isKnownPure)
@@ -131,14 +133,14 @@ namespace PurelySharp.Analyzer.Engine
 				signature += ".get";
 			}
 
-			if (ExtraPureMethods.Contains(signature))
+			if (MatchesConfiguredKnownPureSignature(signature))
 			{
 				return true;
 			}
 
 			if (symbol is IMethodSymbol methodSymbol && methodSymbol.IsGenericMethod)
 			{
-				return ExtraPureMethods.Contains(methodSymbol.ConstructedFrom.ToDisplayString());
+				return MatchesConfiguredKnownPureSignature(methodSymbol.ConstructedFrom.ToDisplayString());
 			}
 
 			if (symbol is IPropertySymbol propertySymbol && propertySymbol.ContainingType.IsGenericType)
@@ -147,10 +149,32 @@ namespace PurelySharp.Analyzer.Engine
 					? propertySymbol.OriginalDefinition.ToDisplayString()
 					: $"{propertySymbol.ContainingType.ConstructedFrom.ToDisplayString()}.{propertySymbol.Name}.get";
 
-				return ExtraPureMethods.Contains(signature);
+				return MatchesConfiguredKnownPureSignature(signature);
 			}
 
 			return false;
+		}
+
+		private static bool MatchesKnownPureSignature(string signature)
+		{
+			return MatchesSignature(Constants.KnownPureBCLMembers, signature) ||
+				MatchesSignature(ExtraPureMethods, signature);
+		}
+
+		private static bool MatchesConfiguredKnownPureSignature(string signature)
+		{
+			return MatchesSignature(ExtraPureMethods, signature);
+		}
+
+		private static bool MatchesSignature(IEnumerable<string> signatures, string signature)
+		{
+			if (signatures.Contains(signature))
+			{
+				return true;
+			}
+
+			return signature.IndexOf('?') >= 0 &&
+				signatures.Contains(signature.Replace("?", string.Empty));
 		}
 
 		public static bool IsKnownImpure(ISymbol symbol)

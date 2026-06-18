@@ -779,6 +779,26 @@ public class TestClass
         }
 
         [Test]
+        public async Task PathHasExtension_NoDiagnostic()
+        {
+            var test = @"
+#nullable enable
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(string path)
+    {
+        return Path.HasExtension(path);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task PathHelpers_Diagnostic()
         {
             var test = @"
@@ -803,7 +823,7 @@ public class TestClass
     [EnforcePure]
     public string? {|PS0002:ChangeExtensionMethod|}(string path)
     {
-        return Path.ChangeExtension(path, ".txt");
+        return Path.ChangeExtension(path, "".txt"");
     }
 }";
 

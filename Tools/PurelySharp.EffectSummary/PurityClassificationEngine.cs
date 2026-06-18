@@ -127,11 +127,25 @@ internal static class PurityClassificationEngine
                 summary: summary);
         }
 
+        if (TryClassifyRuntimeIntrinsicStub(summary, out var intrinsicStubClassification))
+        {
+            visiting.Remove(symbol);
+            memo[symbol] = intrinsicStubClassification;
+            return intrinsicStubClassification;
+        }
+
         var impureCategories = new SortedSet<string>(StringComparer.Ordinal);
         var conservativeCategories = new SortedSet<string>(StringComparer.Ordinal);
 
+        var treatsObjectStateAsFreshOwned = IsFreshOwnedObjectConstructor(summary);
         foreach (var root in summary.RootCandidates)
         {
+            if (treatsObjectStateAsFreshOwned &&
+                string.Equals(root, "object_state_write", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             if (ImpureRoots.Contains(root))
             {
                 impureCategories.Add(root);
@@ -155,7 +169,8 @@ internal static class PurityClassificationEngine
             }
 
             if (string.Equals(effect, "writes_instance_field", StringComparison.Ordinal) &&
-                summary.RootCandidates.Contains("fresh_owned_object_write", StringComparer.Ordinal))
+                (summary.RootCandidates.Contains("fresh_owned_object_write", StringComparer.Ordinal) ||
+                 treatsObjectStateAsFreshOwned))
             {
                 continue;
             }
@@ -247,6 +262,11 @@ internal static class PurityClassificationEngine
             return result;
         }
 
+        var hasFreshObjectEvidence =
+            summary.Effects.Contains("allocates_object", StringComparer.Ordinal) ||
+            treatsObjectStateAsFreshOwned ||
+            freshOwnedObjectCalleeSeen;
+
         if (impureCategories.Count > 0)
         {
             result = new MethodPurityClassification(
@@ -254,7 +274,7 @@ internal static class PurityClassificationEngine
                 Categories: impureCategories.ToArray(),
                 FirstBlockingCallChain: blockingCallChain,
                 HasFreshArrayAllocationEvidence: summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
-                HasFreshObjectAllocationEvidence: summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
+                HasFreshObjectAllocationEvidence: hasFreshObjectEvidence,
                 HasUnsupportedEffects: conservativeCategories.Count > 0,
                 FreshnessClassification: GetFreshnessClassification(summary, "impure"),
                 EffectVisibilityClassification: GetEffectVisibilityClassification(summary, "impure"));
@@ -266,7 +286,7 @@ internal static class PurityClassificationEngine
                 Categories: conservativeCategories.ToArray(),
                 FirstBlockingCallChain: blockingCallChain,
                 HasFreshArrayAllocationEvidence: summary.Effects.Contains("allocates_array", StringComparer.Ordinal),
-                HasFreshObjectAllocationEvidence: summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
+                HasFreshObjectAllocationEvidence: hasFreshObjectEvidence,
                 HasUnsupportedEffects: true,
                 FreshnessClassification: GetFreshnessClassification(summary, "conservative_unknown"),
                 EffectVisibilityClassification: GetEffectVisibilityClassification(summary, "conservative_unknown"));
@@ -280,7 +300,7 @@ internal static class PurityClassificationEngine
                 {
                     freshnessClassification = "fresh_owned_array_write";
                 }
-                else if (freshOwnedObjectCalleeSeen)
+                else if (freshOwnedObjectCalleeSeen || treatsObjectStateAsFreshOwned)
                 {
                     freshnessClassification = "fresh_owned_object_write";
                 }
@@ -298,7 +318,7 @@ internal static class PurityClassificationEngine
                 Categories: Array.Empty<string>(),
                 FirstBlockingCallChain: Array.Empty<string>(),
                 HasFreshArrayAllocationEvidence: HasFreshArrayAllocationEvidence(summary) || freshOwnedArrayCalleeSeen,
-                HasFreshObjectAllocationEvidence: summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
+                HasFreshObjectAllocationEvidence: hasFreshObjectEvidence,
                 HasUnsupportedEffects: false,
                 FreshnessClassification: freshnessClassification,
                 EffectVisibilityClassification: effectVisibilityClassification);
@@ -306,6 +326,54 @@ internal static class PurityClassificationEngine
 
         memo[symbol] = result;
         return result;
+    }
+
+    private static bool TryClassifyRuntimeIntrinsicStub(
+        MethodEffectSummary summary,
+        out MethodPurityClassification classification)
+    {
+        classification = default!;
+        if (string.IsNullOrWhiteSpace(summary.Symbol))
+        {
+            return false;
+        }
+
+        if (IsPureRuntimeIntrinsicStub(summary.Symbol))
+        {
+            classification = new MethodPurityClassification(
+                Classification: "pure",
+                Categories: Array.Empty<string>(),
+                FirstBlockingCallChain: Array.Empty<string>(),
+                HasFreshArrayAllocationEvidence: false,
+                HasFreshObjectAllocationEvidence: false,
+                HasUnsupportedEffects: false,
+                FreshnessClassification: "none",
+                EffectVisibilityClassification: "none");
+            return true;
+        }
+
+        if (summary.Symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(", StringComparison.Ordinal))
+        {
+            classification = new MethodPurityClassification(
+                Classification: "impure",
+                Categories: new[] { "caller_visible_memory_write" },
+                FirstBlockingCallChain: Array.Empty<string>(),
+                HasFreshArrayAllocationEvidence: false,
+                HasFreshObjectAllocationEvidence: false,
+                HasUnsupportedEffects: false,
+                FreshnessClassification: "none",
+                EffectVisibilityClassification: "caller_visible");
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsPureRuntimeIntrinsicStub(string symbol)
+    {
+        return symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Runtime.CompilerServices.Unsafe.SizeOf()", StringComparison.Ordinal);
     }
 
     private static string[] JoinCallChain(string callee, IReadOnlyList<string> nested)
@@ -650,6 +718,29 @@ internal static class PurityClassificationEngine
         var methodBaseSymbol = GetMethodBaseSymbol(summary.Symbol);
         return summary.Calls.Any(call =>
             call.StartsWith(methodBaseSymbol + "(", StringComparison.Ordinal));
+    }
+
+    private static bool IsFreshOwnedObjectConstructor(MethodEffectSummary summary)
+    {
+        if (string.IsNullOrWhiteSpace(summary.Symbol) ||
+            !summary.Symbol.Contains("..ctor(", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        foreach (var effect in summary.Effects)
+        {
+            if (string.Equals(effect, "calls_method", StringComparison.Ordinal) ||
+                string.Equals(effect, "writes_instance_field", StringComparison.Ordinal) ||
+                SafeEffects.Contains(effect))
+            {
+                continue;
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     private static string GetMethodBaseSymbol(string symbol)

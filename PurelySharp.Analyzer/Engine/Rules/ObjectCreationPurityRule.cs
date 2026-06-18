@@ -118,17 +118,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
             {
                 PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Checking Constructor: {constructorSymbol.ToDisplayString()}");
 
+                if (PurityAnalysisEngine.IsKnownPureBCLMember(constructorSymbol))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a known-pure BCL member; skipping recursive callee analysis.");
+                    return PurityAnalysisResult.Pure;
+                }
+
+                if (IsKnownPureStringBuilderConstructor(constructorSymbol) ||
+                    IsKnownPureStringReadOnlySpanConstructor(constructorSymbol))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a reviewed pure constructor.");
+                    return PurityAnalysisResult.Pure;
+                }
+
                 var cctorResult = PurityAnalysisEngine.CheckStaticConstructorPurity(constructorSymbol.ContainingType, context, currentState);
                 if (!cctorResult.IsPure)
                 {
                     PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor invocation IMPURE due to impure static constructor in {constructorSymbol.ContainingType?.Name}.");
                     return cctorResult;
-                }
-
-                if (PurityAnalysisEngine.IsKnownPureBCLMember(constructorSymbol))
-                {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a known-pure BCL member; skipping recursive callee analysis.");
-                    return PurityAnalysisResult.Pure;
                 }
 
                 if (constructorSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
@@ -316,6 +323,37 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var constructorSymbol = objectCreationOperation.Constructor?.OriginalDefinition;
             return constructorSymbol?.ContainingType?.OriginalDefinition.ToDisplayString() == "System.Collections.ObjectModel.ReadOnlyCollection<T>" &&
                 constructorSymbol.Parameters.Length == 1;
+        }
+
+        private static bool IsKnownPureStringBuilderConstructor(IMethodSymbol? constructorSymbol)
+        {
+            if (constructorSymbol?.MethodKind != MethodKind.Constructor ||
+                constructorSymbol.ContainingType?.ToDisplayString() != "System.Text.StringBuilder")
+            {
+                return false;
+            }
+
+            return constructorSymbol.Parameters.Length == 0 ||
+                (constructorSymbol.Parameters.Length == 1 &&
+                 constructorSymbol.Parameters[0].Type.SpecialType == SpecialType.System_String);
+        }
+
+        private static bool IsKnownPureStringReadOnlySpanConstructor(IMethodSymbol? constructorSymbol)
+        {
+            if (constructorSymbol?.MethodKind != MethodKind.Constructor ||
+                constructorSymbol.ContainingType?.SpecialType != SpecialType.System_String ||
+                constructorSymbol.Parameters.Length != 1)
+            {
+                return false;
+            }
+
+            if (constructorSymbol.Parameters[0].Type is not INamedTypeSymbol parameterType)
+            {
+                return false;
+            }
+
+            return parameterType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
+                parameterType.TypeArguments[0].SpecialType == SpecialType.System_Char;
         }
     }
 }

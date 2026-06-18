@@ -30,6 +30,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (returnOperation.ReturnedValue != null)
             {
+                var sourceReturnedValue = GetSourceReturnedValueOperation(returnOperation, context.SemanticModel) ?? returnOperation.ReturnedValue;
                 PurityAnalysisEngine.LogDebug($"    [ReturnRule] Checking returned value: {returnOperation.ReturnedValue.Syntax} ({returnOperation.ReturnedValue.Kind})");
                 var valueResult = PurityAnalysisEngine.CheckSingleOperation(returnOperation.ReturnedValue, context, currentState);
                 if (!valueResult.IsPure)
@@ -37,15 +38,23 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value is IMPURE. Return statement is Impure.");
                     return valueResult;
                 }
+                else if (IsAwaiterFactoryReturn(
+                             context.ContainingMethodSymbol,
+                             sourceReturnedValue,
+                             context.SemanticModel.Compilation))
+                {
+                    PurityAnalysisEngine.LogDebug("    [ReturnRule] Returned value is a fresh awaiter produced by GetAwaiter(). Defer await-protocol purity to AwaitPurityRule.");
+                    return valueResult;
+                }
                 else if (IsAllowedTrustedArrayReturn(
-                             returnOperation.ReturnedValue,
+                             sourceReturnedValue,
                              context.SemanticModel,
                              out var trustedArrayReturnSymbol))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value flows from trusted array-return source '{trustedArrayReturnSymbol.ToDisplayString()}'. Return statement is Pure.");
                     return valueResult;
                 }
-                else if (IsKnownPureArrayFactoryReturn(returnOperation.ReturnedValue, out var factoryMethod))
+                else if (IsKnownPureArrayFactoryReturn(sourceReturnedValue, out var factoryMethod))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes mutable array from known-pure factory '{factoryMethod.ToDisplayString()}'. Return statement is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -58,7 +67,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: factoryMethod,
                             catalogSource: "returned_array_factory"));
                 }
-                else if (IsPureArrayReturningInvocationReturn(returnOperation.ReturnedValue, out var arrayReturningMethod))
+                else if (IsPureArrayReturningInvocationReturn(sourceReturnedValue, out var arrayReturningMethod))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes mutable array from known-pure method '{arrayReturningMethod.ToDisplayString()}'. Return statement is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -71,7 +80,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: arrayReturningMethod,
                             catalogSource: "returned_known_pure_array"));
                 }
-                else if (IsOwnedLocalArrayReturn(returnOperation.ReturnedValue, currentState, out var localSymbol))
+                else if (IsOwnedLocalArrayReturn(sourceReturnedValue, currentState, out var localSymbol))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes owned fresh local array '{localSymbol.Name}'. Return statement is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -84,7 +93,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: localSymbol,
                             catalogSource: "owned_local_array_return"));
                 }
-                else if (IsCallerOwnedArraySpanReturn(returnOperation.ReturnedValue, currentState, out var spanMethod))
+                else if (IsCallerOwnedArraySpanReturn(sourceReturnedValue, currentState, out var spanMethod))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes span view over caller-owned array through '{spanMethod.ToDisplayString()}'. Return statement is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -97,7 +106,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: spanMethod,
                             catalogSource: "returned_array_span_view"));
                 }
-                else if (IsCallerOwnedArrayMemoryReturn(returnOperation.ReturnedValue, currentState, out var memoryConstructor))
+                else if (IsCallerOwnedArrayMemoryReturn(sourceReturnedValue, currentState, out var memoryConstructor))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes memory view over caller-owned array through '{memoryConstructor.ToDisplayString()}'. Return statement is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -173,6 +182,71 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        }
+
+        private static IOperation? GetSourceReturnedValueOperation(IReturnOperation returnOperation, SemanticModel semanticModel)
+        {
+            var expressionSyntax = returnOperation.Syntax switch
+            {
+                ReturnStatementSyntax returnStatementSyntax => returnStatementSyntax.Expression,
+                ArrowExpressionClauseSyntax arrowExpressionClauseSyntax => arrowExpressionClauseSyntax.Expression,
+                _ => null,
+            };
+
+            return expressionSyntax == null
+                ? returnOperation.ReturnedValue
+                : semanticModel.GetOperation(expressionSyntax) ?? returnOperation.ReturnedValue;
+        }
+
+        private static bool IsAwaiterFactoryReturn(
+            IMethodSymbol containingMethodSymbol,
+            IOperation? returnedValue,
+            Compilation compilation)
+        {
+            if (containingMethodSymbol.Name != "GetAwaiter" ||
+                containingMethodSymbol.Parameters.Length != 0)
+            {
+                return false;
+            }
+
+            var unwrappedReturnedValue = PurityAnalysisEngine.SkipImplicitConversions(returnedValue);
+            if (unwrappedReturnedValue is not IObjectCreationOperation objectCreationOperation ||
+                objectCreationOperation.Type is not INamedTypeSymbol awaiterType)
+            {
+                return false;
+            }
+
+            if (!SymbolEqualityComparer.Default.Equals(containingMethodSymbol.ReturnType, awaiterType))
+            {
+                return false;
+            }
+
+            return HasAwaiterPattern(awaiterType, compilation);
+        }
+
+        private static bool HasAwaiterPattern(INamedTypeSymbol awaiterType, Compilation compilation)
+        {
+            var hasIsCompleted = awaiterType.GetMembers("IsCompleted")
+                .OfType<IPropertySymbol>()
+                .Any(property => property.Type.SpecialType == SpecialType.System_Boolean);
+            if (!hasIsCompleted)
+            {
+                return false;
+            }
+
+            var hasGetResult = awaiterType.GetMembers("GetResult")
+                .OfType<IMethodSymbol>()
+                .Any(method => method.Parameters.Length == 0);
+            if (!hasGetResult)
+            {
+                return false;
+            }
+
+            var notifyCompletion = compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.INotifyCompletion");
+            var criticalNotifyCompletion = compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.ICriticalNotifyCompletion");
+
+            return (notifyCompletion != null && awaiterType.AllInterfaces.Contains(notifyCompletion, SymbolEqualityComparer.Default)) ||
+                   (criticalNotifyCompletion != null && awaiterType.AllInterfaces.Contains(criticalNotifyCompletion, SymbolEqualityComparer.Default));
         }
 
         private static bool IsKnownPureArrayFactoryReturn(

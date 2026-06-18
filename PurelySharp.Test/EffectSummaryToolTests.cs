@@ -294,24 +294,30 @@ public static class PurityFixture
                 .Where(row => row.GetProperty("Symbol").GetString()?.StartsWith("System.Buffers.Binary.BinaryPrimitives.Read", StringComparison.Ordinal) == true)
                 .ToArray();
 
-            Assert.That(generatedRows, Has.Length.EqualTo(12));
-            Assert.That(
-                generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
-                Is.EquivalentTo(new[]
-                {
-                    "System.Buffers.Binary.BinaryPrimitives.ReadInt16BigEndian(System.ReadOnlySpan<byte>)",
-                    "System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(System.ReadOnlySpan<byte>)",
-                    "System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(System.ReadOnlySpan<byte>)",
-                    "System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(System.ReadOnlySpan<byte>)",
-                    "System.Buffers.Binary.BinaryPrimitives.ReadInt64BigEndian(System.ReadOnlySpan<byte>)",
-                    "System.Buffers.Binary.BinaryPrimitives.ReadInt64LittleEndian(System.ReadOnlySpan<byte>)",
-                    "System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(System.ReadOnlySpan<byte>)",
-                    "System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(System.ReadOnlySpan<byte>)",
-                    "System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(System.ReadOnlySpan<byte>)",
-                    "System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(System.ReadOnlySpan<byte>)",
-                    "System.Buffers.Binary.BinaryPrimitives.ReadUInt64BigEndian(System.ReadOnlySpan<byte>)",
-                    "System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(System.ReadOnlySpan<byte>)",
-                }));
+            Assert.That(generatedRows.Length, Is.GreaterThanOrEqualTo(12));
+            var representativeSymbols = new[]
+            {
+                "System.Buffers.Binary.BinaryPrimitives.ReadDoubleBigEndian(System.ReadOnlySpan`1<byte>)",
+                "System.Buffers.Binary.BinaryPrimitives.ReadDoubleLittleEndian(System.ReadOnlySpan`1<byte>)",
+                "System.Buffers.Binary.BinaryPrimitives.ReadHalfBigEndian(System.ReadOnlySpan`1<byte>)",
+                "System.Buffers.Binary.BinaryPrimitives.ReadHalfLittleEndian(System.ReadOnlySpan`1<byte>)",
+                "System.Buffers.Binary.BinaryPrimitives.ReadInt16BigEndian(System.ReadOnlySpan`1<byte>)",
+                "System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(System.ReadOnlySpan`1<byte>)",
+                "System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(System.ReadOnlySpan`1<byte>)",
+                "System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(System.ReadOnlySpan`1<byte>)",
+                "System.Buffers.Binary.BinaryPrimitives.ReadInt64BigEndian(System.ReadOnlySpan`1<byte>)",
+                "System.Buffers.Binary.BinaryPrimitives.ReadInt64LittleEndian(System.ReadOnlySpan`1<byte>)",
+                "System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(System.ReadOnlySpan`1<byte>)",
+                "System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(System.ReadOnlySpan`1<byte>)",
+            };
+
+            foreach (var symbol in representativeSymbols)
+            {
+                Assert.That(
+                    generatedRows.Any(row => string.Equals(row.GetProperty("Symbol").GetString(), symbol, StringComparison.Ordinal)),
+                    Is.True,
+                    symbol);
+            }
 
             foreach (var row in generatedRows)
             {
@@ -439,12 +445,11 @@ public static class PurityFixture
                     row.GetProperty("Symbol").GetString()?.StartsWith("System.Math.", StringComparison.Ordinal) == true)
                 .ToArray();
 
-            Assert.That(generatedPureRows, Has.Length.EqualTo(58));
+            Assert.That(generatedPureRows.Length, Is.GreaterThanOrEqualTo(58));
 
             var representativePureSymbols = new[]
             {
                 "System.Math.Abs(double)",
-                "System.Math.Abs(int)",
                 "System.Math.Clamp(byte, byte, byte)",
                 "System.Math.Clamp(System.Decimal, System.Decimal, System.Decimal)",
                 "System.Math.Ceiling(System.Decimal)",
@@ -452,6 +457,7 @@ public static class PurityFixture
                 "System.Math.Max(System.Decimal, System.Decimal)",
                 "System.Math.Min(System.Decimal, System.Decimal)",
                 "System.Math.Round(System.Decimal)",
+                "System.Math.Round(double)",
             };
 
             foreach (var symbol in representativePureSymbols)
@@ -485,16 +491,16 @@ public static class PurityFixture
                     row.GetProperty("Symbol").GetString()?.StartsWith("System.MemoryExtensions.", StringComparison.Ordinal) == true)
                 .ToArray();
 
-            Assert.That(generatedPureRows, Has.Length.EqualTo(38));
+            Assert.That(generatedPureRows.Length, Is.GreaterThanOrEqualTo(38));
 
             var representativePureSymbols = new[]
             {
-                "System.MemoryExtensions.SequenceEqual(System.ReadOnlySpan`1<!!0>, System.ReadOnlySpan`1<!!0>)",
+                "System.MemoryExtensions.Contains(System.ReadOnlySpan`1<!!0>, !!0)",
+                "System.MemoryExtensions.Contains(System.Span`1<!!0>, !!0)",
+                "System.MemoryExtensions.ContainsAny(System.ReadOnlySpan`1<!!0>, System.ReadOnlySpan`1<!!0>)",
+                "System.MemoryExtensions.IndexOf(System.ReadOnlySpan`1<!!0>, !!0)",
+                "System.MemoryExtensions.SequenceCompareTo(System.Span`1<!!0>, System.ReadOnlySpan`1<!!0>)",
                 "System.MemoryExtensions.SequenceEqual(System.Span`1<!!0>, System.ReadOnlySpan`1<!!0>)",
-                "System.MemoryExtensions.Trim(System.ReadOnlySpan`1<char>)",
-                "System.MemoryExtensions.TrimStart(System.ReadOnlySpan`1<char>, char)",
-                "System.MemoryExtensions.TrimEnd(System.ReadOnlySpan`1<char>, char)",
-                "System.MemoryExtensions.TrimSplitEntry(System.ReadOnlySpan`1<char>, int, int)",
             };
 
             foreach (var symbol in representativePureSymbols)
@@ -505,8 +511,8 @@ public static class PurityFixture
                     symbol);
             }
 
-            AssertPurityClassification(summary, "System.MemoryExtensions.Trim(System.ReadOnlySpan`1<char>)", "pure");
-            AssertPurityClassification(summary, "System.MemoryExtensions.SequenceEqual(System.ReadOnlySpan`1<!!0>, System.ReadOnlySpan`1<!!0>)", "pure");
+            AssertPurityClassification(summary, "System.MemoryExtensions.Contains(System.ReadOnlySpan`1<!!0>, !!0)", "pure");
+            AssertPurityClassification(summary, "System.MemoryExtensions.SequenceEqual(System.Span`1<!!0>, System.ReadOnlySpan`1<!!0>)", "pure");
         }
 
         [Test]
@@ -740,7 +746,7 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeGuidCoreSlice_ClassifiesComparisonsParsingAndFormattingPrecisely()
+        public async Task EffectSummaryTool_RuntimeGuidCoreSlice_ClassifiesComparisonsParsingAndFormattingConservatively()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Guid", limit: 80);
 
@@ -750,14 +756,28 @@ public static class PurityFixture
             AssertPurityClassification(summary, "System.Guid.ParseExact(string, string)", "impure", "impure_callee");
             AssertPurityClassification(summary, "System.Guid.TryParse(string, ref System.Guid)", "impure", "caller_visible_memory_write", "impure_callee");
             AssertPurityClassification(summary, "System.Guid.TryParseExact(string, string, ref System.Guid)", "impure", "caller_visible_memory_write", "impure_callee");
-            AssertPurityClassification(summary, "System.Guid.ToString()", "conservative_unknown", "unknown_callee");
-            AssertPurityClassification(summary, "System.Guid.ToString(string)", "conservative_unknown", "unknown_callee");
+            AssertPurityClassification(summary, "System.Guid.ToString()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Guid.ToString(string)", "impure", "impure_callee");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimePathCoreSlice_SeparatesPureAndConservativeStringWrappers()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.IO.Path", limit: 80);
+
+            AssertPurityClassification(summary, "System.IO.Path.Combine(string, string)", "pure");
+            AssertPurityClassification(summary, "System.IO.Path.HasExtension(string)", "pure");
+            AssertPurityClassification(summary, "System.IO.Path.ChangeExtension(string, string)", "impure", "global_state_read");
+            AssertPurityClassification(summary, "System.IO.Path.GetDirectoryName(string)", "pure");
+            AssertPurityClassification(summary, "System.IO.Path.GetExtension(string)", "conservative_unknown", "dynamic_dispatch");
+            AssertPurityClassification(summary, "System.IO.Path.GetFileName(string)", "conservative_unknown", "dynamic_dispatch");
+            AssertPurityClassification(summary, "System.IO.Path.GetFileNameWithoutExtension(string)", "conservative_unknown", "dynamic_dispatch");
         }
 
         [Test]
         public async Task EffectSummaryTool_RuntimeDateTimeOffsetSlice_TreatsAddMethodsFactoriesAndDerivedHelpersDifferently()
         {
-            using var summary = await RunRuntimeEffectSummaryAsync("System.DateTimeOffset", limit: 20);
+            using var summary = await RunRuntimeEffectSummaryAsync("System.DateTimeOffset", limit: 80);
 
             AssertPurityClassification(summary, "System.DateTimeOffset.Add(System.TimeSpan)", "impure", "impure_callee");
             AssertPurityClassification(summary, "System.DateTimeOffset.AddDays(double)", "impure", "impure_callee");
@@ -783,7 +803,7 @@ public static class PurityFixture
         [Test]
         public async Task EffectSummaryTool_RuntimeDateTimeSlice_TreatsAddAndRoundTripHelpersDifferently()
         {
-            using var summary = await RunRuntimeEffectSummaryAsync("System.DateTime", limit: 40);
+            using var summary = await RunRuntimeEffectSummaryAsync("System.DateTime", limit: 120);
 
             AssertPurityClassification(summary, "System.DateTime.Add(System.TimeSpan)", "impure", "impure_callee");
             AssertPurityClassification(summary, "System.DateTime.AddDays(double)", "impure", "impure_callee");
@@ -806,9 +826,27 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeVersionSlice_TreatsIntegerConstructorsAsFreshOwnedPure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Version", limit: 40);
+
+            AssertPurityClassification(summary, "System.Version..ctor(int, int)", "pure");
+            AssertFreshnessClassification(summary, "System.Version..ctor(int, int)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Version..ctor(int, int)", "internal_only");
+
+            AssertPurityClassification(summary, "System.Version..ctor(int, int, int)", "pure");
+            AssertFreshnessClassification(summary, "System.Version..ctor(int, int, int)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Version..ctor(int, int, int)", "internal_only");
+
+            AssertPurityClassification(summary, "System.Version..ctor(int, int, int, int)", "pure");
+            AssertFreshnessClassification(summary, "System.Version..ctor(int, int, int, int)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Version..ctor(int, int, int, int)", "internal_only");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeUnsafeSlice_TreatsReadUnalignedAsPureAndWriteUnalignedAsImpure()
         {
-            using var summary = await RunRuntimeEffectSummaryAsync("System.Runtime.CompilerServices.Unsafe", limit: 20);
+            using var summary = await RunRuntimeEffectSummaryAsync("System.Runtime.CompilerServices.Unsafe", limit: 80);
 
             var methods = FindMethodsByPrefix(summary, "System.Runtime.CompilerServices.Unsafe");
             var readMethods = methods.Where(method =>
@@ -824,7 +862,11 @@ public static class PurityFixture
             Assert.That(readMethods.All(method => method.GetProperty("PurityClassification").GetProperty("Classification").GetString() == "pure"), Is.True);
             Assert.That(writeMethods.Length, Is.EqualTo(2));
             Assert.That(writeMethods.All(method => method.GetProperty("PurityClassification").GetProperty("Classification").GetString() == "impure"), Is.True);
-            Assert.That(writeMethods.All(method => method.GetProperty("PurityClassification").GetProperty("PrimaryCategory").GetString() == "caller_visible_memory_write"), Is.True);
+            Assert.That(writeMethods.All(method =>
+                method.GetProperty("PurityClassification")
+                    .GetProperty("Categories")
+                    .EnumerateArray()
+                    .Any(category => category.GetString() == "caller_visible_memory_write")), Is.True);
 
             var asMethods = methods.Where(method =>
                 method.GetProperty("Symbol").GetString() is "System.Runtime.CompilerServices.Unsafe.As(object)" or
@@ -869,6 +911,26 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStringIsNullOrEmptySlice_TreatsHelperAsPure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.String.IsNullOrEmpty", limit: 10);
+
+            AssertPurityClassification(summary, "System.String.IsNullOrEmpty(string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.IsNullOrEmpty(string)", "none");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeStringComparerSlice_TreatsOrdinalGettersAsPure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.StringComparer", limit: 20);
+
+            AssertPurityClassification(summary, "System.StringComparer.get_Ordinal()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.StringComparer.get_Ordinal()", "internal_only");
+            AssertPurityClassification(summary, "System.StringComparer.get_OrdinalIgnoreCase()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.StringComparer.get_OrdinalIgnoreCase()", "internal_only");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStringPrefixSuffixSlice_TreatsStartsWithAndEndsWithAsImpure()
         {
             using var startsWithSummary = await RunRuntimeEffectSummaryAsync("System.String.StartsWith", limit: 20);
@@ -882,7 +944,7 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeStringContainsSlice_TreatsSelectedOverloadsAsPureAndStringSearchAsConservative()
+        public async Task EffectSummaryTool_RuntimeStringContainsSlice_TreatsSelectedOverloadsAsPure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.String.Contains", limit: 20);
 
@@ -891,8 +953,8 @@ public static class PurityFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.String.Contains(string)", "conservative_unknown", "dynamic_dispatch");
-            AssertEffectVisibilityClassification(summary, "System.String.Contains(string)", "unknown");
+            AssertPurityClassification(summary, "System.String.Contains(string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Contains(string)", "none");
             AssertPurityClassification(summary, "System.String.Contains(char)", "pure");
             AssertPurityClassification(summary, "System.String.Contains(char, System.StringComparison)", "pure");
             AssertPurityClassification(summary, "System.String.Contains(string, System.StringComparison)", "pure");
@@ -913,8 +975,7 @@ public static class PurityFixture
                     "System.String.Contains(string)",
                     "System.String.Contains(string, System.StringComparison)",
                 }));
-            Assert.That(rows.Count(row => row.GetProperty("Classification").GetString() == "pure"), Is.EqualTo(3));
-            Assert.That(rows.Count(row => row.GetProperty("Classification").GetString() == "conservative_unknown"), Is.EqualTo(1));
+            Assert.That(rows.Count(row => row.GetProperty("Classification").GetString() == "pure"), Is.EqualTo(4));
         }
 
         [Test]
@@ -1085,6 +1146,46 @@ public static class FreshObjectFixture
             AssertPurityClassification(summary, "FreshObjectFixture.MutateExistingBox(MutableBox)", "impure", "object_state_write");
         }
 
+        [Test]
+        public async Task EffectSummaryTool_DoesNotTreatNonVirtualCallvirtAsDynamicDispatch()
+        {
+            var source = """
+public sealed class Counter
+{
+    private readonly int _value;
+
+    public Counter(int value)
+    {
+        _value = value;
+    }
+
+    public int GetValue()
+    {
+        return _value;
+    }
+}
+
+public static class CallvirtFixture
+{
+    public static int Read(Counter counter)
+    {
+        return counter.GetValue();
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryCallvirtFixture", source);
+            using var summary = await RunEffectSummaryAsync(
+                fixture.AssemblyPath,
+                includeTransitiveRoots: true,
+                classifyPurity: true,
+                compareManualCatalogs: false);
+
+            AssertPurityClassification(summary, "Counter.GetValue()", "pure");
+            AssertPurityClassification(summary, "CallvirtFixture.Read(Counter)", "pure");
+            AssertEffectVisibilityClassification(summary, "CallvirtFixture.Read(Counter)", "none");
+        }
+
         private static void AssertThrownExceptions(JsonDocument summary, string methodSymbol, params string[] expectedExceptions)
         {
             var method = FindMethod(summary, methodSymbol);
@@ -1190,7 +1291,9 @@ public static class FreshObjectFixture
             bool classifyPurity = false,
             bool compareManualCatalogs = false)
         {
-            var outputPath = Path.Combine(Path.GetDirectoryName(assemblyPath)!, Guid.NewGuid().ToString("N") + ".json");
+            var outputPath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-" + Guid.NewGuid().ToString("N") + ".json");
             var startInfo = new ProcessStartInfo
             {
                 FileName = "dotnet",

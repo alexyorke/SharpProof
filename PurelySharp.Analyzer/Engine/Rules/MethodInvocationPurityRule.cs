@@ -173,6 +173,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 if (invocationOperation.Arguments.Length > 0)
                 {
                     var sourceArgument = invocationOperation.Arguments[0];
+                    if (IsImmediateFreshArrayLinqSource(sourceArgument.Value, context.SemanticModel.Compilation))
+                    {
+                        PurityAnalysisEngine.LogDebug("  [MIR]   LINQ source is an immediate reviewed fresh array producer; skipping conservative source re-analysis.");
+                    }
+                    else
+                    {
                     PurityAnalysisEngine.LogDebug($"  [MIR]   Checking LINQ source argument purity: {sourceArgument.Value.Kind}");
                     var sourceResult = PurityAnalysisEngine.CheckSingleOperation(sourceArgument.Value, context, currentState);
 
@@ -188,6 +194,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     {
                         PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (LINQ source GetEnumerator was impure)");
                         return sourceEnumeratorResult;
+                    }
                     }
                 }
                 else
@@ -350,12 +357,22 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: "attribute"));
             }
 
+            GeneratedPurityCatalog.PurityEntry generatedPurity = default;
+            var hasTrustedGeneratedPurity = originalDefinitionSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
+                    originalDefinitionSymbol,
+                    context.SemanticModel.Compilation,
+                    out generatedPurity);
+
             PurityAnalysisEngine.LogDebug($"  [MIR] Checking purity of {invocationOperation.Arguments.Length} arguments for {originalDefinitionSymbol.Name}.");
             foreach (var argument in invocationOperation.Arguments)
             {
                 if (argument.Parameter?.RefKind is RefKind.Out or RefKind.Ref)
                 {
-                    if (!IsPureOutArgumentTarget(argument.Value))
+                    var allowsTrustedPureRefRead = argument.Parameter.RefKind == RefKind.Ref &&
+                        hasTrustedGeneratedPurity &&
+                        generatedPurity.IsPure;
+                    if (!IsPureOutArgumentTarget(argument.Value) && !allowsTrustedPureRefRead)
                     {
                         PurityAnalysisEngine.LogDebug($"  [MIR]   By-reference argument '{argument.Syntax}' writes to non-local state.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -441,39 +458,16 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return collectionComparisonDispatchResult;
             }
 
+            if (TryCheckStringComparisonPurity(invocationOperation, out var stringComparisonResult))
+            {
+                return stringComparisonResult;
+            }
+
             if (PurityAnalysisEngine.HasPureExternalAttribute(originalDefinitionSymbol))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> PURE ([PureExternal] boundary attribute)");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
-
-            if (originalDefinitionSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
-                    originalDefinitionSymbol,
-                    context.SemanticModel.Compilation,
-                    out var generatedPurity))
-            {
-                if (generatedPurity.IsPure)
-                {
-                    PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (trusted generated purity summary)");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-                }
-
-                if (generatedPurity.IsImpure)
-                {
-                    PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (trusted generated purity summary)");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        invocationOperation.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            generatedPurity.PrimaryCategory,
-                            nameof(MethodInvocationPurityRule),
-                            invocationOperation,
-                            symbol: originalDefinitionSymbol,
-                            catalogSource: "generated_purity_summary"));
-                }
-            }
-
-
 
             string methodDisplayString = originalDefinitionSymbol.ToDisplayString();
             PurityAnalysisEngine.LogDebug($"  [MIR] Analyzing regular call to: {methodDisplayString} | Syntax: {invocationOperation.Syntax}");
@@ -504,6 +498,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinitionSymbol) ?? "known_impure"));
             }
 
+            if (originalDefinitionSymbol.ContainingType?.SpecialType == SpecialType.System_String &&
+                originalDefinitionSymbol.Name == "Split" &&
+                invocationOperation.Type is IArrayTypeSymbol)
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (reviewed fresh owned string.Split array producer)");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Checking IsKnownPureBCLMember with signature: '{originalDefinitionSymbol.ToDisplayString()}'");
             if (PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol))
@@ -517,6 +519,41 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 invokedMethodSymbol,
                 context.EnforcePureAttributeSymbol,
                 context.PureAttributeSymbol);
+            if (PurityAnalysisEngine.IsInConfiguredImpureNamespaceOrType(originalDefinitionSymbol) && !isExplicitlyPure)
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (In configured impure NS/Type and not explicitly Pure)");
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    invocationOperation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        GetCatalogHitCategory(originalDefinitionSymbol),
+                        nameof(MethodInvocationPurityRule),
+                        invocationOperation,
+                        symbol: originalDefinitionSymbol,
+                        catalogSource: "known_impure_namespace_or_type"));
+            }
+
+            if (hasTrustedGeneratedPurity)
+            {
+                if (generatedPurity.IsPure)
+                {
+                    PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (trusted generated purity summary)");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                }
+
+                if (generatedPurity.IsImpure)
+                {
+                    PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (trusted generated purity summary)");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        invocationOperation.Syntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            generatedPurity.PrimaryCategory,
+                            nameof(MethodInvocationPurityRule),
+                            invocationOperation,
+                            symbol: originalDefinitionSymbol,
+                            catalogSource: "generated_purity_summary"));
+                }
+            }
+
             if (PurityAnalysisEngine.IsInImpureNamespaceOrType(originalDefinitionSymbol) && !isExplicitlyPure)
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (In Impure NS/Type and not explicitly Pure)");
@@ -528,6 +565,15 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         invocationOperation,
                         symbol: originalDefinitionSymbol,
                         catalogSource: "known_impure_namespace_or_type"));
+            }
+
+            if (invocationOperation.Type is IArrayTypeSymbol &&
+                PurityAnalysisEngine.IsKnownFreshOwnedArrayReturningMember(
+                    originalDefinitionSymbol,
+                    context.SemanticModel.Compilation))
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (reviewed fresh owned array-returning member)");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
             if (IsUntrustedMetadataOnlyMethod(originalDefinitionSymbol))
@@ -1490,6 +1536,108 @@ namespace PurelySharp.Analyzer.Engine.Rules
         {
             return typeSymbol is INamedTypeSymbol namedType &&
                 namedType.OriginalDefinition.ToDisplayString() == "System.Collections.Generic.IEqualityComparer<T>";
+        }
+
+        private static bool TryCheckStringComparisonPurity(
+            IInvocationOperation invocationOperation,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            var methodSymbol = invocationOperation.TargetMethod?.OriginalDefinition;
+            if (methodSymbol?.Name == "AsSpan" &&
+                methodSymbol.ContainingType?.ToDisplayString() == "System.MemoryExtensions" &&
+                methodSymbol.Parameters.Length == 1 &&
+                methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_String)
+            {
+                return true;
+            }
+
+            if (methodSymbol?.ContainingType?.SpecialType != SpecialType.System_String)
+            {
+                return false;
+            }
+
+            if (methodSymbol.Name == "Contains" &&
+                methodSymbol.Parameters.Length == 1 &&
+                methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_String)
+            {
+                return true;
+            }
+
+            if (methodSymbol.Name is "ToLower" or "ToUpper" &&
+                methodSymbol.Parameters.Length == 0)
+            {
+                result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    invocationOperation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        "reflection_environment_source",
+                        nameof(MethodInvocationPurityRule),
+                        invocationOperation,
+                        symbol: methodSymbol,
+                        catalogSource: "string_default_culture_casing"));
+                return true;
+            }
+
+            if (methodSymbol.Name is "Contains" or "StartsWith" or "EndsWith")
+            {
+                var comparisonParameterIndex = GetStringComparisonParameterIndex(methodSymbol);
+                if (comparisonParameterIndex >= 0 && comparisonParameterIndex < invocationOperation.Arguments.Length)
+                {
+                    if (IsDeterministicStringComparison(invocationOperation.Arguments[comparisonParameterIndex].Value))
+                    {
+                        return true;
+                    }
+
+                    result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        invocationOperation.Syntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            "reflection_environment_source",
+                            nameof(MethodInvocationPurityRule),
+                            invocationOperation,
+                            symbol: methodSymbol,
+                            catalogSource: "string_current_culture_comparison"));
+                    return true;
+                }
+            }
+
+            if (methodSymbol.Name is "StartsWith" or "EndsWith" &&
+                methodSymbol.Parameters.Length == 1 &&
+                methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_String)
+            {
+                result = PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    invocationOperation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        "reflection_environment_source",
+                        nameof(MethodInvocationPurityRule),
+                        invocationOperation,
+                        symbol: methodSymbol,
+                        catalogSource: "string_default_culture_comparison"));
+                return true;
+            }
+
+            return false;
+        }
+
+        private static int GetStringComparisonParameterIndex(IMethodSymbol methodSymbol)
+        {
+            for (int i = 0; i < methodSymbol.Parameters.Length; i++)
+            {
+                if (methodSymbol.Parameters[i].Type.ToDisplayString() == "System.StringComparison")
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private static bool IsDeterministicStringComparison(IOperation? operation)
+        {
+            var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
+            return unwrappedOperation?.ConstantValue.HasValue == true &&
+                unwrappedOperation.ConstantValue.Value is int comparison &&
+                comparison is 2 or 3 or 4 or 5;
         }
 
         private static bool TryCheckMemoryExtensionsDefaultEqualityDispatchPurity(
@@ -3113,6 +3261,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            if (IsTrustedGeneratedPureStringComparerSingleton(value, context))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             var foundImplementation = false;
             foreach (var comparisonMethod in EnumerateComparerImplementations(value.Type))
             {
@@ -3150,6 +3303,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             if (IsNullOrDefaultComparerValue(value))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            if (IsTrustedGeneratedPureStringComparerSingleton(value, context))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
@@ -3213,6 +3371,38 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     "System.Collections.Generic.Comparer<T>";
         }
 
+        private static bool IsTrustedGeneratedPureStringComparerSingleton(
+            IOperation value,
+            PurityAnalysisContext context)
+        {
+            value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
+            if (value is not IPropertyReferenceOperation
+                {
+                    Property:
+                    {
+                        IsStatic: true,
+                        Name: "Ordinal" or "OrdinalIgnoreCase",
+                        ContainingType: { } containingType,
+                        GetMethod: { } getterSymbol
+                    }
+                })
+            {
+                return false;
+            }
+
+            if (containingType.OriginalDefinition.ToDisplayString() != "System.StringComparer" ||
+                getterSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
+            {
+                return false;
+            }
+
+            return PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
+                getterSymbol.OriginalDefinition,
+                context.SemanticModel.Compilation,
+                out var generatedPurity) &&
+                generatedPurity.IsPure;
+        }
+
         private static IEnumerable<IMethodSymbol> EnumerateSourceGetEnumeratorImplementations(ITypeSymbol sourceType)
         {
             var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default);
@@ -3264,6 +3454,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var originalDefinition = typeSymbol.OriginalDefinition;
             return originalDefinition.SpecialType == SpecialType.System_Collections_IEnumerable ||
                 originalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T;
+        }
+
+        private static bool IsImmediateFreshArrayLinqSource(
+            IOperation sourceOperation,
+            Compilation compilation)
+        {
+            var unwrappedSource = PurityAnalysisEngine.SkipImplicitConversions(sourceOperation) ?? sourceOperation;
+            if (unwrappedSource is not IInvocationOperation invocationOperation ||
+                invocationOperation.Type is not IArrayTypeSymbol)
+            {
+                return false;
+            }
+
+            var originalDefinition = invocationOperation.TargetMethod.OriginalDefinition;
+            return (originalDefinition.ContainingType?.SpecialType == SpecialType.System_String &&
+                    originalDefinition.Name == "Split") ||
+                PurityAnalysisEngine.IsKnownFreshOwnedArrayReturningMember(originalDefinition, compilation) ||
+                PurityAnalysisEngine.IsKnownPureBCLArrayFactoryOperation(unwrappedSource, out _);
         }
 
         private static IEnumerable<IMethodSymbol> EnumerateComparerImplementations(ITypeSymbol comparerType)

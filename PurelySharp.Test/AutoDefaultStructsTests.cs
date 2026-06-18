@@ -49,9 +49,10 @@ namespace TestNamespace
 
             var expectedGetX = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0004).WithSpan(9, 23, 9, 24).WithArguments("get_X");
             var expectedGetY = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0004).WithSpan(10, 23, 10, 24).WithArguments("get_Y");
+            var expectedCalculateDistance = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0002).WithSpan(13, 23, 13, 40).WithArguments("CalculateDistance");
             var expectedProcessPoint = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0002).WithSpan(24, 28, 24, 40).WithArguments("ProcessPoint");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedGetX, expectedGetY, expectedProcessPoint });
+            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedGetX, expectedGetY, expectedCalculateDistance, expectedProcessPoint });
         }
 
         [Test]
@@ -96,9 +97,9 @@ namespace TestNamespace
 
 
             var expectedCtor = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0004).WithSpan(14, 16, 14, 24).WithArguments(".ctor");
-            var expectedTestVector = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0004).WithSpan(30, 30, 30, 40).WithArguments("TestVector");
+            var expectedCalculateMagnitude = VerifyCS.Diagnostic(PurelySharpAnalyzer.PS0002).WithSpan(21, 23, 21, 41).WithArguments("CalculateMagnitude");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedCtor, expectedTestVector });
+            await VerifyCS.VerifyAnalyzerAsync(test, new[] { expectedCtor, expectedCalculateMagnitude });
         }
 
         [Test]

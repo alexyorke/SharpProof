@@ -99,6 +99,21 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: "known_impure_namespace_or_type"));
             }
 
+            if (!requiresDispatchCheck && IsSourceAutoPropertyGetter(propertySymbol))
+            {
+                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is a source auto-property getter. Treating read as pure.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            if (!requiresDispatchCheck &&
+                propertySymbol.ContainingType is INamedTypeSymbol containingType &&
+                containingType.IsAnonymousType &&
+                propertySymbol.IsReadOnly)
+            {
+                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is an anonymous-type readonly property. Treating read as pure.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             if (requiresDispatchCheck)
             {
                 PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} may dispatch. Checking getter candidates.");
@@ -348,6 +363,36 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        }
+
+        private static bool IsSourceAutoPropertyGetter(IPropertySymbol propertySymbol)
+        {
+            if (propertySymbol.GetMethod == null ||
+                propertySymbol.GetMethod.IsAbstract ||
+                propertySymbol.ContainingType?.TypeKind == TypeKind.Interface)
+            {
+                return false;
+            }
+
+            foreach (var syntaxReference in propertySymbol.DeclaringSyntaxReferences)
+            {
+                if (syntaxReference.GetSyntax() is not PropertyDeclarationSyntax propertyDeclaration ||
+                    propertyDeclaration.AccessorList == null)
+                {
+                    continue;
+                }
+
+                var getterAccessor = propertyDeclaration.AccessorList.Accessors
+                    .FirstOrDefault(accessor => accessor.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.GetAccessorDeclaration));
+                if (getterAccessor != null &&
+                    getterAccessor.Body == null &&
+                    getterAccessor.ExpressionBody == null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsPartOfAssignmentTarget(IOperation operation)

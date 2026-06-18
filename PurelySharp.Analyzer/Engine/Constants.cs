@@ -1208,8 +1208,6 @@ public static class Constants
         "string.IsNullOrWhiteSpace(string)",
         "string.Replace(string, string)",
         "string.Substring(int, int)",
-        "string.ToLower()",
-        "string.ToUpper()",
         "string.Trim()",
         "string.Length.get",
         "string.Equals(string)",
@@ -1219,6 +1217,7 @@ public static class Constants
         "string.ToUpperInvariant()",
 
         "System.String.Split(char)",
+        "System.String.Split(char, System.StringSplitOptions)",
         "System.String.Split(params char[])",
         "System.String.Split(char[])",
         "System.String.Split(char[], System.StringSplitOptions)",
@@ -1231,12 +1230,15 @@ public static class Constants
         "System.String.Join(string, System.Collections.Generic.IEnumerable<string>)",
         "System.String.Join<T>(string, System.Collections.Generic.IEnumerable<T>)",
 
+        "System.MemoryExtensions.AsSpan(string)",
+
 
         "string.String(System.ReadOnlySpan<char>)",
 
 
 
         "System.StringComparer.InvariantCultureIgnoreCase.Compare(string, string)",
+        "System.StringComparer.Ordinal.get",
         "System.StringComparer.Ordinal.Equals(string, string)",
 
 
@@ -1521,10 +1523,8 @@ public static class Constants
         "string.Length.get",
         "string.Substring(int)",
         "string.Substring(int, int)",
-        "string.ToLower()",
         "string.ToLowerInvariant()",
         "string.ToString()",
-        "string.ToUpper()",
         "string.ToUpperInvariant()",
         "string.Trim()",
         "string.TrimEnd()",

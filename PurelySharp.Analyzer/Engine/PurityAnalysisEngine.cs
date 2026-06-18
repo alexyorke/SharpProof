@@ -935,6 +935,40 @@ namespace PurelySharp.Analyzer.Engine
                     return PurityAnalysisResult.Pure;
                 }
 
+                if (IsInConfiguredImpureNamespaceOrType(methodSymbol))
+                {
+                    LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is in a configured impure namespace/type.");
+                    var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+                    var configuredImpureResult = ImpureResult(
+                        syntax,
+                        PurityEvidence.Create(
+                            "catalog_hit",
+                            "KnownImpureMethod",
+                            syntaxNode: syntax,
+                            symbol: methodSymbol,
+                            catalogSource: "known_impure_namespace_or_type"));
+                    purityCache[methodSymbol] = configuredImpureResult;
+                    LogDebug($"{indent}<< Exit DeterminePurity (Configured Impure Namespace/Type): {methodSymbol.ToDisplayString()}");
+                    return configuredImpureResult;
+                }
+
+                if (IsKnownImpure(methodSymbol))
+                {
+                    LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is known impure.");
+                    var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+                    var knownImpureResult = ImpureResult(
+                        syntax,
+                        PurityEvidence.Create(
+                            "catalog_hit",
+                            "KnownImpureMethod",
+                            syntaxNode: syntax,
+                            symbol: methodSymbol,
+                            catalogSource: GetKnownImpureMemberSource(methodSymbol) ?? "known_impure"));
+                    purityCache[methodSymbol] = knownImpureResult;
+                    LogDebug($"{indent}<< Exit DeterminePurity (Known Impure): {methodSymbol.ToDisplayString()}");
+                    return knownImpureResult;
+                }
+
                 if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
                     TryGetTrustedGeneratedPurity(methodSymbol, semanticModel.Compilation, out var generatedPurity))
                 {
@@ -959,23 +993,6 @@ namespace PurelySharp.Analyzer.Engine
                         purityCache[methodSymbol] = generatedResult;
                         return generatedResult;
                     }
-                }
-
-                if (IsKnownImpure(methodSymbol))
-                {
-                    LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is known impure.");
-                    var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
-                    var knownImpureResult = ImpureResult(
-                        syntax,
-                        PurityEvidence.Create(
-                            "catalog_hit",
-                            "KnownImpureMethod",
-                            syntaxNode: syntax,
-                            symbol: methodSymbol,
-                            catalogSource: GetKnownImpureMemberSource(methodSymbol) ?? "known_impure"));
-                    purityCache[methodSymbol] = knownImpureResult;
-                    LogDebug($"{indent}<< Exit DeterminePurity (Known Impure): {methodSymbol.ToDisplayString()}");
-                    return knownImpureResult;
                 }
 
 
@@ -1028,10 +1045,39 @@ namespace PurelySharp.Analyzer.Engine
 
                 if (methodSymbol.IsAbstract || bodySyntaxNode == null)
                 {
-                    LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is abstract or has no body AND not known impure/pure. Assuming pure.");
-                    purityCache[methodSymbol] = PurityAnalysisResult.Pure;
+                    if (methodSymbol.MethodKind == MethodKind.Constructor &&
+                        !methodSymbol.IsExtern &&
+                        methodSymbol.ContainingType?.Locations.Any(location => !location.IsInMetadata) == true)
+                    {
+                        LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is a source constructor without an explicit body. Treating as pure.");
+                        purityCache[methodSymbol] = PurityAnalysisResult.Pure;
+                        LogDebug($"{indent}<< Exit DeterminePurity (Source Constructor Without Body): {methodSymbol.ToDisplayString()}");
+                        return PurityAnalysisResult.Pure;
+                    }
+
+                    if (methodSymbol.MethodKind == MethodKind.PropertyGet &&
+                        !methodSymbol.IsAbstract &&
+                        methodSymbol.ContainingType?.TypeKind != TypeKind.Interface &&
+                        methodSymbol.DeclaringSyntaxReferences.Length > 0)
+                    {
+                        LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is a source property getter without an explicit body. Treating as pure.");
+                        purityCache[methodSymbol] = PurityAnalysisResult.Pure;
+                        LogDebug($"{indent}<< Exit DeterminePurity (Source Auto Getter): {methodSymbol.ToDisplayString()}");
+                        return PurityAnalysisResult.Pure;
+                    }
+
+                    LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is abstract or has no body AND lacks trusted purity evidence. Assuming impure.");
+                    var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+                    var noBodyResult = ImpureResult(
+                        syntax,
+                        PurityEvidence.Create(
+                            "unknown_external_call",
+                            syntaxNode: syntax,
+                            symbol: methodSymbol,
+                            catalogSource: "no_body"));
+                    purityCache[methodSymbol] = noBodyResult;
                     LogDebug($"{indent}<< Exit DeterminePurity (Abstract/NoBody): {methodSymbol.ToDisplayString()}");
-                    return PurityAnalysisResult.Pure;
+                    return noBodyResult;
                 }
 
 
@@ -2872,6 +2918,37 @@ namespace PurelySharp.Analyzer.Engine
                 purity.IsFreshArrayCandidate;
         }
 
+        internal static bool IsKnownFreshOwnedArrayReturningMember(
+            IMethodSymbol methodSymbol,
+            Compilation compilation)
+        {
+            if (methodSymbol == null)
+            {
+                return false;
+            }
+
+            if (IsTrustedGeneratedFreshOwnedArrayReturningMember(methodSymbol, compilation))
+            {
+                return true;
+            }
+
+            var signature = methodSymbol.OriginalDefinition.ToDisplayString();
+            if (Constants.KnownFreshOwnedArrayReturningMembers.Contains(signature))
+            {
+                return true;
+            }
+
+            if (methodSymbol.ContainingType?.SpecialType == SpecialType.System_String &&
+                signature.StartsWith("string.", StringComparison.Ordinal) &&
+                Constants.KnownFreshOwnedArrayReturningMembers.Contains("System.String." + signature.Substring("string.".Length)))
+            {
+                return true;
+            }
+
+            return methodSymbol.IsGenericMethod &&
+                Constants.KnownFreshOwnedArrayReturningMembers.Contains(methodSymbol.ConstructedFrom.ToDisplayString());
+        }
+
 
         internal static bool HasImpureAttribute(ISymbol symbol)
         {
@@ -3593,7 +3670,7 @@ namespace PurelySharp.Analyzer.Engine
 
                         foreach (var localSymbol in writtenLocalSymbols)
                         {
-                            if (IsOwnedLocalArrayValue(valueOperation, currentState))
+                            if (IsOwnedLocalArrayValue(valueOperation, currentState, context.SemanticModel.Compilation))
                             {
                                 nextState = nextState.WithOwnedLocalArray(localSymbol);
                             }
@@ -3661,7 +3738,7 @@ namespace PurelySharp.Analyzer.Engine
 
                     foreach (var localSymbol in writtenLocalSymbols)
                     {
-                        if (IsOwnedLocalArrayValue(valueOperation, currentState))
+                        if (IsOwnedLocalArrayValue(valueOperation, currentState, context.SemanticModel.Compilation))
                         {
                             nextState = nextState.WithOwnedLocalArray(localSymbol);
                         }
@@ -3771,7 +3848,7 @@ namespace PurelySharp.Analyzer.Engine
                                     nextState = nextState.WithoutLocalConcreteType(declaredSymbol);
                                 }
 
-                                if (IsOwnedLocalArrayValue(initializerValue, nextState))
+                                if (IsOwnedLocalArrayValue(initializerValue, nextState, context.SemanticModel.Compilation))
                                 {
                                     nextState = nextState.WithOwnedLocalArray(declaredSymbol);
                                 }
@@ -3882,7 +3959,10 @@ namespace PurelySharp.Analyzer.Engine
             }
         }
 
-        private static bool IsOwnedLocalArrayValue(IOperation? valueOperation, PurityAnalysisState currentState)
+        private static bool IsOwnedLocalArrayValue(
+            IOperation? valueOperation,
+            PurityAnalysisState currentState,
+            Compilation compilation)
         {
             var unwrappedValue = UnwrapArrayOwnershipPreservingConversions(valueOperation);
             if (unwrappedValue == null)
@@ -3893,6 +3973,13 @@ namespace PurelySharp.Analyzer.Engine
             if (unwrappedValue is IArrayCreationOperation ||
                 IsArrayCollectionExpressionOperation(unwrappedValue) ||
                 IsKnownPureBCLArrayFactoryOperation(unwrappedValue, out _))
+            {
+                return true;
+            }
+
+            if (unwrappedValue is IInvocationOperation invocationOperation &&
+                invocationOperation.Type is IArrayTypeSymbol &&
+                IsKnownFreshOwnedArrayReturningMember(invocationOperation.TargetMethod.OriginalDefinition, compilation))
             {
                 return true;
             }

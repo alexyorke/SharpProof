@@ -23,6 +23,10 @@ namespace PurelySharp.Analyzer
             typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
             genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
             miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
+        private static readonly SymbolDisplayFormat EffectSummaryNonGenericContainingTypeFormat = new SymbolDisplayFormat(
+            typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
+            genericsOptions: SymbolDisplayGenericsOptions.None,
+            miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
         private static readonly SymbolDisplayFormat EffectSummaryParameterTypeFormat = new SymbolDisplayFormat(
             genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
             miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
@@ -297,12 +301,30 @@ namespace PurelySharp.Analyzer
             AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol));
             AddSymbolKey(keys, CreateExactSummaryKey(methodSymbol.OriginalDefinition));
             AddSymbolKey(keys, CreateExactSummaryKey(methodSymbol));
+            AddSymbolKey(keys, CreateMetadataEffectSummaryKey(methodSymbol.OriginalDefinition));
+            AddSymbolKey(keys, CreateMetadataEffectSummaryKey(methodSymbol));
+            AddSymbolKey(keys, CreateMetadataExactSummaryKey(methodSymbol.OriginalDefinition));
+            AddSymbolKey(keys, CreateMetadataExactSummaryKey(methodSymbol));
+            AddSymbolKey(keys, CreatePositionalEffectSummaryKey(methodSymbol.OriginalDefinition));
+            AddSymbolKey(keys, CreatePositionalEffectSummaryKey(methodSymbol));
+            AddSymbolKey(keys, CreatePositionalExactSummaryKey(methodSymbol.OriginalDefinition));
+            AddSymbolKey(keys, CreatePositionalExactSummaryKey(methodSymbol));
+            AddSymbolKey(keys, CreateMetadataPositionalEffectSummaryKey(methodSymbol.OriginalDefinition));
+            AddSymbolKey(keys, CreateMetadataPositionalEffectSummaryKey(methodSymbol));
+            AddSymbolKey(keys, CreateMetadataPositionalExactSummaryKey(methodSymbol.OriginalDefinition));
+            AddSymbolKey(keys, CreateMetadataPositionalExactSummaryKey(methodSymbol));
 
             if (methodSymbol.IsGenericMethod)
             {
                 AddSymbolKey(keys, methodSymbol.ConstructedFrom.ToDisplayString());
                 AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol.ConstructedFrom));
                 AddSymbolKey(keys, CreateExactSummaryKey(methodSymbol.ConstructedFrom));
+                AddSymbolKey(keys, CreateMetadataEffectSummaryKey(methodSymbol.ConstructedFrom));
+                AddSymbolKey(keys, CreateMetadataExactSummaryKey(methodSymbol.ConstructedFrom));
+                AddSymbolKey(keys, CreatePositionalEffectSummaryKey(methodSymbol.ConstructedFrom));
+                AddSymbolKey(keys, CreatePositionalExactSummaryKey(methodSymbol.ConstructedFrom));
+                AddSymbolKey(keys, CreateMetadataPositionalEffectSummaryKey(methodSymbol.ConstructedFrom));
+                AddSymbolKey(keys, CreateMetadataPositionalExactSummaryKey(methodSymbol.ConstructedFrom));
             }
 
             return keys;
@@ -341,6 +363,199 @@ namespace PurelySharp.Analyzer
                 ? "void"
                 : methodSymbol.ReturnType.ToDisplayString(EffectSummaryParameterTypeFormat);
             return containingTypeName + "." + methodName + "(" + parameterList + ")->" + returnType;
+        }
+
+        private static string CreateMetadataEffectSummaryKey(IMethodSymbol methodSymbol)
+        {
+            return CreateMetadataSummaryKey(methodSymbol, includeReturnType: false, useOrdinalGenericParameters: false);
+        }
+
+        private static string CreateMetadataExactSummaryKey(IMethodSymbol methodSymbol)
+        {
+            return CreateMetadataSummaryKey(methodSymbol, includeReturnType: true, useOrdinalGenericParameters: false);
+        }
+
+        private static string CreatePositionalEffectSummaryKey(IMethodSymbol methodSymbol)
+        {
+            return CreatePositionalSummaryKey(methodSymbol, includeReturnType: false);
+        }
+
+        private static string CreatePositionalExactSummaryKey(IMethodSymbol methodSymbol)
+        {
+            return CreatePositionalSummaryKey(methodSymbol, includeReturnType: true);
+        }
+
+        private static string CreateMetadataPositionalEffectSummaryKey(IMethodSymbol methodSymbol)
+        {
+            return CreateMetadataSummaryKey(methodSymbol, includeReturnType: false, useOrdinalGenericParameters: true);
+        }
+
+        private static string CreateMetadataPositionalExactSummaryKey(IMethodSymbol methodSymbol)
+        {
+            return CreateMetadataSummaryKey(methodSymbol, includeReturnType: true, useOrdinalGenericParameters: true);
+        }
+
+        private static string CreatePositionalSummaryKey(IMethodSymbol methodSymbol, bool includeReturnType)
+        {
+            var containingTypeName = FormatSummaryType(methodSymbol.ContainingType, useOrdinalGenericParameters: true);
+            var methodName = methodSymbol.MethodKind == MethodKind.Constructor
+                ? ".ctor"
+                : methodSymbol.Name;
+            var parameterList = string.Join(
+                ", ",
+                methodSymbol.Parameters.Select(parameter => FormatSummaryParameter(parameter, useOrdinalGenericParameters: true)));
+            if (!includeReturnType)
+            {
+                return containingTypeName + "." + methodName + "(" + parameterList + ")";
+            }
+
+            var returnType = methodSymbol.MethodKind == MethodKind.Constructor
+                ? "void"
+                : FormatSummaryReturnType(methodSymbol, useOrdinalGenericParameters: true);
+            return containingTypeName + "." + methodName + "(" + parameterList + ")->" + returnType;
+        }
+
+        private static string CreateMetadataSummaryKey(
+            IMethodSymbol methodSymbol,
+            bool includeReturnType,
+            bool useOrdinalGenericParameters)
+        {
+            var containingTypeName = FormatSummaryType(
+                methodSymbol.ContainingType,
+                useOrdinalGenericParameters,
+                useMetadataTypeNames: true);
+            var methodName = methodSymbol.MethodKind == MethodKind.Constructor
+                ? ".ctor"
+                : methodSymbol.Name;
+            var parameterList = string.Join(
+                ", ",
+                methodSymbol.Parameters.Select(parameter => FormatSummaryParameter(
+                    parameter,
+                    useOrdinalGenericParameters,
+                    useMetadataTypeNames: true)));
+            if (!includeReturnType)
+            {
+                return containingTypeName + "." + methodName + "(" + parameterList + ")";
+            }
+
+            var returnType = methodSymbol.MethodKind == MethodKind.Constructor
+                ? "void"
+                : FormatSummaryReturnType(
+                    methodSymbol,
+                    useOrdinalGenericParameters,
+                    useMetadataTypeNames: true);
+            return containingTypeName + "." + methodName + "(" + parameterList + ")->" + returnType;
+        }
+
+        private static string FormatSummaryReturnType(
+            IMethodSymbol methodSymbol,
+            bool useOrdinalGenericParameters,
+            bool useMetadataTypeNames = false)
+        {
+            var returnType = FormatSummaryType(methodSymbol.ReturnType, useOrdinalGenericParameters, useMetadataTypeNames);
+            return PrefixRefKind(methodSymbol.ReturnsByRefReadonly ? RefKind.RefReadOnlyParameter :
+                methodSymbol.ReturnsByRef ? RefKind.Ref : RefKind.None) + returnType;
+        }
+
+        private static string FormatSummaryParameter(
+            IParameterSymbol parameter,
+            bool useOrdinalGenericParameters,
+            bool useMetadataTypeNames = false)
+        {
+            return PrefixRefKind(parameter.RefKind) +
+                FormatSummaryType(parameter.Type, useOrdinalGenericParameters, useMetadataTypeNames);
+        }
+
+        private static string PrefixRefKind(RefKind refKind)
+        {
+            return refKind switch
+            {
+                RefKind.Ref => "ref ",
+                RefKind.Out => "out ",
+                RefKind.In => "in ",
+                RefKind.RefReadOnlyParameter => "ref readonly ",
+                _ => string.Empty,
+            };
+        }
+
+        private static string FormatSummaryType(
+            ITypeSymbol typeSymbol,
+            bool useOrdinalGenericParameters,
+            bool useMetadataTypeNames = false)
+        {
+            switch (typeSymbol)
+            {
+                case IArrayTypeSymbol arrayType:
+                    return FormatSummaryType(arrayType.ElementType, useOrdinalGenericParameters, useMetadataTypeNames) +
+                        "[" + new string(',', Math.Max(arrayType.Rank, 1) - 1) + "]";
+                case IPointerTypeSymbol pointerType:
+                    return FormatSummaryType(pointerType.PointedAtType, useOrdinalGenericParameters, useMetadataTypeNames) + "*";
+                case ITypeParameterSymbol typeParameter:
+                    if (!useOrdinalGenericParameters)
+                    {
+                        return typeParameter.Name;
+                    }
+
+                    return typeParameter.TypeParameterKind == TypeParameterKind.Method
+                        ? "!!" + typeParameter.Ordinal
+                        : "!" + typeParameter.Ordinal;
+                case INamedTypeSymbol namedType when useMetadataTypeNames && namedType.SpecialType != SpecialType.None:
+                    return namedType.ToDisplayString(EffectSummaryParameterTypeFormat);
+                case INamedTypeSymbol namedType when namedType.IsTupleType && !useMetadataTypeNames:
+                    return namedType.ToDisplayString(EffectSummaryParameterTypeFormat);
+                case INamedTypeSymbol namedType:
+                    var typeName = useMetadataTypeNames
+                        ? GetMetadataGenericDefinitionName(namedType)
+                        : namedType.ConstructedFrom.ToDisplayString(EffectSummaryNonGenericContainingTypeFormat);
+                    var typeArguments = useMetadataTypeNames
+                        ? GetFlattenedTypeArguments(namedType)
+                        : namedType.TypeArguments;
+                    if (typeArguments.Length == 0)
+                    {
+                        return typeName;
+                    }
+
+                    var formattedTypeArguments = string.Join(
+                        ", ",
+                        typeArguments.Select(argument => FormatSummaryType(argument, useOrdinalGenericParameters, useMetadataTypeNames)));
+                    return typeName + "<" + formattedTypeArguments + ">";
+                default:
+                    return typeSymbol.ToDisplayString(EffectSummaryParameterTypeFormat);
+            }
+        }
+
+        private static string GetMetadataGenericDefinitionName(INamedTypeSymbol namedType)
+        {
+            var definition = namedType.ConstructedFrom;
+            if (definition.ContainingType != null)
+            {
+                return GetMetadataGenericDefinitionName(definition.ContainingType) + "+" + definition.MetadataName;
+            }
+
+            var containingNamespace = definition.ContainingNamespace?.ToDisplayString();
+            return string.IsNullOrWhiteSpace(containingNamespace)
+                ? definition.MetadataName
+                : containingNamespace + "." + definition.MetadataName;
+        }
+
+        private static ImmutableArray<ITypeSymbol> GetFlattenedTypeArguments(INamedTypeSymbol namedType)
+        {
+            var builder = ImmutableArray.CreateBuilder<ITypeSymbol>();
+            AppendFlattenedTypeArguments(namedType, builder);
+            return builder.ToImmutable();
+        }
+
+        private static void AppendFlattenedTypeArguments(INamedTypeSymbol namedType, ImmutableArray<ITypeSymbol>.Builder builder)
+        {
+            if (namedType.ContainingType != null)
+            {
+                AppendFlattenedTypeArguments(namedType.ContainingType, builder);
+            }
+
+            foreach (var typeArgument in namedType.TypeArguments)
+            {
+                builder.Add(typeArgument);
+            }
         }
 
         private static ActualMethodIdentity? TryResolveActualMethodIdentity(IMethodSymbol methodSymbol, Compilation compilation)
@@ -458,17 +673,36 @@ namespace PurelySharp.Analyzer
                 yield return effectSummaryKey;
             }
 
+            var positionalEffectSummaryKey = GetPositionalEffectSummaryLikeMethodSymbol(reader, handle);
+            if (!string.Equals(positionalEffectSummaryKey, raw, StringComparison.Ordinal) &&
+                !string.Equals(positionalEffectSummaryKey, effectSummaryKey, StringComparison.Ordinal))
+            {
+                yield return positionalEffectSummaryKey;
+            }
+
             var exactKey = GetExactMethodKey(reader, handle);
             if (!string.Equals(exactKey, raw, StringComparison.Ordinal) &&
-                !string.Equals(exactKey, effectSummaryKey, StringComparison.Ordinal))
+                !string.Equals(exactKey, effectSummaryKey, StringComparison.Ordinal) &&
+                !string.Equals(exactKey, positionalEffectSummaryKey, StringComparison.Ordinal))
             {
                 yield return exactKey;
+            }
+
+            var positionalExactKey = GetPositionalExactMethodKey(reader, handle);
+            if (!string.Equals(positionalExactKey, raw, StringComparison.Ordinal) &&
+                !string.Equals(positionalExactKey, effectSummaryKey, StringComparison.Ordinal) &&
+                !string.Equals(positionalExactKey, positionalEffectSummaryKey, StringComparison.Ordinal) &&
+                !string.Equals(positionalExactKey, exactKey, StringComparison.Ordinal))
+            {
+                yield return positionalExactKey;
             }
 
             var roslynDisplay = GetRoslynLikeMethodSymbol(reader, handle);
             if (!string.Equals(roslynDisplay, raw, StringComparison.Ordinal) &&
                 !string.Equals(roslynDisplay, effectSummaryKey, StringComparison.Ordinal) &&
-                !string.Equals(roslynDisplay, exactKey, StringComparison.Ordinal))
+                !string.Equals(roslynDisplay, positionalEffectSummaryKey, StringComparison.Ordinal) &&
+                !string.Equals(roslynDisplay, exactKey, StringComparison.Ordinal) &&
+                !string.Equals(roslynDisplay, positionalExactKey, StringComparison.Ordinal))
             {
                 yield return roslynDisplay;
             }
@@ -529,11 +763,37 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        private static string DecodePositionalMethodSignature(MetadataReader reader, MethodDefinition definition)
+        {
+            try
+            {
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
+                return "(" + string.Join(", ", signature.ParameterTypes) + ")";
+            }
+            catch (BadImageFormatException)
+            {
+                return "(?)";
+            }
+        }
+
         private static string DecodeExactMethodSignature(MetadataReader reader, MethodDefinition definition)
         {
             try
             {
                 var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), CreateGenericContext(reader, definition));
+                return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
+            }
+            catch (BadImageFormatException)
+            {
+                return "(?)->?";
+            }
+        }
+
+        private static string DecodePositionalExactMethodSignature(MetadataReader reader, MethodDefinition definition)
+        {
+            try
+            {
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
                 return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
             }
             catch (BadImageFormatException)
@@ -549,11 +809,25 @@ namespace PurelySharp.Analyzer
             return typeName + "." + reader.GetString(definition.Name) + DecodeMethodSignature(reader, definition);
         }
 
+        private static string GetPositionalEffectSummaryLikeMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
+        {
+            var definition = reader.GetMethodDefinition(handle);
+            var typeName = GetTypeName(reader, definition.GetDeclaringType());
+            return typeName + "." + reader.GetString(definition.Name) + DecodePositionalMethodSignature(reader, definition);
+        }
+
         private static string GetExactMethodKey(MetadataReader reader, MethodDefinitionHandle handle)
         {
             var definition = reader.GetMethodDefinition(handle);
             var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
             return typeName + "." + reader.GetString(definition.Name) + DecodeExactMethodSignature(reader, definition);
+        }
+
+        private static string GetPositionalExactMethodKey(MetadataReader reader, MethodDefinitionHandle handle)
+        {
+            var definition = reader.GetMethodDefinition(handle);
+            var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
+            return typeName + "." + reader.GetString(definition.Name) + DecodePositionalExactMethodSignature(reader, definition);
         }
 
         private static string NormalizeExactTypeName(string typeName)
@@ -738,13 +1012,12 @@ namespace PurelySharp.Analyzer
 
         private static string? TryResolveRuntimeImplementationAssemblyPath(IMethodSymbol methodSymbol)
         {
-            if (methodSymbol.ContainingType?.ContainingNamespace?.ToDisplayString().StartsWith("System", StringComparison.Ordinal) == true)
+            var coreLibPath = typeof(object).Assembly.Location;
+            if (!string.IsNullOrWhiteSpace(coreLibPath) &&
+                File.Exists(coreLibPath) &&
+                TryResolveMethodIdentityFromPath(methodSymbol, coreLibPath, out _))
             {
-                var coreLibPath = typeof(object).Assembly.Location;
-                if (!string.IsNullOrWhiteSpace(coreLibPath) && File.Exists(coreLibPath))
-                {
-                    return coreLibPath;
-                }
+                return coreLibPath;
             }
 
             var assemblyName = methodSymbol.ContainingAssembly?.Identity.Name;

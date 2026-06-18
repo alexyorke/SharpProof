@@ -31,9 +31,9 @@ public class TestClass
         // Split is allowed here because the mutable array result is consumed locally.
         var words = input.Split(' ')
             .Where(w => !string.IsNullOrEmpty(w))
-            .Select(w => w.Trim().ToLower())
+            .Select(w => w.Trim().ToLowerInvariant())
             .OrderBy(w => w.Length)
-            .ThenBy(w => w);
+            .ThenBy(w => w, StringComparer.Ordinal);
 
         return string.Join("" "", words);
     }
@@ -92,6 +92,44 @@ public class TestClass
     public bool {|PS0002:TestMethod|}(string input)
     {
         return input.StartsWith(""abc"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StringStartsWithStringComparisonOrdinal_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(string input)
+    {
+        return input.StartsWith(""abc"", StringComparison.Ordinal);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StringStartsWithStringComparisonCurrentCulture_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool {|PS0002:TestMethod|}(string input)
+    {
+        return input.StartsWith(""abc"", StringComparison.CurrentCulture);
     }
 }";
 
@@ -231,7 +269,7 @@ public class TestClass
     [EnforcePure]
     public string TestMethod(int x, string y)
     {
-        return $""Value: {x}, Text: {y.ToUpper()}"";
+        return $""Value: {x}, Text: {y.ToUpperInvariant()}"";
     }
 }";
 
@@ -552,7 +590,26 @@ public class TestClass
         }
 
         [Test]
-        public async Task StringContains_String_Diagnostic()
+        public async Task StringContains_String_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(string value, string search)
+    {
+        return value.Contains(search);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StringContains_StringComparisonCurrentCulture_Diagnostic()
         {
             var test = @"
 using System;
@@ -563,7 +620,7 @@ public class TestClass
     [EnforcePure]
     public bool {|PS0002:TestMethod|}(string value, string search)
     {
-        return value.Contains(search);
+        return value.Contains(search, StringComparison.CurrentCulture);
     }
 }";
 

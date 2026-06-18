@@ -62,11 +62,25 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void PathHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        public void GeneratedPathHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
             {
                 "System.IO.Path.Combine(string, string)",
+                "System.IO.Path.HasExtension(string)",
+            };
+
+            foreach (var member in members)
+            {
+                Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(member));
+            }
+        }
+
+        [Test]
+        public void UnresolvedPathWrappers_AreNotBackedByStaticCatalogs()
+        {
+            var members = new[]
+            {
                 "System.IO.Path.ChangeExtension(string, string)",
                 "System.IO.Path.ChangeExtension(string?, string?)",
                 "System.IO.Path.GetDirectoryName(string)",
@@ -83,7 +97,7 @@ namespace PurelySharp.Test
 
             foreach (var member in members)
             {
-                Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(member));
+                AssertNotInManualCatalogs(member);
             }
         }
 
@@ -793,10 +807,13 @@ public static class DateTimeCatalogSignatureSamples
 
         private static string GetInvocationSignature(Compilation compilation, SyntaxTree syntaxTree, string expressionText)
         {
-            var invocation = syntaxTree.GetRoot()
+            var invocations = syntaxTree.GetRoot()
                 .DescendantNodes()
                 .OfType<InvocationExpressionSyntax>()
-                .Single(node => node.ToString() == expressionText);
+                .Where(node => node.ToString() == expressionText)
+                .ToArray();
+            Assert.That(invocations, Is.Not.Empty, "Invocation should exist: " + expressionText);
+            var invocation = invocations[^1];
             var symbol = compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol;
             Assert.That(symbol, Is.Not.Null, "Invocation should resolve: " + expressionText);
             return symbol!.OriginalDefinition.ToDisplayString();

@@ -263,6 +263,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            if (IsSourceAutoPropertySetter(propertyReference.Property))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             if (IsPotentiallyDispatchedSetter(setter))
             {
                 return CheckDispatchedSetterPurity(propertyReference, context, currentState);
@@ -272,6 +277,38 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return setterResult.IsPure
                 ? PurityAnalysisEngine.PurityAnalysisResult.Pure
                 : setterResult.WithCallee(setter.OriginalDefinition, targetOperation.Syntax);
+        }
+
+        private static bool IsSourceAutoPropertySetter(IPropertySymbol propertySymbol)
+        {
+            if (propertySymbol.SetMethod == null ||
+                propertySymbol.SetMethod.IsAbstract ||
+                propertySymbol.ContainingType?.TypeKind == TypeKind.Interface)
+            {
+                return false;
+            }
+
+            foreach (var syntaxReference in propertySymbol.DeclaringSyntaxReferences)
+            {
+                if (syntaxReference.GetSyntax() is not PropertyDeclarationSyntax propertyDeclaration ||
+                    propertyDeclaration.AccessorList == null)
+                {
+                    continue;
+                }
+
+                var setterAccessor = propertyDeclaration.AccessorList.Accessors
+                    .FirstOrDefault(accessor =>
+                        accessor.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.SetAccessorDeclaration) ||
+                        accessor.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.InitAccessorDeclaration));
+                if (setterAccessor != null &&
+                    setterAccessor.Body == null &&
+                    setterAccessor.ExpressionBody == null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsPotentiallyDispatchedSetter(IMethodSymbol setterSymbol)

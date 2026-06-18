@@ -619,6 +619,19 @@ internal static class AssemblyEffectSummarizer
             return true;
         }
 
+        if (fields.All(static field =>
+            string.Equals(field, "System.StringComparer._ordinal", StringComparison.Ordinal) ||
+            string.Equals(field, "System.StringComparer._ordinalIgnoreCase", StringComparison.Ordinal) ||
+            string.Equals(field, "System.StringComparer._invariantCulture", StringComparison.Ordinal) ||
+            string.Equals(field, "System.StringComparer._invariantCultureIgnoreCase", StringComparison.Ordinal) ||
+            string.Equals(field, "System.OrdinalCaseSensitiveComparer.Instance", StringComparison.Ordinal) ||
+            string.Equals(field, "System.OrdinalIgnoreCaseComparer.Instance", StringComparison.Ordinal) ||
+            string.Equals(field, "System.CultureAwareComparer.InvariantCaseSensitiveInstance", StringComparison.Ordinal) ||
+            string.Equals(field, "System.CultureAwareComparer.InvariantIgnoreCaseInstance", StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
         return calls.Count == 1 && calls.Any(static call =>
             call.StartsWith("System.ReadOnlySpan`1<byte>..ctor(void*, int)", StringComparison.Ordinal));
     }
@@ -737,7 +750,9 @@ internal static class AssemblyEffectSummarizer
                     effects.Add("calls_method");
                 }
 
-                if (opCode == OpCodes.Callvirt)
+                if (opCode == OpCodes.Callvirt &&
+                    operandToken is not null &&
+                    ShouldTreatCallvirtAsDynamicDispatch(reader, operandToken.Value))
                 {
                     effects.Add("virtual_call");
                 }
@@ -1271,7 +1286,47 @@ internal static class AssemblyEffectSummarizer
     private static string GetFieldDefinitionSymbol(MetadataReader reader, FieldDefinitionHandle handle)
     {
         var definition = reader.GetFieldDefinition(handle);
-        return reader.GetString(definition.Name);
+        var typeName = GetTypeName(reader, definition.GetDeclaringType());
+        return $"{typeName}.{reader.GetString(definition.Name)}";
+    }
+
+    private static bool ShouldTreatCallvirtAsDynamicDispatch(MetadataReader reader, int token)
+    {
+        var handle = MetadataTokens.Handle(token);
+        return handle.Kind switch
+        {
+            HandleKind.MethodDefinition => IsVirtualDispatchCandidate(reader, (MethodDefinitionHandle)handle),
+            HandleKind.MethodSpecification => IsVirtualDispatchCandidate(reader, (MethodSpecificationHandle)handle),
+            _ => true,
+        };
+    }
+
+    private static bool IsVirtualDispatchCandidate(MetadataReader reader, MethodSpecificationHandle handle)
+    {
+        var specification = reader.GetMethodSpecification(handle);
+        return specification.Method.Kind switch
+        {
+            HandleKind.MethodDefinition => IsVirtualDispatchCandidate(reader, (MethodDefinitionHandle)specification.Method),
+            _ => true,
+        };
+    }
+
+    private static bool IsVirtualDispatchCandidate(MetadataReader reader, MethodDefinitionHandle handle)
+    {
+        var definition = reader.GetMethodDefinition(handle);
+        var attributes = definition.Attributes;
+        if ((attributes & System.Reflection.MethodAttributes.Virtual) == 0)
+        {
+            return false;
+        }
+
+        if ((attributes & System.Reflection.MethodAttributes.Final) != 0)
+        {
+            return false;
+        }
+
+        var declaringType = reader.GetTypeDefinition(definition.GetDeclaringType());
+        return (declaringType.Attributes & System.Reflection.TypeAttributes.Sealed) == 0;
     }
 
     private static string GetMemberReferenceSymbol(MetadataReader reader, MemberReferenceHandle handle)

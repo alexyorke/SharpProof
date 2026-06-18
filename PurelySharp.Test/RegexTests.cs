@@ -57,7 +57,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task Regex_EscapeAndUnescape_Static_NoDiagnostic()
+        public async Task Regex_EscapeAndUnescape_Static_Diagnostic()
         {
             var test = @"
 using System;
@@ -67,7 +67,7 @@ using System.Text.RegularExpressions;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod(string input)
+    public string {|PS0002:TestMethod|}(string input)
     {
         return Regex.Unescape(Regex.Escape(input));
     }

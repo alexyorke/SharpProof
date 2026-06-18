@@ -230,7 +230,7 @@ public record User
     public required string {|PS0004:Email|} { get; init; }
 
     [SetsRequiredMembers]
-    public {|PS0004:User|}(string name, string email)
+    public User(string name, string email)
     {
         Name = name;
         Email = email;
@@ -288,7 +288,7 @@ public class UserProfile
     public int {|PS0004:Age|} { get; set; }
 
     [SetsRequiredMembers]
-    public {|PS0004:UserProfile|}(string username)
+    public UserProfile(string username)
     {
         Username = username;
     }
@@ -400,7 +400,7 @@ public class Product
     public required decimal {|PS0004:Price|} { get; init; }
 
     [SetsRequiredMembers]
-    public {|PS0004:Product|}(int id, string name, decimal price)
+    public Product(int id, string name, decimal price)
     {
         Id = id;
         Name = name;
@@ -442,7 +442,7 @@ public struct Point
     public required double {|PS0004:Y|} { get; init; }
 
     [EnforcePure]
-    public double CalculateDistance()
+    public double {|PS0002:CalculateDistance|}()
     {
         return Math.Sqrt(X * X + Y * Y);
     }

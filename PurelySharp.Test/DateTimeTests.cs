@@ -179,7 +179,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public DateTime TestMethod(DateTime value)
+    public long TestMethod(DateTime value)
     {
         return value.ToBinary();
     }
