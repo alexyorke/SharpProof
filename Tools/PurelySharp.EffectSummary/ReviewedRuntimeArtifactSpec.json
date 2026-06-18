@@ -75,7 +75,10 @@
       "SymbolPrefixes": [
         "System.Environment.get_NewLine",
         "System.Environment.get_Is64BitProcess",
-        "System.Environment.get_Is64BitOperatingSystem"
+        "System.Environment.get_Is64BitOperatingSystem",
+        "System.Environment.get_CurrentDirectory",
+        "System.Environment.set_CurrentDirectory",
+        "System.Environment.GetFolderPath"
       ]
     },
     {

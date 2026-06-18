@@ -3266,6 +3266,52 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeEnvironmentPathStateSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                80,
+                "System.Environment.get_CurrentDirectory",
+                "System.Environment.set_CurrentDirectory",
+                "System.Environment.GetFolderPath");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Environment.get_CurrentDirectory()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_CurrentDirectory()", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.set_CurrentDirectory(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Environment.set_CurrentDirectory(string)", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.GetFolderPath(System.Environment+SpecialFolder)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Environment.GetFolderPath(System.Environment+SpecialFolder)", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.GetFolderPath(System.Environment+SpecialFolder, System.Environment+SpecialFolderOption)", "impure", "impure_callee", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Environment.GetFolderPath(System.Environment+SpecialFolder, System.Environment+SpecialFolderOption)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Environment.get_CurrentDirectory()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.set_CurrentDirectory(string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.GetFolderPath(System.Environment+SpecialFolder)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.GetFolderPath(System.Environment+SpecialFolder, System.Environment+SpecialFolderOption)", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Environment.GetFolderPath(System.Environment+SpecialFolder)",
+                "System.Environment.GetFolderPath(System.Environment+SpecialFolder, System.Environment+SpecialFolderOption)",
+                "System.Environment.get_CurrentDirectory()",
+                "System.Environment.set_CurrentDirectory(string)",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeTimeProviderAndTimeZoneInfoSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

@@ -120,6 +120,33 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void EnvironmentPathStateHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+
+public static class EnvironmentCatalogSignatureSamples
+{
+    public static string Sample()
+    {
+        _ = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.None);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "EnvironmentCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs("System.Environment.CurrentDirectory.get");
+            AssertNotInManualCatalogs("System.Environment.CurrentDirectory.set");
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.None)"));
+        }
+
+        [Test]
         public void WebUtilityHelpers_AreNotBackedByStaticCatalogs()
         {
             var members = new[]
