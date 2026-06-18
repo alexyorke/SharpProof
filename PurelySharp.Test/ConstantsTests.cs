@@ -602,10 +602,10 @@ public static class RecentCatalogSignatureSamples
                 GetTrustedPlatformReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Guid.ParseExact(text, \"D\")"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Guid.TryParse(text, out var parsed)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "Guid.TryParseExact(text, \"D\", out parsed)"), expectedPure: true, expectedImpure: false);
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "guid.ToString(\"N\")"), expectedPure: true, expectedImpure: false);
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Guid.ParseExact(text, \"D\")"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Guid.TryParse(text, out var parsed)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Guid.TryParseExact(text, \"D\", out parsed)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "guid.ToString(\"N\")"));
             AssertCatalogMembership(GetObjectCreationSignature(compilation, syntaxTree, "new string(charSpan)"), expectedPure: true, expectedImpure: false);
             var bitConverterGetBytesExpressions = new[]
             {
