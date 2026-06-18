@@ -395,7 +395,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     }
 
                     if (argument.Parameter.RefKind == RefKind.Out &&
-                        ((hasTrustedGeneratedPurity && generatedPurity.IsPure) ||
+                        (hasTrustedGeneratedPurity ||
                          (allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol)) ||
                          IsSemanticallyPureOutArgumentMethod(originalDefinitionSymbol) ||
                          IsDispatchAnalyzedOutArgumentMethod(invokedMethodSymbol)))

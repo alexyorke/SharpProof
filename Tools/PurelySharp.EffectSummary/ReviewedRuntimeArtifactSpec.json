@@ -143,7 +143,8 @@
         "System.Collections.Generic.Dictionary`2.ContainsKey",
         "System.Collections.Generic.HashSet`1.Contains",
         "System.Collections.Generic.Queue`1.Contains",
-        "System.Collections.Generic.Queue`1.Peek"
+        "System.Collections.Generic.Queue`1.Peek",
+        "System.Collections.Generic.Queue`1.TryPeek"
       ]
     },
     {

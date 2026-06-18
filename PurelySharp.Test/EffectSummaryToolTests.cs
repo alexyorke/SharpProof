@@ -3050,7 +3050,8 @@ public static class PurityFixture
                 "System.Collections.Generic.Dictionary`2.ContainsKey",
                 "System.Collections.Generic.HashSet`1.Contains",
                 "System.Collections.Generic.Queue`1.Contains",
-                "System.Collections.Generic.Queue`1.Peek");
+                "System.Collections.Generic.Queue`1.Peek",
+                "System.Collections.Generic.Queue`1.TryPeek");
             using var stackSummary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Collections.dll",
                 80,
@@ -3078,6 +3079,8 @@ public static class PurityFixture
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Queue`1.Contains(!0)", "none");
             AssertPurityClassification(summary, "System.Collections.Generic.Queue`1.Peek()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Queue`1.Peek()", "none");
+            AssertPurityClassification(summary, "System.Collections.Generic.Queue`1.TryPeek(ref !0)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Queue`1.TryPeek(ref !0)", "caller_visible");
             AssertPurityClassification(stackSummary, "System.Collections.Generic.Stack`1.Contains(!0)", "pure");
             AssertEffectVisibilityClassification(stackSummary, "System.Collections.Generic.Stack`1.Contains(!0)", "none");
             AssertPurityClassification(stackSummary, "System.Collections.Generic.Stack`1.Peek()", "pure");
@@ -3095,6 +3098,7 @@ public static class PurityFixture
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.HashSet`1.Contains(!0)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Queue`1.Contains(!0)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Queue`1.Peek()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Queue`1.TryPeek(ref !0)"));
 
             var stackGeneratedSymbols = stackSummary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")

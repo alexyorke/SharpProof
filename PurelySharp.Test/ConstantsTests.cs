@@ -188,6 +188,7 @@ public static class MutableCollectionCatalogSignatureSamples
         _ = set.Contains(value);
         _ = queue.Contains(value);
         _ = queue.Peek();
+        _ = queue.TryPeek(out value);
         _ = stack.Contains(value);
         _ = stack.Peek();
         _ = list.BinarySearch(value);
@@ -207,6 +208,7 @@ public static class MutableCollectionCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "set.Contains(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "queue.Contains(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "queue.Peek()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "queue.TryPeek(out value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "stack.Contains(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "stack.Peek()"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "list.BinarySearch(value)"));

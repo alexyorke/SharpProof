@@ -342,7 +342,27 @@ namespace PurelySharp.Analyzer
         {
             if (!string.IsNullOrWhiteSpace(value))
             {
-                keys.Add(value.Trim());
+                var trimmed = value.Trim();
+                keys.Add(trimmed);
+
+                foreach (var compatibilityKey in GetMetadataRefKindCompatibilityKeys(trimmed))
+                {
+                    keys.Add(compatibilityKey);
+                }
+            }
+        }
+
+        private static IEnumerable<string> GetMetadataRefKindCompatibilityKeys(string key)
+        {
+            if (key.Contains("out ", StringComparison.Ordinal))
+            {
+                yield return key.Replace("out ", "ref ");
+            }
+
+            if (key.Contains("ref ", StringComparison.Ordinal) &&
+                !key.Contains("ref readonly ", StringComparison.Ordinal))
+            {
+                yield return key.Replace("ref ", "out ");
             }
         }
 
