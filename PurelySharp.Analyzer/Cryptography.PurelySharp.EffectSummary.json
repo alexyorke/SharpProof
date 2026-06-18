@@ -1,0 +1,2168 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-18T00:37:24.1690684+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.Security.Cryptography",
+      "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+      "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+      "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+      "MethodCount": 4857,
+      "EmittedMethodCount": 35,
+      "Methods": [
+        {
+          "Symbol": "System.Security.Cryptography.MD5.HashData(byte[])",
+          "ExactSymbolKey": "System.Security.Cryptography.MD5.HashData(byte[])-\u003Ebyte[]",
+          "MetadataToken": "0x060007AE",
+          "RelativeVirtualAddress": 1146964,
+          "MethodBodySha256": "32fb9e79c8ffea185c3e517c9d0daa4f52b036fa681857fc61ce4e7c2c16e9d9",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060007AE|il:32fb9e79c8ffea185c3e517c9d0daa4f52b036fa681857fc61ce4e7c2c16e9d9",
+          "Effects": [
+            "allocates_object",
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.ReadOnlySpan\u00601\u003Cbyte\u003E..ctor(!0[])-\u003Evoid",
+            "System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_array_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]",
+          "MetadataToken": "0x060007AF",
+          "RelativeVirtualAddress": 1146988,
+          "MethodBodySha256": "a980d87192eb7409fb8af411d57d8c1cca63953f1c7e16a08fa3bdcbdef39bc1",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060007AF|il:a980d87192eb7409fb8af411d57d8c1cca63953f1c7e16a08fa3bdcbdef39bc1",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.GC.AllocateUninitializedArray(int, bool)-\u003E!!0[]",
+            "System.MemoryExtensions.AsSpan(!!0[])-\u003ESystem.Span\u00601\u003C!!0\u003E",
+            "System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_array_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+          "MetadataToken": "0x060007B0",
+          "RelativeVirtualAddress": 1147024,
+          "MethodBodySha256": "7d18c9aee5236a9f865a8dd312c16c65eb109188a30fb5e2bd3f15ecba47b89f",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060007B0|il:7d18c9aee5236a9f865a8dd312c16c65eb109188a30fb5e2bd3f15ecba47b89f",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws"
+          ],
+          "RootCandidates": [
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.Security.Cryptography.MD5.TryHashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E, ref int)-\u003Ebool"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.MD5.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.MD5.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+          "MetadataToken": "0x060007B2",
+          "RelativeVirtualAddress": 1147104,
+          "MethodBodySha256": "337a205ca3ba866fbb692e98256111e7c3af9fc9d1b049451d48325c63773a6e",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060007B2|il:337a205ca3ba866fbb692e98256111e7c3af9fc9d1b049451d48325c63773a6e",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStream(string, System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+            "System.Span\u00601\u003Cbyte\u003E.get_Length()-\u003Eint"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.MD5.HashData(System.IO.Stream)",
+          "ExactSymbolKey": "System.Security.Cryptography.MD5.HashData(System.IO.Stream)-\u003Ebyte[]",
+          "MetadataToken": "0x060007B3",
+          "RelativeVirtualAddress": 1147192,
+          "MethodBodySha256": "75dfc4b06288aad1c18bca3b0446fac33206ab2d049090ccfc408983a822326d",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060007B3|il:75dfc4b06288aad1c18bca3b0446fac33206ab2d049090ccfc408983a822326d",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStream(string, int, System.IO.Stream)-\u003Ebyte[]"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.MD5.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Security.Cryptography.MD5.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E",
+          "MetadataToken": "0x060007B4",
+          "RelativeVirtualAddress": 1147244,
+          "MethodBodySha256": "4a67cd9f280fa6dfc0d8ccb404372cdc8798f78be150be074baa2eee83562c2a",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060007B4|il:4a67cd9f280fa6dfc0d8ccb404372cdc8798f78be150be074baa2eee83562c2a",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStreamAsync(string, System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.MD5.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Security.Cryptography.MD5.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E",
+          "MetadataToken": "0x060007B5",
+          "RelativeVirtualAddress": 1147296,
+          "MethodBodySha256": "6d3908a5794fd35fa50dfcb5f831191d7e937de2ef8fe1ef65f129c5784dbfc4",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060007B5|il:6d3908a5794fd35fa50dfcb5f831191d7e937de2ef8fe1ef65f129c5784dbfc4",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.Memory\u00601\u003Cbyte\u003E.get_Length()-\u003Eint",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStreamAsync(string, System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA1.HashData(byte[])",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA1.HashData(byte[])-\u003Ebyte[]",
+          "MetadataToken": "0x0600096A",
+          "RelativeVirtualAddress": 1170952,
+          "MethodBodySha256": "8aa6fd39d4cf47ec51099fc0ecd486bbcd90eb22eaa29d2b013316ecdde2e103",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600096A|il:8aa6fd39d4cf47ec51099fc0ecd486bbcd90eb22eaa29d2b013316ecdde2e103",
+          "Effects": [
+            "allocates_object",
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.ReadOnlySpan\u00601\u003Cbyte\u003E..ctor(!0[])-\u003Evoid",
+            "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_array_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]",
+          "MetadataToken": "0x0600096B",
+          "RelativeVirtualAddress": 1170976,
+          "MethodBodySha256": "c82677a306eda3850b3875129379afc5dadb120dfe9c2ab768946ed2c2bab4fe",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600096B|il:c82677a306eda3850b3875129379afc5dadb120dfe9c2ab768946ed2c2bab4fe",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.GC.AllocateUninitializedArray(int, bool)-\u003E!!0[]",
+            "System.MemoryExtensions.AsSpan(!!0[])-\u003ESystem.Span\u00601\u003C!!0\u003E",
+            "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_array_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+          "MetadataToken": "0x0600096C",
+          "RelativeVirtualAddress": 1171012,
+          "MethodBodySha256": "95e29e42d5035160a0c5a97926a11c9538ece853891459bcc949fe931dca81d4",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600096C|il:95e29e42d5035160a0c5a97926a11c9538ece853891459bcc949fe931dca81d4",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws"
+          ],
+          "RootCandidates": [
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.Security.Cryptography.SHA1.TryHashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E, ref int)-\u003Ebool"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA1.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA1.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+          "MetadataToken": "0x0600096E",
+          "RelativeVirtualAddress": 1171092,
+          "MethodBodySha256": "8ec93061e0298584628621673b681fc7c0783b75a68dc4761119a23285ab371a",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600096E|il:8ec93061e0298584628621673b681fc7c0783b75a68dc4761119a23285ab371a",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStream(string, System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+            "System.Span\u00601\u003Cbyte\u003E.get_Length()-\u003Eint"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA1.HashData(System.IO.Stream)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA1.HashData(System.IO.Stream)-\u003Ebyte[]",
+          "MetadataToken": "0x0600096F",
+          "RelativeVirtualAddress": 1171180,
+          "MethodBodySha256": "a6d4238cba20a477bce19665f4b96e8e87fb7c681ae9a89f9ba382d064aaf880",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600096F|il:a6d4238cba20a477bce19665f4b96e8e87fb7c681ae9a89f9ba382d064aaf880",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStream(string, int, System.IO.Stream)-\u003Ebyte[]"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA1.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA1.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E",
+          "MetadataToken": "0x06000970",
+          "RelativeVirtualAddress": 1171232,
+          "MethodBodySha256": "9dbee08fc5c61234a049bc27b2380ed600200441db62275e6027e134ea24b488",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x06000970|il:9dbee08fc5c61234a049bc27b2380ed600200441db62275e6027e134ea24b488",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStreamAsync(string, System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA1.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA1.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E",
+          "MetadataToken": "0x06000971",
+          "RelativeVirtualAddress": 1171284,
+          "MethodBodySha256": "1434ffb4ef94a8522258f7270bff6ae888f8f004fe3a8319a228ed53eafb07a0",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x06000971|il:1434ffb4ef94a8522258f7270bff6ae888f8f004fe3a8319a228ed53eafb07a0",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.Memory\u00601\u003Cbyte\u003E.get_Length()-\u003Eint",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStreamAsync(string, System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA256.HashData(byte[])",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA256.HashData(byte[])-\u003Ebyte[]",
+          "MetadataToken": "0x0600098A",
+          "RelativeVirtualAddress": 1171932,
+          "MethodBodySha256": "7722f1d8c1120375c7f6bfbc591ca17d62651642bbc247b8d6495d520d2c307c",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600098A|il:7722f1d8c1120375c7f6bfbc591ca17d62651642bbc247b8d6495d520d2c307c",
+          "Effects": [
+            "allocates_object",
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.ReadOnlySpan\u00601\u003Cbyte\u003E..ctor(!0[])-\u003Evoid",
+            "System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_array_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]",
+          "MetadataToken": "0x0600098B",
+          "RelativeVirtualAddress": 1171956,
+          "MethodBodySha256": "199191d37f122ce809033f28ea12b1eef40d02aef939116a19618ec4bc12f435",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600098B|il:199191d37f122ce809033f28ea12b1eef40d02aef939116a19618ec4bc12f435",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.GC.AllocateUninitializedArray(int, bool)-\u003E!!0[]",
+            "System.MemoryExtensions.AsSpan(!!0[])-\u003ESystem.Span\u00601\u003C!!0\u003E",
+            "System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_array_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+          "MetadataToken": "0x0600098C",
+          "RelativeVirtualAddress": 1171992,
+          "MethodBodySha256": "4aeca00aaf5b3f77662fa91d0a52f653199fabf5c90a2c7c3ac6ed5555908199",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600098C|il:4aeca00aaf5b3f77662fa91d0a52f653199fabf5c90a2c7c3ac6ed5555908199",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws"
+          ],
+          "RootCandidates": [
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.Security.Cryptography.SHA256.TryHashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E, ref int)-\u003Ebool"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA256.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA256.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+          "MetadataToken": "0x0600098E",
+          "RelativeVirtualAddress": 1172072,
+          "MethodBodySha256": "f25c68e6a2f4fbdeb76d00ad1ee7945cd799efadab0889764467fb4c66b15f4c",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600098E|il:f25c68e6a2f4fbdeb76d00ad1ee7945cd799efadab0889764467fb4c66b15f4c",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStream(string, System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+            "System.Span\u00601\u003Cbyte\u003E.get_Length()-\u003Eint"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA256.HashData(System.IO.Stream)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA256.HashData(System.IO.Stream)-\u003Ebyte[]",
+          "MetadataToken": "0x0600098F",
+          "RelativeVirtualAddress": 1172160,
+          "MethodBodySha256": "d87b843397514ced669bcf7a6c0a053e99f2df558e967f662b87471ca4c0f8b8",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600098F|il:d87b843397514ced669bcf7a6c0a053e99f2df558e967f662b87471ca4c0f8b8",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStream(string, int, System.IO.Stream)-\u003Ebyte[]"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA256.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA256.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E",
+          "MetadataToken": "0x06000990",
+          "RelativeVirtualAddress": 1172212,
+          "MethodBodySha256": "55f54e79d8297c9599c8c00fe131486226f83180f881d92c9ecb9375990be7b0",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x06000990|il:55f54e79d8297c9599c8c00fe131486226f83180f881d92c9ecb9375990be7b0",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStreamAsync(string, System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA256.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA256.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E",
+          "MetadataToken": "0x06000991",
+          "RelativeVirtualAddress": 1172264,
+          "MethodBodySha256": "67cdee8e8d413283af359ca72859b40c373d2c6390f5444f77cda1e54e571a02",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x06000991|il:67cdee8e8d413283af359ca72859b40c373d2c6390f5444f77cda1e54e571a02",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.Memory\u00601\u003Cbyte\u003E.get_Length()-\u003Eint",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStreamAsync(string, System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA384.HashData(byte[])",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA384.HashData(byte[])-\u003Ebyte[]",
+          "MetadataToken": "0x060009AA",
+          "RelativeVirtualAddress": 1172912,
+          "MethodBodySha256": "9dcbd36d5b36fc59b9d7d1e46c144852fd2e9147a9f8661dc23e650a3ce3381c",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009AA|il:9dcbd36d5b36fc59b9d7d1e46c144852fd2e9147a9f8661dc23e650a3ce3381c",
+          "Effects": [
+            "allocates_object",
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.ReadOnlySpan\u00601\u003Cbyte\u003E..ctor(!0[])-\u003Evoid",
+            "System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_array_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]",
+          "MetadataToken": "0x060009AB",
+          "RelativeVirtualAddress": 1172936,
+          "MethodBodySha256": "f490845a99d4c1dd2b55686807cf9757e13cfd1316473d76b7db4034a9933b27",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009AB|il:f490845a99d4c1dd2b55686807cf9757e13cfd1316473d76b7db4034a9933b27",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.GC.AllocateUninitializedArray(int, bool)-\u003E!!0[]",
+            "System.MemoryExtensions.AsSpan(!!0[])-\u003ESystem.Span\u00601\u003C!!0\u003E",
+            "System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_array_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+          "MetadataToken": "0x060009AC",
+          "RelativeVirtualAddress": 1172972,
+          "MethodBodySha256": "9e812a4166d21b34ea6db09f6e5c855be5e248df17b1a6ea95f33f26b01f0102",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009AC|il:9e812a4166d21b34ea6db09f6e5c855be5e248df17b1a6ea95f33f26b01f0102",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws"
+          ],
+          "RootCandidates": [
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.Security.Cryptography.SHA384.TryHashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E, ref int)-\u003Ebool"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA384.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA384.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+          "MetadataToken": "0x060009AE",
+          "RelativeVirtualAddress": 1173052,
+          "MethodBodySha256": "2ef59d8370140e780992e279c824fe6160fe6295fb1128774f44f0510d0dbcc8",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009AE|il:2ef59d8370140e780992e279c824fe6160fe6295fb1128774f44f0510d0dbcc8",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStream(string, System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+            "System.Span\u00601\u003Cbyte\u003E.get_Length()-\u003Eint"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA384.HashData(System.IO.Stream)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA384.HashData(System.IO.Stream)-\u003Ebyte[]",
+          "MetadataToken": "0x060009AF",
+          "RelativeVirtualAddress": 1173140,
+          "MethodBodySha256": "b2081452433d87a896d7c04362b4b56c8405cb6213e941d3572a908c21f82d24",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009AF|il:b2081452433d87a896d7c04362b4b56c8405cb6213e941d3572a908c21f82d24",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStream(string, int, System.IO.Stream)-\u003Ebyte[]"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA384.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA384.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E",
+          "MetadataToken": "0x060009B0",
+          "RelativeVirtualAddress": 1173192,
+          "MethodBodySha256": "3af4f33545d49968e2513a9e2d38817a6889bbddbf1c0694609d907ac0408d00",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009B0|il:3af4f33545d49968e2513a9e2d38817a6889bbddbf1c0694609d907ac0408d00",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStreamAsync(string, System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA384.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA384.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E",
+          "MetadataToken": "0x060009B1",
+          "RelativeVirtualAddress": 1173244,
+          "MethodBodySha256": "c179f902f5bdb9899609f38719708b52685818eba216ae9e59bd7d555dabd2bb",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009B1|il:c179f902f5bdb9899609f38719708b52685818eba216ae9e59bd7d555dabd2bb",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.Memory\u00601\u003Cbyte\u003E.get_Length()-\u003Eint",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStreamAsync(string, System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA512.HashData(byte[])",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA512.HashData(byte[])-\u003Ebyte[]",
+          "MetadataToken": "0x060009CA",
+          "RelativeVirtualAddress": 1173892,
+          "MethodBodySha256": "4b1e03c28a4f5894862a4818527942b1b84c88b44aaf27e9b29a10db901c53a4",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009CA|il:4b1e03c28a4f5894862a4818527942b1b84c88b44aaf27e9b29a10db901c53a4",
+          "Effects": [
+            "allocates_object",
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.ReadOnlySpan\u00601\u003Cbyte\u003E..ctor(!0[])-\u003Evoid",
+            "System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_array_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]",
+          "MetadataToken": "0x060009CB",
+          "RelativeVirtualAddress": 1173916,
+          "MethodBodySha256": "fdb647d60a7bbca5229b8a358e4bb529d9ecbab638f11085dc77e206756d5564",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009CB|il:fdb647d60a7bbca5229b8a358e4bb529d9ecbab638f11085dc77e206756d5564",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.GC.AllocateUninitializedArray(int, bool)-\u003E!!0[]",
+            "System.MemoryExtensions.AsSpan(!!0[])-\u003ESystem.Span\u00601\u003C!!0\u003E",
+            "System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_array_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+          "MetadataToken": "0x060009CC",
+          "RelativeVirtualAddress": 1173952,
+          "MethodBodySha256": "058969ae8110cb87154b35789d065064379851acff114fac8535eabe0d5fbd34",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009CC|il:058969ae8110cb87154b35789d065064379851acff114fac8535eabe0d5fbd34",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws"
+          ],
+          "RootCandidates": [
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.Security.Cryptography.SHA512.TryHashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E, ref int)-\u003Ebool"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA512.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA512.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+          "MetadataToken": "0x060009CE",
+          "RelativeVirtualAddress": 1174032,
+          "MethodBodySha256": "81220ec23e1f3b37d79fbf868cbd586b27aabf3329ffb2fb37801482839656c1",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009CE|il:81220ec23e1f3b37d79fbf868cbd586b27aabf3329ffb2fb37801482839656c1",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStream(string, System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+            "System.Span\u00601\u003Cbyte\u003E.get_Length()-\u003Eint"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA512.HashData(System.IO.Stream)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA512.HashData(System.IO.Stream)-\u003Ebyte[]",
+          "MetadataToken": "0x060009CF",
+          "RelativeVirtualAddress": 1174120,
+          "MethodBodySha256": "e9e999713a74ff6df8376057efbf0be14cdb9cc19c95e837dda334f8e0078b3e",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009CF|il:e9e999713a74ff6df8376057efbf0be14cdb9cc19c95e837dda334f8e0078b3e",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStream(string, int, System.IO.Stream)-\u003Ebyte[]"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA512.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA512.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E",
+          "MetadataToken": "0x060009D0",
+          "RelativeVirtualAddress": 1174172,
+          "MethodBodySha256": "4c77fbe4d89b42f15c751f3a6d2ecbc1b3e8204f9bd84e2c6e87566aaba4f7d6",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009D0|il:4c77fbe4d89b42f15c751f3a6d2ecbc1b3e8204f9bd84e2c6e87566aaba4f7d6",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStreamAsync(string, System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Cryptography.SHA512.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Security.Cryptography.SHA512.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E",
+          "MetadataToken": "0x060009D1",
+          "RelativeVirtualAddress": 1174224,
+          "MethodBodySha256": "358487c88f8dd0e5324edeaf692619e06b1c1c5e7118497df61ca6623e86655d",
+          "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009D1|il:358487c88f8dd0e5324edeaf692619e06b1c1c5e7118497df61ca6623e86655d",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.IO.Stream.get_CanRead()-\u003Ebool",
+            "System.Memory\u00601\u003Cbyte\u003E.get_Length()-\u003Eint",
+            "System.SR.get_Argument_DestinationTooShort()-\u003Estring",
+            "System.SR.get_Argument_StreamNotReadable()-\u003Estring",
+            "System.Security.Cryptography.LiteHashProvider.HashStreamAsync(string, System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 35,
+    "PureCount": 10,
+    "ImpureCount": 25,
+    "ConservativeUnknownCount": 0
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.Security.Cryptography.MD5.HashData(System.IO.Stream)",
+        "ExactSymbolKey": "System.Security.Cryptography.MD5.HashData(System.IO.Stream)-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060007B3|il:75dfc4b06288aad1c18bca3b0446fac33206ab2d049090ccfc408983a822326d",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060007B3",
+        "MethodBodySha256": "75dfc4b06288aad1c18bca3b0446fac33206ab2d049090ccfc408983a822326d",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.MD5.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.MD5.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060007B2|il:337a205ca3ba866fbb692e98256111e7c3af9fc9d1b049451d48325c63773a6e",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060007B2",
+        "MethodBodySha256": "337a205ca3ba866fbb692e98256111e7c3af9fc9d1b049451d48325c63773a6e",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060007AF|il:a980d87192eb7409fb8af411d57d8c1cca63953f1c7e16a08fa3bdcbdef39bc1",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060007AF",
+        "MethodBodySha256": "a980d87192eb7409fb8af411d57d8c1cca63953f1c7e16a08fa3bdcbdef39bc1",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_array_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.MD5.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060007B0|il:7d18c9aee5236a9f865a8dd312c16c65eb109188a30fb5e2bd3f15ecba47b89f",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060007B0",
+        "MethodBodySha256": "7d18c9aee5236a9f865a8dd312c16c65eb109188a30fb5e2bd3f15ecba47b89f",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.MD5.HashData(byte[])",
+        "ExactSymbolKey": "System.Security.Cryptography.MD5.HashData(byte[])-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060007AE|il:32fb9e79c8ffea185c3e517c9d0daa4f52b036fa681857fc61ce4e7c2c16e9d9",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060007AE",
+        "MethodBodySha256": "32fb9e79c8ffea185c3e517c9d0daa4f52b036fa681857fc61ce4e7c2c16e9d9",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_array_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.MD5.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Security.Cryptography.MD5.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060007B5|il:6d3908a5794fd35fa50dfcb5f831191d7e937de2ef8fe1ef65f129c5784dbfc4",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060007B5",
+        "MethodBodySha256": "6d3908a5794fd35fa50dfcb5f831191d7e937de2ef8fe1ef65f129c5784dbfc4",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.MD5.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Security.Cryptography.MD5.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060007B4|il:4a67cd9f280fa6dfc0d8ccb404372cdc8798f78be150be074baa2eee83562c2a",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060007B4",
+        "MethodBodySha256": "4a67cd9f280fa6dfc0d8ccb404372cdc8798f78be150be074baa2eee83562c2a",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA1.HashData(System.IO.Stream)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA1.HashData(System.IO.Stream)-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600096F|il:a6d4238cba20a477bce19665f4b96e8e87fb7c681ae9a89f9ba382d064aaf880",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x0600096F",
+        "MethodBodySha256": "a6d4238cba20a477bce19665f4b96e8e87fb7c681ae9a89f9ba382d064aaf880",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA1.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA1.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600096E|il:8ec93061e0298584628621673b681fc7c0783b75a68dc4761119a23285ab371a",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x0600096E",
+        "MethodBodySha256": "8ec93061e0298584628621673b681fc7c0783b75a68dc4761119a23285ab371a",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600096B|il:c82677a306eda3850b3875129379afc5dadb120dfe9c2ab768946ed2c2bab4fe",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x0600096B",
+        "MethodBodySha256": "c82677a306eda3850b3875129379afc5dadb120dfe9c2ab768946ed2c2bab4fe",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_array_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA1.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600096C|il:95e29e42d5035160a0c5a97926a11c9538ece853891459bcc949fe931dca81d4",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x0600096C",
+        "MethodBodySha256": "95e29e42d5035160a0c5a97926a11c9538ece853891459bcc949fe931dca81d4",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA1.HashData(byte[])",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA1.HashData(byte[])-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600096A|il:8aa6fd39d4cf47ec51099fc0ecd486bbcd90eb22eaa29d2b013316ecdde2e103",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x0600096A",
+        "MethodBodySha256": "8aa6fd39d4cf47ec51099fc0ecd486bbcd90eb22eaa29d2b013316ecdde2e103",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_array_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA1.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA1.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x06000971|il:1434ffb4ef94a8522258f7270bff6ae888f8f004fe3a8319a228ed53eafb07a0",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x06000971",
+        "MethodBodySha256": "1434ffb4ef94a8522258f7270bff6ae888f8f004fe3a8319a228ed53eafb07a0",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA1.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA1.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x06000970|il:9dbee08fc5c61234a049bc27b2380ed600200441db62275e6027e134ea24b488",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x06000970",
+        "MethodBodySha256": "9dbee08fc5c61234a049bc27b2380ed600200441db62275e6027e134ea24b488",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA256.HashData(System.IO.Stream)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA256.HashData(System.IO.Stream)-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600098F|il:d87b843397514ced669bcf7a6c0a053e99f2df558e967f662b87471ca4c0f8b8",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x0600098F",
+        "MethodBodySha256": "d87b843397514ced669bcf7a6c0a053e99f2df558e967f662b87471ca4c0f8b8",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA256.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA256.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600098E|il:f25c68e6a2f4fbdeb76d00ad1ee7945cd799efadab0889764467fb4c66b15f4c",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x0600098E",
+        "MethodBodySha256": "f25c68e6a2f4fbdeb76d00ad1ee7945cd799efadab0889764467fb4c66b15f4c",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600098B|il:199191d37f122ce809033f28ea12b1eef40d02aef939116a19618ec4bc12f435",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x0600098B",
+        "MethodBodySha256": "199191d37f122ce809033f28ea12b1eef40d02aef939116a19618ec4bc12f435",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_array_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA256.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600098C|il:4aeca00aaf5b3f77662fa91d0a52f653199fabf5c90a2c7c3ac6ed5555908199",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x0600098C",
+        "MethodBodySha256": "4aeca00aaf5b3f77662fa91d0a52f653199fabf5c90a2c7c3ac6ed5555908199",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA256.HashData(byte[])",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA256.HashData(byte[])-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x0600098A|il:7722f1d8c1120375c7f6bfbc591ca17d62651642bbc247b8d6495d520d2c307c",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x0600098A",
+        "MethodBodySha256": "7722f1d8c1120375c7f6bfbc591ca17d62651642bbc247b8d6495d520d2c307c",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_array_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA256.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA256.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x06000991|il:67cdee8e8d413283af359ca72859b40c373d2c6390f5444f77cda1e54e571a02",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x06000991",
+        "MethodBodySha256": "67cdee8e8d413283af359ca72859b40c373d2c6390f5444f77cda1e54e571a02",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA256.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA256.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x06000990|il:55f54e79d8297c9599c8c00fe131486226f83180f881d92c9ecb9375990be7b0",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x06000990",
+        "MethodBodySha256": "55f54e79d8297c9599c8c00fe131486226f83180f881d92c9ecb9375990be7b0",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA384.HashData(System.IO.Stream)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA384.HashData(System.IO.Stream)-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009AF|il:b2081452433d87a896d7c04362b4b56c8405cb6213e941d3572a908c21f82d24",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060009AF",
+        "MethodBodySha256": "b2081452433d87a896d7c04362b4b56c8405cb6213e941d3572a908c21f82d24",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA384.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA384.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009AE|il:2ef59d8370140e780992e279c824fe6160fe6295fb1128774f44f0510d0dbcc8",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060009AE",
+        "MethodBodySha256": "2ef59d8370140e780992e279c824fe6160fe6295fb1128774f44f0510d0dbcc8",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009AB|il:f490845a99d4c1dd2b55686807cf9757e13cfd1316473d76b7db4034a9933b27",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060009AB",
+        "MethodBodySha256": "f490845a99d4c1dd2b55686807cf9757e13cfd1316473d76b7db4034a9933b27",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_array_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA384.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009AC|il:9e812a4166d21b34ea6db09f6e5c855be5e248df17b1a6ea95f33f26b01f0102",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060009AC",
+        "MethodBodySha256": "9e812a4166d21b34ea6db09f6e5c855be5e248df17b1a6ea95f33f26b01f0102",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA384.HashData(byte[])",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA384.HashData(byte[])-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009AA|il:9dcbd36d5b36fc59b9d7d1e46c144852fd2e9147a9f8661dc23e650a3ce3381c",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060009AA",
+        "MethodBodySha256": "9dcbd36d5b36fc59b9d7d1e46c144852fd2e9147a9f8661dc23e650a3ce3381c",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_array_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA384.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA384.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009B1|il:c179f902f5bdb9899609f38719708b52685818eba216ae9e59bd7d555dabd2bb",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060009B1",
+        "MethodBodySha256": "c179f902f5bdb9899609f38719708b52685818eba216ae9e59bd7d555dabd2bb",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA384.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA384.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009B0|il:3af4f33545d49968e2513a9e2d38817a6889bbddbf1c0694609d907ac0408d00",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060009B0",
+        "MethodBodySha256": "3af4f33545d49968e2513a9e2d38817a6889bbddbf1c0694609d907ac0408d00",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA512.HashData(System.IO.Stream)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA512.HashData(System.IO.Stream)-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009CF|il:e9e999713a74ff6df8376057efbf0be14cdb9cc19c95e837dda334f8e0078b3e",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060009CF",
+        "MethodBodySha256": "e9e999713a74ff6df8376057efbf0be14cdb9cc19c95e837dda334f8e0078b3e",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA512.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA512.HashData(System.IO.Stream, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009CE|il:81220ec23e1f3b37d79fbf868cbd586b27aabf3329ffb2fb37801482839656c1",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060009CE",
+        "MethodBodySha256": "81220ec23e1f3b37d79fbf868cbd586b27aabf3329ffb2fb37801482839656c1",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009CB|il:fdb647d60a7bbca5229b8a358e4bb529d9ecbab638f11085dc77e206756d5564",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060009CB",
+        "MethodBodySha256": "fdb647d60a7bbca5229b8a358e4bb529d9ecbab638f11085dc77e206756d5564",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_array_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA512.HashData(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Span\u00601\u003Cbyte\u003E)-\u003Eint",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009CC|il:058969ae8110cb87154b35789d065064379851acff114fac8535eabe0d5fbd34",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060009CC",
+        "MethodBodySha256": "058969ae8110cb87154b35789d065064379851acff114fac8535eabe0d5fbd34",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA512.HashData(byte[])",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA512.HashData(byte[])-\u003Ebyte[]",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009CA|il:4b1e03c28a4f5894862a4818527942b1b84c88b44aaf27e9b29a10db901c53a4",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060009CA",
+        "MethodBodySha256": "4b1e03c28a4f5894862a4818527942b1b84c88b44aaf27e9b29a10db901c53a4",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_array_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA512.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA512.HashDataAsync(System.IO.Stream, System.Memory\u00601\u003Cbyte\u003E, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cint\u003E",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009D1|il:358487c88f8dd0e5324edeaf692619e06b1c1c5e7118497df61ca6623e86655d",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060009D1",
+        "MethodBodySha256": "358487c88f8dd0e5324edeaf692619e06b1c1c5e7118497df61ca6623e86655d",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Cryptography.SHA512.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Security.Cryptography.SHA512.HashDataAsync(System.IO.Stream, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.ValueTask\u00601\u003Cbyte[]\u003E",
+        "CacheKey": "mvid:596f181f-d406-4d3a-89cf-5fda7ebf82e2|token:0x060009D0|il:4c77fbe4d89b42f15c751f3a6d2ecbc1b3e8204f9bd84e2c6e87566aaba4f7d6",
+        "AssemblyName": "System.Security.Cryptography",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Cryptography.dll",
+        "AssemblySha256": "a998a46e2379d65412d54bb6f55e0eb5f16c3d856228882311f011c870c668b4",
+        "ModuleVersionId": "596f181f-d406-4d3a-89cf-5fda7ebf82e2",
+        "MetadataToken": "0x060009D0",
+        "MethodBodySha256": "4c77fbe4d89b42f15c751f3a6d2ecbc1b3e8204f9bd84e2c6e87566aaba4f7d6",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      }
+    ]
+  }
+}

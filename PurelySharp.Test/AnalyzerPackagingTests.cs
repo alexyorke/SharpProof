@@ -139,6 +139,11 @@ namespace TestNamespace {
                 file.Include.EndsWith("PurelySharp.EffectSummary.json", StringComparison.Ordinal) &&
                 file.PackagePath == "analyzers/dotnet/cs"), Is.True,
                 "The generated purity artifact must be packed next to the analyzer so runtime-helper proofs are available.");
+
+            Assert.That(packageFiles.Any(file =>
+                file.Include.EndsWith("*.PurelySharp.EffectSummary.json", StringComparison.Ordinal) &&
+                file.PackagePath == "analyzers/dotnet/cs"), Is.True,
+                "All domain-specific generated purity artifacts must be packed next to the analyzer, not just the root summary file.");
         }
 
         [Test]

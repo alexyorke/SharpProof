@@ -30,8 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="PurelySharp.EffectSummary.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="DateTime*.PurelySharp.EffectSummary.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="*.PurelySharp.EffectSummary.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

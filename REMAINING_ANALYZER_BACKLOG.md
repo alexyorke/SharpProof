@@ -122,7 +122,7 @@ Evidence:
 
 Current state:
 
-- Reviewed trusted fresh-array producers already include:
+- Bundled generated purity summaries now cover:
   - `SHA1.HashData(byte[])`
   - `SHA1.HashData(System.ReadOnlySpan<byte>)`
   - `SHA256.HashData(byte[])`
@@ -133,6 +133,7 @@ Current state:
   - `SHA512.HashData(System.ReadOnlySpan<byte>)`
   - `MD5.HashData(byte[])`
   - `MD5.HashData(System.ReadOnlySpan<byte>)`
+- Reviewed trusted fresh-array producers still maintained in the hand-reviewed policy layer include:
   - `Convert.FromBase64String(string)`
   - `Convert.FromBase64CharArray(char[], int, int)`
   - `Convert.FromHexString(string)`
