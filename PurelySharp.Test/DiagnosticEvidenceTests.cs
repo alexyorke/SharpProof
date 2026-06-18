@@ -1625,6 +1625,93 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_SortedDictionaryLookupHelpers()
+        {
+            const string source = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(SortedDictionary<int, string> values, int key, string target)
+    {
+        return values.ContainsKey(key) &&
+            values.ContainsValue(target) &&
+            values.TryGetValue(key, out var resolved) &&
+            resolved == target;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = new (string Label, IMethodSymbol Symbol)[]
+            {
+                (
+                    "System.Collections.Generic.SortedDictionary<TKey, TValue>.ContainsKey(TKey)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "values.ContainsKey(key)"))
+                        .Symbol!),
+                (
+                    "System.Collections.Generic.SortedDictionary<TKey, TValue>.ContainsValue(TValue)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "values.ContainsValue(target)"))
+                        .Symbol!),
+                (
+                    "System.Collections.Generic.SortedDictionary<TKey, TValue>.TryGetValue(TKey, out TValue)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "values.TryGetValue(key, out var resolved)"))
+                        .Symbol!),
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = trackedMethods.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "SortedDictionary lookup helpers should stay semantically pure for builtin keys and values after removing the static pure catalog entries.");
+            Assert.That(classifications["System.Collections.Generic.SortedDictionary<TKey, TValue>.ContainsKey(TKey)"].matched, Is.True,
+                "Generated purity catalog should resolve SortedDictionary<TKey, TValue>.ContainsKey.");
+            Assert.That(classifications["System.Collections.Generic.SortedDictionary<TKey, TValue>.ContainsKey(TKey)"].classification, Is.EqualTo("impure"),
+                "Generated purity catalog should capture the runtime summary classification for SortedDictionary<TKey, TValue>.ContainsKey.");
+            Assert.That(classifications["System.Collections.Generic.SortedDictionary<TKey, TValue>.ContainsValue(TValue)"].matched, Is.True,
+                "Generated purity catalog should resolve SortedDictionary<TKey, TValue>.ContainsValue.");
+            Assert.That(classifications["System.Collections.Generic.SortedDictionary<TKey, TValue>.ContainsValue(TValue)"].classification, Is.EqualTo("impure"),
+                "Generated purity catalog should capture the runtime summary classification for SortedDictionary<TKey, TValue>.ContainsValue.");
+            Assert.That(classifications["System.Collections.Generic.SortedDictionary<TKey, TValue>.TryGetValue(TKey, out TValue)"].matched, Is.True,
+                "Generated purity catalog should resolve SortedDictionary<TKey, TValue>.TryGetValue.");
+            Assert.That(classifications["System.Collections.Generic.SortedDictionary<TKey, TValue>.TryGetValue(TKey, out TValue)"].classification, Is.EqualTo("impure"),
+                "Generated purity catalog should capture the runtime summary classification for SortedDictionary<TKey, TValue>.TryGetValue.");
+        }
+
+        [Test]
         public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPureMethodFallback()
         {
             const string source = @"

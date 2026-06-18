@@ -243,6 +243,34 @@ public static class SortedListAndLinkedListCatalogSignatureSamples
         }
 
         [Test]
+        public void SortedDictionaryLookupHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Collections.Generic;
+
+public static class SortedDictionaryCatalogSignatureSamples
+{
+    public static bool Sample(SortedDictionary<int, string> values, int key, string target)
+    {
+        return values.ContainsKey(key) &&
+            values.ContainsValue(target) &&
+            values.TryGetValue(key, out var resolved) &&
+            resolved == target;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "SortedDictionaryCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.ContainsKey(key)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.ContainsValue(target)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.TryGetValue(key, out var resolved)"));
+        }
+
+        [Test]
         public void ListHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

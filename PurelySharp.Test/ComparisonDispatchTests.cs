@@ -86,6 +86,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task SortedDictionaryTryGetValueForBuiltinKey_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(SortedDictionary<int, string> values, int key)
+    {
+        return values.TryGetValue(key, out var value) && value is not null;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task SortedDictionaryContainsKeyWithDirectImpureComparer_Diagnostic()
         {
             var test = @"

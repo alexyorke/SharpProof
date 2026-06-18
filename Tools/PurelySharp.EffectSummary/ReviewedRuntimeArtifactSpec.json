@@ -184,6 +184,17 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/SortedDictionary.Lookup.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/SortedDictionary.Lookup.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Collections.dll",
+      "Limit": 40,
+      "SymbolPrefixes": [
+        "System.Collections.Generic.SortedDictionary`2.ContainsKey",
+        "System.Collections.Generic.SortedDictionary`2.ContainsValue",
+        "System.Collections.Generic.SortedDictionary`2.TryGetValue"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Stack.Readers.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Stack.Readers.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Collections.dll",

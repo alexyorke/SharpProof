@@ -867,6 +867,62 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeSortedDictionaryLookupSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Collections.dll",
+                40,
+                "System.Collections.Generic.SortedDictionary`2.ContainsKey",
+                "System.Collections.Generic.SortedDictionary`2.ContainsValue",
+                "System.Collections.Generic.SortedDictionary`2.TryGetValue");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(
+                summary,
+                "System.Collections.Generic.SortedDictionary`2.ContainsKey(!0)",
+                "impure",
+                "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Collections.Generic.SortedDictionary`2.ContainsKey(!0)",
+                "caller_visible");
+            AssertPurityClassification(
+                summary,
+                "System.Collections.Generic.SortedDictionary`2.ContainsValue(!1)",
+                "impure",
+                "object_state_write");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Collections.Generic.SortedDictionary`2.ContainsValue(!1)",
+                "caller_visible");
+            AssertPurityClassification(
+                summary,
+                "System.Collections.Generic.SortedDictionary`2.TryGetValue(!0, ref !1)",
+                "impure",
+                "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Collections.Generic.SortedDictionary`2.TryGetValue(!0, ref !1)",
+                "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.SortedDictionary`2.ContainsKey(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.SortedDictionary`2.ContainsValue(!1)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.SortedDictionary`2.TryGetValue(!0, ref !1)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeBitConverterReadSlice_TreatsIntrinsicHelpersAsPure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.BitConverter.ToInt32", limit: 20);
