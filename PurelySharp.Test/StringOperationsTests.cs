@@ -118,6 +118,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task StringLengthAndTrimHelpers_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(string input)
+    {
+        return input.Length + input.Trim().Length + input.TrimStart().Length + input.TrimEnd().Length;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task StringStartsWithStringComparisonOrdinal_NoDiagnostic()
         {
             var test = @"

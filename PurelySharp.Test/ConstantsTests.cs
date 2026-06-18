@@ -163,6 +163,23 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void StringLengthAndTrimHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "string.Length.get",
+                "string.Trim()",
+                "string.TrimEnd()",
+                "string.TrimStart()",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void StringPrefixSuffix_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.String.StartsWith(System.String)"));

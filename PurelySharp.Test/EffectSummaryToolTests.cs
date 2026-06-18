@@ -1000,6 +1000,61 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStringLengthSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.String.get_Length", limit: 10);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.String.get_Length()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.get_Length()", "none");
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var symbols = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.String.get_Length", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(symbols, Is.EqualTo(new[]
+            {
+                "System.String.get_Length()",
+            }));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeStringTrimSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.String.Trim", limit: 20);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.String.Trim()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Trim()", "none");
+            AssertPurityClassification(summary, "System.String.TrimStart()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.TrimStart()", "none");
+            AssertPurityClassification(summary, "System.String.TrimEnd()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.TrimEnd()", "none");
+
+            var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
+            var symbols = generatedCatalog.GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.String.Trim", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(symbols, Does.Contain("System.String.Trim()"));
+            Assert.That(symbols, Does.Contain("System.String.TrimStart()"));
+            Assert.That(symbols, Does.Contain("System.String.TrimEnd()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStringPrefixSuffixSlice_TreatsStartsWithAndEndsWithAsImpure()
         {
             using var startsWithSummary = await RunRuntimeEffectSummaryAsync("System.String.StartsWith", limit: 20);

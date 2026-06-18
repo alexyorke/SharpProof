@@ -1190,8 +1190,6 @@ public static class Constants
         "string.Concat(params string[])",
         "string.Replace(string, string)",
         "string.Substring(int, int)",
-        "string.Trim()",
-        "string.Length.get",
         "string.Equals(string)",
         "string.Equals(object)",
         "string.GetHashCode()",
@@ -1474,15 +1472,11 @@ public static class Constants
         "string.GetHashCode()",
         "string.IndexOf(char)",
         "string.IndexOf(string)",
-        "string.Length.get",
         "string.Substring(int)",
         "string.Substring(int, int)",
         "string.ToLowerInvariant()",
         "string.ToString()",
         "string.ToUpperInvariant()",
-        "string.Trim()",
-        "string.TrimEnd()",
-        "string.TrimStart()",
 
 
 
