@@ -1334,7 +1334,6 @@ public static class Constants
         "System.Net.IPEndPoint.IPEndPoint(System.Net.IPAddress, int)",
         "System.ObjectDisposedException.ObjectDisposedException(string)",
         "System.Runtime.InteropServices.Marshal.SizeOf<T>()",
-        "string.IndexOf(char)",
         "string.Insert(int, string)",
         "string.Join(string, System.Collections.Generic.IEnumerable<string>)",
         "string.PadLeft(int)",
@@ -1441,15 +1440,6 @@ public static class Constants
         "System.ReadOnlySpan<T>.Slice(int, int)",
         "System.Span<T>.Length.get",
         "System.Span<T>.IsEmpty.get",
-
-
-        "string.Clone()",
-        "string.CompareTo(string)",
-        "string.IndexOf(char)",
-        "string.IndexOf(string)",
-        "string.ToString()",
-
-
 
 
         // Exception guard helpers considered pure (diverging without side effects)

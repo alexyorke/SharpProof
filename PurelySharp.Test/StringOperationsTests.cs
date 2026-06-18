@@ -238,6 +238,85 @@ public class TestClass
         }
 
         [Test]
+        public async Task StringCloneCompareToAndIndexOfChar_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(string input, string other)
+    {
+        var clone = (string)input.Clone();
+        var normalized = clone.ToString();
+        var comparison = normalized.CompareTo(other);
+        return normalized.IndexOf('a') + comparison;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StringIndexOfString_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(string input)
+    {
+        return input.IndexOf(""abc"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StringIndexOfStringComparisonOrdinal_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(string input)
+    {
+        return input.IndexOf(""abc"", StringComparison.OrdinalIgnoreCase);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StringIndexOfStringComparisonCurrentCulture_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(string input)
+    {
+        return input.IndexOf(""abc"", StringComparison.CurrentCulture);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task StringStartsWithStringComparisonOrdinal_NoDiagnostic()
         {
             var test = @"

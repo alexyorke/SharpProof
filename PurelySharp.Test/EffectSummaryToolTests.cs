@@ -1203,6 +1203,65 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStringIndexOfSlice_TreatsDefaultStringSearchAsGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.String.IndexOf", limit: 80);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.String.IndexOf(char)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.IndexOf(char)", "none");
+            AssertPurityClassification(summary, "System.String.IndexOf(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.String.IndexOf(string)", "caller_visible");
+            AssertPurityClassification(summary, "System.String.IndexOf(string, System.StringComparison)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.String.IndexOf(string, System.StringComparison)", "caller_visible");
+            AssertPurityClassification(summary, "System.String.IndexOf(string, int, int, System.StringComparison)", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.String.IndexOf(string, int, int, System.StringComparison)", "caller_visible");
+
+            var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.String.IndexOf", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(symbols, Does.Contain("System.String.IndexOf(char)"));
+            Assert.That(symbols, Does.Contain("System.String.IndexOf(string)"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeStringCloneCompareToAndToStringSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                40,
+                "System.String.Clone",
+                "System.String.CompareTo",
+                "System.String.ToString");
+
+            AssertPurityClassification(summary, "System.String.Clone()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Clone()", "none");
+            AssertPurityClassification(summary, "System.String.CompareTo(string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.CompareTo(string)", "none");
+            AssertPurityClassification(summary, "System.String.ToString()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.ToString()", "none");
+
+            var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.String.Clone()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.String.CompareTo(string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.String.ToString()", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(symbols, Does.Contain("System.String.Clone()"));
+            Assert.That(symbols, Does.Contain("System.String.CompareTo(string)"));
+            Assert.That(symbols, Does.Contain("System.String.ToString()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStringSplitSlice_UsesGeneratedFreshArrayEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.String.Split", limit: 80);
@@ -1749,8 +1808,18 @@ public static class CallvirtFixture
             return JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
         }
 
-        private static async Task<JsonDocument> RunRuntimeEffectSummaryAsync(string symbolPrefix, int limit)
+        private static Task<JsonDocument> RunRuntimeEffectSummaryAsync(string symbolPrefix, int limit)
         {
+            return RunRuntimeEffectSummaryAsync(limit, symbolPrefix);
+        }
+
+        private static async Task<JsonDocument> RunRuntimeEffectSummaryAsync(int limit, params string[] symbolPrefixes)
+        {
+            if (symbolPrefixes.Length == 0)
+            {
+                throw new ArgumentException("At least one symbol prefix is required.", nameof(symbolPrefixes));
+            }
+
             var outputPath = Path.Combine(
                 TestContext.CurrentContext.WorkDirectory,
                 "runtime-effect-summary-" + Guid.NewGuid().ToString("N") + ".json");
@@ -1766,8 +1835,11 @@ public static class CallvirtFixture
             startInfo.ArgumentList.Add("--");
             startInfo.ArgumentList.Add("--framework");
             startInfo.ArgumentList.Add("net8.0");
-            startInfo.ArgumentList.Add("--symbol-prefix");
-            startInfo.ArgumentList.Add(symbolPrefix);
+            foreach (var symbolPrefix in symbolPrefixes)
+            {
+                startInfo.ArgumentList.Add("--symbol-prefix");
+                startInfo.ArgumentList.Add(symbolPrefix);
+            }
             startInfo.ArgumentList.Add("--include-callees");
             startInfo.ArgumentList.Add("--classify-purity");
             startInfo.ArgumentList.Add("--compare-manual-catalogs");
@@ -1790,7 +1862,7 @@ public static class CallvirtFixture
             {
                 throw new AssertionException(
                     "Effect summary tool failed with exit code " + process.ExitCode + "." + Environment.NewLine +
-                    "Symbol prefix: " + symbolPrefix + Environment.NewLine +
+                    "Symbol prefixes: " + string.Join(", ", symbolPrefixes) + Environment.NewLine +
                     "Output: " + outputPath);
             }
 

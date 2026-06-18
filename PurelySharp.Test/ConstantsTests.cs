@@ -254,6 +254,24 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void StringIndexOfCloneCompareToAndToStringHelpers_AreSourcedFromGeneratedPurityEvidence_AndSemanticRules_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "string.Clone()",
+                "string.CompareTo(string)",
+                "string.IndexOf(char)",
+                "string.IndexOf(string)",
+                "string.ToString()",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void StringPrefixSuffix_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.String.StartsWith(System.String)"));
