@@ -825,8 +825,6 @@ public static class Constants
     {
         "System.Collections.Generic.Dictionary<TKey, TValue>.ContainsValue(TValue)",
         "System.Collections.Generic.Dictionary<TKey, TValue>.TryGetValue(TKey, out TValue)",
-        "System.Collections.Generic.Comparer<T>.Default.get",
-        "System.Collections.Generic.EqualityComparer<T>.Default.get",
         "System.Collections.Generic.HashSet<T>.IsSubsetOf(System.Collections.Generic.IEnumerable<T>)",
 
 
@@ -881,7 +879,6 @@ public static class Constants
 
 
 
-        "System.Globalization.CultureInfo.InvariantCulture.get",
         "System.Globalization.CultureInfo.Name.get",
 
 
@@ -940,7 +937,6 @@ public static class Constants
         "System.StringComparer.Ordinal.Equals(string, string)",
 
 
-        "System.Threading.Tasks.Task.CompletedTask.get",
         "System.Threading.Tasks.Task.FromResult<TResult>(TResult)",
 
         "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)",

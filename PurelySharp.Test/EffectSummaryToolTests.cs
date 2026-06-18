@@ -1278,6 +1278,44 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStaticCacheGetterSlice_TreatsSafeStaticCacheReadsAsPure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                40,
+                "System.Collections.Generic.Comparer`1.get_Default",
+                "System.Collections.Generic.EqualityComparer`1.get_Default",
+                "System.Globalization.CultureInfo.get_InvariantCulture",
+                "System.Threading.Tasks.Task.get_CompletedTask");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Collections.Generic.Comparer`1.get_Default()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Comparer`1.get_Default()", "internal_only");
+            AssertPurityClassification(summary, "System.Collections.Generic.EqualityComparer`1.get_Default()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.EqualityComparer`1.get_Default()", "internal_only");
+            AssertPurityClassification(summary, "System.Globalization.CultureInfo.get_InvariantCulture()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Globalization.CultureInfo.get_InvariantCulture()", "internal_only");
+            AssertPurityClassification(summary, "System.Threading.Tasks.Task.get_CompletedTask()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Threading.Tasks.Task.get_CompletedTask()", "internal_only");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Comparer`1.get_Default()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.EqualityComparer`1.get_Default()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Globalization.CultureInfo.get_InvariantCulture()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Threading.Tasks.Task.get_CompletedTask()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeGuidToByteArraySlice_TreatsRuntimeHelpersAndEndianReadsAsPure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Guid.ToByteArray", limit: 20);

@@ -555,6 +555,37 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void StaticCacheGetterHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Collections.Generic;
+using System.Globalization;
+using System.Threading.Tasks;
+
+public static class StaticCacheGetterCatalogSignatureSamples
+{
+    public static object Sample()
+    {
+        _ = Comparer<int>.Default;
+        _ = EqualityComparer<int>.Default;
+        _ = Task.CompletedTask;
+        return CultureInfo.InvariantCulture;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "StaticCacheGetterCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Comparer<int>.Default"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "EqualityComparer<int>.Default"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Task.CompletedTask"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "CultureInfo.InvariantCulture"));
+        }
+
+        [Test]
         public void FileNotFoundExceptionStringConstructor_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.IO.FileNotFoundException.FileNotFoundException(string?)");

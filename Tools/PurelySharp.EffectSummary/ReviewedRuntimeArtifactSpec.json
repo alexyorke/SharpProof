@@ -277,6 +277,17 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/StaticCache.Getters.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/StaticCache.Getters.PurelySharp.EffectSummary.json",
+      "Limit": 40,
+      "SymbolPrefixes": [
+        "System.Collections.Generic.Comparer`1.get_Default",
+        "System.Collections.Generic.EqualityComparer`1.get_Default",
+        "System.Globalization.CultureInfo.get_InvariantCulture",
+        "System.Threading.Tasks.Task.get_CompletedTask"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/SortedSet.GetViewBetween.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/SortedSet.GetViewBetween.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Collections.dll",

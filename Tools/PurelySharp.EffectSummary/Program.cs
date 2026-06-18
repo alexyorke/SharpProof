@@ -936,6 +936,8 @@ internal static class AssemblyEffectSummarizer
             string.Equals(field, "System.StringComparer._ordinalIgnoreCase", StringComparison.Ordinal) ||
             string.Equals(field, "System.StringComparer._invariantCulture", StringComparison.Ordinal) ||
             string.Equals(field, "System.StringComparer._invariantCultureIgnoreCase", StringComparison.Ordinal) ||
+            string.Equals(field, "System.Threading.Tasks.Task.s_cachedCompleted", StringComparison.Ordinal) ||
+            string.Equals(field, "System.Globalization.CultureInfo.s_InvariantCultureInfo", StringComparison.Ordinal) ||
             string.Equals(field, "System.OrdinalCaseSensitiveComparer.Instance", StringComparison.Ordinal) ||
             string.Equals(field, "System.OrdinalIgnoreCaseComparer.Instance", StringComparison.Ordinal) ||
             string.Equals(field, "System.CultureAwareComparer.InvariantCaseSensitiveInstance", StringComparison.Ordinal) ||
@@ -944,6 +946,14 @@ internal static class AssemblyEffectSummarizer
             string.Equals(field, "System.UriHelper.Unreserved", StringComparison.Ordinal) ||
             string.Equals(field, "System.Globalization.TextInfo.Invariant", StringComparison.Ordinal) ||
             string.Equals(field, "System.Globalization.CompareInfo.Invariant", StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
+        if (fields.All(static field =>
+            (field.StartsWith("System.Collections.Generic.Comparer`1", StringComparison.Ordinal) ||
+             field.StartsWith("System.Collections.Generic.EqualityComparer`1", StringComparison.Ordinal)) &&
+            field.EndsWith(".<Default>k__BackingField", StringComparison.Ordinal)))
         {
             return true;
         }

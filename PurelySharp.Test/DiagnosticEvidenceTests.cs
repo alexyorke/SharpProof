@@ -496,6 +496,73 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_StaticCachePureGetters()
+        {
+            const string source = @"
+using System.Collections.Generic;
+using System.Globalization;
+using System.Threading.Tasks;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        _ = Comparer<int>.Default;
+        _ = EqualityComparer<int>.Default;
+        _ = Task.CompletedTask;
+        _ = CultureInfo.InvariantCulture;
+        return 4;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var memberAccesses = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "Comparer<int>.Default" ||
+                    node.ToString() == "EqualityComparer<int>.Default" ||
+                    node.ToString() == "Task.CompletedTask" ||
+                    node.ToString() == "CultureInfo.InvariantCulture")
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = memberAccesses.ToDictionary(
+                node => node.ToString(),
+                node =>
+                {
+                    var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(node).Symbol!;
+                    var args = new object?[] { propertySymbol.GetMethod!.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = matched
+                        ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                        : string.Empty;
+                    return (matched, classification);
+                });
+
+            Assert.That(classifications["Comparer<int>.Default"].matched, Is.True);
+            Assert.That(classifications["Comparer<int>.Default"].classification, Is.EqualTo("pure"));
+            Assert.That(classifications["EqualityComparer<int>.Default"].matched, Is.True);
+            Assert.That(classifications["EqualityComparer<int>.Default"].classification, Is.EqualTo("pure"));
+            Assert.That(classifications["Task.CompletedTask"].matched, Is.True);
+            Assert.That(classifications["Task.CompletedTask"].classification, Is.EqualTo("pure"));
+            Assert.That(classifications["CultureInfo.InvariantCulture"].matched, Is.True);
+            Assert.That(classifications["CultureInfo.InvariantCulture"].classification, Is.EqualTo("pure"));
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_ArgumentGuardHelpersAsPureEvidence()
         {
             const string source = @"
