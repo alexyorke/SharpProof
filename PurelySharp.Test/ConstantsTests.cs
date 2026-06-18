@@ -503,6 +503,25 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void SpanAndMemoryMarshalHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Runtime.InteropServices.MemoryMarshal.AsBytes<T>(System.Span<T>)",
+                "System.ReadOnlySpan<T>.Length.get",
+                "System.ReadOnlySpan<T>.IsEmpty.get",
+                "System.ReadOnlySpan<T>.Slice(int, int)",
+                "System.Span<T>.Length.get",
+                "System.Span<T>.IsEmpty.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void BooleanParseHelpers_AreHandledSemantically_NotStaticCatalogs()
         {
             var members = new[]
@@ -1704,6 +1723,38 @@ public static class IndexHashCodeCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "hash.ToHashCode()"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Index.End"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Index.Start"));
+        }
+
+        [Test]
+        public void SpanAndMemoryMarshalGeneratedPurityEntriesResolveAgainstNet80References()
+        {
+            var source = @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class SpanMemoryMarshalCatalogSignatureSamples
+{
+    public static int Sample(ReadOnlySpan<int> readOnly, Span<int> writable)
+    {
+        var head = readOnly.Slice(0, 0);
+        var readOnlyBytes = MemoryMarshal.AsBytes(readOnly);
+        var writableBytes = MemoryMarshal.AsBytes(writable);
+        return readOnly.Length + writable.Length + head.Length + readOnlyBytes.Length + writableBytes.Length + (readOnly.IsEmpty ? 0 : 1) + (writable.IsEmpty ? 0 : 1);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "SpanMemoryMarshalGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "readOnly.Slice(0, 0)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "MemoryMarshal.AsBytes(writable)"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "readOnly.Length"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "writable.Length"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "readOnly.IsEmpty"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "writable.IsEmpty"));
         }
 
         private static void AssertCatalogMembership(string signature, bool expectedPure, bool expectedImpure)

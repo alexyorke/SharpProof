@@ -1138,15 +1138,7 @@ public static class Constants
         "System.Linq.Enumerable.TakeWhile<TSource>(System.Collections.Generic.IEnumerable<TSource>, System.Func<TSource, bool>)",
         "System.Net.IPAddress.IsLoopback(System.Net.IPAddress)",
         "object.MemberwiseClone()",
-        "System.Runtime.InteropServices.MemoryMarshal.AsBytes<T>(System.Span<T>)",
         "string.IsNullOrWhiteSpace(System.ReadOnlySpan<char>)",
-
-        "System.ReadOnlySpan<T>.Length.get",
-        "System.ReadOnlySpan<T>.IsEmpty.get",
-        "System.ReadOnlySpan<T>.Slice(int, int)",
-        "System.Span<T>.Length.get",
-        "System.Span<T>.IsEmpty.get",
-
 
         // Exception guard helpers considered pure (diverging without side effects)
         "System.Exception.Message.get",

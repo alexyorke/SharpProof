@@ -192,6 +192,18 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/SpanMemoryMarshal.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/SpanMemoryMarshal.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.ReadOnlySpan`1.get_Length",
+        "System.ReadOnlySpan`1.get_IsEmpty",
+        "System.ReadOnlySpan`1.Slice(int, int)",
+        "System.Span`1.get_Length",
+        "System.Span`1.get_IsEmpty",
+        "System.Runtime.InteropServices.MemoryMarshal.AsBytes"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json"
     },

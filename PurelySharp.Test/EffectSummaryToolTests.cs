@@ -2041,6 +2041,54 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeSpanAndMemoryMarshalSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                80,
+                "System.ReadOnlySpan`1.get_Length",
+                "System.ReadOnlySpan`1.get_IsEmpty",
+                "System.ReadOnlySpan`1.Slice(int, int)",
+                "System.Span`1.get_Length",
+                "System.Span`1.get_IsEmpty",
+                "System.Runtime.InteropServices.MemoryMarshal.AsBytes");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var representativeSymbols = new[]
+            {
+                "System.ReadOnlySpan`1.get_Length()",
+                "System.ReadOnlySpan`1.get_IsEmpty()",
+                "System.ReadOnlySpan`1.Slice(int, int)",
+                "System.Span`1.get_Length()",
+                "System.Span`1.get_IsEmpty()",
+                "System.Runtime.InteropServices.MemoryMarshal.AsBytes(System.ReadOnlySpan`1<!!0>)",
+                "System.Runtime.InteropServices.MemoryMarshal.AsBytes(System.Span`1<!!0>)",
+            };
+
+            foreach (var symbol in representativeSymbols)
+            {
+                AssertPurityClassification(summary, symbol, "pure");
+                AssertEffectVisibilityClassification(summary, symbol, "none");
+            }
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            foreach (var symbol in representativeSymbols)
+            {
+                Assert.That(generatedSymbols, Does.Contain(symbol));
+            }
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeEnumTryParseSlice_UsesSemanticHandlingInsteadOfManualCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(80, "System.Enum.TryParse");

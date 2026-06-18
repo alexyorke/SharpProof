@@ -974,6 +974,97 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_SpanAndMemoryMarshalHelpers()
+        {
+            const string source = @"
+using System;
+using System.Runtime.InteropServices;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(ReadOnlySpan<int> readOnly, Span<int> writable)
+    {
+        var head = readOnly.Slice(0, 0);
+        var readOnlyBytes = MemoryMarshal.AsBytes(readOnly);
+        var writableBytes = MemoryMarshal.AsBytes(writable);
+        return readOnly.Length + writable.Length + head.Length + readOnlyBytes.Length + writableBytes.Length + (readOnly.IsEmpty ? 0 : 1) + (writable.IsEmpty ? 0 : 1);
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = new IMethodSymbol[]
+            {
+                (IMethodSymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Single(node => node.ToString() == "readOnly.Slice(0, 0)"))
+                    .Symbol!,
+                (IMethodSymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Single(node => node.ToString() == "MemoryMarshal.AsBytes(readOnly)"))
+                    .Symbol!,
+                (IMethodSymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Single(node => node.ToString() == "MemoryMarshal.AsBytes(writable)"))
+                    .Symbol!,
+                ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<MemberAccessExpressionSyntax>()
+                        .Single(node => node.ToString() == "readOnly.Length"))
+                    .Symbol!).GetMethod!,
+                ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<MemberAccessExpressionSyntax>()
+                        .Single(node => node.ToString() == "writable.Length"))
+                    .Symbol!).GetMethod!,
+                ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<MemberAccessExpressionSyntax>()
+                        .Single(node => node.ToString() == "readOnly.IsEmpty"))
+                    .Symbol!).GetMethod!,
+                ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<MemberAccessExpressionSyntax>()
+                        .Single(node => node.ToString() == "writable.IsEmpty"))
+                    .Symbol!).GetMethod!,
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var matched = trackedMethods.Select(method =>
+            {
+                var args = new object?[] { method.OriginalDefinition, compilation, null };
+                return (bool)tryGetPurity.Invoke(catalog, args)!;
+            }).ToArray();
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow the tracked span and MemoryMarshal helpers.");
+            Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedMethods.Length).ToArray()),
+                "Generated purity catalog should resolve the tracked span and MemoryMarshal helpers.");
+        }
+
+        [Test]
         public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPureMethodFallback()
         {
             const string source = @"
