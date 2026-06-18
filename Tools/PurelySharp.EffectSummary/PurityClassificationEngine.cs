@@ -141,9 +141,10 @@ internal static class PurityClassificationEngine
         var treatsObjectStateAsFreshOwned = IsFreshOwnedObjectConstructor(summary);
         var treatsVirtualDispatchAsResolved = HasOnlyResolvedVirtualCallTargets(summary, bySymbol);
         var treatsArgumentGuardThrowHelpersAsPure = IsPureArgumentGuardWrapper(summary.Symbol);
+        var treatsDelegateDispatchAsSemantic = IsSemanticallyCheckedDelegateInvokingBclMethod(summary.Symbol);
         foreach (var root in summary.RootCandidates)
         {
-            if (treatsVirtualDispatchAsResolved &&
+            if ((treatsVirtualDispatchAsResolved || treatsDelegateDispatchAsSemantic) &&
                 string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal))
             {
                 continue;
@@ -180,7 +181,7 @@ internal static class PurityClassificationEngine
 
         foreach (var effect in summary.Effects)
         {
-            if (treatsVirtualDispatchAsResolved &&
+            if ((treatsVirtualDispatchAsResolved || treatsDelegateDispatchAsSemantic) &&
                 string.Equals(effect, "virtual_call", StringComparison.Ordinal))
             {
                 continue;
@@ -258,8 +259,10 @@ internal static class PurityClassificationEngine
             var calleeClassification = ClassifyMethod(resolvedCallKey, bySymbol, memo, visiting);
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal))
             {
-                if (treatsArgumentGuardThrowHelpersAsPure &&
-                    IsArgumentGuardThrowHelper(resolvedCallSummary.Symbol))
+                if (((treatsArgumentGuardThrowHelpersAsPure &&
+                      IsArgumentGuardThrowHelper(resolvedCallSummary.Symbol)) ||
+                     (treatsDelegateDispatchAsSemantic &&
+                      IsSemanticallyNeutralValidationThrowHelper(resolvedCallSummary.Symbol))))
                 {
                     continue;
                 }
@@ -1228,6 +1231,51 @@ internal static class PurityClassificationEngine
 
         return methodBaseSymbol.Contains(".Throw", StringComparison.Ordinal) &&
             !methodBaseSymbol.Contains(".ThrowIf", StringComparison.Ordinal);
+    }
+
+    private static bool IsSemanticallyNeutralValidationThrowHelper(string symbol)
+    {
+        if (IsArgumentGuardThrowHelper(symbol))
+        {
+            return true;
+        }
+
+        var methodBaseSymbol = GetMethodBaseSymbol(symbol);
+        return methodBaseSymbol.StartsWith("System.ThrowHelper.Throw", StringComparison.Ordinal);
+    }
+
+    private static bool IsSemanticallyCheckedDelegateInvokingBclMethod(string symbol)
+    {
+        var methodBaseSymbol = GetMethodBaseSymbol(symbol);
+        var lastDotIndex = methodBaseSymbol.LastIndexOf('.');
+        if (lastDotIndex <= 0 || lastDotIndex == methodBaseSymbol.Length - 1)
+        {
+            return false;
+        }
+
+        var containingType = methodBaseSymbol[..lastDotIndex];
+        var methodName = methodBaseSymbol[(lastDotIndex + 1)..];
+
+        // These helpers already rely on analyzer-side semantic checking of the delegate target.
+        // The runtime summaries should ignore delegate dispatch noise and validation throw helpers.
+        return containingType switch
+        {
+            "System.Array" => methodName is
+                "Exists" or
+                "Find" or
+                "FindIndex" or
+                "FindLast" or
+                "FindLastIndex" or
+                "TrueForAll",
+            "System.Collections.Generic.List`1" => methodName is
+                "Exists" or
+                "Find" or
+                "FindIndex" or
+                "FindLast" or
+                "FindLastIndex" or
+                "TrueForAll",
+            _ => false
+        };
     }
 }
 

@@ -89,6 +89,82 @@ public class TestClass
         }
 
         [Test]
+        public async Task ArrayFindIndexWithUnresolvedPredicateParameter_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(int[] values, Predicate<int> predicate)
+    {
+        return Array.FindIndex(values, predicate);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ArrayFindIndexWithPureLambda_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(int[] values)
+    {
+        return Array.FindIndex(values, static value => value > 0);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ArrayTrueForAllWithUnresolvedPredicateParameter_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool {|PS0002:TestMethod|}(int[] values, Predicate<int> predicate)
+    {
+        return Array.TrueForAll(values, predicate);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ArrayTrueForAllWithPureLambda_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(int[] values)
+    {
+        return Array.TrueForAll(values, static value => value > 0);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ListExistsWithPureLambda_NoDiagnostic()
         {
             var test = @"
@@ -101,6 +177,45 @@ public class TestClass
     public bool TestMethod(List<int> values)
     {
         return values.Exists(static value => value > 0);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ListTrueForAllWithUnresolvedPredicateParameter_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool {|PS0002:TestMethod|}(List<int> values, Predicate<int> predicate)
+    {
+        return values.TrueForAll(predicate);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ListTrueForAllWithPureLambda_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(List<int> values)
+    {
+        return values.TrueForAll(static value => value > 0);
     }
 }";
 

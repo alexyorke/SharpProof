@@ -25,8 +25,10 @@
       "SourceSummaryPath": "PurelySharp.Analyzer/Array.Find.PurelySharp.EffectSummary.json",
       "Limit": 40,
       "SymbolPrefixes": [
+        "System.Array.Exists(",
         "System.Array.Find(",
-        "System.Array.FindIndex("
+        "System.Array.FindIndex(",
+        "System.Array.TrueForAll("
       ]
     },
     {

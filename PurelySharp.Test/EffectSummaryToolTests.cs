@@ -705,13 +705,15 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeArrayFindSlice_UsesGeneratedPurityCatalogEntries()
+        public async Task EffectSummaryTool_RuntimeArrayPredicateSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
                 40,
+                "System.Array.Exists(",
                 "System.Array.Find(",
-                "System.Array.FindIndex(");
+                "System.Array.FindIndex(",
+                "System.Array.TrueForAll(");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -723,8 +725,7 @@ public static class PurityFixture
                 summary,
                 "System.Array.Find(!!0[], System.Predicate`1<!!0>)",
                 "impure",
-                "caller_visible_memory_write",
-                "impure_callee");
+                "caller_visible_memory_write");
             AssertEffectVisibilityClassification(
                 summary,
                 "System.Array.Find(!!0[], System.Predicate`1<!!0>)",
@@ -732,12 +733,27 @@ public static class PurityFixture
             AssertPurityClassification(
                 summary,
                 "System.Array.FindIndex(!!0[], System.Predicate`1<!!0>)",
-                "impure",
-                "impure_callee");
+                "pure");
             AssertEffectVisibilityClassification(
                 summary,
                 "System.Array.FindIndex(!!0[], System.Predicate`1<!!0>)",
-                "caller_visible");
+                "none");
+            AssertPurityClassification(
+                summary,
+                "System.Array.Exists(!!0[], System.Predicate`1<!!0>)",
+                "pure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Array.Exists(!!0[], System.Predicate`1<!!0>)",
+                "none");
+            AssertPurityClassification(
+                summary,
+                "System.Array.TrueForAll(!!0[], System.Predicate`1<!!0>)",
+                "pure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Array.TrueForAll(!!0[], System.Predicate`1<!!0>)",
+                "none");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -746,10 +762,12 @@ public static class PurityFixture
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .ToArray();
 
+            Assert.That(generatedSymbols, Does.Contain("System.Array.Exists(!!0[], System.Predicate`1<!!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Array.Find(!!0[], System.Predicate`1<!!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Array.FindIndex(!!0[], System.Predicate`1<!!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Array.FindIndex(!!0[], int, System.Predicate`1<!!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Array.FindIndex(!!0[], int, int, System.Predicate`1<!!0>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Array.TrueForAll(!!0[], System.Predicate`1<!!0>)"));
         }
 
         [Test]
@@ -4080,11 +4098,9 @@ public static class PurityFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Collections.Generic.List`1.Contains(!0)", "pure");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Capacity()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.get_Capacity()", "none");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Count()", "pure");
-            AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Item(int)", "pure");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.Exists(System.Predicate`1<!0>)", "pure");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.FindIndex(System.Predicate`1<!0>)", "pure");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.FindIndex(System.Predicate`1<!0>)", "none");
@@ -4092,8 +4108,8 @@ public static class PurityFixture
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Find(System.Predicate`1<!0>)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.FindLast(System.Predicate`1<!0>)", "impure", "caller_visible_memory_write");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.FindLast(System.Predicate`1<!0>)", "caller_visible");
-            AssertPurityClassification(summary, "System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)", "conservative_unknown", "dynamic_dispatch", "virtual_call");
-            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)", "unknown");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)", "none");
 
             var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
             var generatedSymbols = generatedCatalog.GetProperty("Entries")
@@ -4102,10 +4118,8 @@ public static class PurityFixture
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.Collections.Generic.List`1.", StringComparison.Ordinal))
                 .ToArray();
 
-            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Contains(!0)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Capacity()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Count()"));
-            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Item(int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Exists(System.Predicate`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.FindIndex(System.Predicate`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Find(System.Predicate`1<!0>)"));
