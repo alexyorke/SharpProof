@@ -1,0 +1,131 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-18T14:03:43.8263962+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.Memory",
+      "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Memory.dll",
+      "AssemblySha256": "4d6fe7d23c06b4e81748d83a1314218f31bb1e4ce9b6d1ebc7ba8a78a342833c",
+      "ModuleVersionId": "29033785-28a6-4d22-b89f-3dac7706bce3",
+      "MethodCount": 227,
+      "EmittedMethodCount": 2,
+      "Methods": [
+        {
+          "Symbol": "System.Buffers.ReadOnlySequence\u00601.get_Length()",
+          "ExactSymbolKey": "System.Buffers.ReadOnlySequence\u00601.get_Length()-\u003Elong",
+          "MetadataToken": "0x0600004C",
+          "RelativeVirtualAddress": 78064,
+          "MethodBodySha256": "eaca67919e3960f2de765aa7d8d4b8d221f77f050def995483038d49b3a5e3e3",
+          "CacheKey": "mvid:29033785-28a6-4d22-b89f-3dac7706bce3|token:0x0600004C|il:eaca67919e3960f2de765aa7d8d4b8d221f77f050def995483038d49b3a5e3e3",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.Buffers.ReadOnlySequence\u00601\u003C!0\u003E.GetLength()-\u003Elong"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Buffers.ReadOnlySequence\u00601.get_IsEmpty()",
+          "ExactSymbolKey": "System.Buffers.ReadOnlySequence\u00601.get_IsEmpty()-\u003Ebool",
+          "MetadataToken": "0x0600004D",
+          "RelativeVirtualAddress": 78072,
+          "MethodBodySha256": "933ec85e961066cceb18fe959b745ec5e5327f386f047c448c7d76424c278550",
+          "CacheKey": "mvid:29033785-28a6-4d22-b89f-3dac7706bce3|token:0x0600004D|il:933ec85e961066cceb18fe959b745ec5e5327f386f047c448c7d76424c278550",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.Buffers.ReadOnlySequence\u00601\u003C!0\u003E.get_Length()-\u003Elong"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 2,
+    "PureCount": 2,
+    "ImpureCount": 0,
+    "ConservativeUnknownCount": 0,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.Buffers.ReadOnlySequence\u00601.get_IsEmpty()",
+        "ExactSymbolKey": "System.Buffers.ReadOnlySequence\u00601.get_IsEmpty()-\u003Ebool",
+        "CacheKey": "mvid:29033785-28a6-4d22-b89f-3dac7706bce3|token:0x0600004D|il:933ec85e961066cceb18fe959b745ec5e5327f386f047c448c7d76424c278550",
+        "AssemblyName": "System.Memory",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Memory.dll",
+        "AssemblySha256": "4d6fe7d23c06b4e81748d83a1314218f31bb1e4ce9b6d1ebc7ba8a78a342833c",
+        "ModuleVersionId": "29033785-28a6-4d22-b89f-3dac7706bce3",
+        "MetadataToken": "0x0600004D",
+        "MethodBodySha256": "933ec85e961066cceb18fe959b745ec5e5327f386f047c448c7d76424c278550",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Buffers.ReadOnlySequence\u00601.get_Length()",
+        "ExactSymbolKey": "System.Buffers.ReadOnlySequence\u00601.get_Length()-\u003Elong",
+        "CacheKey": "mvid:29033785-28a6-4d22-b89f-3dac7706bce3|token:0x0600004C|il:eaca67919e3960f2de765aa7d8d4b8d221f77f050def995483038d49b3a5e3e3",
+        "AssemblyName": "System.Memory",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Memory.dll",
+        "AssemblySha256": "4d6fe7d23c06b4e81748d83a1314218f31bb1e4ce9b6d1ebc7ba8a78a342833c",
+        "ModuleVersionId": "29033785-28a6-4d22-b89f-3dac7706bce3",
+        "MetadataToken": "0x0600004C",
+        "MethodBodySha256": "eaca67919e3960f2de765aa7d8d4b8d221f77f050def995483038d49b3a5e3e3",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      }
+    ]
+  }
+}

@@ -522,6 +522,21 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void ReadOnlySequenceHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Buffers.ReadOnlySequence<T>.IsEmpty.get",
+                "System.Buffers.ReadOnlySequence<T>.Length.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void BooleanParseHelpers_AreHandledSemantically_NotStaticCatalogs()
         {
             var members = new[]
@@ -1755,6 +1770,30 @@ public static class SpanMemoryMarshalCatalogSignatureSamples
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "writable.Length"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "readOnly.IsEmpty"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "writable.IsEmpty"));
+        }
+
+        [Test]
+        public void ReadOnlySequenceGeneratedPurityEntriesResolveAgainstNet80References()
+        {
+            var source = @"
+using System.Buffers;
+
+public static class ReadOnlySequenceCatalogSignatureSamples
+{
+    public static long Sample(ReadOnlySequence<int> value)
+    {
+        return value.Length + (value.IsEmpty ? 0L : 1L);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ReadOnlySequenceGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Length"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.IsEmpty"));
         }
 
         private static void AssertCatalogMembership(string signature, bool expectedPure, bool expectedImpure)

@@ -204,6 +204,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/ReadOnlySequence.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/ReadOnlySequence.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Memory.dll",
+      "SymbolPrefixes": [
+        "System.Buffers.ReadOnlySequence`1.get_IsEmpty",
+        "System.Buffers.ReadOnlySequence`1.get_Length"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json"
     },
