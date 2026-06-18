@@ -753,6 +753,11 @@ public static class PurityFixture
             AssertPurityClassification(summary, "System.DateTimeOffset.AddSeconds(double)", "impure", "impure_callee");
             AssertPurityClassification(summary, "System.DateTimeOffset.AddTicks(long)", "impure", "impure_callee");
             AssertPurityClassification(summary, "System.DateTimeOffset.AddYears(int)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTimeOffset.Compare(System.DateTimeOffset, System.DateTimeOffset)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.CompareTo(System.DateTimeOffset)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.Equals(System.DateTimeOffset)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.Equals(System.DateTimeOffset, System.DateTimeOffset)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.Subtract(System.DateTimeOffset)", "pure");
             AssertPurityClassification(summary, "System.DateTimeOffset.ToUnixTimeMilliseconds()", "pure");
             AssertPurityClassification(summary, "System.DateTimeOffset.ToUnixTimeSeconds()", "pure");
             AssertPurityClassification(summary, "System.DateTimeOffset.get_Offset()", "pure");

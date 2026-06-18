@@ -586,6 +586,11 @@ public static class RecentCatalogSignatureSamples
         var addTicks = value.AddTicks(7);
         var addYears = value.AddYears(8);
         var added = value.AddDays(1);
+        _ = DateTimeOffset.Compare(value, added);
+        _ = value.CompareTo(added);
+        _ = value.Equals(added);
+        _ = DateTimeOffset.Equals(value, added);
+        _ = added.Subtract(value);
         var seconds = added.ToUnixTimeSeconds();
         return added.ToUnixTimeMilliseconds() + seconds + value.Offset.Ticks;
     }
@@ -700,6 +705,11 @@ public static class RecentCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddTicks(7)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddYears(8)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddDays(1)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTimeOffset.Compare(value, added)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.CompareTo(added)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.Equals(added)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTimeOffset.Equals(value, added)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "added.Subtract(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "added.ToUnixTimeMilliseconds()"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "added.ToUnixTimeSeconds()"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Offset"));
@@ -726,6 +736,12 @@ public static class DateTimeCatalogSignatureSamples
         _ = value.AddYears(8);
         _ = DateTime.FromBinary(value.ToBinary());
         _ = DateTime.FromOADate(value.ToOADate());
+        _ = DateTime.Compare(value, value);
+        _ = value.CompareTo(value);
+        _ = value.Equals(value);
+        _ = DateTime.Equals(value, value);
+        _ = DateTime.DaysInMonth(2000, 2);
+        _ = value.Subtract(value);
         _ = value.ToBinary();
         return value;
     }
@@ -748,6 +764,12 @@ public static class DateTimeCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.AddYears(8)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTime.FromBinary(value.ToBinary())"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTime.FromOADate(value.ToOADate())"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTime.Compare(value, value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.CompareTo(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.Equals(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTime.Equals(value, value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTime.DaysInMonth(2000, 2)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.Subtract(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.ToBinary()"));
         }
 
