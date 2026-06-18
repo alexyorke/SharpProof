@@ -196,6 +196,29 @@ public static class ArrayBinarySearchCatalogSignatureSamples
         }
 
         [Test]
+        public void SortedSetGetViewBetween_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Collections.Generic;
+
+public static class SortedSetCatalogSignatureSamples
+{
+    public static int Sample(SortedSet<int> values, int lower, int upper)
+    {
+        return values.GetViewBetween(lower, upper).Count;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "SortedSetCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.GetViewBetween(lower, upper)"));
+        }
+
+        [Test]
         public void ListHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

@@ -790,6 +790,40 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeSortedSetGetViewBetweenSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Collections.dll",
+                30,
+                "System.Collections.Generic.SortedSet`1.GetViewBetween");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(
+                summary,
+                "System.Collections.Generic.SortedSet`1.GetViewBetween(!0, !0)",
+                "impure",
+                "throw");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Collections.Generic.SortedSet`1.GetViewBetween(!0, !0)",
+                "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.SortedSet`1.GetViewBetween(!0, !0)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeBitConverterReadSlice_TreatsIntrinsicHelpersAsPure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.BitConverter.ToInt32", limit: 20);

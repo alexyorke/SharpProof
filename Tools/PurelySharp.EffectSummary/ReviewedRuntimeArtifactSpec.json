@@ -165,6 +165,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/SortedSet.GetViewBetween.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/SortedSet.GetViewBetween.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Collections.dll",
+      "Limit": 30,
+      "SymbolPrefixes": [
+        "System.Collections.Generic.SortedSet`1.GetViewBetween"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Stack.Readers.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Stack.Readers.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Collections.dll",

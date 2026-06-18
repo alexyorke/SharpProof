@@ -1,0 +1,98 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-18T15:05:46.7455556+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.Collections",
+      "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.dll",
+      "AssemblySha256": "f0fe3fc9cecf713d5c29a2fecdf6aafc50b41efb8130a56af54b8c9330c1ffc1",
+      "ModuleVersionId": "3dc059c5-7601-466b-9b9d-ad8601df8f36",
+      "MethodCount": 623,
+      "EmittedMethodCount": 1,
+      "Methods": [
+        {
+          "Symbol": "System.Collections.Generic.SortedSet\u00601.GetViewBetween(!0, !0)",
+          "ExactSymbolKey": "System.Collections.Generic.SortedSet\u00601.GetViewBetween(!0, !0)-\u003ESystem.Collections.Generic.SortedSet\u00601\u003C!0\u003E",
+          "MetadataToken": "0x060001EE",
+          "RelativeVirtualAddress": 146792,
+          "MethodBodySha256": "7a4804bf5821d7cf79e668be4cbf24ac5c87a7aac77f8ed42ba25a148f84b8ce",
+          "CacheKey": "mvid:3dc059c5-7601-466b-9b9d-ad8601df8f36|token:0x060001EE|il:7a4804bf5821d7cf79e668be4cbf24ac5c87a7aac77f8ed42ba25a148f84b8ce",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentException..ctor(string, string)-\u003Evoid",
+            "System.Collections.Generic.IComparer\u00601\u003C!0\u003E.Compare(!0, !0)-\u003Eint",
+            "System.Collections.Generic.SortedSet\u00601\u002BTreeSubSet\u003C!0\u003E..ctor(System.Collections.Generic.SortedSet\u00601\u003C!0\u003E, !0, !0, bool, bool)-\u003Evoid",
+            "System.Collections.Generic.SortedSet\u00601\u003C!0\u003E.get_Comparer()-\u003ESystem.Collections.Generic.IComparer\u00601\u003C!0\u003E",
+            "System.SR.get_SortedSet_LowerValueGreaterThanUpperValue()-\u003Estring"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 1,
+    "PureCount": 0,
+    "ImpureCount": 1,
+    "ConservativeUnknownCount": 0,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.Collections.Generic.SortedSet\u00601.GetViewBetween(!0, !0)",
+        "ExactSymbolKey": "System.Collections.Generic.SortedSet\u00601.GetViewBetween(!0, !0)-\u003ESystem.Collections.Generic.SortedSet\u00601\u003C!0\u003E",
+        "CacheKey": "mvid:3dc059c5-7601-466b-9b9d-ad8601df8f36|token:0x060001EE|il:7a4804bf5821d7cf79e668be4cbf24ac5c87a7aac77f8ed42ba25a148f84b8ce",
+        "AssemblyName": "System.Collections",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.dll",
+        "AssemblySha256": "f0fe3fc9cecf713d5c29a2fecdf6aafc50b41efb8130a56af54b8c9330c1ffc1",
+        "ModuleVersionId": "3dc059c5-7601-466b-9b9d-ad8601df8f36",
+        "MetadataToken": "0x060001EE",
+        "MethodBodySha256": "7a4804bf5821d7cf79e668be4cbf24ac5c87a7aac77f8ed42ba25a148f84b8ce",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      }
+    ]
+  }
+}

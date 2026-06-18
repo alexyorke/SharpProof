@@ -1108,7 +1108,6 @@ public static class Constants
         "char.ConvertFromUtf32(int)",
         "System.Collections.Generic.ICollection<T>.Contains(T)",
         "System.Collections.Generic.IList<T>.IndexOf(T)",
-        "System.Collections.Generic.SortedSet<T>.GetViewBetween(T, T)",
         "System.ComponentModel.DataAnnotations.RegularExpressionAttribute.RegularExpressionAttribute(string)",
         "double.PositiveInfinity.get",
         "System.FormattableString.Format.get",
