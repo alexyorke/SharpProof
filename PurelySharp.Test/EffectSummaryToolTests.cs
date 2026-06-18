@@ -2835,6 +2835,44 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimePureConstructorsSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                40,
+                "System.ArgumentOutOfRangeException..ctor(string)",
+                "System.AttributeUsageAttribute..ctor(System.AttributeTargets)",
+                "System.BadImageFormatException..ctor(string)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.ArgumentOutOfRangeException..ctor(string)", "pure");
+            AssertFreshnessClassification(summary, "System.ArgumentOutOfRangeException..ctor(string)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException..ctor(string)", "internal_only");
+
+            AssertPurityClassification(summary, "System.BadImageFormatException..ctor(string)", "pure");
+            AssertFreshnessClassification(summary, "System.BadImageFormatException..ctor(string)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.BadImageFormatException..ctor(string)", "internal_only");
+
+            AssertPurityClassification(summary, "System.AttributeUsageAttribute..ctor(System.AttributeTargets)", "pure");
+            AssertFreshnessClassification(summary, "System.AttributeUsageAttribute..ctor(System.AttributeTargets)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.AttributeUsageAttribute..ctor(System.AttributeTargets)", "internal_only");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.ArgumentOutOfRangeException..ctor(string)"));
+            Assert.That(generatedSymbols, Does.Contain("System.BadImageFormatException..ctor(string)"));
+            Assert.That(generatedSymbols, Does.Contain("System.AttributeUsageAttribute..ctor(System.AttributeTargets)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_GeneratedPurityCatalog_UsesDistinctExactKeys_ForDuplicateDisplaySymbols()
         {
             var source = """

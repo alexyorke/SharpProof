@@ -219,6 +219,14 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void PureExceptionAndAttributeConstructors_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.ArgumentOutOfRangeException.ArgumentOutOfRangeException(string)");
+            AssertNotInManualCatalogs("System.AttributeUsageAttribute.AttributeUsageAttribute(System.AttributeTargets)");
+            AssertNotInManualCatalogs("System.BadImageFormatException.BadImageFormatException(string)");
+        }
+
+        [Test]
         public void StringNullHelpers_AndOrdinalComparerGetter_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
@@ -1044,6 +1052,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Reflection;
 using System.Security.Cryptography;
 
 public sealed class NameCollection : KeyedCollection<string, string>
@@ -1079,6 +1088,9 @@ public static class CatalogSignatureSamples
         _ = SHA512.HashData(spanBytes);
         _ = MD5.HashData(spanBytes);
         _ = CryptographicOperations.FixedTimeEquals(left, right);
+        _ = new ArgumentOutOfRangeException(""value"");
+        _ = new BadImageFormatException(""bad image"");
+        _ = new AttributeUsageAttribute(AttributeTargets.Method);
         return Array.Empty<int>().Length + list.Count + now.Day;
     }
 }";
@@ -1112,6 +1124,15 @@ public static class CatalogSignatureSamples
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "CryptographicOperations.FixedTimeEquals(left, right)"), Is.EqualTo("System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan<byte>, System.ReadOnlySpan<byte>)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "CryptographicOperations.FixedTimeEquals(left, right)"));
+
+            Assert.That(GetObjectCreationSignature(compilation, syntaxTree, "new ArgumentOutOfRangeException(\"value\")"), Is.EqualTo("System.ArgumentOutOfRangeException.ArgumentOutOfRangeException(string?)"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new ArgumentOutOfRangeException(\"value\")"));
+
+            Assert.That(GetObjectCreationSignature(compilation, syntaxTree, "new BadImageFormatException(\"bad image\")"), Is.EqualTo("System.BadImageFormatException.BadImageFormatException(string?)"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new BadImageFormatException(\"bad image\")"));
+
+            Assert.That(GetObjectCreationSignature(compilation, syntaxTree, "new AttributeUsageAttribute(AttributeTargets.Method)"), Is.EqualTo("System.AttributeUsageAttribute.AttributeUsageAttribute(System.AttributeTargets)"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new AttributeUsageAttribute(AttributeTargets.Method)"));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.SHA1.HashData(byte[])"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)")));

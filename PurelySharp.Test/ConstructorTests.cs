@@ -263,6 +263,27 @@ public class TestClass
         }
 
         [Test]
+        public async Task PureMethodReturningGeneratedPureExceptionConstructors_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Exception TestMethod(bool useRange)
+    {
+        return useRange
+            ? new ArgumentOutOfRangeException(""value"")
+            : new BadImageFormatException(""bad image"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task RecordConstructor_MissingAttributeDiagnostics()
         {
             var test = @"
