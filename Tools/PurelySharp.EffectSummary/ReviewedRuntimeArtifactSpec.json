@@ -136,6 +136,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Directory.CurrentDirectory.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Environment.PurelySharp.EffectSummary.json",
+      "Limit": 80,
+      "SymbolPrefixes": [
+        "System.IO.Directory.GetCurrentDirectory",
+        "System.IO.Directory.SetCurrentDirectory"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/OperatingSystem.PurelySharp.EffectSummary.json",
       "Limit": 120,
       "SymbolPrefixes": [

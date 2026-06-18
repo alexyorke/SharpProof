@@ -282,6 +282,44 @@ public class TestClass
         }
 
         [Test]
+        public async Task DirectoryGetCurrentDirectory_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}()
+    {
+        return Directory.GetCurrentDirectory();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task DirectorySetCurrentDirectory_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(string path)
+    {
+        Directory.SetCurrentDirectory(path);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task DynamicDispatchImpurity_Diagnostic()
         {
 

@@ -173,6 +173,13 @@ public static class EnvironmentCatalogSignatureSamples
         }
 
         [Test]
+        public void DirectoryCurrentDirectoryHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.IO.Directory.GetCurrentDirectory()");
+            AssertNotInManualCatalogs("System.IO.Directory.SetCurrentDirectory(string)");
+        }
+
+        [Test]
         public void WebUtilityHelpers_AreNotBackedByStaticCatalogs()
         {
             var members = new[]

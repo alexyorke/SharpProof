@@ -665,8 +665,6 @@ public static class Constants
         "System.IO.BinaryReader.ReadBoolean()",
         "System.IO.BinaryWriter.Write(string)",
         "System.IO.Directory.EnumerateDirectories(string)",
-        "System.IO.Directory.GetCurrentDirectory()",
-        "System.IO.Directory.SetCurrentDirectory(string)",
         "System.IO.FileStream.FileStream(string, System.IO.FileMode)",
         "System.IO.Pipelines.PipeReader.ReadAsync(System.Threading.CancellationToken)",
         "System.IO.Pipelines.PipeWriter.WriteAsync(System.ReadOnlyMemory<byte>, System.Threading.CancellationToken)",

@@ -3162,6 +3162,82 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_Classifies_DirectoryCurrentDirectory_AsImpure()
+        {
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-directory-current-directory-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var outputPath = Path.Combine(workingDirectory, "Directory.CurrentDirectory.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Defaults = new
+                    {
+                        Framework = "net8.0",
+                        RuntimeAssemblyName = "System.Private.CoreLib.dll",
+                        IncludeCallees = true,
+                        IncludePurityClassification = true,
+                        CompareManualCatalogs = true,
+                    },
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = outputPath,
+                            SourceSummaryPath = "PurelySharp.Analyzer/Environment.PurelySharp.EffectSummary.json",
+                            SymbolPrefixes = new[]
+                            {
+                                "System.IO.Directory.GetCurrentDirectory",
+                                "System.IO.Directory.SetCurrentDirectory",
+                            },
+                            Limit = 80,
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
+
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "caller_visible");
+            AssertPurityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.IO.Directory.GetCurrentDirectory()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.IO.Directory.SetCurrentDirectory(string)", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.IO.Directory.GetCurrentDirectory()",
+                "System.IO.Directory.SetCurrentDirectory(string)",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeAppContextSlice_UsesGeneratedPurityAndImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
@@ -3546,7 +3622,12 @@ public static class PurityFixture
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
-            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(
+                catalogComparison.GetProperty("KnownImpureMembers")
+                    .EnumerateArray()
+                    .Select(entry => entry.GetProperty("Symbol").GetString())
+                    .ToArray(),
+                Is.EqualTo(new[] { "object.ToString()" }));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.Environment.get_CurrentDirectory()", "impure", "impure_callee");
