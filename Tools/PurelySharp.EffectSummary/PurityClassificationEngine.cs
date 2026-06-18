@@ -456,7 +456,9 @@ internal static class PurityClassificationEngine
     {
         return symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
             symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Runtime.CompilerServices.Unsafe.SizeOf()", StringComparison.Ordinal);
+            string.Equals(symbol, "System.Runtime.CompilerServices.Unsafe.SizeOf()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Object.GetType()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Reflection.MemberInfo.get_Name()", StringComparison.Ordinal);
     }
 
     private static string[] JoinCallChain(string callee, IReadOnlyList<string> nested)

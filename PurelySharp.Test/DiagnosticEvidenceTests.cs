@@ -1505,6 +1505,56 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_ObjectGetTypeAndTypeToStringAsPureMetadataEvidence()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(object value)
+    {
+        return value.GetType().ToString();
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "value.GetType()" ||
+                    node.ToString() == "value.GetType().ToString()")
+                .Select(node => (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!)
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var matched = trackedMethods.Select(method =>
+            {
+                var args = new object?[] { method.OriginalDefinition, compilation, null };
+                return (bool)tryGetPurity.Invoke(catalog, args)!;
+            }).ToArray();
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow object.GetType() and Type.ToString() as metadata-only reads.");
+            Assert.That(matched, Is.EqualTo(new[] { true, true }),
+                "Generated purity catalog should resolve object.GetType() and Type.ToString() from runtime metadata evidence.");
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_ObjectReferenceEqualsTupleFactoriesAndArraySegmentConstructors()
         {
             const string source = @"

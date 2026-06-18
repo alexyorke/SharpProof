@@ -291,6 +291,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Object.TypeMetadata.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Object.TypeMetadata.PurelySharp.EffectSummary.json",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Object.GetType",
+        "System.Type.ToString"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/MutableCollection.Readers.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/MutableCollection.Readers.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [

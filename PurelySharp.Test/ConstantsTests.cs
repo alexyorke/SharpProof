@@ -1240,6 +1240,13 @@ public static class StopwatchCatalogSignatureSamples
         }
 
         [Test]
+        public void ObjectTypeMetadataHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("object.GetType()");
+            AssertNotInManualCatalogs("System.Type.ToString()");
+        }
+
+        [Test]
         public void ArgumentGuardHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var legacyMembers = new[]

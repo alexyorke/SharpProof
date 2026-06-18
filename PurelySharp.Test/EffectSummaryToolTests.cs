@@ -3931,6 +3931,47 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeObjectTypeMetadataSlice_UsesGeneratedPurityEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.Object.GetType",
+                "System.Type.ToString");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Object.GetType()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Object.GetType()", "none");
+            AssertPurityClassification(summary, "System.Reflection.MemberInfo.get_Name()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Reflection.MemberInfo.get_Name()", "none");
+            AssertPurityClassification(summary, "System.Type.ToString()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.ToString()", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Object.GetType()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Reflection.MemberInfo.get_Name()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.ToString()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Object.GetType()",
+                "System.Reflection.MemberInfo.get_Name()",
+                "System.Type.ToString()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeFileSystemStateSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

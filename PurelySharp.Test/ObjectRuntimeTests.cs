@@ -10,7 +10,7 @@ namespace PurelySharp.Test
     public class ObjectRuntimeTests
     {
         [Test]
-        public async Task ObjectGetType_Diagnostic()
+        public async Task ObjectGetType_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -19,7 +19,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public Type {|PS0002:TestMethod|}(object value)
+    public Type TestMethod(object value)
     {
         return value.GetType();
     }
