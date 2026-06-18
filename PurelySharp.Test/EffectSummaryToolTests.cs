@@ -1787,11 +1787,12 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeAppContextSlice_UsesGeneratedImpureEvidence()
+        public async Task EffectSummaryTool_RuntimeAppContextSlice_UsesGeneratedPurityAndImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
-                80,
+                100,
+                "System.AppContext.get_TargetFrameworkName",
                 "System.AppContext.get_BaseDirectory",
                 "System.AppContext.GetData",
                 "System.AppContext.SetData",
@@ -1804,6 +1805,8 @@ public static class PurityFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
+            AssertPurityClassification(summary, "System.AppContext.get_TargetFrameworkName()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.AppContext.get_TargetFrameworkName()", "none");
             AssertPurityClassification(summary, "System.AppContext.get_BaseDirectory()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.AppContext.get_BaseDirectory()", "caller_visible");
             AssertPurityClassification(summary, "System.AppContext.GetData(string)", "impure", "global_state_read");
@@ -1830,16 +1833,18 @@ public static class PurityFixture
                 "System.AppContext.SetSwitch(string, bool)",
                 "System.AppContext.TryGetSwitch(string, ref bool)",
                 "System.AppContext.get_BaseDirectory()",
+                "System.AppContext.get_TargetFrameworkName()",
             }));
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeAppDomainSlice_UsesGeneratedImpureEvidence()
+        public async Task EffectSummaryTool_RuntimeAppDomainSlice_UsesGeneratedPurityAndImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
-                40,
+                60,
                 "System.AppDomain.get_CurrentDomain",
+                "System.AppDomain.get_Id",
                 "System.AppDomain.get_BaseDirectory",
                 "System.AppContext.get_BaseDirectory",
                 "System.AppContext.GetData");
@@ -1850,6 +1855,8 @@ public static class PurityFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
+            AssertPurityClassification(summary, "System.AppDomain.get_Id()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.AppDomain.get_Id()", "none");
             AssertPurityClassification(summary, "System.AppDomain.get_CurrentDomain()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.AppDomain.get_CurrentDomain()", "caller_visible");
             AssertPurityClassification(summary, "System.AppDomain.get_BaseDirectory()", "impure", "impure_callee");
@@ -1861,7 +1868,8 @@ public static class PurityFixture
                 .Select(entry => entry.GetProperty("Symbol").GetString())
                 .Where(symbol =>
                     string.Equals(symbol, "System.AppDomain.get_CurrentDomain()", StringComparison.Ordinal) ||
-                    string.Equals(symbol, "System.AppDomain.get_BaseDirectory()", StringComparison.Ordinal))
+                    string.Equals(symbol, "System.AppDomain.get_BaseDirectory()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.AppDomain.get_Id()", StringComparison.Ordinal))
                 .OrderBy(symbol => symbol, StringComparer.Ordinal)
                 .ToArray();
 
@@ -1869,6 +1877,59 @@ public static class PurityFixture
             {
                 "System.AppDomain.get_BaseDirectory()",
                 "System.AppDomain.get_CurrentDomain()",
+                "System.AppDomain.get_Id()",
+            }));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeOperatingSystemSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                120,
+                "System.OperatingSystem.IsWindows",
+                "System.OperatingSystem.IsLinux",
+                "System.OperatingSystem.IsOSPlatform",
+                "System.OperatingSystem.IsWindowsVersionAtLeast",
+                "System.OperatingSystem.get_Platform");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.OperatingSystem.IsWindows()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsWindows()", "none");
+            AssertPurityClassification(summary, "System.OperatingSystem.IsLinux()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsLinux()", "none");
+            AssertPurityClassification(summary, "System.OperatingSystem.IsOSPlatform(string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsOSPlatform(string)", "none");
+            AssertPurityClassification(summary, "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)", "none");
+            AssertPurityClassification(summary, "System.OperatingSystem.get_Platform()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.get_Platform()", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.OperatingSystem.IsWindows()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.OperatingSystem.IsLinux()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.OperatingSystem.IsOSPlatform(string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.OperatingSystem.get_Platform()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.OperatingSystem.IsLinux()",
+                "System.OperatingSystem.IsOSPlatform(string)",
+                "System.OperatingSystem.IsWindows()",
+                "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)",
+                "System.OperatingSystem.get_Platform()",
             }));
         }
 

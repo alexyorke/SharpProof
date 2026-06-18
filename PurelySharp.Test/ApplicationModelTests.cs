@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis.Testing;
+using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using System.Threading.Tasks;
 using PurelySharp.Analyzer;
@@ -109,7 +109,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task AppContextTargetFrameworkName_Diagnostic()
+        public async Task AppContextTargetFrameworkName_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -119,7 +119,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string? {|PS0002:TestMethod|}()
+    public string? TestMethod()
     {
         return AppContext.TargetFrameworkName;
     }
@@ -186,7 +186,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task AppDomainId_Diagnostic()
+        public async Task AppDomainId_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -195,7 +195,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public int {|PS0002:TestMethod|}()
+    public int TestMethod()
     {
         return AppDomain.CurrentDomain.Id;
     }

@@ -425,6 +425,43 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void OperatingSystemAndApplicationModelPureHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.AppContext.TargetFrameworkName.get",
+                "System.AppDomain.Id.get",
+                "System.OperatingSystem.IsAndroid()",
+                "System.OperatingSystem.IsAndroidVersionAtLeast(int, int, int, int)",
+                "System.OperatingSystem.IsBrowser()",
+                "System.OperatingSystem.IsFreeBSD()",
+                "System.OperatingSystem.IsFreeBSDVersionAtLeast(int, int, int, int)",
+                "System.OperatingSystem.IsIOS()",
+                "System.OperatingSystem.IsIOSVersionAtLeast(int, int, int)",
+                "System.OperatingSystem.IsLinux()",
+                "System.OperatingSystem.IsMacCatalyst()",
+                "System.OperatingSystem.IsMacCatalystVersionAtLeast(int, int, int)",
+                "System.OperatingSystem.IsMacOS()",
+                "System.OperatingSystem.IsMacOSVersionAtLeast(int, int, int)",
+                "System.OperatingSystem.IsOSPlatform(string)",
+                "System.OperatingSystem.IsOSPlatformVersionAtLeast(string, int, int, int, int)",
+                "System.OperatingSystem.Platform.get",
+                "System.OperatingSystem.IsTvOS()",
+                "System.OperatingSystem.IsTvOSVersionAtLeast(int, int, int)",
+                "System.OperatingSystem.IsWasi()",
+                "System.OperatingSystem.IsWatchOS()",
+                "System.OperatingSystem.IsWatchOSVersionAtLeast(int, int, int)",
+                "System.OperatingSystem.IsWindows()",
+                "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void TimeProviderAndTimeZoneInfoGlobals_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.TimeProvider.LocalTimeZone.get");
