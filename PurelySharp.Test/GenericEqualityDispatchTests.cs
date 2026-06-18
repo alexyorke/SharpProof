@@ -47,5 +47,43 @@ public class TestClass<T>
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task ICollectionContainsWithUnknownInterfaceReceiver_Diagnostic()
+        {
+            var test = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool {|PS0002:TestMethod|}(ICollection<int> values, int value)
+    {
+        return values.Contains(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task IListIndexOfWithUnknownInterfaceReceiver_Diagnostic()
+        {
+            var test = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(IList<int> values, int value)
+    {
+        return values.IndexOf(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

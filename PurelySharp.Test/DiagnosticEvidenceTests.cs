@@ -1712,6 +1712,78 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_InterfaceCollectionLookupHelpers()
+        {
+            const string source = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(ICollection<int> collection, IList<int> list, int value)
+    {
+        return collection.Contains(value) && list.IndexOf(value) >= 0;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = new (string Label, IMethodSymbol Symbol)[]
+            {
+                (
+                    "System.Collections.Generic.ICollection<T>.Contains(T)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "collection.Contains(value)"))
+                        .Symbol!),
+                (
+                    "System.Collections.Generic.IList<T>.IndexOf(T)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "list.IndexOf(value)"))
+                        .Symbol!),
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = trackedMethods.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.True,
+                "Unknown ICollection<T>.Contains and IList<T>.IndexOf dispatch should become conservative once the static pure fallback is removed.");
+            Assert.That(classifications["System.Collections.Generic.ICollection<T>.Contains(T)"].matched, Is.True,
+                "Generated purity catalog should resolve ICollection<T>.Contains.");
+            Assert.That(classifications["System.Collections.Generic.ICollection<T>.Contains(T)"].classification, Is.EqualTo("conservative_unknown"),
+                "Generated purity catalog should classify ICollection<T>.Contains as conservative_unknown.");
+            Assert.That(classifications["System.Collections.Generic.IList<T>.IndexOf(T)"].matched, Is.True,
+                "Generated purity catalog should resolve IList<T>.IndexOf.");
+            Assert.That(classifications["System.Collections.Generic.IList<T>.IndexOf(T)"].classification, Is.EqualTo("conservative_unknown"),
+                "Generated purity catalog should classify IList<T>.IndexOf as conservative_unknown.");
+        }
+
+        [Test]
         public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPureMethodFallback()
         {
             const string source = @"

@@ -271,6 +271,30 @@ public static class SortedDictionaryCatalogSignatureSamples
         }
 
         [Test]
+        public void InterfaceCollectionLookupHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Collections.Generic;
+
+public static class InterfaceCollectionLookupCatalogSignatureSamples
+{
+    public static bool Sample(ICollection<int> collection, IList<int> list, int value)
+    {
+        return collection.Contains(value) && list.IndexOf(value) >= 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "InterfaceCollectionLookupCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "collection.Contains(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "list.IndexOf(value)"));
+        }
+
+        [Test]
         public void ListHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

@@ -1101,8 +1101,6 @@ public static class Constants
         "System.Array.IndexOf<T>(T[], T)",
         "System.Array.LastIndexOf<T>(T[], T)",
         "char.ConvertFromUtf32(int)",
-        "System.Collections.Generic.ICollection<T>.Contains(T)",
-        "System.Collections.Generic.IList<T>.IndexOf(T)",
         "System.ComponentModel.DataAnnotations.RegularExpressionAttribute.RegularExpressionAttribute(string)",
         "double.PositiveInfinity.get",
         "System.FormattableString.Format.get",

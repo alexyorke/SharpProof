@@ -195,6 +195,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Interface.CollectionLookup.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Interface.CollectionLookup.PurelySharp.EffectSummary.json",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Collections.Generic.ICollection`1.Contains",
+        "System.Collections.Generic.IList`1.IndexOf"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Stack.Readers.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Stack.Readers.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Collections.dll",

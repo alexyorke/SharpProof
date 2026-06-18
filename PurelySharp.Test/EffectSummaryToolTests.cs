@@ -923,6 +923,55 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeInterfaceCollectionLookupSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.Collections.Generic.ICollection`1.Contains",
+                "System.Collections.Generic.IList`1.IndexOf");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(
+                summary,
+                "System.Collections.Generic.ICollection`1.Contains(!0)",
+                "conservative_unknown",
+                "abstract",
+                "metadata_only_or_external",
+                "no_il_body");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Collections.Generic.ICollection`1.Contains(!0)",
+                "unknown");
+            AssertPurityClassification(
+                summary,
+                "System.Collections.Generic.IList`1.IndexOf(!0)",
+                "conservative_unknown",
+                "abstract",
+                "metadata_only_or_external",
+                "no_il_body");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Collections.Generic.IList`1.IndexOf(!0)",
+                "unknown");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.ICollection`1.Contains(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.IList`1.IndexOf(!0)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeBitConverterReadSlice_TreatsIntrinsicHelpersAsPure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.BitConverter.ToInt32", limit: 20);
