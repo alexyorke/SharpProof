@@ -197,6 +197,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void StringInvariantCasingAndHashCodeHelpers_AreSourcedFromGeneratedPurityEvidence_AndSemanticRules_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "string.GetHashCode()",
+                "string.ToLowerInvariant()",
+                "string.ToUpperInvariant()",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void StringPrefixSuffix_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.String.StartsWith(System.String)"));

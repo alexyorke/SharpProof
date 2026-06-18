@@ -1075,6 +1075,40 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStringGetHashCodeSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.String.GetHashCode", limit: 20);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.String.GetHashCode()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.GetHashCode()", "none");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeStringInvariantCasingSlice_TreatsHelpersAsGeneratedImpureEvidence()
+        {
+            using var lowerSummary = await RunRuntimeEffectSummaryAsync("System.String.ToLowerInvariant", limit: 10);
+            using var upperSummary = await RunRuntimeEffectSummaryAsync("System.String.ToUpperInvariant", limit: 10);
+
+            var lowerReport = lowerSummary.RootElement.GetProperty("PurityReport");
+            var lowerCatalogComparison = lowerReport.GetProperty("CatalogComparison");
+            Assert.That(lowerCatalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var upperReport = upperSummary.RootElement.GetProperty("PurityReport");
+            var upperCatalogComparison = upperReport.GetProperty("CatalogComparison");
+            Assert.That(upperCatalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(lowerSummary, "System.String.ToLowerInvariant()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(lowerSummary, "System.String.ToLowerInvariant()", "caller_visible");
+            AssertPurityClassification(upperSummary, "System.String.ToUpperInvariant()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(upperSummary, "System.String.ToUpperInvariant()", "caller_visible");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStringPrefixSuffixSlice_TreatsStartsWithAndEndsWithAsImpure()
         {
             using var startsWithSummary = await RunRuntimeEffectSummaryAsync("System.String.StartsWith", limit: 20);

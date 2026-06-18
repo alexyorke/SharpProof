@@ -194,6 +194,27 @@ public class TestClass
         }
 
         [Test]
+        public async Task StringInvariantCasingAndHashCode_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(string input)
+    {
+        var lower = input.ToLowerInvariant();
+        var upper = input.ToUpperInvariant();
+        return lower.GetHashCode() + upper.Length;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task StringStartsWithStringComparisonOrdinal_NoDiagnostic()
         {
             var test = @"
