@@ -1,0 +1,97 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-18T09:34:12.0283664+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.Private.Uri",
+      "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.Uri.dll",
+      "AssemblySha256": "7ce81174fdba93a1e12c596ea3e1ad4bcc9e798710292e1629cbe827ee34458b",
+      "ModuleVersionId": "5d784c43-db46-4a75-bfd4-a37c57198043",
+      "MethodCount": 337,
+      "EmittedMethodCount": 1,
+      "Methods": [
+        {
+          "Symbol": "System.Uri.UnescapeDataString(string)",
+          "ExactSymbolKey": "System.Uri.UnescapeDataString(string)-\u003Estring",
+          "MetadataToken": "0x060000A1",
+          "RelativeVirtualAddress": 148108,
+          "MethodBodySha256": "14d098864ad2f48ab61b6d95ae55e6cc7b95ed6a915bbeb5d12e7e9e8c20a518",
+          "CacheKey": "mvid:5d784c43-db46-4a75-bfd4-a37c57198043|token:0x060000A1|il:14d098864ad2f48ab61b6d95ae55e6cc7b95ed6a915bbeb5d12e7e9e8c20a518",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "reads_static_field"
+          ],
+          "RootCandidates": [
+            "safe_static_cache_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.MemoryExtensions.AsSpan(string, int, int)-\u003ESystem.ReadOnlySpan\u00601\u003Cchar\u003E",
+            "System.Span\u00601\u003Cchar\u003E..ctor(void*, int)-\u003Evoid",
+            "System.Text.ValueStringBuilder..ctor(System.Span\u00601\u003Cchar\u003E)-\u003Evoid",
+            "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)-\u003Evoid",
+            "System.Text.ValueStringBuilder.EnsureCapacity(int)-\u003Evoid",
+            "System.UriHelper.UnescapeString(string, int, int, ref System.Text.ValueStringBuilder, char, char, char, System.UnescapeMode, System.UriParser, bool)-\u003Evoid",
+            "object.ToString()-\u003Estring",
+            "string.IndexOf(char)-\u003Eint",
+            "string.get_Length()-\u003Eint"
+          ],
+          "Fields": [
+            "System.String.Empty"
+          ],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 1,
+    "PureCount": 1,
+    "ImpureCount": 0,
+    "ConservativeUnknownCount": 0,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.Uri.UnescapeDataString(string)",
+        "ExactSymbolKey": "System.Uri.UnescapeDataString(string)-\u003Estring",
+        "CacheKey": "mvid:5d784c43-db46-4a75-bfd4-a37c57198043|token:0x060000A1|il:14d098864ad2f48ab61b6d95ae55e6cc7b95ed6a915bbeb5d12e7e9e8c20a518",
+        "AssemblyName": "System.Private.Uri",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.Uri.dll",
+        "AssemblySha256": "7ce81174fdba93a1e12c596ea3e1ad4bcc9e798710292e1629cbe827ee34458b",
+        "ModuleVersionId": "5d784c43-db46-4a75-bfd4-a37c57198043",
+        "MetadataToken": "0x060000A1",
+        "MethodBodySha256": "14d098864ad2f48ab61b6d95ae55e6cc7b95ed6a915bbeb5d12e7e9e8c20a518",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "internal_only"
+      }
+    ]
+  }
+}

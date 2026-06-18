@@ -829,6 +829,7 @@ internal static class PurityClassificationEngine
         return summary.Fields.All(static field =>
             string.Equals(field, "System.String.Empty", StringComparison.Ordinal) ||
             string.Equals(field, "System.String._firstChar", StringComparison.Ordinal) ||
+            string.Equals(field, "System.UriHelper.Unreserved", StringComparison.Ordinal) ||
             string.Equals(field, "System.Globalization.TextInfo.Invariant", StringComparison.Ordinal) ||
             string.Equals(field, "System.Globalization.CompareInfo.Invariant", StringComparison.Ordinal) ||
             string.Equals(field, "System.BitConverter.IsLittleEndian", StringComparison.Ordinal) ||

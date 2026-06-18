@@ -383,6 +383,13 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void UriEscapeAndUnescapeDataString_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Uri.EscapeDataString(string)");
+            AssertNotInManualCatalogs("System.Uri.UnescapeDataString(string)");
+        }
+
+        [Test]
         public void IPAddressParseHelpers_AreHandledSemantically_NotStaticCatalogs()
         {
             var members = new[]

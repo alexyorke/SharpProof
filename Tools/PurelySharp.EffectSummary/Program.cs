@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Reflection.Metadata;
@@ -248,6 +249,9 @@ internal static class RuntimeAssemblyResolver
 
 internal static class AssemblyEffectSummarizer
 {
+    private static readonly ConcurrentDictionary<string, Type?> RuntimeTypeCache =
+        new ConcurrentDictionary<string, Type?>(StringComparer.Ordinal);
+
     private static readonly IReadOnlyDictionary<short, OpCode> OpCodesByValue =
         typeof(OpCodes)
             .GetFields(BindingFlags.Public | BindingFlags.Static)
@@ -630,6 +634,7 @@ internal static class AssemblyEffectSummarizer
             string.Equals(field, "System.CultureAwareComparer.InvariantCaseSensitiveInstance", StringComparison.Ordinal) ||
             string.Equals(field, "System.CultureAwareComparer.InvariantIgnoreCaseInstance", StringComparison.Ordinal) ||
             string.Equals(field, "System.String.Empty", StringComparison.Ordinal) ||
+            string.Equals(field, "System.UriHelper.Unreserved", StringComparison.Ordinal) ||
             string.Equals(field, "System.Globalization.TextInfo.Invariant", StringComparison.Ordinal) ||
             string.Equals(field, "System.Globalization.CompareInfo.Invariant", StringComparison.Ordinal)))
         {
@@ -1315,6 +1320,7 @@ internal static class AssemblyEffectSummarizer
         {
             HandleKind.MethodDefinition => IsVirtualDispatchCandidate(reader, (MethodDefinitionHandle)handle),
             HandleKind.MethodSpecification => IsVirtualDispatchCandidate(reader, (MethodSpecificationHandle)handle),
+            HandleKind.MemberReference => IsVirtualDispatchCandidate(reader, (MemberReferenceHandle)handle),
             _ => true,
         };
     }
@@ -1345,6 +1351,101 @@ internal static class AssemblyEffectSummarizer
 
         var declaringType = reader.GetTypeDefinition(definition.GetDeclaringType());
         return (declaringType.Attributes & System.Reflection.TypeAttributes.Sealed) == 0;
+    }
+
+    private static bool IsVirtualDispatchCandidate(MetadataReader reader, MemberReferenceHandle handle)
+    {
+        var memberReference = reader.GetMemberReference(handle);
+        var runtimeType = TryResolveRuntimeType(reader, memberReference.Parent);
+        if (runtimeType == null)
+        {
+            return true;
+        }
+
+        if (runtimeType.IsValueType || runtimeType.IsSealed)
+        {
+            return false;
+        }
+
+        var parameterCount = TryGetMemberReferenceParameterCount(reader, memberReference);
+        if (parameterCount == null)
+        {
+            return true;
+        }
+
+        var methodName = reader.GetString(memberReference.Name);
+        var candidates = runtimeType
+            .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
+            .Where(method =>
+                string.Equals(method.Name, methodName, StringComparison.Ordinal) &&
+                method.GetParameters().Length == parameterCount.Value)
+            .ToArray();
+        if (candidates.Length == 0)
+        {
+            return true;
+        }
+
+        return candidates.Any(static method => method.IsVirtual && !method.IsFinal && method.DeclaringType?.IsSealed != true);
+    }
+
+    private static int? TryGetMemberReferenceParameterCount(MetadataReader reader, MemberReference memberReference)
+    {
+        try
+        {
+            return memberReference.DecodeMethodSignature(new TypeNameProvider(reader), genericContext: null).ParameterTypes.Length;
+        }
+        catch (BadImageFormatException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private static Type? TryResolveRuntimeType(MetadataReader reader, EntityHandle handle)
+    {
+        var typeName = handle.Kind switch
+        {
+            HandleKind.TypeDefinition => GetTypeName(reader, (TypeDefinitionHandle)handle),
+            HandleKind.TypeReference => GetTypeReferenceName(reader, (TypeReferenceHandle)handle),
+            _ => null
+        };
+        if (string.IsNullOrWhiteSpace(typeName))
+        {
+            return null;
+        }
+
+        return RuntimeTypeCache.GetOrAdd(typeName, static fullName =>
+        {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var resolved = assembly.GetType(fullName, throwOnError: false);
+                if (resolved != null)
+                {
+                    return resolved;
+                }
+            }
+
+            if (fullName.IndexOfAny(new[] { '<', '>', ',', '!', '*' }) >= 0)
+            {
+                return null;
+            }
+
+            try
+            {
+                return Type.GetType(fullName, throwOnError: false);
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
+            catch (FileLoadException)
+            {
+                return null;
+            }
+        });
     }
 
     private static string GetMemberReferenceSymbol(MetadataReader reader, MemberReferenceHandle handle)

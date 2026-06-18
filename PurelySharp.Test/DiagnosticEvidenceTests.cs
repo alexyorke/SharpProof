@@ -307,6 +307,54 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_UriEscapeAndUnescapeDataString_FromRuntimeImplementationAssembly()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(string value)
+    {
+        return Uri.UnescapeDataString(Uri.EscapeDataString(value));
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var invocations = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Select(invocation => (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!)
+                .OrderBy(symbol => symbol.Name, StringComparer.Ordinal)
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var matched = invocations.Select(symbol =>
+            {
+                var args = new object?[] { symbol.OriginalDefinition, compilation, null };
+                return (bool)tryGetPurity.Invoke(catalog, args)!;
+            }).ToArray();
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow Uri.EscapeDataString and Uri.UnescapeDataString when the symbol resolves through a facade assembly.");
+            Assert.That(matched, Is.EqualTo(new[] { true, true }),
+                "Generated purity catalog should resolve both Uri.EscapeDataString and Uri.UnescapeDataString to their runtime implementation assembly.");
+        }
+
+        [Test]
         public void InvariantCultureDeterministicParseHelper_Recognizes_TimeSpanSpanParseExact()
         {
             const string source = @"
