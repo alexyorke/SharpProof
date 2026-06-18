@@ -317,6 +317,46 @@ public class TestClass
         }
 
         [Test]
+        public async Task StringInsertPadLeftAndRemoveRange_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(string input)
+    {
+        var padded = input.PadLeft(5);
+        var inserted = padded.Insert(1, ""-"");
+        return inserted.Remove(0, 1);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StringRemoveSingleIndex_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(string input)
+    {
+        return input.Remove(1);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task StringStartsWithStringComparisonOrdinal_NoDiagnostic()
         {
             var test = @"

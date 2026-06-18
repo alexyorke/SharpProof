@@ -272,6 +272,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void StringInsertPadLeftAndRemoveHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "string.Insert(int, string)",
+                "string.PadLeft(int)",
+                "string.Remove(int)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void StringPrefixSuffix_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.String.StartsWith(System.String)"));

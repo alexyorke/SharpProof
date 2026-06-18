@@ -1262,6 +1262,45 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStringInsertPadLeftAndRemoveSlice_UsesGeneratedPurityAndImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                60,
+                "System.String.Insert",
+                "System.String.PadLeft",
+                "System.String.Remove");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.String.Insert(int, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Insert(int, string)", "none");
+            AssertPurityClassification(summary, "System.String.PadLeft(int)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.PadLeft(int)", "none");
+            AssertPurityClassification(summary, "System.String.Remove(int)", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.String.Remove(int)", "caller_visible");
+            AssertPurityClassification(summary, "System.String.Remove(int, int)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Remove(int, int)", "internal_only");
+
+            var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.String.Insert(int, string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.String.PadLeft(int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.String.Remove(int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.String.Remove(int, int)", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(symbols, Does.Contain("System.String.Insert(int, string)"));
+            Assert.That(symbols, Does.Contain("System.String.PadLeft(int)"));
+            Assert.That(symbols, Does.Contain("System.String.Remove(int)"));
+            Assert.That(symbols, Does.Contain("System.String.Remove(int, int)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStringSplitSlice_UsesGeneratedFreshArrayEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.String.Split", limit: 80);
