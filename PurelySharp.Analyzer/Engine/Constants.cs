@@ -1106,8 +1106,6 @@ public static class Constants
         "System.Array.Find<T>(T[], System.Predicate<T>)",
         "System.Array.FindIndex<T>(T[], System.Predicate<T>)",
 
-        "System.Collections.Generic.List<T>.FindIndex(System.Predicate<T>)",
-        "System.Collections.Generic.List<T>.FindLast(System.Predicate<T>)",
         "System.Array.GetLength(int)",
         "System.Array.IndexOf<T>(T[], T)",
         "System.Array.LastIndexOf<T>(T[], T)",

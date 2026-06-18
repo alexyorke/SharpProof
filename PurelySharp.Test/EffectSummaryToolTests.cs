@@ -3014,8 +3014,12 @@ public static class PurityFixture
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Count()", "pure");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Item(int)", "pure");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.Exists(System.Predicate`1<!0>)", "pure");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.FindIndex(System.Predicate`1<!0>)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.FindIndex(System.Predicate`1<!0>)", "none");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.Find(System.Predicate`1<!0>)", "impure", "caller_visible_memory_write");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Find(System.Predicate`1<!0>)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.FindLast(System.Predicate`1<!0>)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.FindLast(System.Predicate`1<!0>)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)", "conservative_unknown", "dynamic_dispatch", "virtual_call");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)", "unknown");
 
@@ -3031,7 +3035,9 @@ public static class PurityFixture
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Count()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Item(int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Exists(System.Predicate`1<!0>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.FindIndex(System.Predicate`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Find(System.Predicate`1<!0>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.FindLast(System.Predicate`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)"));
         }
 

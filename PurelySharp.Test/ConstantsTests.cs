@@ -152,6 +152,8 @@ namespace PurelySharp.Test
                 "System.Collections.Generic.List<T>.Contains(T)",
                 "System.Collections.Generic.List<T>.Count.get",
                 "System.Collections.Generic.List<T>.Find(System.Predicate<T>)",
+                "System.Collections.Generic.List<T>.FindIndex(System.Predicate<T>)",
+                "System.Collections.Generic.List<T>.FindLast(System.Predicate<T>)",
                 "System.Collections.Generic.List<T>.Exists(System.Predicate<T>)",
                 "System.Collections.Generic.List<T>.TrueForAll(System.Predicate<T>)",
                 "System.Collections.Generic.List<T>.this[int].get",
