@@ -1189,9 +1189,6 @@ public static class Constants
         "System.String.Join(string, System.Collections.Generic.IEnumerable<string>)",
         "System.String.Join<T>(string, System.Collections.Generic.IEnumerable<T>)",
 
-        "System.MemoryExtensions.AsSpan(string)",
-
-
         "string.String(System.ReadOnlySpan<char>)",
 
 

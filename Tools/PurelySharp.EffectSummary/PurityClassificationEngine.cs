@@ -143,7 +143,8 @@ internal static class PurityClassificationEngine
             if (string.Equals(root, "caller_visible_memory_write", StringComparison.Ordinal) &&
                 (HasFreshOwnedArrayWritePattern(summary) ||
                  HasFreshOwnedStringWritePattern(summary) ||
-                 HasLocalScratchMemoryWritePattern(summary)))
+                 HasLocalScratchMemoryWritePattern(summary) ||
+                 HasByRefLikeViewConstructionPattern(summary)))
             {
                 continue;
             }
@@ -174,7 +175,8 @@ internal static class PurityClassificationEngine
                 (summary.RootCandidates.Contains("fresh_owned_memory_write", StringComparer.Ordinal) ||
                  HasFreshOwnedArrayWritePattern(summary) ||
                  HasFreshOwnedStringWritePattern(summary) ||
-                 HasLocalScratchMemoryWritePattern(summary)))
+                 HasLocalScratchMemoryWritePattern(summary) ||
+                 HasByRefLikeViewConstructionPattern(summary)))
             {
                 continue;
             }
@@ -777,6 +779,46 @@ internal static class PurityClassificationEngine
             call.StartsWith("System.Text.ValueStringBuilder.", StringComparison.Ordinal));
     }
 
+    private static bool HasByRefLikeViewConstructionPattern(MethodEffectSummary? summary)
+    {
+        if (summary == null ||
+            !summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        foreach (var effect in summary.Effects)
+        {
+            if (string.Equals(effect, "allocates_object", StringComparison.Ordinal) ||
+                string.Equals(effect, "calls_method", StringComparison.Ordinal) ||
+                string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            return false;
+        }
+
+        var sawByRefLikeConstructor = false;
+        foreach (var call in summary.Calls)
+        {
+            if (IsByRefLikeViewConstructionCall(call))
+            {
+                sawByRefLikeConstructor = true;
+                continue;
+            }
+
+            if (IsPurityNeutralIntrinsicHelperCall(call))
+            {
+                continue;
+            }
+
+            return false;
+        }
+
+        return sawByRefLikeConstructor;
+    }
+
     private static bool HasOnlySafeStaticReads(MethodEffectSummary summary)
     {
         if (!summary.Effects.Contains("reads_static_field", StringComparer.Ordinal))
@@ -919,7 +961,17 @@ internal static class PurityClassificationEngine
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.BitCast(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("string.GetRawStringData()", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("string.get_Length()", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains(".get_Length()", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) && callSymbol.Contains(".get_Length()", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences(", StringComparison.Ordinal);
+    }
+
+    private static bool IsByRefLikeViewConstructionCall(string callSymbol)
+    {
+        return callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) && callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal);
     }
 }
 

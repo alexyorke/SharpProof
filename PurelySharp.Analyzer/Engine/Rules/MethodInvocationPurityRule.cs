@@ -1536,14 +1536,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
             var methodSymbol = invocationOperation.TargetMethod?.OriginalDefinition;
-            if (methodSymbol?.Name == "AsSpan" &&
-                methodSymbol.ContainingType?.ToDisplayString() == "System.MemoryExtensions" &&
-                methodSymbol.Parameters.Length == 1 &&
-                methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_String)
-            {
-                return true;
-            }
-
             if (methodSymbol?.ContainingType?.SpecialType != SpecialType.System_String)
             {
                 return false;

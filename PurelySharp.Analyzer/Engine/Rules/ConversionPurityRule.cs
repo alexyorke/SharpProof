@@ -61,6 +61,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 PurityAnalysisEngine.LogDebug($"    [ConversionRule] Operator Method Return Type: {operatorMethod.ReturnType?.ToDisplayString()}");
                 PurityAnalysisEngine.LogDebug($"    [ConversionRule] Operator Method Param Count: {operatorMethod.Parameters.Length}");
 
+                if (IsPurityNeutralIntrinsicConversion(operatorMethod))
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                }
+
                 if (IsStaticAbstractInterfaceConversion(operatorMethod))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ConversionRule] Static abstract interface conversion '{operatorMethod.Name}' has unresolved dispatch targets. Conversion is Impure.");
@@ -86,6 +91,18 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
 
             return operandResult;
+        }
+
+        private static bool IsPurityNeutralIntrinsicConversion(IMethodSymbol operatorMethod)
+        {
+            return operatorMethod.ContainingType?.SpecialType == SpecialType.System_String &&
+                operatorMethod.Name == "op_Implicit" &&
+                operatorMethod.Parameters.Length == 1 &&
+                operatorMethod.Parameters[0].Type.SpecialType == SpecialType.System_String &&
+                operatorMethod.ReturnType is INamedTypeSymbol namedReturnType &&
+                namedReturnType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
+                namedReturnType.TypeArguments.Length == 1 &&
+                namedReturnType.TypeArguments[0].SpecialType == SpecialType.System_Char;
         }
 
         private static bool IsStaticAbstractInterfaceConversion(IMethodSymbol methodSymbol)

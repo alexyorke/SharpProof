@@ -27,6 +27,9 @@ namespace PurelySharp.Analyzer.Engine
 		internal static bool IsStrictPurityProfile =>
 			string.Equals(_configuredOverrides.Value?.PurityProfile, "strict", StringComparison.OrdinalIgnoreCase);
 
+		private static readonly Lazy<ImmutableHashSet<string>> KnownPureNormalizedSignatures =
+			new(() => NormalizeSignatures(Constants.KnownPureBCLMembers));
+
 		internal static IDisposable UseConfiguredOverrides(AnalyzerConfiguration config)
 		{
 			var previous = _configuredOverrides.Value;
@@ -152,24 +155,43 @@ namespace PurelySharp.Analyzer.Engine
 
 		private static bool MatchesKnownPureSignature(string signature)
 		{
-			return MatchesSignature(Constants.KnownPureBCLMembers, signature) ||
-				MatchesSignature(ExtraPureMethods, signature);
+			return MatchesSignature(Constants.KnownPureBCLMembers, KnownPureNormalizedSignatures.Value, signature) ||
+				MatchesSignature(ExtraPureMethods, NormalizeSignatures(ExtraPureMethods), signature);
 		}
 
 		private static bool MatchesConfiguredKnownPureSignature(string signature)
 		{
-			return MatchesSignature(ExtraPureMethods, signature);
+			return MatchesSignature(ExtraPureMethods, NormalizeSignatures(ExtraPureMethods), signature);
 		}
 
-		private static bool MatchesSignature(IEnumerable<string> signatures, string signature)
+		private static bool MatchesSignature(
+			IEnumerable<string> signatures,
+			ImmutableHashSet<string> normalizedSignatures,
+			string signature)
 		{
 			if (signatures.Contains(signature))
 			{
 				return true;
 			}
 
-			return signature.IndexOf('?') >= 0 &&
-				signatures.Contains(signature.Replace("?", string.Empty));
+			var normalizedSignature = NormalizeSignature(signature);
+			return (!string.Equals(normalizedSignature, signature, StringComparison.Ordinal) &&
+				signatures.Contains(normalizedSignature)) ||
+				normalizedSignatures.Contains(normalizedSignature);
+		}
+
+		private static ImmutableHashSet<string> NormalizeSignatures(IEnumerable<string> signatures)
+		{
+			return signatures
+				.Select(NormalizeSignature)
+				.ToImmutableHashSet(StringComparer.Ordinal);
+		}
+
+		private static string NormalizeSignature(string signature)
+		{
+			return signature.IndexOf('?') >= 0
+				? signature.Replace("?", string.Empty)
+				: signature;
 		}
 
 		public static bool IsKnownImpure(ISymbol symbol)

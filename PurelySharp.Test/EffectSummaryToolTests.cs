@@ -516,6 +516,28 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeMemoryExtensionsStringAsSpanSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.MemoryExtensions.AsSpan(string)", limit: 20);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.MemoryExtensions.AsSpan(string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.MemoryExtensions.AsSpan(string)", "none");
+
+            var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.MemoryExtensions.AsSpan(string)", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(symbols, Does.Contain("System.MemoryExtensions.AsSpan(string)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeBitOperationsDeBruijnHelpersSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Numerics.BitOperations", limit: 80);

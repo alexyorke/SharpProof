@@ -13,6 +13,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using PurelySharp.Analyzer;
@@ -261,6 +262,47 @@ public class TestClass
                 Is.False,
                 "Trusted generated purity should keep SHA256.HashData(ReadOnlySpan<byte>) out of the impure cryptography namespace fallback.");
             Assert.That(matched, Is.True, "Generated purity catalog should trust the exact SHA256.ReadOnlySpan<byte> overload.");
+        }
+
+        [Test]
+        public void InvariantCultureDeterministicParseHelper_Recognizes_TimeSpanSpanParseExact()
+        {
+            const string source = @"
+#nullable enable
+using System;
+using System.Globalization;
+
+public static class TestClass
+{
+    public static TimeSpan TestMethod(string value)
+    {
+        ReadOnlySpan<char> span = value.AsSpan();
+        return TimeSpan.ParseExact(span, ""c"", CultureInfo.InvariantCulture, TimeSpanStyles.None);
+    }
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "DeterministicParseProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var invocation = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Single(node => node.ToString().Contains("TimeSpan.ParseExact", StringComparison.Ordinal));
+            var operation = (IInvocationOperation)semanticModel.GetOperation(invocation)!;
+            var engineType = typeof(PurelySharpAnalyzer).Assembly.GetType(
+                "PurelySharp.Analyzer.Engine.PurityAnalysisEngine",
+                throwOnError: true)!;
+            var helper = engineType.GetMethod(
+                "IsInvariantCultureDeterministicParseInvocation",
+                BindingFlags.NonPublic | BindingFlags.Static)!;
+
+            var matched = (bool)helper.Invoke(null, new object[] { operation })!;
+
+            Assert.That(matched, Is.True, "The deterministic parse helper should recognize span ParseExact with InvariantCulture and None styles.");
         }
 
         [Test]

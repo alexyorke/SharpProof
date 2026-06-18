@@ -467,14 +467,14 @@ namespace PurelySharp.Test
         {
             var members = new[]
             {
+                "System.MemoryExtensions.AsSpan(string)",
                 "System.MemoryExtensions.SequenceEqual<T>(System.ReadOnlySpan<T>, System.ReadOnlySpan<T>)",
                 "System.MemoryExtensions.Trim<T>(System.ReadOnlySpan<T>)",
             };
 
             foreach (var member in members)
             {
-                Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(member));
-                Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(member));
+                AssertNotInManualCatalogs(member);
             }
         }
 
