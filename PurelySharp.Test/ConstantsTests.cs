@@ -537,6 +537,12 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void ListCapacity_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Collections.Generic.List<T>.Capacity.get");
+        }
+
+        [Test]
         public void EmailAddressConstructor_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
@@ -1808,6 +1814,29 @@ public static class ReadOnlySequenceCatalogSignatureSamples
 
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Length"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.IsEmpty"));
+        }
+
+        [Test]
+        public void ListCapacityGeneratedPurityEntryResolvesAgainstNet80References()
+        {
+            var source = @"
+using System.Collections.Generic;
+
+public static class ListCapacityCatalogSignatureSamples
+{
+    public static int Sample(List<int> values)
+    {
+        return values.Capacity;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ListCapacityGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "values.Capacity"));
         }
 
         [Test]

@@ -2977,6 +2977,8 @@ public static class PurityFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.Contains(!0)", "pure");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Capacity()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.get_Capacity()", "none");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Count()", "pure");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Item(int)", "pure");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.Exists(System.Predicate`1<!0>)", "pure");
@@ -2993,6 +2995,7 @@ public static class PurityFixture
                 .ToArray();
 
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Contains(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Capacity()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Count()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Item(int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Exists(System.Predicate`1<!0>)"));

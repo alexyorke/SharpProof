@@ -1105,7 +1105,6 @@ public static class Constants
         "System.Array.BinarySearch(System.Array, object)",
         "System.Array.Find<T>(T[], System.Predicate<T>)",
         "System.Array.FindIndex<T>(T[], System.Predicate<T>)",
-        "System.Collections.Generic.List<T>.Capacity.get",
 
         "System.Collections.Generic.List<T>.FindIndex(System.Predicate<T>)",
         "System.Collections.Generic.List<T>.FindLast(System.Predicate<T>)",
