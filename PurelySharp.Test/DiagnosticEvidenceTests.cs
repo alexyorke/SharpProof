@@ -573,6 +573,86 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_ObjectReferenceEqualsTupleFactoriesAndArraySegmentConstructors()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(int[] values, object left, object right)
+    {
+        var same = object.ReferenceEquals(left, right);
+        var whole = new ArraySegment<int>(values);
+        var prefix = new ArraySegment<int>(values, 0, 1);
+        var tuple = Tuple.Create(1, 2);
+        var valueTuple = ValueTuple.Create(1, 2);
+        return same ? 1 : values.Length;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = new IMethodSymbol[]
+            {
+                (IMethodSymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Single(node => node.ToString() == "object.ReferenceEquals(left, right)"))
+                    .Symbol!,
+                (IMethodSymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<ObjectCreationExpressionSyntax>()
+                        .Single(node => node.ToString() == "new ArraySegment<int>(values)"))
+                    .Symbol!,
+                (IMethodSymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<ObjectCreationExpressionSyntax>()
+                        .Single(node => node.ToString() == "new ArraySegment<int>(values, 0, 1)"))
+                    .Symbol!,
+                (IMethodSymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Single(node => node.ToString() == "Tuple.Create(1, 2)"))
+                    .Symbol!,
+                (IMethodSymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Single(node => node.ToString() == "ValueTuple.Create(1, 2)"))
+                    .Symbol!,
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var matched = trackedMethods.Select(method =>
+            {
+                var args = new object?[] { method.OriginalDefinition, compilation, null };
+                return (bool)tryGetPurity.Invoke(catalog, args)!;
+            }).ToArray();
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow object.ReferenceEquals, ArraySegment constructors, Tuple.Create, and ValueTuple.Create.");
+            Assert.That(matched, Is.EqualTo(new[] { true, true, true, true, true }),
+                "Generated purity catalog should resolve the tracked ReferenceEquals, ArraySegment, Tuple, and ValueTuple members.");
+        }
+
+        [Test]
         public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPureMethodFallback()
         {
             const string source = @"

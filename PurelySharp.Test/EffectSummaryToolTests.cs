@@ -2873,6 +2873,56 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeTupleArraySegmentAndReferenceEqualsSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                80,
+                "System.Object.ReferenceEquals(object, object)",
+                "System.Tuple.Create",
+                "System.ValueTuple.Create",
+                "System.ArraySegment`1..ctor(!0[])",
+                "System.ArraySegment`1..ctor(!0[], int, int)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Object.ReferenceEquals(object, object)", "pure");
+            AssertFreshnessClassification(summary, "System.Object.ReferenceEquals(object, object)", "none");
+            AssertEffectVisibilityClassification(summary, "System.Object.ReferenceEquals(object, object)", "none");
+
+            AssertPurityClassification(summary, "System.Tuple.Create(!!0, !!1)", "pure");
+            AssertFreshnessClassification(summary, "System.Tuple.Create(!!0, !!1)", "none");
+            AssertEffectVisibilityClassification(summary, "System.Tuple.Create(!!0, !!1)", "none");
+
+            AssertPurityClassification(summary, "System.ValueTuple.Create(!!0, !!1)", "pure");
+            AssertFreshnessClassification(summary, "System.ValueTuple.Create(!!0, !!1)", "none");
+            AssertEffectVisibilityClassification(summary, "System.ValueTuple.Create(!!0, !!1)", "none");
+
+            AssertPurityClassification(summary, "System.ArraySegment`1..ctor(!0[])", "pure");
+            AssertFreshnessClassification(summary, "System.ArraySegment`1..ctor(!0[])", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.ArraySegment`1..ctor(!0[])", "internal_only");
+
+            AssertPurityClassification(summary, "System.ArraySegment`1..ctor(!0[], int, int)", "pure");
+            AssertFreshnessClassification(summary, "System.ArraySegment`1..ctor(!0[], int, int)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.ArraySegment`1..ctor(!0[], int, int)", "internal_only");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Object.ReferenceEquals(object, object)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Tuple.Create(!!0, !!1)"));
+            Assert.That(generatedSymbols, Does.Contain("System.ValueTuple.Create(!!0, !!1)"));
+            Assert.That(generatedSymbols, Does.Contain("System.ArraySegment`1..ctor(!0[])"));
+            Assert.That(generatedSymbols, Does.Contain("System.ArraySegment`1..ctor(!0[], int, int)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_GeneratedPurityCatalog_UsesDistinctExactKeys_ForDuplicateDisplaySymbols()
         {
             var source = """

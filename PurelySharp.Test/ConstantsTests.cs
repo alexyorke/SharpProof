@@ -227,6 +227,15 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void TupleArraySegmentAndReferenceEqualsHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("object.ReferenceEquals(object, object)"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Tuple.Create"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.ValueTuple.Create"));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.ArraySegment<T>.ArraySegment(T[], int, int)"));
+        }
+
+        [Test]
         public void StringNullHelpers_AndOrdinalComparerGetter_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
@@ -1066,6 +1075,9 @@ public static class CatalogSignatureSamples
     {
         var list = new List<int>();
         var names = new NameCollection();
+        var values = new[] { 1, 2, 3 };
+        object leftObject = new object();
+        object rightObject = new object();
         list.Add(1);
         var now = DateTime.Now;
         _ = IPAddress.Loopback;
@@ -1091,6 +1103,11 @@ public static class CatalogSignatureSamples
         _ = new ArgumentOutOfRangeException(""value"");
         _ = new BadImageFormatException(""bad image"");
         _ = new AttributeUsageAttribute(AttributeTargets.Method);
+        _ = object.ReferenceEquals(leftObject, rightObject);
+        _ = new ArraySegment<int>(values);
+        _ = new ArraySegment<int>(values, 0, 1);
+        _ = Tuple.Create(1, 2);
+        _ = ValueTuple.Create(1, 2);
         return Array.Empty<int>().Length + list.Count + now.Day;
     }
 }";
@@ -1133,6 +1150,12 @@ public static class CatalogSignatureSamples
 
             Assert.That(GetObjectCreationSignature(compilation, syntaxTree, "new AttributeUsageAttribute(AttributeTargets.Method)"), Is.EqualTo("System.AttributeUsageAttribute.AttributeUsageAttribute(System.AttributeTargets)"));
             AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new AttributeUsageAttribute(AttributeTargets.Method)"));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "object.ReferenceEquals(leftObject, rightObject)"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new ArraySegment<int>(values)"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new ArraySegment<int>(values, 0, 1)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Tuple.Create(1, 2)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "ValueTuple.Create(1, 2)"));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.SHA1.HashData(byte[])"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)")));

@@ -183,6 +183,17 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/TupleArraySegmentReferenceEquals.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/TupleArraySegmentReferenceEquals.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.Object.ReferenceEquals(object, object)",
+        "System.Tuple.Create",
+        "System.ValueTuple.Create",
+        "System.ArraySegment`1..ctor(!0[])",
+        "System.ArraySegment`1..ctor(!0[], int, int)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Guid.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Guid.PurelySharp.EffectSummary.json"
     },

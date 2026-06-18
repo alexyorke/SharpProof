@@ -975,9 +975,6 @@ public static class Constants
         "System.Numerics.Complex.Complex(double, double)",
         "System.Numerics.Complex.Abs(System.Numerics.Complex)",
 
-        "object.ReferenceEquals(object, object)",
-
-
         "System.Reflection.FieldInfo.GetValue(object)",
         "System.Reflection.PropertyInfo.GetValue(object)",
         "System.Runtime.InteropServices.Marshal.PtrToStructure<T>(System.IntPtr)",
@@ -1003,10 +1000,6 @@ public static class Constants
         "System.Threading.Tasks.Task.FromResult<TResult>(TResult)",
 
         "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)",
-
-
-        "System.Tuple.Create",
-        "System.ValueTuple.Create",
 
 
         "System.Type.Equals(object)",
@@ -1044,7 +1037,6 @@ public static class Constants
         "System.IO.Hashing.Crc32.Hash(System.ReadOnlySpan<byte>)",
         "System.Linq.Enumerable.Chunk<TSource>(System.Collections.Generic.IEnumerable<TSource>, int)",
         "System.Runtime.InteropServices.MemoryMarshal.Read<T>(System.ReadOnlySpan<byte>)",
-        "System.ArraySegment<T>.ArraySegment(T[], int, int)",
         "System.Collections.Hashtable.ContainsKey(object)",
         "System.Collections.SortedList.GetKey(int)",
         "System.ComponentModel.BrowsableAttribute.BrowsableAttribute(bool)",
@@ -1194,9 +1186,6 @@ public static class Constants
         "object.MemberwiseClone()",
         "System.Runtime.InteropServices.MemoryMarshal.AsBytes<T>(System.Span<T>)",
         "string.IsNullOrWhiteSpace(System.ReadOnlySpan<char>)",
-
-        "object.ReferenceEquals(object, object)",
-
 
         "System.ReadOnlySpan<T>.Length.get",
         "System.ReadOnlySpan<T>.IsEmpty.get",
