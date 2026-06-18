@@ -478,6 +478,37 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void VersionPureMembers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Version.Version(int, int)",
+                "System.Version.Version(int, int, int)",
+                "System.Version.Version(int, int, int, int)",
+                "System.Version.CompareTo(System.Version?)",
+                "System.Version.Equals(System.Version?)",
+                "System.Version.Major.get",
+                "System.Version.Minor.get",
+                "System.Version.Build.get",
+                "System.Version.Revision.get",
+                "System.Version.MajorRevision.get",
+                "System.Version.MinorRevision.get",
+                "System.Version.GetHashCode()",
+                "System.Version.op_Equality(System.Version?, System.Version?)",
+                "System.Version.op_Inequality(System.Version?, System.Version?)",
+                "System.Version.op_GreaterThan(System.Version?, System.Version?)",
+                "System.Version.op_GreaterThanOrEqual(System.Version?, System.Version?)",
+                "System.Version.op_LessThan(System.Version?, System.Version?)",
+                "System.Version.op_LessThanOrEqual(System.Version?, System.Version?)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void TimeProviderAndTimeZoneInfoGlobals_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.TimeProvider.LocalTimeZone.get");

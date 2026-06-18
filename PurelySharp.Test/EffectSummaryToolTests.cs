@@ -943,6 +943,97 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeVersionPureSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                80,
+                "System.Version..ctor(int, int)",
+                "System.Version..ctor(int, int, int)",
+                "System.Version..ctor(int, int, int, int)",
+                "System.Version.CompareTo(System.Version)",
+                "System.Version.Equals(System.Version)",
+                "System.Version.get_Major",
+                "System.Version.get_Minor",
+                "System.Version.get_Build",
+                "System.Version.get_Revision",
+                "System.Version.get_MajorRevision",
+                "System.Version.get_MinorRevision",
+                "System.Version.GetHashCode",
+                "System.Version.op_Equality",
+                "System.Version.op_Inequality",
+                "System.Version.op_GreaterThan",
+                "System.Version.op_GreaterThanOrEqual",
+                "System.Version.op_LessThan",
+                "System.Version.op_LessThanOrEqual");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Version..ctor(int, int)", "pure");
+            AssertFreshnessClassification(summary, "System.Version..ctor(int, int)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Version..ctor(int, int)", "internal_only");
+            AssertPurityClassification(summary, "System.Version.CompareTo(System.Version)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Version.CompareTo(System.Version)", "none");
+            AssertPurityClassification(summary, "System.Version.Equals(System.Version)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Version.Equals(System.Version)", "none");
+            AssertPurityClassification(summary, "System.Version.get_Major()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Version.get_Major()", "none");
+            AssertPurityClassification(summary, "System.Version.op_Equality(System.Version, System.Version)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Version.op_Equality(System.Version, System.Version)", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Version..ctor(int, int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version..ctor(int, int, int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version..ctor(int, int, int, int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.CompareTo(System.Version)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.Equals(System.Version)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.get_Major()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.get_Minor()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.get_Build()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.get_Revision()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.get_MajorRevision()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.get_MinorRevision()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.GetHashCode()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.op_Equality(System.Version, System.Version)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.op_Inequality(System.Version, System.Version)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.op_GreaterThan(System.Version, System.Version)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.op_GreaterThanOrEqual(System.Version, System.Version)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.op_LessThan(System.Version, System.Version)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.op_LessThanOrEqual(System.Version, System.Version)", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Version..ctor(int, int)",
+                "System.Version..ctor(int, int, int)",
+                "System.Version..ctor(int, int, int, int)",
+                "System.Version.CompareTo(System.Version)",
+                "System.Version.Equals(System.Version)",
+                "System.Version.GetHashCode()",
+                "System.Version.get_Build()",
+                "System.Version.get_Major()",
+                "System.Version.get_MajorRevision()",
+                "System.Version.get_Minor()",
+                "System.Version.get_MinorRevision()",
+                "System.Version.get_Revision()",
+                "System.Version.op_Equality(System.Version, System.Version)",
+                "System.Version.op_GreaterThan(System.Version, System.Version)",
+                "System.Version.op_GreaterThanOrEqual(System.Version, System.Version)",
+                "System.Version.op_Inequality(System.Version, System.Version)",
+                "System.Version.op_LessThan(System.Version, System.Version)",
+                "System.Version.op_LessThanOrEqual(System.Version, System.Version)",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeTimeSpanSlice_TreatsConstructorAsPureAndAddAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.TimeSpan", limit: 80);
