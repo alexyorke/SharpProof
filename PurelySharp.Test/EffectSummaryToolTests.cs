@@ -1669,6 +1669,53 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeAppContextSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                80,
+                "System.AppContext.get_BaseDirectory",
+                "System.AppContext.GetData",
+                "System.AppContext.SetData",
+                "System.AppContext.TryGetSwitch",
+                "System.AppContext.SetSwitch");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.AppContext.get_BaseDirectory()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.AppContext.get_BaseDirectory()", "caller_visible");
+            AssertPurityClassification(summary, "System.AppContext.GetData(string)", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.AppContext.GetData(string)", "caller_visible");
+            AssertPurityClassification(summary, "System.AppContext.SetData(string, object)", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.AppContext.SetData(string, object)", "caller_visible");
+            AssertPurityClassification(summary, "System.AppContext.TryGetSwitch(string, ref bool)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.AppContext.TryGetSwitch(string, ref bool)", "caller_visible");
+            AssertPurityClassification(summary, "System.AppContext.SetSwitch(string, bool)", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.AppContext.SetSwitch(string, bool)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.AppContext", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.AppContext.GetData(string)",
+                "System.AppContext.SetData(string, object)",
+                "System.AppContext.SetSwitch(string, bool)",
+                "System.AppContext.TryGetSwitch(string, ref bool)",
+                "System.AppContext.get_BaseDirectory()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeIPAddressParseSlice_UsesSemanticHandlingInsteadOfManualCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly("System.Net.Primitives.dll", 80, "System.Net.IPAddress");

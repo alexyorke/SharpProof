@@ -390,6 +390,16 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AppContextImpureHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.AppContext.BaseDirectory.get");
+            AssertNotInManualCatalogs("System.AppContext.GetData(string)");
+            AssertNotInManualCatalogs("System.AppContext.SetData(string, object?)");
+            AssertNotInManualCatalogs("System.AppContext.TryGetSwitch(string, out bool)");
+            AssertNotInManualCatalogs("System.AppContext.SetSwitch(string, bool)");
+        }
+
+        [Test]
         public void IPAddressParseHelpers_AreHandledSemantically_NotStaticCatalogs()
         {
             var members = new[]
