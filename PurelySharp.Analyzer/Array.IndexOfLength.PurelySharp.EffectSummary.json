@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T16:34:12.4021449+00:00",
+  "GeneratedAtUtc": "2026-06-18T16:44:33.7927545+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -8,7 +8,7 @@
       "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
       "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
       "MethodCount": 34519,
-      "EmittedMethodCount": 2,
+      "EmittedMethodCount": 3,
       "Methods": [
         {
           "Symbol": "System.Array.get_Length()",
@@ -40,6 +40,48 @@
             "HasUnsupportedEffects": false,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Array.GetLength(int)",
+          "ExactSymbolKey": "System.Array.GetLength(int)-\u003Eint",
+          "MetadataToken": "0x06000212",
+          "RelativeVirtualAddress": 6765044,
+          "MethodBodySha256": "09ffbe101f3f90b68b94c13b443fa19b0d13305826b75357ba5f7a0594b1edf9",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000212|il:09ffbe101f3f90b68b94c13b443fa19b0d13305826b75357ba5f7a0594b1edf9",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws"
+          ],
+          "RootCandidates": [
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.IndexOutOfRangeException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.Array.get_Length()-\u003Eint",
+            "System.IndexOutOfRangeException..ctor(string)-\u003Evoid",
+            "System.Runtime.CompilerServices.RuntimeHelpers.GetMultiDimensionalArrayBounds(System.Array)-\u003Eref int",
+            "System.Runtime.CompilerServices.RuntimeHelpers.GetMultiDimensionalArrayRank(System.Array)-\u003Eint",
+            "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)-\u003Eref !!0",
+            "System.SR.get_IndexOutOfRange_ArrayRankIndex()-\u003Estring"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
           }
         },
         {
@@ -79,9 +121,9 @@
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 2,
+    "MethodCount": 3,
     "PureCount": 2,
-    "ImpureCount": 0,
+    "ImpureCount": 1,
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
       "KnownPureMembers": [],
@@ -92,6 +134,28 @@
   "GeneratedPurityCatalog": {
     "SchemaVersion": 2,
     "Entries": [
+      {
+        "Symbol": "System.Array.GetLength(int)",
+        "ExactSymbolKey": "System.Array.GetLength(int)-\u003Eint",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000212|il:09ffbe101f3f90b68b94c13b443fa19b0d13305826b75357ba5f7a0594b1edf9",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06000212",
+        "MethodBodySha256": "09ffbe101f3f90b68b94c13b443fa19b0d13305826b75357ba5f7a0594b1edf9",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
       {
         "Symbol": "System.Array.IndexOf(System.Array, object)",
         "ExactSymbolKey": "System.Array.IndexOf(System.Array, object)-\u003Eint",

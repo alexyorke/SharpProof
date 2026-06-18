@@ -1079,7 +1079,6 @@ public static class Constants
 
         "System.AggregateException.AggregateException(System.Collections.Generic.IEnumerable<System.Exception>)",
         "System.AggregateException.Flatten()",
-        "System.Array.GetLength(int)",
         "System.Array.IndexOf<T>(T[], T)",
         "System.Array.LastIndexOf<T>(T[], T)",
         "char.ConvertFromUtf32(int)",

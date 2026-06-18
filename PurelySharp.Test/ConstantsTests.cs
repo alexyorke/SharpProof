@@ -194,6 +194,29 @@ public static class ArrayIndexOfLengthCatalogSignatureSamples
         }
 
         [Test]
+        public void ArrayGetLength_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+
+public static class ArrayGetLengthCatalogSignatureSamples
+{
+    public static int Sample(Array values)
+    {
+        return values.GetLength(0);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ArrayGetLengthCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.GetLength(0)"));
+        }
+
+        [Test]
         public void ArrayBinarySearchHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"

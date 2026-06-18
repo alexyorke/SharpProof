@@ -757,6 +757,7 @@ public static class PurityFixture
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
                 40,
+                "System.Array.GetLength",
                 "System.Array.IndexOf(System.Array, object)",
                 "System.Array.get_Length");
 
@@ -782,6 +783,15 @@ public static class PurityFixture
                 summary,
                 "System.Array.get_Length()",
                 "none");
+            AssertPurityClassification(
+                summary,
+                "System.Array.GetLength(int)",
+                "impure",
+                "throw");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Array.GetLength(int)",
+                "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -792,6 +802,7 @@ public static class PurityFixture
 
             Assert.That(generatedSymbols, Does.Contain("System.Array.IndexOf(System.Array, object)"));
             Assert.That(generatedSymbols, Does.Contain("System.Array.get_Length()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Array.GetLength(int)"));
         }
 
         [Test]
