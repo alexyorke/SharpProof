@@ -183,6 +183,29 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/PureCoreConstructors.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/PureCoreConstructors.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.ArgumentException..ctor(string, string)",
+        "System.DivideByZeroException..ctor()",
+        "System.FlagsAttribute..ctor()",
+        "System.FormatException..ctor(string)",
+        "System.Index..ctor(int, bool)",
+        "System.IO.EndOfStreamException..ctor()",
+        "System.InvalidOperationException..ctor(string)",
+        "System.NotImplementedException..ctor()",
+        "System.NotSupportedException..ctor(string)",
+        "System.ObsoleteAttribute..ctor(string)",
+        "System.OverflowException..ctor()",
+        "System.PlatformNotSupportedException..ctor()",
+        "System.Range..ctor(System.Index, System.Index)",
+        "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute..ctor(string)",
+        "System.Runtime.CompilerServices.MethodImplAttribute..ctor(System.Runtime.CompilerServices.MethodImplOptions)",
+        "System.SerializableAttribute..ctor()",
+        "System.UIntPtr..ctor(uint)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/TupleArraySegmentReferenceEquals.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/TupleArraySegmentReferenceEquals.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [

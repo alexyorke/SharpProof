@@ -236,6 +236,36 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void PureCoreConstructorsAndValueTypes_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.ArgumentException.ArgumentException(string, string)",
+                "System.DivideByZeroException.DivideByZeroException()",
+                "System.FlagsAttribute.FlagsAttribute()",
+                "System.FormatException.FormatException(string)",
+                "System.Index.Index(int, bool)",
+                "System.IO.EndOfStreamException.EndOfStreamException()",
+                "System.InvalidOperationException.InvalidOperationException(string)",
+                "System.NotImplementedException.NotImplementedException()",
+                "System.NotSupportedException.NotSupportedException(string)",
+                "System.ObsoleteAttribute.ObsoleteAttribute(string)",
+                "System.OverflowException.OverflowException()",
+                "System.PlatformNotSupportedException.PlatformNotSupportedException()",
+                "System.Range.Range(System.Index, System.Index)",
+                "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute.CallerArgumentExpressionAttribute(string)",
+                "System.Runtime.CompilerServices.MethodImplAttribute.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions)",
+                "System.SerializableAttribute.SerializableAttribute()",
+                "System.UIntPtr.UIntPtr(uint)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void StringNullHelpers_AndOrdinalComparerGetter_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
@@ -1062,6 +1092,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 
 public sealed class NameCollection : KeyedCollection<string, string>
@@ -1108,6 +1139,14 @@ public static class CatalogSignatureSamples
         _ = new ArraySegment<int>(values, 0, 1);
         _ = Tuple.Create(1, 2);
         _ = ValueTuple.Create(1, 2);
+        _ = new DivideByZeroException();
+        _ = new InvalidOperationException(""bad operation"");
+        _ = new ObsoleteAttribute(""legacy"");
+        _ = new Index(2, false);
+        _ = new Range(new Index(0, false), new Index(1, false));
+        _ = new UIntPtr(1u);
+        _ = new CallerArgumentExpressionAttribute(""value"");
+        _ = new MethodImplAttribute(MethodImplOptions.AggressiveInlining);
         return Array.Empty<int>().Length + list.Count + now.Day;
     }
 }";
@@ -1156,6 +1195,14 @@ public static class CatalogSignatureSamples
             AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new ArraySegment<int>(values, 0, 1)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Tuple.Create(1, 2)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "ValueTuple.Create(1, 2)"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new DivideByZeroException()"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new InvalidOperationException(\"bad operation\")"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new ObsoleteAttribute(\"legacy\")"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new Index(2, false)"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new Range(new Index(0, false), new Index(1, false))"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new UIntPtr(1u)"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new CallerArgumentExpressionAttribute(\"value\")"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new MethodImplAttribute(MethodImplOptions.AggressiveInlining)"));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)"), Is.EqualTo("System.Security.Cryptography.SHA1.HashData(byte[])"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "SHA1.HashData(bytes)")));

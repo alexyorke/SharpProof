@@ -653,6 +653,100 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_PureCoreConstructorsAndValueTypes()
+        {
+            const string source = @"
+using System;
+using System.IO;
+using System.Runtime.CompilerServices;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        var argument = new ArgumentException(""bad argument"", ""value"");
+        var divideByZero = new DivideByZeroException();
+        var flags = new FlagsAttribute();
+        var format = new FormatException(""bad format"");
+        var index = new Index(2, false);
+        var endOfStream = new EndOfStreamException();
+        var invalidOperation = new InvalidOperationException(""bad operation"");
+        var notImplemented = new NotImplementedException();
+        var notSupported = new NotSupportedException(""unsupported"");
+        var obsolete = new ObsoleteAttribute(""legacy"");
+        var overflow = new OverflowException();
+        var platformNotSupported = new PlatformNotSupportedException();
+        var range = new Range(new Index(0, false), new Index(1, false));
+        var callerArgument = new CallerArgumentExpressionAttribute(""value"");
+        var methodImpl = new MethodImplAttribute(MethodImplOptions.AggressiveInlining);
+        var serializable = new SerializableAttribute();
+        var pointer = new UIntPtr(1u);
+        return 0;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedExpressions = new[]
+            {
+                "new ArgumentException(\"bad argument\", \"value\")",
+                "new DivideByZeroException()",
+                "new FlagsAttribute()",
+                "new FormatException(\"bad format\")",
+                "new Index(2, false)",
+                "new EndOfStreamException()",
+                "new InvalidOperationException(\"bad operation\")",
+                "new NotImplementedException()",
+                "new NotSupportedException(\"unsupported\")",
+                "new ObsoleteAttribute(\"legacy\")",
+                "new OverflowException()",
+                "new PlatformNotSupportedException()",
+                "new Range(new Index(0, false), new Index(1, false))",
+                "new CallerArgumentExpressionAttribute(\"value\")",
+                "new MethodImplAttribute(MethodImplOptions.AggressiveInlining)",
+                "new SerializableAttribute()",
+                "new UIntPtr(1u)",
+            };
+            var trackedMethods = trackedExpressions
+                .Select(expressionText =>
+                {
+                    var symbol = semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<ObjectCreationExpressionSyntax>()
+                            .Single(node => node.ToString() == expressionText))
+                        .Symbol;
+                    Assert.That(symbol, Is.Not.Null, expressionText);
+                    return (IMethodSymbol)symbol!;
+                })
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var matched = trackedMethods.Select(method =>
+            {
+                var args = new object?[] { method.OriginalDefinition, compilation, null };
+                return (bool)tryGetPurity.Invoke(catalog, args)!;
+            }).ToArray();
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow the probed core constructors and value-type constructors.");
+            Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedExpressions.Length).ToArray()),
+                "Generated purity catalog should resolve the tracked core constructor members.");
+        }
+
+        [Test]
         public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPureMethodFallback()
         {
             const string source = @"

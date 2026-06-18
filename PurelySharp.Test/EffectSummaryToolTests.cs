@@ -2923,6 +2923,65 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimePureCoreConstructorsSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                140,
+                "System.ArgumentException..ctor(string, string)",
+                "System.DivideByZeroException..ctor()",
+                "System.FlagsAttribute..ctor()",
+                "System.FormatException..ctor(string)",
+                "System.Index..ctor(int, bool)",
+                "System.IO.EndOfStreamException..ctor()",
+                "System.InvalidOperationException..ctor(string)",
+                "System.NotImplementedException..ctor()",
+                "System.NotSupportedException..ctor(string)",
+                "System.ObsoleteAttribute..ctor(string)",
+                "System.OverflowException..ctor()",
+                "System.PlatformNotSupportedException..ctor()",
+                "System.Range..ctor(System.Index, System.Index)",
+                "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute..ctor(string)",
+                "System.Runtime.CompilerServices.MethodImplAttribute..ctor(System.Runtime.CompilerServices.MethodImplOptions)",
+                "System.SerializableAttribute..ctor()",
+                "System.UIntPtr..ctor(uint)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var representativeSymbols = new[]
+            {
+                "System.DivideByZeroException..ctor()",
+                "System.InvalidOperationException..ctor(string)",
+                "System.ObsoleteAttribute..ctor(string)",
+                "System.Runtime.CompilerServices.MethodImplAttribute..ctor(System.Runtime.CompilerServices.MethodImplOptions)",
+                "System.Index..ctor(int, bool)",
+                "System.Range..ctor(System.Index, System.Index)",
+                "System.UIntPtr..ctor(uint)",
+            };
+
+            foreach (var symbol in representativeSymbols)
+            {
+                AssertPurityClassification(summary, symbol, "pure");
+                AssertFreshnessClassification(summary, symbol, "fresh_owned_object_write");
+                AssertEffectVisibilityClassification(summary, symbol, "internal_only");
+            }
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            foreach (var symbol in representativeSymbols)
+            {
+                Assert.That(generatedSymbols, Does.Contain(symbol));
+            }
+        }
+
+        [Test]
         public async Task EffectSummaryTool_GeneratedPurityCatalog_UsesDistinctExactKeys_ForDuplicateDisplaySymbols()
         {
             var source = """
