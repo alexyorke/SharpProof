@@ -237,6 +237,15 @@ internal static class PurityClassificationEngine
 
             if (!TryResolveCallSummary(call, bySymbol, out var resolvedCallKey, out var resolvedCallSummary))
             {
+                if (TryClassifyUnresolvedInteropBoundaryCall(call, out var unresolvedInteropCategory))
+                {
+                    impureCategories.Add(unresolvedInteropCategory);
+                    if (blockingCallChain.Length == 0)
+                    {
+                        blockingCallChain = new[] { call };
+                    }
+                }
+
                 continue;
             }
 
@@ -929,6 +938,22 @@ internal static class PurityClassificationEngine
 
         resolvedCallKey = string.Empty;
         resolvedCallSummary = default!;
+        return false;
+    }
+
+    private static bool TryClassifyUnresolvedInteropBoundaryCall(string callSymbol, out string category)
+    {
+        if (callSymbol.StartsWith("Interop+", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("Internal.Win32.", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.InteropServices.NativeLibrary.", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastPInvokeError(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastSystemError(", StringComparison.Ordinal))
+        {
+            category = "global_state_read";
+            return true;
+        }
+
+        category = string.Empty;
         return false;
     }
 

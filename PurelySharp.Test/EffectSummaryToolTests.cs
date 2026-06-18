@@ -3384,6 +3384,47 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeEnvironmentAmbientLookupSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                80,
+                "System.Environment.GetEnvironmentVariable",
+                "System.Environment.get_UserInteractive");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariable(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Environment.GetEnvironmentVariable(string)", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.get_UserInteractive()", "impure", "caller_visible_memory_write", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_UserInteractive()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Environment.GetEnvironmentVariable(string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.get_UserInteractive()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Environment.GetEnvironmentVariable(string)",
+                "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)",
+                "System.Environment.get_UserInteractive()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeTimeProviderAndTimeZoneInfoSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

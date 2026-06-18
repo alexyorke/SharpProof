@@ -87,7 +87,9 @@
         "System.Environment.get_SystemDirectory",
         "System.Environment.get_SystemPageSize",
         "System.Environment.get_UserDomainName",
-        "System.Environment.get_WorkingSet"
+        "System.Environment.get_WorkingSet",
+        "System.Environment.GetEnvironmentVariable",
+        "System.Environment.get_UserInteractive"
       ]
     },
     {

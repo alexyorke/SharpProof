@@ -151,6 +151,8 @@ public static class EnvironmentCatalogSignatureSamples
         {
             var members = new[]
             {
+                "System.Environment.GetEnvironmentVariable(string)",
+                "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)",
                 "System.Environment.MachineName.get",
                 "System.Environment.OSVersion.get",
                 "System.Environment.ProcessId.get",
@@ -159,6 +161,7 @@ public static class EnvironmentCatalogSignatureSamples
                 "System.Environment.SystemDirectory.get",
                 "System.Environment.SystemPageSize.get",
                 "System.Environment.UserDomainName.get",
+                "System.Environment.UserInteractive.get",
                 "System.Environment.WorkingSet.get",
             };
 
