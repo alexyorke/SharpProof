@@ -170,6 +170,32 @@ public static class ArrayFindCatalogSignatureSamples
         }
 
         [Test]
+        public void ArrayBinarySearchHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+using System.Collections;
+
+public static class ArrayBinarySearchCatalogSignatureSamples
+{
+    public static int Sample(Array values, object target, IComparer comparer)
+    {
+        _ = Array.BinarySearch(values, target);
+        return Array.BinarySearch(values, target, comparer);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ArrayBinarySearchCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Array.BinarySearch(values, target)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Array.BinarySearch(values, target, comparer)"));
+        }
+
+        [Test]
         public void ListHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
