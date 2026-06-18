@@ -407,6 +407,17 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void TimeProviderAndTimeZoneInfoGlobals_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.TimeProvider.LocalTimeZone.get");
+            AssertNotInManualCatalogs("System.TimeProvider.System.get");
+            AssertNotInManualCatalogs("System.TimeProvider.TimestampFrequency.get");
+            AssertNotInManualCatalogs("System.TimeZoneInfo.Local.get");
+            AssertNotInManualCatalogs("System.TimeZoneInfo.FindSystemTimeZoneById(string)");
+            AssertNotInManualCatalogs("System.TimeZoneInfo.ClearCachedData()");
+        }
+
+        [Test]
         public void IPAddressParseHelpers_AreHandledSemantically_NotStaticCatalogs()
         {
             var members = new[]

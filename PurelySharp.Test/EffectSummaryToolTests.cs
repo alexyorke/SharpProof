@@ -1755,6 +1755,63 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeTimeProviderAndTimeZoneInfoSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                60,
+                "System.TimeProvider.get_System",
+                "System.TimeProvider.get_LocalTimeZone",
+                "System.TimeProvider.get_TimestampFrequency",
+                "System.TimeZoneInfo.get_Local",
+                "System.TimeZoneInfo.FindSystemTimeZoneById",
+                "System.TimeZoneInfo.ClearCachedData");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.TimeProvider.get_System()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.TimeProvider.get_System()", "caller_visible");
+            AssertPurityClassification(summary, "System.TimeProvider.get_LocalTimeZone()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.TimeProvider.get_LocalTimeZone()", "caller_visible");
+            AssertPurityClassification(summary, "System.TimeProvider.get_TimestampFrequency()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.TimeProvider.get_TimestampFrequency()", "caller_visible");
+            AssertPurityClassification(summary, "System.TimeZoneInfo.get_Local()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.TimeZoneInfo.get_Local()", "caller_visible");
+            AssertPurityClassification(summary, "System.TimeZoneInfo.FindSystemTimeZoneById(string)", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.TimeZoneInfo.FindSystemTimeZoneById(string)", "caller_visible");
+            AssertPurityClassification(summary, "System.TimeZoneInfo.ClearCachedData()", "impure", "global_state_write");
+            AssertEffectVisibilityClassification(summary, "System.TimeZoneInfo.ClearCachedData()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.TimeProvider.get_System()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.TimeProvider.get_LocalTimeZone()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.TimeProvider.get_TimestampFrequency()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.TimeZoneInfo.get_Local()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.TimeZoneInfo.FindSystemTimeZoneById(string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.TimeZoneInfo.ClearCachedData()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.TimeProvider.get_LocalTimeZone()",
+                "System.TimeProvider.get_System()",
+                "System.TimeProvider.get_TimestampFrequency()",
+                "System.TimeZoneInfo.ClearCachedData()",
+                "System.TimeZoneInfo.FindSystemTimeZoneById(string)",
+                "System.TimeZoneInfo.get_Local()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeIPAddressParseSlice_UsesSemanticHandlingInsteadOfManualCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly("System.Net.Primitives.dll", 80, "System.Net.IPAddress");
