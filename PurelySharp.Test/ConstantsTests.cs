@@ -102,6 +102,25 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void WebUtilityHelpers_AreNotBackedByStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Net.WebUtility.HtmlDecode(string)",
+                "System.Net.WebUtility.HtmlEncode(string)",
+                "System.Net.WebUtility.UrlDecode(string)",
+                "System.Net.WebUtility.UrlEncode(string)",
+                "System.Net.WebUtility.UrlDecodeToBytes(byte[], int, int)",
+                "System.Net.WebUtility.UrlEncodeToBytes(byte[], int, int)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void StringPrefixSuffix_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.String.StartsWith(System.String)"));

@@ -10,7 +10,7 @@ namespace PurelySharp.Test
     public class WebUtilityTests
     {
         [Test]
-        public async Task WebUtilityHtmlEncode_NoDiagnostic()
+        public async Task WebUtilityHtmlEncode_Diagnostic()
         {
             var test = @"
 using System.Net;
@@ -19,7 +19,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod(string value)
+    public string {|PS0002:TestMethod|}(string value)
     {
         return WebUtility.HtmlEncode(value);
     }
@@ -29,7 +29,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task WebUtilityUrlDecode_NoDiagnostic()
+        public async Task WebUtilityUrlDecode_Diagnostic()
         {
             var test = @"
 using System.Net;
@@ -38,7 +38,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod(string value)
+    public string {|PS0002:TestMethod|}(string value)
     {
         return WebUtility.UrlDecode(value);
     }
@@ -48,7 +48,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task WebUtilityHtmlDecode_NoDiagnostic()
+        public async Task WebUtilityHtmlDecode_Diagnostic()
         {
             var test = @"
 using System.Net;
@@ -57,7 +57,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod(string value)
+    public string {|PS0002:TestMethod|}(string value)
     {
         return WebUtility.HtmlDecode(value);
     }
@@ -67,7 +67,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task WebUtilityUrlEncode_NoDiagnostic()
+        public async Task WebUtilityUrlEncode_Diagnostic()
         {
             var test = @"
 using System.Net;
@@ -76,7 +76,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod(string value)
+    public string {|PS0002:TestMethod|}(string value)
     {
         return WebUtility.UrlEncode(value);
     }

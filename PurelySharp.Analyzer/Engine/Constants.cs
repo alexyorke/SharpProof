@@ -1166,16 +1166,6 @@ public static class Constants
         "System.Math.E",
         "System.Math.PI",
         "System.Math.Tau",
-
-
-        "System.Net.WebUtility.HtmlDecode(string)",
-        "System.Net.WebUtility.HtmlEncode(string)",
-        "System.Net.WebUtility.UrlDecode(string)",
-        "System.Net.WebUtility.UrlEncode(string)",
-        "System.Net.WebUtility.UrlDecodeToBytes(byte[], int, int)",
-        "System.Net.WebUtility.UrlEncodeToBytes(byte[], int, int)",
-
-
         "System.Nullable.Compare<T>(T?, T?)",
         "System.Nullable.Equals<T>(T?, T?)",
 
