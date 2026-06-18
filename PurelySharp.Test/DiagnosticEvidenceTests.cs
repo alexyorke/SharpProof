@@ -1553,6 +1553,78 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_SortedListAndLinkedListReadHelpers()
+        {
+            const string source = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(SortedList<int, int> values, int key, LinkedListNode<int> node)
+    {
+        return values.IndexOfKey(key) + node.Value;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
+            {
+                (
+                    "System.Collections.Generic.SortedList<TKey, TValue>.IndexOfKey(TKey)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "values.IndexOfKey(key)"))
+                        .Symbol!),
+                (
+                    "System.Collections.Generic.LinkedListNode<T>.Value.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "node.Value"))
+                        .Symbol!).GetMethod!),
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = trackedMembers.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow SortedList<TKey, TValue>.IndexOfKey and LinkedListNode<T>.Value.");
+            Assert.That(classifications["System.Collections.Generic.SortedList<TKey, TValue>.IndexOfKey(TKey)"].matched, Is.True,
+                "Generated purity catalog should resolve SortedList<TKey, TValue>.IndexOfKey.");
+            Assert.That(classifications["System.Collections.Generic.SortedList<TKey, TValue>.IndexOfKey(TKey)"].classification, Is.EqualTo("pure"),
+                "Generated purity catalog should classify SortedList<TKey, TValue>.IndexOfKey as pure.");
+            Assert.That(classifications["System.Collections.Generic.LinkedListNode<T>.Value.get"].matched, Is.True,
+                "Generated purity catalog should resolve LinkedListNode<T>.Value.get.");
+            Assert.That(classifications["System.Collections.Generic.LinkedListNode<T>.Value.get"].classification, Is.EqualTo("pure"),
+                "Generated purity catalog should classify LinkedListNode<T>.Value.get as pure.");
+        }
+
+        [Test]
         public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPureMethodFallback()
         {
             const string source = @"

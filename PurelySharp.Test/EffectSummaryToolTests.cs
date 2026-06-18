@@ -824,6 +824,49 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeSortedListAndLinkedListNodeReadSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Collections.dll",
+                20,
+                "System.Collections.Generic.LinkedListNode`1.get_Value()",
+                "System.Collections.Generic.SortedList`2.IndexOfKey(");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(
+                summary,
+                "System.Collections.Generic.LinkedListNode`1.get_Value()",
+                "pure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Collections.Generic.LinkedListNode`1.get_Value()",
+                "none");
+            AssertPurityClassification(
+                summary,
+                "System.Collections.Generic.SortedList`2.IndexOfKey(!0)",
+                "pure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Collections.Generic.SortedList`2.IndexOfKey(!0)",
+                "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.LinkedListNode`1.get_Value()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.SortedList`2.IndexOfKey(!0)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeBitConverterReadSlice_TreatsIntrinsicHelpersAsPure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.BitConverter.ToInt32", limit: 20);

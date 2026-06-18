@@ -219,6 +219,30 @@ public static class SortedSetCatalogSignatureSamples
         }
 
         [Test]
+        public void SortedListAndLinkedListReadHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Collections.Generic;
+
+public static class SortedListAndLinkedListCatalogSignatureSamples
+{
+    public static int Sample(SortedList<int, int> values, int key, LinkedListNode<int> node)
+    {
+        return values.IndexOfKey(key) + node.Value;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "SortedListAndLinkedListCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.IndexOfKey(key)"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "node.Value"));
+        }
+
+        [Test]
         public void ListHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

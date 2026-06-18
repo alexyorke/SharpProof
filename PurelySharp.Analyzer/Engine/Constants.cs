@@ -1009,8 +1009,6 @@ public static class Constants
 
 
         "System.Buffers.Text.Utf8Parser.TryParse(System.ReadOnlySpan<byte>, out int, out int)",
-        "System.Collections.Generic.LinkedListNode<T>.Value.get",
-        "System.Collections.Generic.SortedList<TKey, TValue>.IndexOfKey(TKey)",
         "System.Collections.Generic.SortedDictionary<TKey, TValue>.ContainsKey(TKey)",
         "System.Collections.Generic.SortedDictionary<TKey, TValue>.ContainsValue(TValue)",
         "System.Collections.Generic.SortedDictionary<TKey, TValue>.TryGetValue(TKey, out TValue)",
