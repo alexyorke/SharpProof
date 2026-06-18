@@ -396,6 +396,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     if (argument.Parameter.RefKind == RefKind.Out &&
                         ((hasTrustedGeneratedPurity && generatedPurity.IsPure) ||
                          PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol) ||
+                         IsSemanticallyPureOutArgumentMethod(originalDefinitionSymbol) ||
                          IsDispatchAnalyzedOutArgumentMethod(invokedMethodSymbol)))
                     {
                         PurityAnalysisEngine.LogDebug($"  [MIR]   Skipping purity check for local/discard out argument target '{argument.Syntax}' on dispatch-analyzed member {originalDefinitionSymbol.ToDisplayString()}.");
@@ -462,6 +463,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (TryCheckStringComparisonPurity(invocationOperation, out var stringComparisonResult))
             {
                 return stringComparisonResult;
+            }
+
+            if (TryCheckBooleanParsePurity(invocationOperation, out var booleanParseResult))
+            {
+                return booleanParseResult;
             }
 
             if (PurityAnalysisEngine.HasPureExternalAttribute(originalDefinitionSymbol))
@@ -751,6 +757,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 "System.Collections.Immutable.ImmutableHashSet<T>" or
                 "System.Collections.Immutable.ImmutableSortedSet<T>" or
                 "System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue>";
+        }
+
+        private static bool IsSemanticallyPureOutArgumentMethod(IMethodSymbol methodSymbol)
+        {
+            return IsBooleanTryParseMethod(methodSymbol.OriginalDefinition);
         }
 
         private static bool IsKnownDelegateInvokingBclMethod(IMethodSymbol methodSymbol)
@@ -1615,6 +1626,51 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return false;
         }
 
+        private static bool TryCheckBooleanParsePurity(
+            IInvocationOperation invocationOperation,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            var methodSymbol = invocationOperation.TargetMethod?.OriginalDefinition;
+            if (methodSymbol == null)
+            {
+                return false;
+            }
+
+            if (IsBooleanParseMethod(methodSymbol) &&
+                invocationOperation.Arguments.Length == 1)
+            {
+                return true;
+            }
+
+            if (IsBooleanTryParseMethod(methodSymbol) &&
+                invocationOperation.Arguments.Length == 2)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsBooleanParseMethod(IMethodSymbol methodSymbol)
+        {
+            return methodSymbol.ContainingType?.SpecialType == SpecialType.System_Boolean &&
+                methodSymbol.Name == "Parse" &&
+                methodSymbol.Parameters.Length == 1 &&
+                IsStringOrReadOnlySpanOfChar(methodSymbol.Parameters[0].Type);
+        }
+
+        private static bool IsBooleanTryParseMethod(IMethodSymbol methodSymbol)
+        {
+            return methodSymbol.ContainingType?.SpecialType == SpecialType.System_Boolean &&
+                methodSymbol.Name == "TryParse" &&
+                methodSymbol.Parameters.Length == 2 &&
+                IsStringOrReadOnlySpanOfChar(methodSymbol.Parameters[0].Type) &&
+                methodSymbol.Parameters[1].RefKind == RefKind.Out &&
+                methodSymbol.Parameters[1].Type.SpecialType == SpecialType.System_Boolean;
+        }
+
         private static int GetStringComparisonParameterIndex(IMethodSymbol methodSymbol)
         {
             for (int i = 0; i < methodSymbol.Parameters.Length; i++)
@@ -1626,6 +1682,20 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return -1;
+        }
+
+        private static bool IsReadOnlySpanOfChar(ITypeSymbol typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
+                namedType.TypeArguments.Length == 1 &&
+                namedType.TypeArguments[0].SpecialType == SpecialType.System_Char;
+        }
+
+        private static bool IsStringOrReadOnlySpanOfChar(ITypeSymbol typeSymbol)
+        {
+            return typeSymbol.SpecialType == SpecialType.System_String ||
+                IsReadOnlySpanOfChar(typeSymbol);
         }
 
         private static bool IsDeterministicStringComparison(IOperation? operation)

@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using System.Threading.Tasks;
@@ -109,6 +109,68 @@ public class TestClass
     public bool TestMethod(string? input)
     {
         return bool.TryParse(input, out _);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task KnownPureBoolTryParseNullableStringWithLocalOut_NoDiagnostic()
+        {
+            var test = @"
+#nullable enable
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(string? input)
+    {
+        var parsed = false;
+        return bool.TryParse(input, out parsed);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task KnownPureBoolParseString_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(string input)
+    {
+        return bool.Parse(input);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task BoolTryParseWithFieldOut_Diagnostic()
+        {
+            var test = @"
+#nullable enable
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    private bool _result;
+
+    [EnforcePure]
+    public bool {|PS0002:TestMethod|}(string? input)
+    {
+        return bool.TryParse(input, out _result);
     }
 }";
 

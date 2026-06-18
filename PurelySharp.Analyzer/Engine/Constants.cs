@@ -912,10 +912,6 @@ public static class Constants
         "System.Array.TrueForAll<T>(T[], System.Predicate<T>)",
         "System.Array.Length.get",
 
-
-        "bool.Parse(string)",
-
-
         "char.IsDigit(char)",
         "char.IsLetter(char)",
         "char.IsWhiteSpace(char)",
@@ -1230,8 +1226,6 @@ public static class Constants
         "System.Array.Find<T>(T[], System.Predicate<T>)",
         "System.Array.FindIndex<T>(T[], System.Predicate<T>)",
         "bool.CompareTo(bool)",
-        "bool.TryParse(string, out bool)",
-        "bool.TryParse(string?, out bool)",
         "char.GetNumericValue(char)",
         "char.IsControl(char)",
         "char.IsLower(char)",

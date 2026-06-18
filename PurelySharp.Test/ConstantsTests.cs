@@ -338,6 +338,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void BooleanParseHelpers_AreHandledSemantically_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "bool.Parse(string)",
+                "bool.TryParse(string, out bool)",
+                "bool.TryParse(string?, out bool)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void JsonSerializerSerialize_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.Json.JsonSerializer.Serialize<TValue>(TValue, System.Text.Json.JsonSerializerOptions?)"));
