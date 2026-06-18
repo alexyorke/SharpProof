@@ -462,6 +462,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void EnvironmentStablePureGetters_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Environment.Is64BitOperatingSystem.get",
+                "System.Environment.Is64BitProcess.get",
+                "System.Environment.NewLine.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void TimeProviderAndTimeZoneInfoGlobals_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.TimeProvider.LocalTimeZone.get");

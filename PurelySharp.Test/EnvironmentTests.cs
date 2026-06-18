@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis.Testing;
+using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using System.Threading.Tasks;
 using PurelySharp.Analyzer;
@@ -98,7 +98,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task Environment_Is64BitOperatingSystem_Diagnostic()
+        public async Task Environment_Is64BitOperatingSystem_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -107,7 +107,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}()
+    public bool TestMethod()
     {
         return Environment.Is64BitOperatingSystem;
     }
@@ -117,7 +117,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task Environment_Is64BitProcess_Diagnostic()
+        public async Task Environment_Is64BitProcess_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -126,7 +126,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}()
+    public bool TestMethod()
     {
         return Environment.Is64BitProcess;
     }
@@ -441,7 +441,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task Environment_NewLine_Diagnostic()
+        public async Task Environment_NewLine_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -450,7 +450,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string {|PS0002:TestMethod|}()
+    public string TestMethod()
     {
         return Environment.NewLine;
     }

@@ -441,6 +441,60 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_EnvironmentStablePureGetters()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod()
+    {
+        return Environment.Is64BitProcess && Environment.Is64BitOperatingSystem
+            ? Environment.NewLine
+            : string.Empty;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var memberAccesses = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "Environment.Is64BitProcess" ||
+                    node.ToString() == "Environment.Is64BitOperatingSystem" ||
+                    node.ToString() == "Environment.NewLine")
+                .Select(node => (IPropertySymbol)semanticModel.GetSymbolInfo(node).Symbol!)
+                .OrderBy(symbol => symbol.Name, StringComparer.Ordinal)
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var matched = memberAccesses.Select(symbol =>
+            {
+                var args = new object?[] { symbol.GetMethod!.OriginalDefinition, compilation, null };
+                return (bool)tryGetPurity.Invoke(catalog, args)!;
+            }).ToArray();
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow Environment.Is64BitProcess, Environment.Is64BitOperatingSystem, and Environment.NewLine.");
+            Assert.That(matched, Is.EqualTo(new[] { true, true, true }),
+                "Generated purity catalog should resolve the stable Environment getters to their runtime implementation assembly.");
+        }
+
+        [Test]
         public async Task Ps0002_AppContextSetSwitch_UsesGeneratedPurityCatalogSource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
