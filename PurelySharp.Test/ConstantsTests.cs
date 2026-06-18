@@ -935,6 +935,46 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void FieldBackedStaticBclValues_AreHandledSemantically_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+using System.Net;
+using System.Net.Http;
+using System.Reflection;
+
+public static class StaticFieldSamples
+{
+    public static object Sample()
+    {
+        _ = Guid.Empty;
+        _ = TimeSpan.Zero;
+        _ = EventArgs.Empty;
+        _ = DBNull.Value;
+        _ = IPAddress.Any;
+        _ = IPAddress.Loopback;
+        _ = HttpVersion.Version11;
+        return Missing.Value;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "StaticFieldCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Guid.Empty"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "TimeSpan.Zero"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "EventArgs.Empty"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "DBNull.Value"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "IPAddress.Any"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "HttpVersion.Version11"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Missing.Value"));
+        }
+
+        [Test]
         public void RepresentativeCatalogSignaturesResolveAgainstNet80References()
         {
             var source = @"
@@ -995,7 +1035,7 @@ public static class CatalogSignatureSamples
             Assert.That(Constants.KnownImpureMethods, Does.Contain(GetPropertySignature(compilation, syntaxTree, "DateTime.Now")));
 
             Assert.That(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback"), Is.EqualTo("System.Net.IPAddress.Loopback.get"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback")));
+            Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback")));
 
             Assert.That(GetPropertySignature(compilation, syntaxTree, "list.Count"), Is.EqualTo("System.Collections.Generic.List<T>.Count.get"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetPropertySignature(compilation, syntaxTree, "list.Count")));
@@ -1082,7 +1122,7 @@ public static class CatalogConflictSamples
 
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "list.Add(1)"), expectedPure: false, expectedImpure: true);
             AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "DateTime.Now"), expectedPure: false, expectedImpure: true);
-            AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback"), expectedPure: true, expectedImpure: false);
+            AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback"), expectedPure: false, expectedImpure: false);
             AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "list.Count"), expectedPure: false, expectedImpure: false);
         }
 

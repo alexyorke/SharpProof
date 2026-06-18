@@ -935,7 +935,6 @@ public static class Constants
 
 
 
-        "System.DBNull.Value.get",
 
 
         "System.Diagnostics.Contracts.Contract.Ensures(bool)",
@@ -946,7 +945,6 @@ public static class Constants
         "System.Globalization.CultureInfo.Name.get",
 
 
-        "System.Guid.Empty.get",
 
 
 
@@ -1066,7 +1064,6 @@ public static class Constants
         "System.ComponentModel.DescriptionAttribute.DescriptionAttribute(string)",
         "System.Diagnostics.ConditionalAttribute.ConditionalAttribute(string)",
         "System.DivideByZeroException.DivideByZeroException()",
-        "System.EventArgs.Empty.get",
         "System.Exception.HResult.get",
         "System.Exception.InnerException.get",
         "System.FlagsAttribute.FlagsAttribute()",
@@ -1081,7 +1078,6 @@ public static class Constants
         "System.Linq.ParallelEnumerable.AsParallel<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
         "System.MemoryExtensions.AsSpan<T>(T[])",
         "System.MemoryExtensions.BinarySearch<T>(System.ReadOnlySpan<T>, T)",
-        "System.Net.HttpVersion.Version11.get",
         "System.NotImplementedException.NotImplementedException()",
         "System.Nullable<T>.GetValueOrDefault()",
         "System.Numerics.Quaternion.Quaternion(float, float, float, float)",
@@ -1091,7 +1087,6 @@ public static class Constants
         "System.Range.Range(System.Index, System.Index)",
         "System.Reflection.Emit.OpCodes.Ldarg_0.get",
         "System.Reflection.MemberInfo.Name.get",
-        "System.Reflection.Missing.Value.get",
         "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute.CallerArgumentExpressionAttribute(string)",
         "System.Runtime.CompilerServices.IsExternalInit",
         "System.Runtime.CompilerServices.MethodImplAttribute.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions)",
@@ -1212,14 +1207,11 @@ public static class Constants
         "System.IO.FileInfo.Name.get",
 
         "System.Linq.Enumerable.TakeWhile<TSource>(System.Collections.Generic.IEnumerable<TSource>, System.Func<TSource, bool>)",
-        "System.Net.IPAddress.Any.get",
-        "System.Net.IPAddress.Loopback.get",
         "System.Net.IPAddress.IsLoopback(System.Net.IPAddress)",
         "System.NotSupportedException.NotSupportedException(string)",
         "object.MemberwiseClone()",
         "System.Runtime.InteropServices.MemoryMarshal.AsBytes<T>(System.Span<T>)",
         "string.IsNullOrWhiteSpace(System.ReadOnlySpan<char>)",
-        "System.TimeSpan.Zero.get",
 
         "object.ReferenceEquals(object, object)",
 
