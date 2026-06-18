@@ -1137,6 +1137,7 @@ public static class MutableCollectionCatalogSignatureSamples
             var members = new[]
             {
                 "System.MemoryExtensions.AsSpan(string)",
+                "System.MemoryExtensions.AsSpan<T>(T[])",
                 "System.MemoryExtensions.SequenceEqual<T>(System.ReadOnlySpan<T>, System.ReadOnlySpan<T>)",
                 "System.MemoryExtensions.Trim<T>(System.ReadOnlySpan<T>)",
             };

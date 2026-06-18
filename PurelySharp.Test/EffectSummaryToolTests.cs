@@ -516,9 +516,9 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeMemoryExtensionsStringAsSpanSlice_UsesGeneratedPurityCatalogEntries()
+        public async Task EffectSummaryTool_RuntimeMemoryExtensionsAsSpanSlice_UsesGeneratedPurityCatalogEntries()
         {
-            using var summary = await RunRuntimeEffectSummaryAsync("System.MemoryExtensions.AsSpan(string)", limit: 20);
+            using var summary = await RunRuntimeEffectSummaryAsync("System.MemoryExtensions.AsSpan", limit: 40);
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -526,15 +526,18 @@ public static class PurityFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.MemoryExtensions.AsSpan(string)", "pure");
+            AssertPurityClassification(summary, "System.MemoryExtensions.AsSpan(!!0[])", "pure");
             AssertEffectVisibilityClassification(summary, "System.MemoryExtensions.AsSpan(string)", "none");
+            AssertEffectVisibilityClassification(summary, "System.MemoryExtensions.AsSpan(!!0[])", "none");
 
             var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
                 .EnumerateArray()
                 .Select(entry => entry.GetProperty("Symbol").GetString())
-                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.MemoryExtensions.AsSpan(string)", StringComparison.Ordinal))
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.MemoryExtensions.AsSpan", StringComparison.Ordinal))
                 .ToArray();
             Assert.That(symbols, Does.Contain("System.MemoryExtensions.AsSpan(string)"));
+            Assert.That(symbols, Does.Contain("System.MemoryExtensions.AsSpan(!!0[])"));
         }
 
         [Test]

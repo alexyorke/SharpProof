@@ -1044,7 +1044,6 @@ public static class Constants
         "System.Linq.Expressions.Expression.Constant(object)",
         "System.Linq.Expressions.Expression.Call(System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])",
         "System.Linq.ParallelEnumerable.AsParallel<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
-        "System.MemoryExtensions.AsSpan<T>(T[])",
         "System.MemoryExtensions.BinarySearch<T>(System.ReadOnlySpan<T>, T)",
         "System.Nullable<T>.GetValueOrDefault()",
         "System.Numerics.Quaternion.Quaternion(float, float, float, float)",

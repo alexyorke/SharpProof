@@ -384,7 +384,10 @@
     },
     {
       "OutputPath": "PurelySharp.Analyzer/MemoryExtensions.AsSpan.PurelySharp.EffectSummary.json",
-      "SourceSummaryPath": "PurelySharp.Analyzer/MemoryExtensions.AsSpan.PurelySharp.EffectSummary.json"
+      "SourceSummaryPath": "PurelySharp.Analyzer/MemoryExtensions.AsSpan.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.MemoryExtensions.AsSpan"
+      ]
     },
     {
       "OutputPath": "PurelySharp.Analyzer/Path.PurelySharp.EffectSummary.json",

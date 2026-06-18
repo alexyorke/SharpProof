@@ -801,11 +801,13 @@ internal static class PurityClassificationEngine
             return false;
         }
 
+        var allowsTupleOffsetReads = HasOnlyByRefLikeViewHelperFieldReads(summary);
         foreach (var effect in summary.Effects)
         {
             if (string.Equals(effect, "allocates_object", StringComparison.Ordinal) ||
                 string.Equals(effect, "calls_method", StringComparison.Ordinal) ||
-                string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal))
+                string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal) ||
+                string.Equals(effect, "reads_instance_field", StringComparison.Ordinal) && allowsTupleOffsetReads)
             {
                 continue;
             }
@@ -822,6 +824,11 @@ internal static class PurityClassificationEngine
                 continue;
             }
 
+            if (IsByRefLikeViewConstructionHelperCall(call))
+            {
+                continue;
+            }
+
             if (IsPurityNeutralIntrinsicHelperCall(call))
             {
                 continue;
@@ -831,6 +838,19 @@ internal static class PurityClassificationEngine
         }
 
         return sawByRefLikeConstructor;
+    }
+
+    private static bool HasOnlyByRefLikeViewHelperFieldReads(MethodEffectSummary summary)
+    {
+        if (!summary.Effects.Contains("reads_instance_field", StringComparer.Ordinal))
+        {
+            return true;
+        }
+
+        return summary.Fields.All(static field =>
+            field.StartsWith("System.ValueTuple", StringComparison.Ordinal) &&
+            (field.EndsWith(".Item1", StringComparison.Ordinal) ||
+             field.EndsWith(".Item2", StringComparison.Ordinal)));
     }
 
     private static bool HasOnlySafeStaticReads(MethodEffectSummary summary)
@@ -1127,6 +1147,24 @@ internal static class PurityClassificationEngine
             callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains(".get_Length()", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) && callSymbol.Contains(".get_Length()", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences(", StringComparison.Ordinal);
+    }
+
+    private static bool IsByRefLikeViewConstructionHelperCall(string callSymbol)
+    {
+        return callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Index.Equals(System.Index)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Index.GetOffset(int)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Index.get_Start()", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Range.GetOffsetAndLength(int)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Range.get_End()", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Range.get_Start()", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.ThrowHelper.ThrowArgumentNullException(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.ThrowHelper.ThrowArgumentOutOfRangeException(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.ThrowHelper.ThrowArrayTypeMismatchException()", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Type.get_IsValueType()", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Type.op_Inequality(System.Type, System.Type)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("object.GetType()", StringComparison.Ordinal);
     }
 
     private static bool IsByRefLikeViewConstructionCall(string callSymbol)
