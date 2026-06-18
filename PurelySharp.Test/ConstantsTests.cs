@@ -678,12 +678,17 @@ public static class MutableCollectionCatalogSignatureSamples
                 "char.ConvertToUtf32(char, char)",
                 "char.GetNumericValue(char)",
                 "char.IsControl(char)",
+                "char.IsDigit(char)",
+                "char.IsLetter(char)",
                 "char.IsLower(char)",
                 "char.IsNumber(char)",
                 "char.IsPunctuation(char)",
                 "char.IsSeparator(char)",
                 "char.IsSymbol(char)",
                 "char.IsUpper(char)",
+                "char.IsWhiteSpace(char)",
+                "char.ToLowerInvariant(char)",
+                "char.ToUpperInvariant(char)",
             };
 
             foreach (var member in members)
@@ -1918,12 +1923,17 @@ public static class BooleanCharCatalogSignatureSamples
         _ = char.ConvertToUtf32(value, other);
         _ = char.GetNumericValue(value);
         _ = char.IsControl(value);
+        _ = char.IsDigit(value);
+        _ = char.IsLetter(value);
         _ = char.IsLower(value);
         _ = char.IsNumber(value);
         _ = char.IsPunctuation(value);
         _ = char.IsSeparator(value);
         _ = char.IsSymbol(value);
         _ = char.IsUpper(value);
+        _ = char.IsWhiteSpace(value);
+        _ = char.ToLowerInvariant(value);
+        _ = char.ToUpperInvariant(value);
         return 0;
     }
 }";
@@ -1938,12 +1948,17 @@ public static class BooleanCharCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.ConvertToUtf32(value, other)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.GetNumericValue(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsControl(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsDigit(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsLetter(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsLower(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsNumber(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsPunctuation(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsSeparator(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsSymbol(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsUpper(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.IsWhiteSpace(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.ToLowerInvariant(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "char.ToUpperInvariant(value)"));
         }
 
         [Test]

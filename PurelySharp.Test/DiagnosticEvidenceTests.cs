@@ -842,12 +842,17 @@ public class TestClass
         var codePoint = char.ConvertToUtf32(value, other);
         var numeric = char.GetNumericValue(value);
         var isControl = char.IsControl(value);
+        var isDigit = char.IsDigit(value);
+        var isLetter = char.IsLetter(value);
         var isLower = char.IsLower(value);
         var isNumber = char.IsNumber(value);
         var isPunctuation = char.IsPunctuation(value);
         var isSeparator = char.IsSeparator(value);
         var isSymbol = char.IsSymbol(value);
         var isUpper = char.IsUpper(value);
+        var isWhiteSpace = char.IsWhiteSpace(value);
+        var lowerInvariant = char.ToLowerInvariant(value);
+        var upperInvariant = char.ToUpperInvariant(value);
         return compare;
     }
 }";
@@ -866,12 +871,17 @@ public class TestClass
                 "char.ConvertToUtf32(value, other)",
                 "char.GetNumericValue(value)",
                 "char.IsControl(value)",
+                "char.IsDigit(value)",
+                "char.IsLetter(value)",
                 "char.IsLower(value)",
                 "char.IsNumber(value)",
                 "char.IsPunctuation(value)",
                 "char.IsSeparator(value)",
                 "char.IsSymbol(value)",
                 "char.IsUpper(value)",
+                "char.IsWhiteSpace(value)",
+                "char.ToLowerInvariant(value)",
+                "char.ToUpperInvariant(value)",
             };
             var trackedMethods = trackedExpressions
                 .Select(expressionText =>

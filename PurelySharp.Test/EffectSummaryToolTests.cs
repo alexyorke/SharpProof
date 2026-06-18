@@ -2328,12 +2328,17 @@ public static class PurityFixture
                 "System.Char.ConvertToUtf32(char, char)",
                 "System.Char.GetNumericValue(char)",
                 "System.Char.IsControl(char)",
+                "System.Char.IsDigit(char)",
+                "System.Char.IsLetter(char)",
                 "System.Char.IsLower(char)",
                 "System.Char.IsNumber(char)",
                 "System.Char.IsPunctuation(char)",
                 "System.Char.IsSeparator(char)",
                 "System.Char.IsSymbol(char)",
-                "System.Char.IsUpper(char)");
+                "System.Char.IsUpper(char)",
+                "System.Char.IsWhiteSpace(char)",
+                "System.Char.ToLowerInvariant(char)",
+                "System.Char.ToUpperInvariant(char)");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -2348,6 +2353,9 @@ public static class PurityFixture
                 "System.Char.GetNumericValue(char)",
                 "System.Char.IsControl(char)",
                 "System.Char.IsUpper(char)",
+                "System.Char.IsWhiteSpace(char)",
+                "System.Char.ToLowerInvariant(char)",
+                "System.Char.ToUpperInvariant(char)",
             };
 
             foreach (var symbol in representativeSymbols)

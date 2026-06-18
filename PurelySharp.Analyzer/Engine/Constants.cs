@@ -867,13 +867,6 @@ public static class Constants
         "System.Array.TrueForAll<T>(T[], System.Predicate<T>)",
         "System.Array.Length.get",
 
-        "char.IsDigit(char)",
-        "char.IsLetter(char)",
-        "char.IsWhiteSpace(char)",
-        "char.ToLowerInvariant(char)",
-        "char.ToUpperInvariant(char)",
-
-
         "System.Collections.Generic.Dictionary<TKey, TValue>.ContainsValue(TValue)",
         "System.Collections.Generic.Dictionary<TKey, TValue>.TryGetValue(TKey, out TValue)",
         "System.Collections.Generic.Comparer<T>.Default.get",
