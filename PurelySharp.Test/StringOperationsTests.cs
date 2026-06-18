@@ -42,7 +42,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task StringSplitReturnedArray_Diagnostic()
+        public async Task StringSplitReturnedArray_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -51,7 +51,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string[] {|PS0002:TestMethod|}(string input)
+    public string[] TestMethod(string input)
     {
         return input.Split(' ');
     }

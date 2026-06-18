@@ -731,6 +731,7 @@ internal static class AssemblyEffectSummarizer
         var offset = 0;
         string? lastConstructedExceptionType = null;
         var localExceptionTypes = new Dictionary<int, string?>();
+        var suppressDynamicDispatchForNextCallvirt = false;
         while (offset < il.Length)
         {
             var instructionOffset = offset;
@@ -742,6 +743,12 @@ internal static class AssemblyEffectSummarizer
                 : (int?)null;
 
             offset += operandSize;
+
+            if (opCode == OpCodes.Constrained)
+            {
+                suppressDynamicDispatchForNextCallvirt = true;
+                continue;
+            }
 
             if (opCode == OpCodes.Call || opCode == OpCodes.Callvirt || opCode == OpCodes.Newobj)
             {
@@ -756,6 +763,7 @@ internal static class AssemblyEffectSummarizer
                 }
 
                 if (opCode == OpCodes.Callvirt &&
+                    !suppressDynamicDispatchForNextCallvirt &&
                     operandToken is not null &&
                     ShouldTreatCallvirtAsDynamicDispatch(reader, operandToken.Value))
                 {
@@ -865,6 +873,8 @@ internal static class AssemblyEffectSummarizer
             {
                 lastConstructedExceptionType = null;
             }
+
+            suppressDynamicDispatchForNextCallvirt = false;
         }
     }
 

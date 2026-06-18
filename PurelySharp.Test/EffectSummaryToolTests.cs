@@ -740,7 +740,7 @@ public static class PurityFixture
                 var symbol = method.GetProperty("Symbol").GetString();
                 var classification = method.GetProperty("PurityClassification");
                 Assert.That(classification.GetProperty("Classification").GetString(), Is.EqualTo("pure"), symbol);
-                Assert.That(classification.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("fresh_owned_array_write"), symbol);
+                Assert.That(classification.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("fresh_array_candidate_via_local_helpers"), symbol);
                 Assert.That(classification.GetProperty("EffectVisibilityClassification").GetString(), Is.EqualTo("internal_only"), symbol);
             }
         }
@@ -769,9 +769,9 @@ public static class PurityFixture
             AssertPurityClassification(summary, "System.IO.Path.HasExtension(string)", "pure");
             AssertPurityClassification(summary, "System.IO.Path.ChangeExtension(string, string)", "pure");
             AssertPurityClassification(summary, "System.IO.Path.GetDirectoryName(string)", "pure");
-            AssertPurityClassification(summary, "System.IO.Path.GetExtension(string)", "conservative_unknown", "dynamic_dispatch");
-            AssertPurityClassification(summary, "System.IO.Path.GetFileName(string)", "conservative_unknown", "dynamic_dispatch");
-            AssertPurityClassification(summary, "System.IO.Path.GetFileNameWithoutExtension(string)", "conservative_unknown", "dynamic_dispatch");
+            AssertPurityClassification(summary, "System.IO.Path.GetExtension(string)", "pure");
+            AssertPurityClassification(summary, "System.IO.Path.GetFileName(string)", "pure");
+            AssertPurityClassification(summary, "System.IO.Path.GetFileNameWithoutExtension(string)", "pure");
         }
 
         [Test]
@@ -1203,6 +1203,57 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStringSplitSlice_UsesGeneratedFreshArrayEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.String.Split", limit: 80);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.String.Split(char[])", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Split(char[])", "internal_only");
+            AssertFreshnessClassification(summary, "System.String.Split(char[])", "fresh_owned_array_write");
+            AssertPurityClassification(summary, "System.String.Split(char[], System.StringSplitOptions)", "pure");
+            AssertFreshnessClassification(summary, "System.String.Split(char[], System.StringSplitOptions)", "fresh_owned_array_write");
+            AssertPurityClassification(summary, "System.String.Split(string[], System.StringSplitOptions)", "pure");
+            AssertFreshnessClassification(summary, "System.String.Split(string[], System.StringSplitOptions)", "fresh_owned_array_write");
+
+            var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.String.Split", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(symbols, Does.Contain("System.String.Split(char[])"));
+            Assert.That(symbols, Does.Contain("System.String.Split(char[], System.StringSplitOptions)"));
+            Assert.That(symbols, Does.Contain("System.String.Split(string[], System.StringSplitOptions)"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeStringJoinSlice_UsesGeneratedPurityForArrayOverloads()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.String.Join", limit: 80);
+
+            AssertPurityClassification(summary, "System.String.Join(string, string[])", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Join(string, string[])", "none");
+            AssertPurityClassification(summary, "System.String.Join(string, string[], int, int)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Join(string, string[], int, int)", "none");
+            AssertPurityClassification(summary, "System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>)", "conservative_unknown", "dynamic_dispatch");
+            AssertEffectVisibilityClassification(summary, "System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>)", "unknown");
+
+            var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.String.Join", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(symbols, Does.Contain("System.String.Join(string, string[])"));
+            Assert.That(symbols, Does.Contain("System.String.Join(string, string[], int, int)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStringPrefixSuffixSlice_TreatsStartsWithAndEndsWithAsImpure()
         {
             using var startsWithSummary = await RunRuntimeEffectSummaryAsync("System.String.StartsWith", limit: 20);
@@ -1336,7 +1387,8 @@ public static class PurityFixture
             AssertPurityClassification(summary, "System.Net.WebUtility.UrlEncode(string)", "impure", "impure_callee");
             AssertPurityClassification(summary, "System.Net.WebUtility.UrlDecode(string)", "impure", "impure_callee");
             AssertPurityClassification(summary, "System.Net.WebUtility.UrlEncodeToBytes(byte[], int, int)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.Net.WebUtility.UrlDecodeToBytes(byte[], int, int)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Net.WebUtility.UrlDecodeToBytes(byte[], int, int)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Net.WebUtility.UrlDecodeToBytes(byte[], int, int)", "internal_only");
         }
 
         [Test]

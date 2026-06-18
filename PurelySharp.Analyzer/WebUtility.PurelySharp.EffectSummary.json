@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T05:27:09.0780079+00:00",
+  "GeneratedAtUtc": "2026-06-18T06:54:21.4980453+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -19,12 +19,9 @@
           "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06002CB9|il:1c414d51c897f65261df598906ed87fef0f9ac26aa7a4261475191fcc2d21861",
           "Effects": [
             "allocates_object",
-            "calls_method",
-            "virtual_call"
+            "calls_method"
           ],
-          "RootCandidates": [
-            "dynamic_dispatch"
-          ],
+          "RootCandidates": [],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
@@ -54,7 +51,7 @@
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
-            "HasUnsupportedEffects": true,
+            "HasUnsupportedEffects": false,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "caller_visible"
           }
@@ -145,7 +142,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "caller_visible_memory_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -153,7 +149,7 @@
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": true,
+            "HasUnsupportedEffects": false,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "caller_visible"
           }
@@ -167,12 +163,9 @@
           "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06002CBC|il:e4eda59f94fc0b28557204939578a58106726fe77038d8f1ddcc7d5d77ad40cb",
           "Effects": [
             "allocates_object",
-            "calls_method",
-            "virtual_call"
+            "calls_method"
           ],
-          "RootCandidates": [
-            "dynamic_dispatch"
-          ],
+          "RootCandidates": [],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
@@ -202,7 +195,7 @@
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
-            "HasUnsupportedEffects": true,
+            "HasUnsupportedEffects": false,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "caller_visible"
           }
@@ -518,16 +511,14 @@
           ],
           "Fields": [],
           "PurityClassification": {
-            "Classification": "impure",
-            "Categories": [
-              "caller_visible_memory_write"
-            ],
+            "Classification": "pure",
+            "Categories": [],
             "FirstBlockingCallChain": [],
             "HasFreshArrayAllocationEvidence": true,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": true,
-            "FreshnessClassification": "fresh_array_candidate_requires_non_pure_resolution",
-            "EffectVisibilityClassification": "caller_visible"
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_array_write",
+            "EffectVisibilityClassification": "internal_only"
           }
         },
         {
@@ -584,18 +575,14 @@
           ],
           "Fields": [],
           "PurityClassification": {
-            "Classification": "impure",
-            "Categories": [
-              "impure_callee"
-            ],
-            "FirstBlockingCallChain": [
-              "System.Net.WebUtility.UrlDecodeInternal(byte[], int, int)"
-            ],
-            "HasFreshArrayAllocationEvidence": false,
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": true,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": false,
-            "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "caller_visible"
+            "FreshnessClassification": "fresh_owned_array_write",
+            "EffectVisibilityClassification": "internal_only"
           }
         },
         {
@@ -1094,8 +1081,8 @@
   "PurityReport": {
     "SchemaVersion": 3,
     "MethodCount": 27,
-    "PureCount": 5,
-    "ImpureCount": 22,
+    "PureCount": 7,
+    "ImpureCount": 20,
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
       "KnownPureMembers": [],
@@ -1421,7 +1408,7 @@
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
-        "HasUnsupportedEffects": true,
+        "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "caller_visible"
       },
@@ -1461,9 +1448,8 @@
         "MetadataToken": "0x06002CBB",
         "MethodBodySha256": "9d1d0c0e9101674407cc5ae733a1467e5dbf1d8b6418ce861bfb8fba1247e33d",
         "Classification": "impure",
-        "PrimaryCategory": "caller_visible_memory_write",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "caller_visible_memory_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -1471,7 +1457,7 @@
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": true,
+        "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "caller_visible"
       },
@@ -1496,7 +1482,7 @@
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
-        "HasUnsupportedEffects": true,
+        "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "caller_visible"
       },
@@ -1600,17 +1586,15 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x06002CC4",
         "MethodBodySha256": "68ce7c819a632d363a968b007effd4a0dece3f62f222ba8786fbe2aca79a3629",
-        "Classification": "impure",
-        "PrimaryCategory": "caller_visible_memory_write",
-        "Categories": [
-          "caller_visible_memory_write"
-        ],
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
         "FirstBlockingCallChain": [],
         "HasFreshArrayAllocationEvidence": true,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": true,
-        "FreshnessClassification": "fresh_array_candidate_requires_non_pure_resolution",
-        "EffectVisibilityClassification": "caller_visible"
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_array_write",
+        "EffectVisibilityClassification": "internal_only"
       },
       {
         "Symbol": "System.Net.WebUtility.UrlDecodeInternal(string, System.Text.Encoding)",
@@ -1646,19 +1630,15 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x06002CC6",
         "MethodBodySha256": "318dbf690ea532916e9b55fdd99f519d529e623646fec62c4425cbb2430b2eed",
-        "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
-        "Categories": [
-          "impure_callee"
-        ],
-        "FirstBlockingCallChain": [
-          "System.Net.WebUtility.UrlDecodeInternal(byte[], int, int)"
-        ],
-        "HasFreshArrayAllocationEvidence": false,
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": true,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": false,
-        "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "caller_visible"
+        "FreshnessClassification": "fresh_owned_array_write",
+        "EffectVisibilityClassification": "internal_only"
       },
       {
         "Symbol": "System.Net.WebUtility.UrlEncode(string)",

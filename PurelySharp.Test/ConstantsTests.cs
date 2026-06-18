@@ -231,6 +231,29 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void StringSplitAndArrayJoinHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.String.Split(char)",
+                "System.String.Split(char, System.StringSplitOptions)",
+                "System.String.Split(params char[])",
+                "System.String.Split(char[])",
+                "System.String.Split(char[], System.StringSplitOptions)",
+                "System.String.Split(string[], System.StringSplitOptions)",
+                "System.String.Split(char[], int, System.StringSplitOptions)",
+                "System.String.Split(string[], int, System.StringSplitOptions)",
+                "System.String.Join(string, string[])",
+                "System.String.Join(string, params string[])",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void StringPrefixSuffix_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.String.StartsWith(System.String)"));

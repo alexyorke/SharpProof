@@ -1186,17 +1186,6 @@ public static class Constants
         "System.Security.Cryptography.SHA256.ComputeHash(byte[])",
 
 
-        "System.String.Split(char)",
-        "System.String.Split(char, System.StringSplitOptions)",
-        "System.String.Split(params char[])",
-        "System.String.Split(char[])",
-        "System.String.Split(char[], System.StringSplitOptions)",
-        "System.String.Split(string[], System.StringSplitOptions)",
-        "System.String.Split(char[], int, System.StringSplitOptions)",
-        "System.String.Split(string[], int, System.StringSplitOptions)",
-
-        "System.String.Join(string, string[])",
-        "System.String.Join(string, params string[])",
         "System.String.Join(string, System.Collections.Generic.IEnumerable<string>)",
         "System.String.Join<T>(string, System.Collections.Generic.IEnumerable<T>)",
 

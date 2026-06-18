@@ -499,15 +499,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinitionSymbol) ?? "known_impure"));
             }
 
-            if (originalDefinitionSymbol.ContainingType?.SpecialType == SpecialType.System_String &&
-                originalDefinitionSymbol.Name == "Split" &&
-                invocationOperation.Type is IArrayTypeSymbol)
-            {
-                PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (reviewed fresh owned string.Split array producer)");
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-
             bool isExplicitlyPure = PurityAnalysisEngine.IsPureEnforced(
                 invokedMethodSymbol,
                 context.EnforcePureAttributeSymbol,
@@ -3468,9 +3459,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             var originalDefinition = invocationOperation.TargetMethod.OriginalDefinition;
-            return (originalDefinition.ContainingType?.SpecialType == SpecialType.System_String &&
-                    originalDefinition.Name == "Split") ||
-                PurityAnalysisEngine.IsKnownFreshOwnedArrayReturningMember(originalDefinition, compilation) ||
+            return PurityAnalysisEngine.IsKnownFreshOwnedArrayReturningMember(originalDefinition, compilation) ||
                 PurityAnalysisEngine.IsKnownPureBCLArrayFactoryOperation(unwrappedSource, out _);
         }
 

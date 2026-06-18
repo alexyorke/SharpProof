@@ -140,6 +140,14 @@ internal static class PurityClassificationEngine
         var treatsObjectStateAsFreshOwned = IsFreshOwnedObjectConstructor(summary);
         foreach (var root in summary.RootCandidates)
         {
+            if (string.Equals(root, "caller_visible_memory_write", StringComparison.Ordinal) &&
+                (HasFreshOwnedArrayWritePattern(summary) ||
+                 HasFreshOwnedStringWritePattern(summary) ||
+                 HasLocalScratchMemoryWritePattern(summary)))
+            {
+                continue;
+            }
+
             if (treatsObjectStateAsFreshOwned &&
                 string.Equals(root, "object_state_write", StringComparison.Ordinal))
             {
@@ -163,7 +171,10 @@ internal static class PurityClassificationEngine
         foreach (var effect in summary.Effects)
         {
             if (string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal) &&
-                summary.RootCandidates.Contains("fresh_owned_memory_write", StringComparer.Ordinal))
+                (summary.RootCandidates.Contains("fresh_owned_memory_write", StringComparer.Ordinal) ||
+                 HasFreshOwnedArrayWritePattern(summary) ||
+                 HasFreshOwnedStringWritePattern(summary) ||
+                 HasLocalScratchMemoryWritePattern(summary)))
             {
                 continue;
             }
@@ -673,30 +684,115 @@ internal static class PurityClassificationEngine
             return false;
         }
 
-        if (summary.Effects.Contains("allocates_array", StringComparer.Ordinal))
+        if (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) &&
+            summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
         {
-            var sawSpanConstruction = false;
-            var sawSpanWrite = false;
-            foreach (var call in summary.Calls)
+            if (summary.Effects.Contains("writes_static_field", StringComparer.Ordinal) ||
+                summary.Effects.Contains("writes_instance_field", StringComparer.Ordinal) ||
+                summary.Effects.Contains("reads_instance_field", StringComparer.Ordinal) ||
+                summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
+                summary.Effects.Contains("virtual_call", StringComparer.Ordinal) ||
+                summary.Effects.Contains("block_memory_write", StringComparer.Ordinal))
             {
-                if (!sawSpanConstruction &&
-                    call.StartsWith("System.Span`1<byte>.op_Implicit(!0[])", StringComparison.Ordinal))
-                {
-                    sawSpanConstruction = true;
-                    continue;
-                }
-
-                if (!sawSpanWrite &&
-                    call.StartsWith("System.Runtime.InteropServices.MemoryMarshal.TryWrite(System.Span`1<byte>, ref ", StringComparison.Ordinal))
-                {
-                    sawSpanWrite = true;
-                }
+                return false;
             }
 
-            return sawSpanConstruction && sawSpanWrite;
+            if (!HasOnlySafeStaticReads(summary))
+            {
+                return false;
+            }
+
+            return true;
         }
 
         return HasAllocateUninitializedArrayWrapperPattern(summary);
+    }
+
+    private static bool HasFreshOwnedStringWritePattern(MethodEffectSummary? summary)
+    {
+        if (summary == null ||
+            !summary.Effects.Contains("allocates_object", StringComparer.Ordinal) ||
+            !summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        if (!summary.Calls.Any(static call =>
+                string.Equals(call, "string.FastAllocateString(int)->string", StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        if (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) ||
+            summary.Effects.Contains("writes_static_field", StringComparer.Ordinal) ||
+            summary.Effects.Contains("writes_instance_field", StringComparer.Ordinal) ||
+            summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
+            summary.Effects.Contains("virtual_call", StringComparer.Ordinal) ||
+            summary.Effects.Contains("block_memory_write", StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        if (!HasOnlySafeStaticReads(summary))
+        {
+            return false;
+        }
+
+        foreach (var field in summary.Fields)
+        {
+            if (string.Equals(field, "System.String.Empty", StringComparison.Ordinal) ||
+                string.Equals(field, "System.String._firstChar", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool HasLocalScratchMemoryWritePattern(MethodEffectSummary? summary)
+    {
+        if (summary == null ||
+            !summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        if (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) ||
+            summary.Effects.Contains("writes_static_field", StringComparer.Ordinal) ||
+            summary.Effects.Contains("writes_instance_field", StringComparer.Ordinal) ||
+            summary.Effects.Contains("reads_instance_field", StringComparer.Ordinal) ||
+            summary.Effects.Contains("reads_static_field", StringComparer.Ordinal) ||
+            summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
+            summary.Effects.Contains("virtual_call", StringComparer.Ordinal) ||
+            summary.Effects.Contains("block_memory_write", StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        return summary.Calls.Any(static call =>
+            call.StartsWith("System.Collections.Generic.ValueListBuilder`1<", StringComparison.Ordinal) ||
+            call.StartsWith("System.Text.ValueStringBuilder.", StringComparison.Ordinal));
+    }
+
+    private static bool HasOnlySafeStaticReads(MethodEffectSummary summary)
+    {
+        if (!summary.Effects.Contains("reads_static_field", StringComparer.Ordinal))
+        {
+            return true;
+        }
+
+        return summary.Fields.All(static field =>
+            string.Equals(field, "System.String.Empty", StringComparison.Ordinal) ||
+            string.Equals(field, "System.String._firstChar", StringComparison.Ordinal) ||
+            string.Equals(field, "System.Globalization.TextInfo.Invariant", StringComparison.Ordinal) ||
+            string.Equals(field, "System.Globalization.CompareInfo.Invariant", StringComparison.Ordinal) ||
+            string.Equals(field, "System.BitConverter.IsLittleEndian", StringComparison.Ordinal) ||
+            string.Equals(field, "IsLittleEndian", StringComparison.Ordinal) ||
+            field.StartsWith("System.Array+EmptyArray`1", StringComparison.Ordinal) &&
+            field.EndsWith(".Value", StringComparison.Ordinal));
     }
 
     private static bool HasFreshArrayAllocationEvidence(MethodEffectSummary? summary)
@@ -774,6 +870,9 @@ internal static class PurityClassificationEngine
         if (summary.RootCandidates.Contains("fresh_owned_memory_write", StringComparer.Ordinal) ||
             summary.RootCandidates.Contains("fresh_owned_array_write", StringComparer.Ordinal) ||
             summary.RootCandidates.Contains("fresh_owned_object_write", StringComparer.Ordinal) ||
+            HasFreshOwnedArrayWritePattern(summary) ||
+            HasFreshOwnedStringWritePattern(summary) ||
+            HasLocalScratchMemoryWritePattern(summary) ||
             summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
             summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal))
         {
