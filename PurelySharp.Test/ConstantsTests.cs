@@ -400,6 +400,13 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void AppDomainCurrentDomainAndBaseDirectory_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.AppDomain.CurrentDomain.get");
+            AssertNotInManualCatalogs("System.AppDomain.BaseDirectory.get");
+        }
+
+        [Test]
         public void IPAddressParseHelpers_AreHandledSemantically_NotStaticCatalogs()
         {
             var members = new[]

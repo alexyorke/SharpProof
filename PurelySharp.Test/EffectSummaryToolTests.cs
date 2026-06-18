@@ -1716,6 +1716,45 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeAppDomainSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                40,
+                "System.AppDomain.get_CurrentDomain",
+                "System.AppDomain.get_BaseDirectory",
+                "System.AppContext.get_BaseDirectory",
+                "System.AppContext.GetData");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.AppDomain.get_CurrentDomain()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.AppDomain.get_CurrentDomain()", "caller_visible");
+            AssertPurityClassification(summary, "System.AppDomain.get_BaseDirectory()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.AppDomain.get_BaseDirectory()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.AppDomain.get_CurrentDomain()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.AppDomain.get_BaseDirectory()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.AppDomain.get_BaseDirectory()",
+                "System.AppDomain.get_CurrentDomain()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeIPAddressParseSlice_UsesSemanticHandlingInsteadOfManualCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly("System.Net.Primitives.dll", 80, "System.Net.IPAddress");
