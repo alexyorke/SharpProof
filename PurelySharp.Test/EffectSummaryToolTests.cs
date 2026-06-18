@@ -1878,6 +1878,106 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_GeneratesMultipleOutputFiles()
+        {
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-artifact-spec-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var versionOutputPath = Path.Combine(workingDirectory, "Version.PurelySharp.EffectSummary.json");
+            var environmentOutputPath = Path.Combine(workingDirectory, "Environment.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Defaults = new
+                    {
+                        Framework = "net8.0",
+                        RuntimeAssemblyName = "System.Private.CoreLib.dll",
+                        IncludeCallees = true,
+                        IncludePurityClassification = true,
+                        CompareManualCatalogs = true,
+                    },
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = versionOutputPath,
+                            Limit = 40,
+                            SymbolPrefixes = new[]
+                            {
+                                "System.Version..ctor(int, int)",
+                                "System.Version.get_Major",
+                            },
+                        },
+                        new
+                        {
+                            OutputPath = environmentOutputPath,
+                            Limit = 20,
+                            SymbolPrefixes = new[]
+                            {
+                                "System.Environment.get_NewLine",
+                                "System.Environment.get_Is64BitProcess",
+                            },
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
+
+            Assert.That(File.Exists(versionOutputPath), Is.True);
+            Assert.That(File.Exists(environmentOutputPath), Is.True);
+
+            using var versionSummary = JsonDocument.Parse(await File.ReadAllTextAsync(versionOutputPath));
+            using var environmentSummary = JsonDocument.Parse(await File.ReadAllTextAsync(environmentOutputPath));
+
+            Assert.That(
+                versionSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                    .GetProperty("Entries")
+                    .EnumerateArray()
+                    .Any(entry => string.Equals(
+                        entry.GetProperty("Symbol").GetString(),
+                        "System.Version..ctor(int, int)",
+                        StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                versionSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                    .GetProperty("Entries")
+                    .EnumerateArray()
+                    .Any(entry => string.Equals(
+                        entry.GetProperty("Symbol").GetString(),
+                        "System.Version.get_Major()",
+                        StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                environmentSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                    .GetProperty("Entries")
+                    .EnumerateArray()
+                    .Any(entry => string.Equals(
+                        entry.GetProperty("Symbol").GetString(),
+                        "System.Environment.get_NewLine()",
+                        StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                environmentSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                    .GetProperty("Entries")
+                    .EnumerateArray()
+                    .Any(entry => string.Equals(
+                        entry.GetProperty("Symbol").GetString(),
+                        "System.Environment.get_Is64BitProcess()",
+                        StringComparison.Ordinal)),
+                Is.True);
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeAppContextSlice_UsesGeneratedPurityAndImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
@@ -2630,6 +2730,51 @@ public static class CallvirtFixture
             }
 
             return JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+        }
+
+        private static async Task RunEffectSummaryToolAsync(params string[] arguments)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                WorkingDirectory = GetRepositoryRoot(),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            startInfo.ArgumentList.Add("run");
+            startInfo.ArgumentList.Add("--project");
+            startInfo.ArgumentList.Add("Tools\\PurelySharp.EffectSummary\\PurelySharp.EffectSummary.csproj");
+            startInfo.ArgumentList.Add("--");
+            foreach (var argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start effect summary tool.");
+            var standardOutputTask = process.StandardOutput.ReadToEndAsync();
+            var standardErrorTask = process.StandardError.ReadToEndAsync();
+
+            try
+            {
+                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(120));
+            }
+            catch (TimeoutException)
+            {
+                TryKillProcess(process);
+                throw new AssertionException("Effect summary tool timed out after 120 seconds.");
+            }
+
+            var standardOutput = await standardOutputTask;
+            var standardError = await standardErrorTask;
+            if (process.ExitCode != 0)
+            {
+                throw new AssertionException(
+                    "Effect summary tool failed with exit code " + process.ExitCode + "." + Environment.NewLine +
+                    "Arguments: " + string.Join(" ", arguments) + Environment.NewLine +
+                    standardOutput + Environment.NewLine +
+                    standardError);
+            }
         }
 
         private static Task<JsonDocument> RunRuntimeEffectSummaryAsync(string symbolPrefix, int limit)

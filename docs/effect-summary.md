@@ -109,6 +109,16 @@ Compare emitted methods against the current reviewed manual catalogs:
 dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix System.BitConverter.GetBytes --include-callees --classify-purity --compare-manual-catalogs --limit 50
 ```
 
+Generate multiple checked-in artifacts from a JSON spec:
+
+```powershell
+dotnet run --project Tools\PurelySharp.EffectSummary -- --artifact-spec Tools\PurelySharp.EffectSummary\ReviewedRuntimeArtifactSpec.json
+```
+
+`ReviewedRuntimeArtifactSpec.json` is a starter checked-in recipe for reviewed
+runtime slices such as `AppContext`, `AppDomain`, `Environment`,
+`OperatingSystem`, and `Version`. It is intentionally not yet exhaustive.
+
 ## Analyzer consumption
 
 The analyzer can consume generated exception summaries when the JSON is supplied as an additional file named `PurelySharp.EffectSummary.json` or `*.PurelySharp.EffectSummary.json`.

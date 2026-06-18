@@ -22,6 +22,34 @@ internal static class EffectSummaryCli
             return 0;
         }
 
+        if (!string.IsNullOrWhiteSpace(options.ArtifactSpecPath))
+        {
+            return RunArtifactSpec(options.ArtifactSpecPath!);
+        }
+
+        WriteDocument(BuildDocument(options), options.OutputPath);
+        return 0;
+    }
+
+    private static int RunArtifactSpec(string artifactSpecPath)
+    {
+        var document = ArtifactSpecDocument.Load(artifactSpecPath);
+        foreach (var artifact in document.Artifacts)
+        {
+            var options = CliOptions.FromArtifactSpec(document.Defaults, artifact);
+            if (string.IsNullOrWhiteSpace(options.OutputPath))
+            {
+                throw new ArgumentException("Artifact spec entries require OutputPath.");
+            }
+
+            WriteDocument(BuildDocument(options), options.OutputPath);
+        }
+
+        return 0;
+    }
+
+    private static EffectSummaryDocument BuildDocument(CliOptions options)
+    {
         var assemblies = options.AssemblyPaths.Count == 0
             ? new[] { RuntimeAssemblyResolver.Resolve(options.Framework, options.RuntimeAssemblyName) }
             : options.AssemblyPaths.Select(Path.GetFullPath).ToArray();
@@ -55,6 +83,11 @@ internal static class EffectSummaryCli
             PurityReport: purityClassificationReport,
             GeneratedPurityCatalog: generatedPurityCatalog);
 
+        return document;
+    }
+
+    private static void WriteDocument(EffectSummaryDocument document, string? outputPath)
+    {
         var jsonOptions = new JsonSerializerOptions
         {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -62,17 +95,15 @@ internal static class EffectSummaryCli
         };
 
         var json = JsonSerializer.Serialize(document, jsonOptions);
-        if (string.IsNullOrWhiteSpace(options.OutputPath))
+        if (string.IsNullOrWhiteSpace(outputPath))
         {
             Console.WriteLine(json);
         }
         else
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(options.OutputPath))!);
-            File.WriteAllText(options.OutputPath, json);
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath))!);
+            File.WriteAllText(outputPath, json);
         }
-
-        return 0;
     }
 
     private static void PrintHelp()
@@ -85,6 +116,7 @@ internal static class EffectSummaryCli
         Console.Error.WriteLine();
         Console.Error.WriteLine("Options:");
         Console.Error.WriteLine("  --assembly <path>          Assembly to summarize. Can be repeated.");
+        Console.Error.WriteLine("  --artifact-spec <path>     Generate one or more output files from a JSON artifact spec.");
         Console.Error.WriteLine("  --framework <net8.0>       Runtime framework to inspect when --assembly is omitted.");
         Console.Error.WriteLine("  --runtime-assembly <name>  Runtime assembly name when --assembly is omitted. Default: System.Private.CoreLib.dll");
         Console.Error.WriteLine("  --symbol-prefix <prefix>   Emit only methods whose decoded symbol starts with this prefix. Can be repeated.");
@@ -104,6 +136,8 @@ internal sealed class CliOptions
     public List<string> AssemblyPaths { get; } = new();
 
     public List<string> SymbolPrefixes { get; } = new();
+
+    public string? ArtifactSpecPath { get; private set; }
 
     public string Framework { get; private set; } = "net8.0";
 
@@ -135,6 +169,9 @@ internal sealed class CliOptions
             {
                 case "--assembly":
                     options.AssemblyPaths.Add(ReadRequiredValue(args, ref i, arg));
+                    break;
+                case "--artifact-spec":
+                    options.ArtifactSpecPath = ReadRequiredValue(args, ref i, arg);
                     break;
                 case "--framework":
                     options.Framework = ReadRequiredValue(args, ref i, arg);
@@ -180,6 +217,39 @@ internal sealed class CliOptions
         return options;
     }
 
+    public static CliOptions FromArtifactSpec(ArtifactSpecDefaults? defaults, ArtifactSpecEntry artifact)
+    {
+        var options = new CliOptions
+        {
+            Framework = artifact.Framework ?? defaults?.Framework ?? "net8.0",
+            RuntimeAssemblyName = artifact.RuntimeAssemblyName ?? defaults?.RuntimeAssemblyName ?? "System.Private.CoreLib.dll",
+            OutputPath = artifact.OutputPath,
+            Limit = artifact.Limit ?? defaults?.Limit,
+            IncludeCallees = artifact.IncludeCallees ?? defaults?.IncludeCallees ?? false,
+            MaxDepth = artifact.MaxDepth ?? defaults?.MaxDepth ?? 1,
+            IncludeTransitiveRoots = artifact.IncludeTransitiveRoots ?? defaults?.IncludeTransitiveRoots ?? false,
+            IncludePurityClassification = artifact.IncludePurityClassification ?? defaults?.IncludePurityClassification ?? false,
+            CompareManualCatalogs = artifact.CompareManualCatalogs ?? defaults?.CompareManualCatalogs ?? false,
+        };
+
+        if (artifact.AssemblyPaths != null)
+        {
+            options.AssemblyPaths.AddRange(artifact.AssemblyPaths);
+        }
+
+        if (artifact.SymbolPrefixes != null)
+        {
+            options.SymbolPrefixes.AddRange(artifact.SymbolPrefixes);
+        }
+
+        if (options.CompareManualCatalogs)
+        {
+            options.IncludePurityClassification = true;
+        }
+
+        return options;
+    }
+
     private static string ReadRequiredValue(string[] args, ref int index, string option)
     {
         if (index + 1 >= args.Length)
@@ -190,6 +260,83 @@ internal sealed class CliOptions
         index++;
         return args[index];
     }
+}
+
+internal sealed class ArtifactSpecDocument
+{
+    public int SchemaVersion { get; set; }
+
+    public ArtifactSpecDefaults? Defaults { get; set; }
+
+    public ArtifactSpecEntry[] Artifacts { get; set; } = Array.Empty<ArtifactSpecEntry>();
+
+    public static ArtifactSpecDocument Load(string path)
+    {
+        var json = File.ReadAllText(path);
+        var document = JsonSerializer.Deserialize<ArtifactSpecDocument>(
+            json,
+            new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+            }) ?? throw new InvalidOperationException($"Failed to deserialize artifact spec '{path}'.");
+
+        if (document.SchemaVersion != 1)
+        {
+            throw new InvalidOperationException(
+                $"Unsupported artifact spec schema version '{document.SchemaVersion}' in '{path}'.");
+        }
+
+        if (document.Artifacts.Length == 0)
+        {
+            throw new InvalidOperationException($"Artifact spec '{path}' does not contain any artifacts.");
+        }
+
+        return document;
+    }
+}
+
+internal sealed class ArtifactSpecDefaults
+{
+    public string? Framework { get; set; }
+
+    public string? RuntimeAssemblyName { get; set; }
+
+    public int? Limit { get; set; }
+
+    public bool? IncludeCallees { get; set; }
+
+    public int? MaxDepth { get; set; }
+
+    public bool? IncludeTransitiveRoots { get; set; }
+
+    public bool? IncludePurityClassification { get; set; }
+
+    public bool? CompareManualCatalogs { get; set; }
+}
+
+internal sealed class ArtifactSpecEntry
+{
+    public string? OutputPath { get; set; }
+
+    public string? Framework { get; set; }
+
+    public string? RuntimeAssemblyName { get; set; }
+
+    public string[]? AssemblyPaths { get; set; }
+
+    public string[]? SymbolPrefixes { get; set; }
+
+    public int? Limit { get; set; }
+
+    public bool? IncludeCallees { get; set; }
+
+    public int? MaxDepth { get; set; }
+
+    public bool? IncludeTransitiveRoots { get; set; }
+
+    public bool? IncludePurityClassification { get; set; }
+
+    public bool? CompareManualCatalogs { get; set; }
 }
 
 internal static class RuntimeAssemblyResolver
