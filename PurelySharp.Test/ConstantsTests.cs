@@ -316,6 +316,12 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void StringBuilderToString_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Text.StringBuilder.ToString()");
+        }
+
+        [Test]
         public void JsonSerializerSerialize_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.Text.Json.JsonSerializer.Serialize<TValue>(TValue, System.Text.Json.JsonSerializerOptions?)"));

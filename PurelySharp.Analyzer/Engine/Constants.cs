@@ -1200,11 +1200,6 @@ public static class Constants
         "System.StringComparer.Ordinal.Equals(string, string)",
 
 
-        "System.Text.StringBuilder.ToString()",
-
-
-
-
         "System.Threading.Tasks.Task.CompletedTask.get",
         "System.Threading.Tasks.Task.FromResult<TResult>(TResult)",
 

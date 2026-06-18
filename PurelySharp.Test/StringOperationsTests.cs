@@ -780,7 +780,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task PureMethodWithStringBuilderToString_NoDiagnostic()
+        public async Task PureMethodWithStringBuilderToString_Diagnostic()
         {
             var test = @"
 using System;
@@ -790,16 +790,17 @@ using System.Text;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod(StringBuilder sb)
+    public string {|PS0002:TestMethod|}(StringBuilder sb)
     {
         return sb.ToString();
     }
 }";
+
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
 
         [Test]
-        public async Task PureMethodWithLocalStringBuilderToString_NoDiagnostic()
+        public async Task PureMethodWithLocalStringBuilderToString_Diagnostic()
         {
 
             var test = @"
@@ -810,7 +811,7 @@ using System.Text;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod()
+    public string {|PS0002:TestMethod|}()
     {
         StringBuilder sb = new StringBuilder(""initial"");
         return sb.ToString();
