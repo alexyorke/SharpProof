@@ -958,6 +958,12 @@ public static class MutableCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void StopwatchGetTimestamp_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Diagnostics.Stopwatch.GetTimestamp()");
+        }
+
+        [Test]
         public void OperatingSystemAndApplicationModelPureHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

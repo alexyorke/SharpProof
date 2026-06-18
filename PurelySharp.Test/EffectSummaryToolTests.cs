@@ -3301,6 +3301,35 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStopwatchGetTimestampSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                8,
+                "System.Diagnostics.Stopwatch.GetTimestamp");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.GetTimestamp()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.GetTimestamp()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceCounter()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Stopwatch.QueryPerformanceCounter()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => string.Equals(symbol, "System.Diagnostics.Stopwatch.GetTimestamp()", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[] { "System.Diagnostics.Stopwatch.GetTimestamp()" }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeOperatingSystemSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

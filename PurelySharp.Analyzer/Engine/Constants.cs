@@ -237,7 +237,6 @@ public static class Constants
         "System.Diagnostics.Stopwatch.ElapsedMilliseconds.get",
         "System.Diagnostics.Stopwatch.ElapsedTicks.get",
         "System.Diagnostics.Stopwatch.Frequency",
-        "System.Diagnostics.Stopwatch.GetTimestamp()",
         "System.Diagnostics.Stopwatch.Start()",
         "System.Diagnostics.Stopwatch.Stop()",
         "System.Diagnostics.Trace.WriteLine(string)",

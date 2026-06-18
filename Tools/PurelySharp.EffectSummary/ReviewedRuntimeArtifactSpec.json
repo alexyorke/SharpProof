@@ -77,6 +77,13 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Stopwatch.GetTimestamp.PurelySharp.EffectSummary.json",
+      "Limit": 8,
+      "SymbolPrefixes": [
+        "System.Diagnostics.Stopwatch.GetTimestamp"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Environment.PurelySharp.EffectSummary.json",
       "Limit": 48,
       "SymbolPrefixes": [
