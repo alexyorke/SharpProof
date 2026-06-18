@@ -1579,7 +1579,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return true;
             }
 
-            if (methodSymbol.Name is "Contains" or "StartsWith" or "EndsWith")
+            if (methodSymbol.Name is "Contains" or "StartsWith" or "EndsWith" or "Equals")
             {
                 var comparisonParameterIndex = GetStringComparisonParameterIndex(methodSymbol);
                 if (comparisonParameterIndex >= 0 && comparisonParameterIndex < invocationOperation.Arguments.Length)

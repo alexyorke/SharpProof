@@ -1055,6 +1055,26 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStringEqualsSlice_TreatsComparisonOverloadsAsGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync("System.String.Equals", limit: 20);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.String.Equals(string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Equals(string)", "none");
+            AssertPurityClassification(summary, "System.String.Equals(string, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Equals(string, string)", "none");
+            AssertPurityClassification(summary, "System.String.Equals(string, System.StringComparison)", "impure", "global_state_read", "throw");
+            AssertEffectVisibilityClassification(summary, "System.String.Equals(string, System.StringComparison)", "caller_visible");
+            AssertPurityClassification(summary, "System.String.Equals(string, string, System.StringComparison)", "impure", "global_state_read", "throw");
+            AssertEffectVisibilityClassification(summary, "System.String.Equals(string, string, System.StringComparison)", "caller_visible");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStringPrefixSuffixSlice_TreatsStartsWithAndEndsWithAsImpure()
         {
             using var startsWithSummary = await RunRuntimeEffectSummaryAsync("System.String.StartsWith", limit: 20);

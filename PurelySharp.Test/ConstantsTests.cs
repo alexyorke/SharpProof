@@ -180,6 +180,23 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void StringEqualsHelpers_AreSourcedFromGeneratedPurityEvidence_AndSemanticRules_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "string.Equals(object)",
+                "string.Equals(string)",
+                "string.Equals(string, string)",
+                "string.Equals(string, System.StringComparison)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void StringPrefixSuffix_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.String.StartsWith(System.String)"));

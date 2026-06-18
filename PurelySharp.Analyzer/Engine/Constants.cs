@@ -1190,8 +1190,6 @@ public static class Constants
         "string.Concat(params string[])",
         "string.Replace(string, string)",
         "string.Substring(int, int)",
-        "string.Equals(string)",
-        "string.Equals(object)",
         "string.GetHashCode()",
         "string.ToLowerInvariant()",
         "string.ToUpperInvariant()",
@@ -1466,9 +1464,6 @@ public static class Constants
 
         "string.Clone()",
         "string.CompareTo(string)",
-        "string.Equals(string)",
-        "string.Equals(string, string)",
-        "string.Equals(string, System.StringComparison)",
         "string.GetHashCode()",
         "string.IndexOf(char)",
         "string.IndexOf(string)",
