@@ -125,11 +125,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     return cctorResult;
                 }
 
-                if (constructorSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                GeneratedPurityCatalog.PurityEntry generatedPurity = default;
+                var hasTrustedGeneratedPurity = constructorSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
                     PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
                         constructorSymbol,
                         context.SemanticModel.Compilation,
-                        out var generatedPurity))
+                        out generatedPurity);
+
+                if (hasTrustedGeneratedPurity)
                 {
                     if (generatedPurity.IsPure)
                     {
@@ -152,14 +155,15 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     }
                 }
 
-                if (PurityAnalysisEngine.IsKnownPureBCLMember(constructorSymbol))
+                if (!hasTrustedGeneratedPurity && PurityAnalysisEngine.IsKnownPureBCLMember(constructorSymbol))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a known-pure BCL member; skipping recursive callee analysis.");
                     return PurityAnalysisResult.Pure;
                 }
 
-                if (IsKnownPureStringBuilderConstructor(constructorSymbol) ||
-                    IsKnownPureStringReadOnlySpanConstructor(constructorSymbol))
+                if (!hasTrustedGeneratedPurity &&
+                    (IsKnownPureStringBuilderConstructor(constructorSymbol) ||
+                     IsKnownPureStringReadOnlySpanConstructor(constructorSymbol)))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a reviewed pure constructor.");
                     return PurityAnalysisResult.Pure;

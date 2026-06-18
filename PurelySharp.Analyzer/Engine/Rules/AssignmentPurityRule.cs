@@ -230,11 +230,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IOperation operation,
             PurityAnalysisContext context)
         {
-            if (operatorMethod.Locations.FirstOrDefault()?.IsInMetadata == true &&
+            GeneratedPurityCatalog.PurityEntry generatedPurity = default;
+            var hasTrustedGeneratedPurity = operatorMethod.Locations.FirstOrDefault()?.IsInMetadata == true &&
                 PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
                     operatorMethod.OriginalDefinition,
                     context.SemanticModel.Compilation,
-                    out var generatedPurity))
+                    out generatedPurity);
+
+            if (hasTrustedGeneratedPurity)
             {
                 if (generatedPurity.IsPure)
                 {
@@ -255,7 +258,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 }
             }
 
-            if (PurityAnalysisEngine.IsKnownPureBCLMember(operatorMethod) ||
+            if ((!hasTrustedGeneratedPurity && PurityAnalysisEngine.IsKnownPureBCLMember(operatorMethod)) ||
                 PurityAnalysisEngine.HasPureExternalAttribute(operatorMethod))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;

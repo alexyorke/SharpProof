@@ -193,11 +193,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinition) ?? "known_impure"));
             }
 
-            if (originalDefinition.Locations.FirstOrDefault()?.IsInMetadata == true &&
+            GeneratedPurityCatalog.PurityEntry generatedPurity = default;
+            var hasTrustedGeneratedPurity = originalDefinition.Locations.FirstOrDefault()?.IsInMetadata == true &&
                 PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
                     originalDefinition,
                     context.SemanticModel.Compilation,
-                    out var generatedPurity))
+                    out generatedPurity);
+
+            if (hasTrustedGeneratedPurity)
             {
                 if (generatedPurity.IsPure)
                 {
@@ -218,7 +221,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 }
             }
 
-            if (PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinition))
+            if (!hasTrustedGeneratedPurity && PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinition))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }

@@ -57,9 +57,17 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 context.EnforcePureAttributeSymbol,
                 context.PureAttributeSymbol);
             var getterSymbol = propertySymbol.GetMethod;
+            GeneratedPurityCatalog.PurityEntry generatedPurity = default;
+            var hasTrustedGeneratedPurity = getterSymbol != null &&
+                getterSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
+                    getterSymbol.OriginalDefinition,
+                    context.SemanticModel.Compilation,
+                    out generatedPurity);
+            var allowsKnownPureFallback = !hasTrustedGeneratedPurity;
             var requiresDispatchCheck = getterSymbol != null &&
                 IsPotentiallyDispatchedProperty(propertySymbol) &&
-                !PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol);
+                !(allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol));
 
             if (isPureEnforcedProperty && !requiresDispatchCheck)
             {
@@ -135,13 +143,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 }
             }
 
-            if (!requiresDispatchCheck &&
-                getterSymbol != null &&
-                getterSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
-                    getterSymbol,
-                    context.SemanticModel.Compilation,
-                    out var generatedPurity))
+            if (!requiresDispatchCheck && hasTrustedGeneratedPurity)
             {
                 if (generatedPurity.IsPure)
                 {
@@ -181,7 +183,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
 
                 string staticPureSig = propertySymbol.OriginalDefinition.ToDisplayString();
-                bool staticKnownPure = PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol);
+                bool staticKnownPure = allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol);
                 PurityAnalysisEngine.LogDebug($"      [PropRefRule] Checking IsKnownPureBCLMember for static property: '{staticPureSig}' -> {staticKnownPure}");
 
                 if (staticKnownPure)
@@ -297,7 +299,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     }
 
                     string instancePureSig = propertySymbol.OriginalDefinition.ToDisplayString();
-                    bool instanceKnownPure = PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol);
+                    bool instanceKnownPure = allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol);
                     PurityAnalysisEngine.LogDebug($"      [PropRefRule] Checking IsKnownPureBCLMember for instance property: '{instancePureSig}' -> {instanceKnownPure}");
 
                     if (instanceKnownPure)
@@ -796,6 +798,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             PurityAnalysisContext context)
         {
             if (implementation.DeclaringSyntaxReferences.Length == 0 &&
+                !PurityAnalysisEngine.HasTrustedGeneratedPurityCoverage(implementation, context.SemanticModel.Compilation) &&
                 !PurityAnalysisEngine.IsKnownPureBCLMember(implementation) &&
                 !PurityAnalysisEngine.HasPureExternalAttribute(implementation))
             {

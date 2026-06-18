@@ -117,7 +117,40 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             var originalDefinition = method.OriginalDefinition;
-            if (PurityAnalysisEngine.HasPureExternalAttribute(originalDefinition) ||
+            GeneratedPurityCatalog.PurityEntry generatedPurity = default;
+            var hasTrustedGeneratedPurity = originalDefinition.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
+                    originalDefinition,
+                    context.SemanticModel.Compilation,
+                    out generatedPurity);
+
+            if (PurityAnalysisEngine.HasPureExternalAttribute(originalDefinition))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            if (hasTrustedGeneratedPurity)
+            {
+                if (generatedPurity.IsPure)
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                }
+
+                if (generatedPurity.IsImpure)
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        operation.Syntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            generatedPurity.PrimaryCategory,
+                            nameof(ListPatternPurityRule),
+                            operation,
+                            syntaxNode: operation.Syntax,
+                            symbol: originalDefinition,
+                            catalogSource: "generated_purity_summary"));
+                }
+            }
+
+            if (!hasTrustedGeneratedPurity &&
                 PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinition))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -136,7 +169,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinition) ?? "known_impure"));
             }
 
-            if (originalDefinition.DeclaringSyntaxReferences.Length == 0 &&
+            if (!hasTrustedGeneratedPurity &&
+                originalDefinition.DeclaringSyntaxReferences.Length == 0 &&
                 !PurityAnalysisEngine.HasImpureAttribute(originalDefinition))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;

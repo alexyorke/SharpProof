@@ -969,8 +969,11 @@ namespace PurelySharp.Analyzer.Engine
                     return knownImpureResult;
                 }
 
-                if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                    TryGetTrustedGeneratedPurity(methodSymbol, semanticModel.Compilation, out var generatedPurity))
+                GeneratedPurityCatalog.PurityEntry generatedPurity = default;
+                var hasTrustedGeneratedPurity = methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                    TryGetTrustedGeneratedPurity(methodSymbol, semanticModel.Compilation, out generatedPurity);
+
+                if (hasTrustedGeneratedPurity)
                 {
                     if (generatedPurity.IsPure)
                     {
@@ -996,7 +999,7 @@ namespace PurelySharp.Analyzer.Engine
                 }
 
 
-                if (IsKnownPureBCLMember(methodSymbol))
+                if (!hasTrustedGeneratedPurity && IsKnownPureBCLMember(methodSymbol))
                 {
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is known pure BCL member.");
                     purityCache[methodSymbol] = PurityAnalysisResult.Pure;
@@ -2627,7 +2630,35 @@ namespace PurelySharp.Analyzer.Engine
                     }
 
 
-                    if (IsKnownPureBCLMember(operatorMethod))
+                    GeneratedPurityCatalog.PurityEntry generatedPurity = default;
+                    var hasTrustedGeneratedPurity = operatorMethod.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                        TryGetTrustedGeneratedPurity(
+                            operatorMethod.OriginalDefinition,
+                            context.SemanticModel.Compilation,
+                            out generatedPurity);
+
+                    if (hasTrustedGeneratedPurity)
+                    {
+                        if (generatedPurity.IsPure)
+                        {
+                            LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is trusted pure from generated purity summary.");
+                            return PurityAnalysisResult.Pure;
+                        }
+
+                        if (generatedPurity.IsImpure)
+                        {
+                            LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is trusted impure from generated purity summary.");
+                            return PurityAnalysisResult.Impure(
+                                operation.Syntax,
+                                PurityEvidence.Create(
+                                    generatedPurity.PrimaryCategory,
+                                    syntaxNode: operation.Syntax,
+                                    symbol: operatorMethod.OriginalDefinition,
+                                    catalogSource: "generated_purity_summary"));
+                        }
+                    }
+
+                    if (!hasTrustedGeneratedPurity && IsKnownPureBCLMember(operatorMethod))
                     {
                         LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is known pure BCL member.");
                         return PurityAnalysisResult.Pure;
@@ -2915,6 +2946,13 @@ namespace PurelySharp.Analyzer.Engine
             return GeneratedPurityCatalog.Current.TryGetPurity(methodSymbol, compilation, out purity);
         }
 
+        internal static bool HasTrustedGeneratedPurityCoverage(
+            IMethodSymbol methodSymbol,
+            Compilation compilation)
+        {
+            return TryGetTrustedGeneratedPurity(methodSymbol.OriginalDefinition, compilation, out _);
+        }
+
         internal static bool IsTrustedGeneratedFreshOwnedArrayReturningMember(
             IMethodSymbol methodSymbol,
             Compilation compilation)
@@ -2933,9 +2971,9 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            if (IsTrustedGeneratedFreshOwnedArrayReturningMember(methodSymbol, compilation))
+            if (TryGetTrustedGeneratedPurity(methodSymbol, compilation, out var purity))
             {
-                return true;
+                return purity.IsPure && purity.IsFreshArrayCandidate;
             }
 
             var signature = methodSymbol.OriginalDefinition.ToDisplayString();

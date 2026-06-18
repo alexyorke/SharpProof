@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -569,6 +570,113 @@ public class TestClass
                 "Trusted generated purity should allow Version constructors, comparisons, and getters.");
             Assert.That(matched, Is.EqualTo(new[] { true, true, true, true }),
                 "Generated purity catalog should resolve the tracked Version members to their runtime implementation assembly.");
+        }
+
+        [Test]
+        public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPureMethodFallback()
+        {
+            const string source = @"
+using System;
+using System.Security.Cryptography;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right)
+    {
+        return CryptographicOperations.FixedTimeEquals(left, right);
+    }
+}";
+
+            const string metadataSymbol = "System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan`1<byte>, System.ReadOnlySpan`1<byte>)";
+            const string displaySymbol = "System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan<byte>, System.ReadOnlySpan<byte>)";
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                source,
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new InMemoryAdditionalText(
+                        "Synthetic.Cryptography.PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            typeof(CryptographicOperations).Assembly.Location,
+                            metadataSymbol,
+                            "conservative_unknown",
+                            "[\"dynamic_dispatch\"]",
+                            displaySymbol))));
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Security.Cryptography.CryptographicOperations.FixedTimeEquals"));
+        }
+
+        [Test]
+        public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPurePropertyFallback()
+        {
+            const string source = @"
+using System.Globalization;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public CultureInfo TestMethod()
+    {
+        return CultureInfo.InvariantCulture;
+    }
+}";
+
+            const string symbol = "System.Globalization.CultureInfo.get_InvariantCulture()";
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                source,
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new InMemoryAdditionalText(
+                        "Synthetic.Globalization.PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            typeof(CultureInfo).Assembly.Location,
+                            symbol,
+                            "conservative_unknown",
+                            "[\"dynamic_dispatch\"]"))));
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("unknown_external_call"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("no_body"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("CultureInfo.InvariantCulture.get"));
+        }
+
+        [Test]
+        public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPureConstructorFallback()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod()
+    {
+        ReadOnlySpan<char> value = ""alpha"".AsSpan();
+        return new string(value);
+    }
+}";
+
+            const string metadataSymbol = "System.String..ctor(System.ReadOnlySpan`1<char>)";
+            const string displaySymbol = "string.String(System.ReadOnlySpan<char>)";
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                source,
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new InMemoryAdditionalText(
+                        "Synthetic.StringConstructor.PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            typeof(string).Assembly.Location,
+                            metadataSymbol,
+                            "conservative_unknown",
+                            "[\"dynamic_dispatch\"]",
+                            displaySymbol))));
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.ImpurityCategoryProperty), Is.True);
         }
 
         [Test]
@@ -2854,6 +2962,83 @@ public class TestClass
 """;
         }
 
+        private static string CreatePuritySummaryJson(
+            string assemblyPath,
+            string actualMethodLookupSymbol,
+            string classification,
+            string categoriesJson,
+            string? symbolOverride = null)
+        {
+            var assemblyIdentity = GetAssemblyIdentity(assemblyPath);
+            var methodIdentity = GetMethodIdentity(assemblyPath, actualMethodLookupSymbol);
+            var symbol = symbolOverride ?? actualMethodLookupSymbol;
+
+            return $$"""
+{
+  "SchemaVersion": 2,
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 1,
+    "Entries": [
+      {
+        "Symbol": "{{symbol}}",
+        "ExactSymbolKey": "{{methodIdentity.ExactSymbolKey}}",
+        "CacheKey": "diagnostic-evidence-test",
+        "AssemblyName": "{{assemblyIdentity.AssemblyName}}",
+        "AssemblyPath": "{{assemblyPath.Replace("\\", "\\\\")}}",
+        "AssemblySha256": "{{assemblyIdentity.AssemblySha256}}",
+        "ModuleVersionId": "{{assemblyIdentity.ModuleVersionId}}",
+        "MetadataToken": "{{methodIdentity.MetadataToken}}",
+        "MethodBodySha256": {{FormatJsonStringOrNull(methodIdentity.MethodBodySha256)}},
+        "Classification": "{{classification}}",
+        "Categories": {{categoriesJson}},
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none"
+      }
+    ]
+  },
+  "Assemblies": [
+    {
+      "AssemblyName": "{{assemblyIdentity.AssemblyName}}",
+      "AssemblyPath": "{{assemblyPath.Replace("\\", "\\\\")}}",
+      "AssemblySha256": "{{assemblyIdentity.AssemblySha256}}",
+      "ModuleVersionId": "{{assemblyIdentity.ModuleVersionId}}",
+      "MethodCount": 1,
+      "EmittedMethodCount": 1,
+      "Methods": [
+        {
+          "Symbol": "{{symbol}}",
+          "ExactSymbolKey": "{{methodIdentity.ExactSymbolKey}}",
+          "MetadataToken": "{{methodIdentity.MetadataToken}}",
+          "RelativeVirtualAddress": 0,
+          "MethodBodySha256": {{FormatJsonStringOrNull(methodIdentity.MethodBodySha256)}},
+          "CacheKey": "diagnostic-evidence-test",
+          "Effects": [],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "{{classification}}",
+            "Categories": {{categoriesJson}},
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none"
+          }
+        }
+      ]
+    }
+  ]
+}
+""";
+        }
+
         private static MethodIdentity GetMethodIdentity(string assemblyPath, string symbol)
         {
             using var stream = File.OpenRead(assemblyPath);
@@ -2881,7 +3066,10 @@ public class TestClass
                     }
                 }
 
-                return new MethodIdentity($"0x{MetadataTokens.GetToken(handle):X8}", methodBodySha256);
+                return new MethodIdentity(
+                    $"0x{MetadataTokens.GetToken(handle):X8}",
+                    methodBodySha256,
+                    GetMethodExactSymbolKey(metadataReader, handle));
             }
 
             throw new AssertionException("Method symbol did not resolve in assembly: " + symbol);
@@ -2936,6 +3124,53 @@ public class TestClass
             }
         }
 
+        private static string GetMethodExactSymbolKey(MetadataReader reader, MethodDefinitionHandle handle)
+        {
+            var definition = reader.GetMethodDefinition(handle);
+            var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
+            var methodName = reader.GetString(definition.Name);
+            var signature = DecodeExactMethodSignature(reader, definition);
+            return typeName + "." + methodName + signature;
+        }
+
+        private static string DecodeExactMethodSignature(MetadataReader reader, MethodDefinition definition)
+        {
+            try
+            {
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
+                return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
+            }
+            catch (BadImageFormatException)
+            {
+                return "(?)->?";
+            }
+        }
+
+        private static string NormalizeExactTypeName(string typeName)
+        {
+            return typeName switch
+            {
+                "System.Boolean" => "bool",
+                "System.Byte" => "byte",
+                "System.Char" => "char",
+                "System.Double" => "double",
+                "System.Int16" => "short",
+                "System.Int32" => "int",
+                "System.Int64" => "long",
+                "System.IntPtr" => "nint",
+                "System.Object" => "object",
+                "System.SByte" => "sbyte",
+                "System.Single" => "float",
+                "System.String" => "string",
+                "System.UInt16" => "ushort",
+                "System.UInt32" => "uint",
+                "System.UInt64" => "ulong",
+                "System.UIntPtr" => "nuint",
+                "System.Void" => "void",
+                _ => typeName
+            };
+        }
+
         private static string FormatJsonArray(params string[] values)
         {
             if (values.Length == 0)
@@ -2944,6 +3179,11 @@ public class TestClass
             }
 
             return "[\"" + string.Join("\", \"", values) + "\"]";
+        }
+
+        private static string FormatJsonStringOrNull(string? value)
+        {
+            return value == null ? "null" : "\"" + value + "\"";
         }
 
         private static AssemblyIdentity GetAssemblyIdentity(string assemblyPath)
@@ -3068,7 +3308,7 @@ public class TestClass
         }
 
         private sealed record AssemblyIdentity(string AssemblyName, string AssemblySha256, string ModuleVersionId);
-        private sealed record MethodIdentity(string MetadataToken, string? MethodBodySha256);
+        private sealed record MethodIdentity(string MetadataToken, string? MethodBodySha256, string ExactSymbolKey);
 
         private sealed class EffectSummaryTypeNameProvider : ISignatureTypeProvider<string, object?>
         {

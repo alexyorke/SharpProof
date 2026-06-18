@@ -363,6 +363,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     originalDefinitionSymbol,
                     context.SemanticModel.Compilation,
                     out generatedPurity);
+            var allowsKnownPureFallback = !hasTrustedGeneratedPurity;
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Checking purity of {invocationOperation.Arguments.Length} arguments for {originalDefinitionSymbol.Name}.");
             foreach (var argument in invocationOperation.Arguments)
@@ -395,7 +396,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
                     if (argument.Parameter.RefKind == RefKind.Out &&
                         ((hasTrustedGeneratedPurity && generatedPurity.IsPure) ||
-                         PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol) ||
+                         (allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol)) ||
                          IsSemanticallyPureOutArgumentMethod(originalDefinitionSymbol) ||
                          IsDispatchAnalyzedOutArgumentMethod(invokedMethodSymbol)))
                     {
@@ -565,7 +566,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Checking IsKnownPureBCLMember with signature: '{originalDefinitionSymbol.ToDisplayString()}'");
-            if (PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol))
+            if (allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (Known Pure BCL)");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -1846,6 +1847,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             PurityAnalysisContext context)
         {
             if (implementation.DeclaringSyntaxReferences.Length == 0 &&
+                !PurityAnalysisEngine.HasTrustedGeneratedPurityCoverage(implementation, context.SemanticModel.Compilation) &&
                 !PurityAnalysisEngine.IsKnownPureBCLMember(implementation) &&
                 !PurityAnalysisEngine.HasPureExternalAttribute(implementation))
             {
