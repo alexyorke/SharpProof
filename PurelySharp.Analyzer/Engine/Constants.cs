@@ -739,7 +739,6 @@ public static class Constants
 
 
 
-        "System.Convert.ChangeType(object, System.Type)",
     };
 
     public static readonly HashSet<string> KnownFreshOwnedArrayReturningMembers = new HashSet<string>(StringComparer.Ordinal)

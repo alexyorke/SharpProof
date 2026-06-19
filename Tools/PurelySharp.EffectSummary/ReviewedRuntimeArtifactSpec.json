@@ -778,6 +778,14 @@
       "SourceSummaryPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json"
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Convert.ChangeType.Type.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Convert.ChangeType.Type.PurelySharp.EffectSummary.json",
+      "Limit": 12,
+      "SymbolPrefixes": [
+        "System.Convert.ChangeType(object, System.Type)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Cryptography.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Cryptography.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [

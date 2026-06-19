@@ -2550,6 +2550,12 @@ public static class IPEndPointCatalogSignatureSamples
         }
 
         [Test]
+        public void ConvertChangeTypeTypeOverload_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Convert.ChangeType(object, System.Type)");
+        }
+
+        [Test]
         public void CurrentCultureNumericParseAndFormatHelpers_AreHandledSemantically_NotStaticCatalogs()
         {
             var members = new[]
