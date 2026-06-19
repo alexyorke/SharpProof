@@ -265,7 +265,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             var dispatchWasProvenPure = false;
-            if (IsPotentiallyDispatchedMethod(invokedMethodSymbol, context.SemanticModel.Compilation)
+            if (!ShouldDeferToSpecializedDispatchPurity(invokedMethodSymbol) &&
+                IsPotentiallyDispatchedMethod(invokedMethodSymbol, context.SemanticModel.Compilation)
                 && (invokedMethodSymbol.IsStatic
                     ? invocationOperation.Instance == null
                     : invocationOperation.Instance != null
@@ -536,7 +537,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: knownImpureMemberSource));
             }
 
-            if (hasTrustedGeneratedPurity)
+            if (hasTrustedGeneratedPurity &&
+                !ShouldDeferToSpecializedDispatchPurity(invokedMethodSymbol))
             {
                 if (generatedPurity.IsPure)
                 {
@@ -734,6 +736,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return !methodSymbol.IsSealed;
+        }
+
+        internal static bool ShouldDeferToSpecializedDispatchPurity(IMethodSymbol methodSymbol)
+        {
+            return TryGetDefaultComparisonCollectionKeyType(methodSymbol, out _) ||
+                TryGetDefaultEqualityCollectionElementType(methodSymbol, out _, out _) ||
+                TryGetEqualityComparerElementType(methodSymbol, out _) ||
+                TryGetComparerElementType(methodSymbol, out _);
         }
 
         private static bool IsPureOutArgumentTarget(IOperation? operation)

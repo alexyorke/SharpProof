@@ -2289,6 +2289,7 @@ internal static class PurityClassificationEngine
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.BitCast(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.SpanHelpers.ContainsValueType(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("string.GetRawStringData()", StringComparison.Ordinal) ||
             callSymbol.StartsWith("string.get_Length()", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains(".get_Length()", StringComparison.Ordinal) ||

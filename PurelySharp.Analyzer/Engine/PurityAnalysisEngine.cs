@@ -1366,7 +1366,8 @@ namespace PurelySharp.Analyzer.Engine
                                     goto PostCfgChecksDone;
                                 }
 
-                                if (hasTrustedGeneratedPurityForInvocation)
+                                if (hasTrustedGeneratedPurityForInvocation &&
+                                    !Rules.MethodInvocationPurityRule.ShouldDeferToSpecializedDispatchPurity(targetMethod))
                                 {
                                     if (postCfgGeneratedPurity.IsPure)
                                     {
