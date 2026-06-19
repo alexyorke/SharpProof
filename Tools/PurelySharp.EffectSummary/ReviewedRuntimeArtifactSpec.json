@@ -536,7 +536,8 @@
         "System.Buffers.ReadOnlySequence`1.get_End",
         "System.Buffers.ReadOnlySequence`1.get_IsEmpty",
         "System.Buffers.ReadOnlySequence`1.get_Length",
-        "System.Buffers.ReadOnlySequence`1.get_Start"
+        "System.Buffers.ReadOnlySequence`1.get_Start",
+        "System.Buffers.ReadOnlySequence`1.Slice(long)"
       ]
     },
     {

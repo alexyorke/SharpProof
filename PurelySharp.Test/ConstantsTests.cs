@@ -1435,7 +1435,7 @@ public static class StringJoinCatalogSignatureSamples
         }
 
         [Test]
-        public void ReadOnlySequenceHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        public void ReadOnlySequenceHelpersAndSlice_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
             {
@@ -1443,6 +1443,7 @@ public static class StringJoinCatalogSignatureSamples
                 "System.Buffers.ReadOnlySequence<T>.IsEmpty.get",
                 "System.Buffers.ReadOnlySequence<T>.Length.get",
                 "System.Buffers.ReadOnlySequence<T>.Start.get",
+                "System.Buffers.ReadOnlySequence<T>.Slice(long)",
             };
 
             foreach (var member in members)
@@ -3213,7 +3214,8 @@ public static class ReadOnlySequenceCatalogSignatureSamples
     {
         var start = value.Start;
         var end = value.End;
-        return value.IsEmpty ? 0 : value.Length > 0 ? 1 : 2;
+        var slice = value.Slice(1L);
+        return value.IsEmpty ? 0 : value.Length > slice.Length ? 1 : 2;
     }
 }";
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
@@ -3227,6 +3229,7 @@ public static class ReadOnlySequenceCatalogSignatureSamples
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.End"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Length"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.IsEmpty"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.Slice(1L)"));
         }
 
         [Test]

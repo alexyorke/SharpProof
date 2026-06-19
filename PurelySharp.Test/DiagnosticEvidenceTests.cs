@@ -2646,7 +2646,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task GeneratedPurityCatalog_Resolves_ReadOnlySequenceHelpers()
+        public async Task GeneratedPurityCatalog_Resolves_ReadOnlySequenceHelpersAndSlice()
         {
             const string source = @"
 using System.Buffers;
@@ -2659,7 +2659,8 @@ public class TestClass
     {
         var start = value.Start;
         var end = value.End;
-        return value.IsEmpty ? 0 : value.Length > 0 ? 1 : 2;
+        var slice = value.Slice(1L);
+        return value.IsEmpty ? 0 : value.Length > slice.Length ? 1 : 2;
     }
 }";
 
@@ -2697,6 +2698,12 @@ public class TestClass
                         .OfType<MemberAccessExpressionSyntax>()
                         .Single(node => node.ToString() == "value.IsEmpty"))
                     .Symbol!).GetMethod!,
+                (IMethodSymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Single(node => node.ToString() == "value.Slice(1L)"))
+                    .Symbol!,
             };
             var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
             var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
@@ -2711,9 +2718,9 @@ public class TestClass
             Assert.That(
                 diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
                 Is.False,
-                "Trusted generated purity should allow the tracked ReadOnlySequence helpers.");
+                "Trusted generated purity should allow the tracked ReadOnlySequence helpers and Slice(long).");
             Assert.That(matched, Is.EqualTo(Enumerable.Repeat(true, trackedMethods.Length).ToArray()),
-                "Generated purity catalog should resolve the tracked ReadOnlySequence helpers.");
+                "Generated purity catalog should resolve the tracked ReadOnlySequence helpers and Slice(long).");
         }
 
         [Test]

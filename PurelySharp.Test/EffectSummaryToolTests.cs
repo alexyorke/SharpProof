@@ -3292,7 +3292,8 @@ public static class StringComparisonFixture
                 "System.Buffers.ReadOnlySequence`1.get_End",
                 "System.Buffers.ReadOnlySequence`1.get_IsEmpty",
                 "System.Buffers.ReadOnlySequence`1.get_Length",
-                "System.Buffers.ReadOnlySequence`1.get_Start");
+                "System.Buffers.ReadOnlySequence`1.get_Start",
+                "System.Buffers.ReadOnlySequence`1.Slice(long)");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -3306,13 +3307,21 @@ public static class StringComparisonFixture
                 "System.Buffers.ReadOnlySequence`1.get_IsEmpty()",
                 "System.Buffers.ReadOnlySequence`1.get_Length()",
                 "System.Buffers.ReadOnlySequence`1.get_Start()",
+                "System.Buffers.ReadOnlySequence`1.Slice(long)",
             };
 
-            foreach (var symbol in representativeSymbols)
-            {
-                AssertPurityClassification(summary, symbol, "pure");
-                AssertEffectVisibilityClassification(summary, symbol, "none");
-            }
+            AssertPurityClassification(summary, "System.Buffers.ReadOnlySequence`1.get_End()", "pure");
+            AssertFreshnessClassification(summary, "System.Buffers.ReadOnlySequence`1.get_End()", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Buffers.ReadOnlySequence`1.get_End()", "internal_only");
+            AssertPurityClassification(summary, "System.Buffers.ReadOnlySequence`1.get_IsEmpty()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Buffers.ReadOnlySequence`1.get_IsEmpty()", "none");
+            AssertPurityClassification(summary, "System.Buffers.ReadOnlySequence`1.get_Length()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Buffers.ReadOnlySequence`1.get_Length()", "none");
+            AssertPurityClassification(summary, "System.Buffers.ReadOnlySequence`1.get_Start()", "pure");
+            AssertFreshnessClassification(summary, "System.Buffers.ReadOnlySequence`1.get_Start()", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Buffers.ReadOnlySequence`1.get_Start()", "internal_only");
+            AssertPurityClassification(summary, "System.Buffers.ReadOnlySequence`1.Slice(long)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Buffers.ReadOnlySequence`1.Slice(long)", "none");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")

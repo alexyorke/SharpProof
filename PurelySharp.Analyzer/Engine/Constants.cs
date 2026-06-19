@@ -951,7 +951,6 @@ public static class Constants
         "System.Reflection.Emit.Label.Equals(object)",
         "System.Threading.Tasks.ValueTask<TResult>.ValueTask(TResult)",
         "System.Threading.Tasks.ValueTask.AsTask()",
-        "System.Buffers.ReadOnlySequence<T>.Slice(long)",
         "System.IO.Hashing.Crc32.Hash(System.ReadOnlySpan<byte>)",
         "System.Runtime.InteropServices.MemoryMarshal.Read<T>(System.ReadOnlySpan<byte>)",
         "System.HashCode.Combine<T1, T2>(T1, T2)",
