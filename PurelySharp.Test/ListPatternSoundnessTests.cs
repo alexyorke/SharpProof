@@ -101,6 +101,92 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task InterfaceListPatternImpureCountImplementation_Diagnostic()
+        {
+            var test = @"
+using System.Collections;
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public static class GlobalState
+{
+    public static int Count;
+}
+
+public sealed class Sequence : IReadOnlyList<int>
+{
+    public int Count
+    {
+        get
+        {
+            GlobalState.Count++;
+            return 2;
+        }
+    }
+
+    public int this[int index] => index;
+
+    public IEnumerator<int> GetEnumerator() => ((IEnumerable<int>)new int[0]).GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public bool {|PS0002:TestMethod|}(IReadOnlyList<int> values)
+    {
+        return values is [0, 1];
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task InterfaceListPatternImpureIndexerImplementation_Diagnostic()
+        {
+            var test = @"
+using System.Collections;
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public static class GlobalState
+{
+    public static int Count;
+}
+
+public sealed class Sequence : IReadOnlyList<int>
+{
+    public int Count => 2;
+
+    public int this[int index]
+    {
+        get
+        {
+            GlobalState.Count++;
+            return index;
+        }
+    }
+
+    public IEnumerator<int> GetEnumerator() => ((IEnumerable<int>)new int[0]).GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public bool {|PS0002:TestMethod|}(IReadOnlyList<int> values)
+    {
+        return values is [0, 1];
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ArraySlicePattern_NoDiagnostic()
         {
             var test = @"
@@ -152,5 +238,6 @@ public sealed class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
     }
 }

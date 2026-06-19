@@ -8,22 +8,43 @@ namespace PurelySharp.Analyzer.Engine.Rules
     internal sealed class ListPatternPurityRule : IPurityRule
     {
         public IEnumerable<OperationKind> ApplicableOperationKinds =>
-            ImmutableArray.Create(OperationKind.ListPattern, OperationKind.SlicePattern);
+            ImmutableArray.Create(OperationKind.ListPattern);
 
         public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(
             IOperation operation,
             PurityAnalysisContext context,
             PurityAnalysisEngine.PurityAnalysisState currentState)
         {
+            var matchedInputOperation = GetMatchedInputOperation(operation);
+            if (matchedInputOperation == null)
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            var receiverType = GetKnownReceiverType(
+                matchedInputOperation,
+                currentState,
+                out var hasStableConcreteReceiver);
+
             if (operation is IListPatternOperation listPattern)
             {
-                var lengthResult = CheckMemberPurity(listPattern.LengthSymbol, operation, context);
+                var lengthResult = CheckMemberPurity(
+                    listPattern.LengthSymbol,
+                    receiverType,
+                    hasStableConcreteReceiver,
+                    operation,
+                    context);
                 if (!lengthResult.IsPure)
                 {
                     return lengthResult;
                 }
 
-                var indexerResult = CheckMemberPurity(listPattern.IndexerSymbol, operation, context);
+                var indexerResult = CheckMemberPurity(
+                    listPattern.IndexerSymbol,
+                    receiverType,
+                    hasStableConcreteReceiver,
+                    operation,
+                    context);
                 if (!indexerResult.IsPure)
                 {
                     return indexerResult;
@@ -31,7 +52,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
                 foreach (var pattern in listPattern.Patterns)
                 {
-                    var patternResult = PurityAnalysisEngine.CheckSingleOperation(pattern, context, currentState);
+                    var patternResult = pattern is ISlicePatternOperation slicePattern
+                        ? CheckSlicePatternPurity(
+                            slicePattern,
+                            receiverType,
+                            hasStableConcreteReceiver,
+                            context,
+                            currentState)
+                        : PurityAnalysisEngine.CheckSingleOperation(pattern, context, currentState);
                     if (!patternResult.IsPure)
                     {
                         return patternResult;
@@ -41,24 +69,36 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            if (operation is ISlicePatternOperation slicePattern)
-            {
-                var sliceResult = CheckMemberPurity(slicePattern.SliceSymbol, operation, context);
-                if (!sliceResult.IsPure)
-                {
-                    return sliceResult;
-                }
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        }
 
-                return slicePattern.Pattern == null
-                    ? PurityAnalysisEngine.PurityAnalysisResult.Pure
-                    : PurityAnalysisEngine.CheckSingleOperation(slicePattern.Pattern, context, currentState);
+        private static PurityAnalysisEngine.PurityAnalysisResult CheckSlicePatternPurity(
+            ISlicePatternOperation slicePattern,
+            INamedTypeSymbol? receiverType,
+            bool hasStableConcreteReceiver,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState)
+        {
+            var sliceResult = CheckMemberPurity(
+                slicePattern.SliceSymbol,
+                receiverType,
+                hasStableConcreteReceiver,
+                slicePattern,
+                context);
+            if (!sliceResult.IsPure)
+            {
+                return sliceResult;
             }
 
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            return slicePattern.Pattern == null
+                ? PurityAnalysisEngine.PurityAnalysisResult.Pure
+                : PurityAnalysisEngine.CheckSingleOperation(slicePattern.Pattern, context, currentState);
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckMemberPurity(
             ISymbol? member,
+            INamedTypeSymbol? receiverType,
+            bool hasStableConcreteReceiver,
             IOperation operation,
             PurityAnalysisContext context)
         {
@@ -82,12 +122,22 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(property) ?? "known_impure"));
                 }
 
-                return CheckMethodPurity(property.GetMethod, operation, context);
+                return CheckPropertyGetterPurity(
+                    property,
+                    receiverType,
+                    hasStableConcreteReceiver,
+                    operation,
+                    context);
             }
 
             if (member is IMethodSymbol method)
             {
-                return CheckMethodPurity(method, operation, context);
+                return CheckMethodPurity(
+                    method,
+                    receiverType,
+                    hasStableConcreteReceiver,
+                    operation,
+                    context);
             }
 
             if (PurityAnalysisEngine.IsKnownImpure(member))
@@ -106,8 +156,39 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
         }
 
+        private static PurityAnalysisEngine.PurityAnalysisResult CheckPropertyGetterPurity(
+            IPropertySymbol propertySymbol,
+            INamedTypeSymbol? receiverType,
+            bool hasStableConcreteReceiver,
+            IOperation operation,
+            PurityAnalysisContext context)
+        {
+            var getter = ResolveGetter(
+                propertySymbol,
+                receiverType,
+                hasStableConcreteReceiver,
+                context.SemanticModel.Compilation);
+            if (getter == null)
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    operation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        "dynamic_dispatch",
+                        ruleName: nameof(ListPatternPurityRule),
+                        operation: operation,
+                        symbol: propertySymbol.GetMethod));
+            }
+
+            var getterPurity = PurityAnalysisEngine.GetCalleePurity(getter, context);
+            return getterPurity.IsPure
+                ? PurityAnalysisEngine.PurityAnalysisResult.Pure
+                : getterPurity.WithCallee(getter, operation.Syntax);
+        }
+
         private static PurityAnalysisEngine.PurityAnalysisResult CheckMethodPurity(
             IMethodSymbol? method,
+            INamedTypeSymbol? receiverType,
+            bool hasStableConcreteReceiver,
             IOperation operation,
             PurityAnalysisContext context)
         {
@@ -116,70 +197,238 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            var originalDefinition = method.OriginalDefinition;
-            GeneratedPurityCatalog.PurityEntry generatedPurity = default;
-            var hasTrustedGeneratedPurity = originalDefinition.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
-                    originalDefinition,
-                    context.SemanticModel.Compilation,
-                    out generatedPurity);
-
-            if (PurityAnalysisEngine.HasPureExternalAttribute(originalDefinition))
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            if (hasTrustedGeneratedPurity)
-            {
-                if (generatedPurity.IsPure)
-                {
-                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-                }
-
-                if (generatedPurity.IsImpure)
-                {
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        operation.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            generatedPurity.PrimaryCategory,
-                            nameof(ListPatternPurityRule),
-                            operation,
-                            syntaxNode: operation.Syntax,
-                            symbol: originalDefinition,
-                            catalogSource: "generated_purity_summary"));
-                }
-            }
-
-            if (!hasTrustedGeneratedPurity &&
-                PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinition))
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            if (PurityAnalysisEngine.IsKnownImpure(originalDefinition))
+            var targetMethod = ResolveMethod(
+                method,
+                receiverType,
+                hasStableConcreteReceiver,
+                context.SemanticModel.Compilation);
+            if (targetMethod == null)
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     operation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(
-                        "catalog_hit",
+                        "dynamic_dispatch",
                         nameof(ListPatternPurityRule),
                         operation,
                         syntaxNode: operation.Syntax,
-                        symbol: originalDefinition,
-                        catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinition) ?? "known_impure"));
+                        symbol: method));
             }
 
-            if (!hasTrustedGeneratedPurity &&
-                originalDefinition.DeclaringSyntaxReferences.Length == 0 &&
-                !PurityAnalysisEngine.HasImpureAttribute(originalDefinition))
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            var result = PurityAnalysisEngine.GetCalleePurity(originalDefinition, context);
+            var result = PurityAnalysisEngine.GetCalleePurity(targetMethod, context);
             return result.IsPure
                 ? PurityAnalysisEngine.PurityAnalysisResult.Pure
-                : result.WithCallee(originalDefinition, operation.Syntax);
+                : result.WithCallee(targetMethod, operation.Syntax);
+        }
+
+        private static IMethodSymbol? ResolveGetter(
+            IPropertySymbol propertySymbol,
+            INamedTypeSymbol? receiverType,
+            bool hasStableConcreteReceiver,
+            Compilation compilation)
+        {
+            if (propertySymbol.GetMethod == null)
+            {
+                return null;
+            }
+
+            if (!IsPotentiallyDispatchedGetter(propertySymbol.GetMethod, compilation))
+            {
+                return propertySymbol.GetMethod.OriginalDefinition;
+            }
+
+            if (receiverType == null || !hasStableConcreteReceiver)
+            {
+                return null;
+            }
+
+            if (propertySymbol.ContainingType?.TypeKind == TypeKind.Interface)
+            {
+                var implementation = receiverType.FindImplementationForInterfaceMember(propertySymbol) ??
+                    receiverType.FindImplementationForInterfaceMember(propertySymbol.GetMethod);
+                return implementation switch
+                {
+                    IPropertySymbol implementationProperty when implementationProperty.GetMethod != null =>
+                        implementationProperty.GetMethod.OriginalDefinition,
+                    IMethodSymbol implementationMethod => implementationMethod.OriginalDefinition,
+                    _ => null
+                };
+            }
+
+            var rootProperty = GetRootOverriddenProperty(propertySymbol);
+            for (var current = receiverType; current != null; current = current.BaseType)
+            {
+                foreach (var member in current.GetMembers(rootProperty.Name))
+                {
+                    if (member is IPropertySymbol candidate &&
+                        (SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, rootProperty.OriginalDefinition) ||
+                         OverridesProperty(candidate, rootProperty)) &&
+                        candidate.GetMethod != null)
+                    {
+                        return candidate.GetMethod.OriginalDefinition;
+                    }
+                }
+            }
+
+            return propertySymbol.GetMethod.IsAbstract ? null : propertySymbol.GetMethod.OriginalDefinition;
+        }
+
+        private static IMethodSymbol? ResolveMethod(
+            IMethodSymbol methodSymbol,
+            INamedTypeSymbol? receiverType,
+            bool hasStableConcreteReceiver,
+            Compilation compilation)
+        {
+            if (!IsPotentiallyDispatchedMethod(methodSymbol, compilation))
+            {
+                return methodSymbol.OriginalDefinition;
+            }
+
+            if (receiverType == null || !hasStableConcreteReceiver)
+            {
+                return null;
+            }
+
+            if (methodSymbol.ContainingType?.TypeKind == TypeKind.Interface)
+            {
+                return receiverType.FindImplementationForInterfaceMember(methodSymbol) as IMethodSymbol;
+            }
+
+            var rootMethod = GetRootOverriddenMethod(methodSymbol);
+            for (var current = receiverType; current != null; current = current.BaseType)
+            {
+                foreach (var member in current.GetMembers(rootMethod.Name))
+                {
+                    if (member is IMethodSymbol candidate &&
+                        candidate.Parameters.Length == rootMethod.Parameters.Length &&
+                        (SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, rootMethod.OriginalDefinition) ||
+                         OverridesMethod(candidate, rootMethod)))
+                    {
+                        return candidate.OriginalDefinition;
+                    }
+                }
+            }
+
+            return methodSymbol.IsAbstract ? null : methodSymbol.OriginalDefinition;
+        }
+
+        private static IOperation? GetMatchedInputOperation(IOperation operation)
+        {
+            for (var current = operation; current != null; current = current.Parent)
+            {
+                if (current is IIsPatternOperation isPatternOperation)
+                {
+                    return isPatternOperation.Value;
+                }
+            }
+
+            return null;
+        }
+
+        private static INamedTypeSymbol? GetKnownReceiverType(
+            IOperation? instanceOperation,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out bool hasStableConcreteReceiver)
+        {
+            if (PurityAnalysisEngine.TryResolveKnownConcreteType(instanceOperation, currentState, out var concreteType))
+            {
+                hasStableConcreteReceiver = true;
+                return concreteType;
+            }
+
+            var receiverType = PurityAnalysisEngine.SkipImplicitConversions(instanceOperation)?.Type as INamedTypeSymbol;
+            hasStableConcreteReceiver = receiverType != null &&
+                                        (receiverType.TypeKind == TypeKind.Struct || receiverType.IsSealed);
+            return receiverType;
+        }
+
+        private static bool IsPotentiallyDispatchedGetter(IMethodSymbol getterSymbol, Compilation compilation)
+        {
+            if (getterSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
+                getterSymbol.IsAbstract)
+            {
+                return true;
+            }
+
+            if (!getterSymbol.IsVirtual && !getterSymbol.IsOverride)
+            {
+                return false;
+            }
+
+            if (GeneratedPurityCatalog.TryCanMetadataMethodBeOverridden(getterSymbol, compilation, out var canBeOverridden))
+            {
+                return canBeOverridden;
+            }
+
+            return !getterSymbol.IsSealed;
+        }
+
+        private static bool IsPotentiallyDispatchedMethod(IMethodSymbol methodSymbol, Compilation compilation)
+        {
+            if (methodSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
+                methodSymbol.IsAbstract)
+            {
+                return true;
+            }
+
+            if (!methodSymbol.IsVirtual && !methodSymbol.IsOverride)
+            {
+                return false;
+            }
+
+            if (GeneratedPurityCatalog.TryCanMetadataMethodBeOverridden(methodSymbol, compilation, out var canBeOverridden))
+            {
+                return canBeOverridden;
+            }
+
+            return !methodSymbol.IsSealed;
+        }
+
+        private static IPropertySymbol GetRootOverriddenProperty(IPropertySymbol propertySymbol)
+        {
+            var current = propertySymbol;
+            while (current.OverriddenProperty != null)
+            {
+                current = current.OverriddenProperty;
+            }
+
+            return current.OriginalDefinition;
+        }
+
+        private static IMethodSymbol GetRootOverriddenMethod(IMethodSymbol methodSymbol)
+        {
+            var current = methodSymbol;
+            while (current.OverriddenMethod != null)
+            {
+                current = current.OverriddenMethod;
+            }
+
+            return current.OriginalDefinition;
+        }
+
+        private static bool OverridesProperty(IPropertySymbol property, IPropertySymbol target)
+        {
+            for (var current = property; current != null; current = current.OverriddenProperty)
+            {
+                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool OverridesMethod(IMethodSymbol method, IMethodSymbol target)
+        {
+            for (var current = method; current != null; current = current.OverriddenMethod)
+            {
+                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }
