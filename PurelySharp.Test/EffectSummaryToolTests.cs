@@ -4787,6 +4787,94 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeConsoleStateSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Console.dll",
+                120,
+                2,
+                "System.Console.ReadLine()",
+                "System.Console.get_Error",
+                "System.Console.get_In",
+                "System.Console.get_InputEncoding",
+                "System.Console.get_IsErrorRedirected",
+                "System.Console.get_IsInputRedirected",
+                "System.Console.get_IsOutputRedirected",
+                "System.Console.get_Out",
+                "System.Console.get_OutputEncoding",
+                "System.Console.OpenStandardError()",
+                "System.Console.OpenStandardInput()",
+                "System.Console.OpenStandardOutput()");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Console.ReadLine()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.ReadLine()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_Error()", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_Error()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_In()", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_In()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_InputEncoding()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_InputEncoding()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_IsErrorRedirected()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_IsErrorRedirected()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_IsInputRedirected()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_IsInputRedirected()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_IsOutputRedirected()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_IsOutputRedirected()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_Out()", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_Out()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_OutputEncoding()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_OutputEncoding()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.OpenStandardError()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.OpenStandardError()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.OpenStandardInput()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.OpenStandardInput()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.OpenStandardOutput()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.OpenStandardOutput()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Console.ReadLine()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_Error()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_In()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_InputEncoding()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_IsErrorRedirected()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_IsInputRedirected()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_IsOutputRedirected()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_Out()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_OutputEncoding()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.OpenStandardError()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.OpenStandardInput()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.OpenStandardOutput()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Console.OpenStandardError()",
+                "System.Console.OpenStandardInput()",
+                "System.Console.OpenStandardOutput()",
+                "System.Console.ReadLine()",
+                "System.Console.get_Error()",
+                "System.Console.get_In()",
+                "System.Console.get_InputEncoding()",
+                "System.Console.get_IsErrorRedirected()",
+                "System.Console.get_IsInputRedirected()",
+                "System.Console.get_IsOutputRedirected()",
+                "System.Console.get_Out()",
+                "System.Console.get_OutputEncoding()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeObjectTypeMetadataSlice_UsesGeneratedPurityEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

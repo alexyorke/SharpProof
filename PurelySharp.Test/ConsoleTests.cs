@@ -70,6 +70,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task ConsoleReadLine_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}()
+    {
+        return Console.ReadLine();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ConsoleBackgroundColor_Diagnostic()
         {
             var test = @"
