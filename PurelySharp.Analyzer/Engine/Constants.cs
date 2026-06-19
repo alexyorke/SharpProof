@@ -852,9 +852,6 @@ public static class Constants
 
         "System.Threading.Tasks.Task.FromResult<TResult>(TResult)",
 
-        "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)",
-
-
         "System.Type.Equals(object)",
         "System.Type.Equals(System.Type)",
         "System.Type.GetHashCode()",

@@ -65,5 +65,24 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task TimeZoneInfoConvertTime_DateTimeOffset_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateTimeOffset {|PS0002:TestMethod|}(DateTimeOffset value, TimeZoneInfo timeZone)
+    {
+        return TimeZoneInfo.ConvertTime(value, timeZone);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

@@ -150,6 +150,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Environment.CommandLine.Version.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Environment.PurelySharp.EffectSummary.json",
+      "Limit": 24,
+      "SymbolPrefixes": [
+        "System.Environment.get_CommandLine",
+        "System.Environment.get_Version"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Culture.Region.State.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Culture.Region.State.PurelySharp.EffectSummary.json",
       "Limit": 120,
@@ -931,7 +940,10 @@
     },
     {
       "OutputPath": "PurelySharp.Analyzer/TimeProvider.TimeZoneInfo.PurelySharp.EffectSummary.json",
-      "SourceSummaryPath": "PurelySharp.Analyzer/TimeProvider.TimeZoneInfo.PurelySharp.EffectSummary.json"
+      "SourceSummaryPath": "PurelySharp.Analyzer/TimeProvider.TimeZoneInfo.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)"
+      ]
     },
     {
       "OutputPath": "PurelySharp.Analyzer/TimeSpan.PurelySharp.EffectSummary.json",

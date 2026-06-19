@@ -4186,6 +4186,82 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_Classifies_EnvironmentCommandLineAndVersion_AsImpure()
+        {
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-environment-command-line-version-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var outputPath = Path.Combine(workingDirectory, "Environment.CommandLine.Version.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Defaults = new
+                    {
+                        Framework = "net8.0",
+                        RuntimeAssemblyName = "System.Private.CoreLib.dll",
+                        IncludeCallees = true,
+                        IncludePurityClassification = true,
+                        CompareManualCatalogs = true,
+                    },
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = outputPath,
+                            SourceSummaryPath = "PurelySharp.Analyzer/Environment.PurelySharp.EffectSummary.json",
+                            SymbolPrefixes = new[]
+                            {
+                                "System.Environment.get_CommandLine",
+                                "System.Environment.get_Version",
+                            },
+                            Limit = 24,
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
+
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Environment.get_CommandLine()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_CommandLine()", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.get_Version()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Environment.get_Version()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Environment.get_CommandLine()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.get_Version()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Environment.get_CommandLine()",
+                "System.Environment.get_Version()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeAppContextSlice_UsesGeneratedPurityAndImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
@@ -5581,6 +5657,7 @@ public static class StringComparisonFixture
                 "System.TimeProvider.get_System",
                 "System.TimeProvider.get_LocalTimeZone",
                 "System.TimeProvider.get_TimestampFrequency",
+                "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)",
                 "System.TimeZoneInfo.get_Local",
                 "System.TimeZoneInfo.FindSystemTimeZoneById",
                 "System.TimeZoneInfo.ClearCachedData");
@@ -5597,6 +5674,8 @@ public static class StringComparisonFixture
             AssertEffectVisibilityClassification(summary, "System.TimeProvider.get_LocalTimeZone()", "caller_visible");
             AssertPurityClassification(summary, "System.TimeProvider.get_TimestampFrequency()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.TimeProvider.get_TimestampFrequency()", "caller_visible");
+            AssertPurityClassification(summary, "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)", "caller_visible");
             AssertPurityClassification(summary, "System.TimeZoneInfo.get_Local()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.TimeZoneInfo.get_Local()", "caller_visible");
             AssertPurityClassification(summary, "System.TimeZoneInfo.FindSystemTimeZoneById(string)", "impure", "throw");
@@ -5612,6 +5691,7 @@ public static class StringComparisonFixture
                     string.Equals(symbol, "System.TimeProvider.get_System()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.TimeProvider.get_LocalTimeZone()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.TimeProvider.get_TimestampFrequency()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.TimeZoneInfo.get_Local()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.TimeZoneInfo.FindSystemTimeZoneById(string)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.TimeZoneInfo.ClearCachedData()", StringComparison.Ordinal))
@@ -5624,6 +5704,7 @@ public static class StringComparisonFixture
                 "System.TimeProvider.get_System()",
                 "System.TimeProvider.get_TimestampFrequency()",
                 "System.TimeZoneInfo.ClearCachedData()",
+                "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)",
                 "System.TimeZoneInfo.FindSystemTimeZoneById(string)",
                 "System.TimeZoneInfo.get_Local()",
             }));

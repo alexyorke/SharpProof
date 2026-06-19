@@ -6494,6 +6494,30 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_TimeZoneInfoConvertTimeDateTimeOffset_UsesGeneratedPurityCatalogSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateTimeOffset TestMethod(DateTimeOffset value, TimeZoneInfo timeZone)
+    {
+        return TimeZoneInfo.ConvertTime(value, timeZone);
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)"));
+        }
+
+        [Test]
         public async Task Ps0002_GuidNewGuid_UsesGeneratedPurityCatalogSource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

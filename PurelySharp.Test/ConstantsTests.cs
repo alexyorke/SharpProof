@@ -2268,6 +2268,7 @@ public class GuardSignatureSamples
             AssertNotInManualCatalogs("System.TimeProvider.System.get");
             AssertNotInManualCatalogs("System.TimeProvider.TimestampFrequency.get");
             AssertNotInManualCatalogs("System.TimeZoneInfo.Local.get");
+            AssertNotInManualCatalogs("System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)");
             AssertNotInManualCatalogs("System.TimeZoneInfo.FindSystemTimeZoneById(string)");
             AssertNotInManualCatalogs("System.TimeZoneInfo.ClearCachedData()");
         }
