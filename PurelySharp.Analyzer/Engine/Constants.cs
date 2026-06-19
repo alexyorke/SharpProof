@@ -1013,7 +1013,6 @@ public static class Constants
         "System.FormattableString.Format.get",
         "System.FormattableString.Invariant(System.FormattableString)",
         "System.FormattableString.ToString(System.IFormatProvider)",
-        "System.HashCode.HashCode()",
 
         "System.Linq.Enumerable.TakeWhile<TSource>(System.Collections.Generic.IEnumerable<TSource>, System.Func<TSource, bool>)",
     };

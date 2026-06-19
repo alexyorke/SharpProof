@@ -122,6 +122,11 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
+            if (TryGetImplicitMetadataValueTypeConstructorPurity(methodSymbol, out classification))
+            {
+                return true;
+            }
+
             var actualAssemblyIdentity = TryResolveActualAssemblyIdentity(methodSymbol, compilation);
             var actualMethodIdentity = TryResolveActualMethodIdentity(methodSymbol, compilation);
             if (actualAssemblyIdentity == null || actualMethodIdentity == null)
@@ -149,6 +154,27 @@ namespace PurelySharp.Analyzer
             }
 
             return false;
+        }
+
+        private static bool TryGetImplicitMetadataValueTypeConstructorPurity(IMethodSymbol methodSymbol, out PurityEntry classification)
+        {
+            classification = default;
+            if (methodSymbol.MethodKind != MethodKind.Constructor ||
+                !methodSymbol.IsImplicitlyDeclared ||
+                methodSymbol.Parameters.Length != 0 ||
+                methodSymbol.IsStatic ||
+                methodSymbol.ContainingType?.IsValueType != true)
+            {
+                return false;
+            }
+
+            classification = new PurityEntry(
+                classification: "pure",
+                categories: ImmutableArray<string>.Empty,
+                primaryCategory: "implicit_metadata_value_type_constructor",
+                hasFreshArrayAllocationEvidence: false,
+                freshnessClassification: "none");
+            return true;
         }
 
         public bool TryGetFieldPurity(IFieldSymbol fieldSymbol, Compilation compilation, out PurityEntry classification)

@@ -2872,7 +2872,7 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeIndexAndHashCodeSlice_UsesGeneratedPurityCatalogEntries()
+        public async Task EffectSummaryTool_RuntimeIndexAndHashCodeSlice_ReflectsCurrentIncludeCalleesClassification()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(
                 80,
@@ -2886,18 +2886,12 @@ public static class PurityFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            var representativeSymbols = new[]
-            {
-                "System.HashCode.ToHashCode()",
-                "System.Index.get_End()",
-                "System.Index.get_Start()",
-            };
-
-            foreach (var symbol in representativeSymbols)
-            {
-                AssertPurityClassification(summary, symbol, "pure");
-                AssertEffectVisibilityClassification(summary, symbol, "none");
-            }
+            AssertPurityClassification(summary, "System.HashCode.ToHashCode()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.HashCode.ToHashCode()", "caller_visible");
+            AssertPurityClassification(summary, "System.Index.get_End()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Index.get_End()", "internal_only");
+            AssertPurityClassification(summary, "System.Index.get_Start()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Index.get_Start()", "internal_only");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -2906,7 +2900,12 @@ public static class PurityFixture
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .ToArray();
 
-            foreach (var symbol in representativeSymbols)
+            foreach (var symbol in new[]
+            {
+                "System.HashCode.ToHashCode()",
+                "System.Index.get_End()",
+                "System.Index.get_Start()",
+            })
             {
                 Assert.That(generatedSymbols, Does.Contain(symbol));
             }

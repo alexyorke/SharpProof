@@ -2600,8 +2600,10 @@ public static class IndexHashCodeCatalogSignatureSamples
     public static int Sample()
     {
         HashCode hash = default;
+        var copy = new HashCode();
         var end = Index.End;
         var start = Index.Start;
+        _ = copy.ToHashCode();
         _ = hash.ToHashCode();
         return 0;
     }
@@ -2613,7 +2615,9 @@ public static class IndexHashCodeCatalogSignatureSamples
                 GetTrustedPlatformReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new HashCode()"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "hash.ToHashCode()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "copy.ToHashCode()"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Index.End"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Index.Start"));
         }

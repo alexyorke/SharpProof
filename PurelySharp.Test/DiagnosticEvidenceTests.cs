@@ -2404,9 +2404,10 @@ public class TestClass
     public int TestMethod()
     {
         HashCode hash = default;
+        var copy = new HashCode();
         var end = Index.End;
         var start = Index.Start;
-        return hash.ToHashCode();
+        return hash.ToHashCode() + copy.ToHashCode();
     }
 }";
 
@@ -2424,6 +2425,18 @@ public class TestClass
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == "hash.ToHashCode()"))
                 .Symbol!;
+            var copyHashCode = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "copy.ToHashCode()"))
+                .Symbol!;
+            var hashCodeConstructor = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<ObjectCreationExpressionSyntax>()
+                    .Single(node => node.ToString() == "new HashCode()"))
+                .Symbol!;
             var endGetter = ((IPropertySymbol)semanticModel.GetSymbolInfo(
                 syntaxTree.GetRoot()
                     .DescendantNodes()
@@ -2438,7 +2451,9 @@ public class TestClass
                 .Symbol!).GetMethod!;
             var trackedMethods = new[]
             {
+                hashCodeConstructor.OriginalDefinition,
                 hashCode.OriginalDefinition,
+                copyHashCode.OriginalDefinition,
                 endGetter.OriginalDefinition,
                 startGetter.OriginalDefinition,
             };
@@ -2455,9 +2470,9 @@ public class TestClass
             Assert.That(
                 diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
                 Is.False,
-                "Trusted generated purity should allow Index.End, Index.Start, and HashCode.ToHashCode.");
-            Assert.That(matched, Is.EqualTo(new[] { true, true, true }),
-                "Generated purity catalog should resolve the tracked index and hash helpers.");
+                "Trusted generated purity should allow the implicit HashCode constructor, HashCode.ToHashCode, and Index getters.");
+            Assert.That(matched, Is.EqualTo(new[] { true, true, true, true, true }),
+                "Generated purity catalog should resolve the tracked index and hash helpers, including new HashCode().");
         }
 
         [Test]
