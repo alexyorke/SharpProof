@@ -134,6 +134,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
+            SummaryEntry? bestEntry = null;
             foreach (var key in GetSymbolKeys(methodSymbol))
             {
                 if (!_entriesBySymbol.TryGetValue(key, out var entries))
@@ -148,12 +149,20 @@ namespace PurelySharp.Analyzer
                         continue;
                     }
 
-                    classification = entry.Classification;
-                    return true;
+                    if (bestEntry == null || CompareTrustedPurityEntries(entry, bestEntry) > 0)
+                    {
+                        bestEntry = entry;
+                    }
                 }
             }
 
-            return false;
+            if (bestEntry == null)
+            {
+                return false;
+            }
+
+            classification = bestEntry.Classification;
+            return true;
         }
 
         private static bool TryGetImplicitMetadataValueTypeConstructorPurity(IMethodSymbol methodSymbol, out PurityEntry classification)
@@ -196,6 +205,21 @@ namespace PurelySharp.Analyzer
             }
 
             return TryGetPurity(staticConstructor.OriginalDefinition, compilation, out classification);
+        }
+
+        private static int CompareTrustedPurityEntries(SummaryEntry left, SummaryEntry right)
+        {
+            return GetClassificationPriority(left.Classification).CompareTo(GetClassificationPriority(right.Classification));
+        }
+
+        private static int GetClassificationPriority(PurityEntry classification)
+        {
+            if (classification.IsPure || classification.IsImpure)
+            {
+                return 2;
+            }
+
+            return 1;
         }
 
         internal static bool TryCanMetadataMethodBeOverridden(IMethodSymbol methodSymbol, Compilation compilation, out bool canBeOverridden)
@@ -1259,6 +1283,7 @@ namespace PurelySharp.Analyzer
             out PurityEntry classification)
         {
             classification = default;
+            SummaryEntry? bestEntry = null;
             foreach (var key in methodKeys)
             {
                 if (!_entriesBySymbol.TryGetValue(key, out var entries))
@@ -1273,12 +1298,20 @@ namespace PurelySharp.Analyzer
                         continue;
                     }
 
-                    classification = entry.Classification;
-                    return true;
+                    if (bestEntry == null || CompareTrustedPurityEntries(entry, bestEntry) > 0)
+                    {
+                        bestEntry = entry;
+                    }
                 }
             }
 
-            return false;
+            if (bestEntry == null)
+            {
+                return false;
+            }
+
+            classification = bestEntry.Classification;
+            return true;
         }
 
         private static string? TryResolveRuntimeImplementationAssemblyPath(IMethodSymbol methodSymbol)
