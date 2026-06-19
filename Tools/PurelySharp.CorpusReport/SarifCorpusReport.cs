@@ -13,6 +13,7 @@ public static class SarifCorpusReport
     private const string SymbolProperty = "purelysharp.impurity.symbol";
     private const string CatalogSourceProperty = "purelysharp.impurity.catalog_source";
     private const string CalleeChainProperty = "purelysharp.impurity.callee_chain";
+    private const string ExceptionSymbolProperty = "purelysharp.exceptions.symbol";
     private const string ExceptionTypesProperty = "purelysharp.exceptions.types";
     private const string ExceptionCategoriesProperty = "purelysharp.exceptions.categories";
     private const string ExceptionSourcesProperty = "purelysharp.exceptions.sources";
@@ -64,6 +65,7 @@ public static class SarifCorpusReport
         private int _ps0004Count;
         private int _ps0009Count;
         private int _ps0010Count;
+        private int _ps0011Count;
         private int _totalPurelySharpDiagnostics;
 
         public void AddSarifJson(string inputName, string sarifJson)
@@ -99,6 +101,7 @@ public static class SarifCorpusReport
                 _ps0004Count,
                 _ps0009Count,
                 _ps0010Count,
+                _ps0011Count,
                 _totalPurelySharpDiagnostics,
                 _diagnostics.ToImmutable(),
                 ToImmutableSortedDictionary(_categories),
@@ -138,11 +141,15 @@ public static class SarifCorpusReport
             {
                 _ps0010Count++;
             }
+            else if (ruleId == "PS0011")
+            {
+                _ps0011Count++;
+            }
 
             if (!result.TryGetProperty("properties", out var properties) ||
                 properties.ValueKind != JsonValueKind.Object)
             {
-                _diagnostics.Add(new DiagnosticEvidenceItem(inputName, ruleId, message, null, null, null, null, null, null, null, null, null));
+                _diagnostics.Add(new DiagnosticEvidenceItem(inputName, ruleId, message, null, null, null, null, null, null, null, null, null, null));
                 return;
             }
 
@@ -152,6 +159,7 @@ public static class SarifCorpusReport
             var symbol = GetEvidenceProperty(properties, SymbolProperty);
             var catalogSource = GetEvidenceProperty(properties, CatalogSourceProperty);
             var calleeChain = GetEvidenceProperty(properties, CalleeChainProperty);
+            var exceptionSymbol = GetEvidenceProperty(properties, ExceptionSymbolProperty);
             var exceptionTypes = GetEvidenceProperty(properties, ExceptionTypesProperty);
             var exceptionCategories = GetEvidenceProperty(properties, ExceptionCategoriesProperty);
             var exceptionSources = GetEvidenceProperty(properties, ExceptionSourcesProperty);
@@ -166,11 +174,12 @@ public static class SarifCorpusReport
                 symbol,
                 catalogSource,
                 calleeChain,
+                exceptionSymbol,
                 exceptionTypes,
                 exceptionCategories,
                 exceptionSources));
 
-            if (ruleId == "PS0010")
+            if (ruleId == "PS0010" || ruleId == "PS0011")
             {
                 IncrementSeparatedValues(_exceptionCategories, exceptionCategories);
                 IncrementSeparatedValues(_exceptionSources, exceptionSources);

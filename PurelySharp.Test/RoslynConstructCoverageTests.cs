@@ -205,7 +205,7 @@ public class TestClass
 }
 """);
 
-            Assert.That(report.SchemaVersion, Is.EqualTo("1.2"));
+            Assert.That(report.SchemaVersion, Is.EqualTo(CorpusReportSummary.CurrentSchemaVersion));
             Assert.That(report.OperationKinds["FunctionPointerInvocation"], Is.EqualTo(1));
             Assert.That(report.OperationKinds["Invocation"], Is.EqualTo(1));
             Assert.That(report.UnknownOperationKinds["FunctionPointerInvocation"], Is.EqualTo(1));

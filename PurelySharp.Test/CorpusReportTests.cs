@@ -74,7 +74,7 @@ namespace PurelySharp.Test
             Assert.That(report.Diagnostics[2].RuleId, Is.EqualTo("PS0004"));
 
             var json = JsonSerializer.Serialize(report);
-            Assert.That(json, Does.Contain(@"""SchemaVersion"":""1.2"""));
+            Assert.That(json, Does.Contain(@"""SchemaVersion"":""" + CorpusReportSummary.CurrentSchemaVersion + @""""));
         }
 
         [Test]
@@ -94,6 +94,16 @@ namespace PurelySharp.Test
             "purelysharp.exceptions.categories": "effect_summary",
             "purelysharp.exceptions.sources": "System.ArgumentNullException=effect_summary:System.ArgumentNullException.ThrowIfNull(object, string)"
           }
+        },
+        {
+          "ruleId": "PS0011",
+          "message": { "text": "Operation 'LoadAcceptedDocument(voucher)' may throw uncaught exceptions: System.InvalidOperationException" },
+          "properties": {
+            "purelysharp.exceptions.symbol": "VoucherService.LoadAcceptedDocument(Voucher)",
+            "purelysharp.exceptions.types": "System.InvalidOperationException",
+            "purelysharp.exceptions.categories": "source_callee",
+            "purelysharp.exceptions.sources": "System.InvalidOperationException=source_callee:VoucherService.LoadAcceptedDocument(Voucher) -> VoucherService.RequireAcceptedDocument(Voucher) -> Voucher.get_AcceptedDocument() -> direct_throw:throw"
+          }
         }
       ]
     }
@@ -102,13 +112,20 @@ namespace PurelySharp.Test
 """);
 
             Assert.That(report.Ps0010Count, Is.EqualTo(1));
-            Assert.That(report.TotalPurelySharpDiagnostics, Is.EqualTo(1));
+            Assert.That(report.Ps0011Count, Is.EqualTo(1));
+            Assert.That(report.TotalPurelySharpDiagnostics, Is.EqualTo(2));
             Assert.That(report.ExceptionCategories["effect_summary"], Is.EqualTo(1));
-            Assert.That(report.ExceptionSources[0], Is.EqualTo(new RankedItem("System.ArgumentNullException=effect_summary:System.ArgumentNullException.ThrowIfNull(object, string)", 1)));
+            Assert.That(report.ExceptionCategories["source_callee"], Is.EqualTo(1));
+            Assert.That(report.ExceptionSources, Does.Contain(new RankedItem("System.ArgumentNullException=effect_summary:System.ArgumentNullException.ThrowIfNull(object, string)", 1)));
+            Assert.That(report.ExceptionSources, Does.Contain(new RankedItem("System.InvalidOperationException=source_callee:VoucherService.LoadAcceptedDocument(Voucher) -> VoucherService.RequireAcceptedDocument(Voucher) -> Voucher.get_AcceptedDocument() -> direct_throw:throw", 1)));
             Assert.That(report.Diagnostics[0].RuleId, Is.EqualTo("PS0010"));
             Assert.That(report.Diagnostics[0].ExceptionTypes, Is.EqualTo("System.ArgumentNullException"));
             Assert.That(report.Diagnostics[0].ExceptionCategories, Is.EqualTo("effect_summary"));
             Assert.That(report.Diagnostics[0].ExceptionSources, Does.Contain("System.ArgumentNullException.ThrowIfNull"));
+            Assert.That(report.Diagnostics[1].RuleId, Is.EqualTo("PS0011"));
+            Assert.That(report.Diagnostics[1].ExceptionSymbol, Is.EqualTo("VoucherService.LoadAcceptedDocument(Voucher)"));
+            Assert.That(report.Diagnostics[1].ExceptionTypes, Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(report.Diagnostics[1].ExceptionCategories, Is.EqualTo("source_callee"));
         }
 
         [Test]

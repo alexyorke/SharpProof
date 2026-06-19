@@ -9,6 +9,7 @@ public sealed record CorpusReportSummary(
     int Ps0004Count,
     int Ps0009Count,
     int Ps0010Count,
+    int Ps0011Count,
     int TotalPurelySharpDiagnostics,
     ImmutableArray<DiagnosticEvidenceItem> Diagnostics,
     ImmutableDictionary<string, int> ImpurityCategories,
@@ -21,12 +22,13 @@ public sealed record CorpusReportSummary(
     ImmutableArray<RankedItem> CatalogMisses,
     ImmutableArray<RankedItem> FalsePositiveCandidates)
 {
-    public const string CurrentSchemaVersion = "1.2";
+    public const string CurrentSchemaVersion = "1.3";
 
     public string SchemaVersion { get; init; } = CurrentSchemaVersion;
 
     public static CorpusReportSummary Empty { get; } = new(
         ImmutableArray<string>.Empty,
+        0,
         0,
         0,
         0,
@@ -59,6 +61,7 @@ public sealed record DiagnosticEvidenceItem(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Symbol,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CatalogSource,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CalleeChain,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExceptionSymbol,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExceptionTypes,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExceptionCategories,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExceptionSources);

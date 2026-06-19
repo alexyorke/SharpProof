@@ -129,9 +129,9 @@ duplicating its full reviewed symbol list in the spec.
 
 The analyzer can consume generated exception summaries when the JSON is supplied as an additional file named `PurelySharp.EffectSummary.json` or `*.PurelySharp.EffectSummary.json`.
 
-With `purelysharp_report_exceptions = true`, `PS0010` uses `ThrownExceptionTypes` and `TransitiveThrownExceptionTypes` for matching metadata/library method calls. This extends exception-flow reporting beyond current-compilation source without doing slow live decompilation inside Roslyn analyzer callbacks.
+With `purelysharp_report_exceptions = true`, `PS0010` and `PS0011` use `ThrownExceptionTypes` and `TransitiveThrownExceptionTypes` for matching metadata/library method calls. This extends exception-flow reporting beyond current-compilation source without doing slow live decompilation inside Roslyn analyzer callbacks.
 
-The lookup is exact and evidence-based: summaries are keyed by method symbol strings emitted by this tool, and catch filtering still happens at the source call site when the exception type resolves in the current compilation.
+The lookup is exact and evidence-based: summaries are keyed by method symbol strings emitted by this tool, and catch filtering still happens at the source call site when the exception type resolves in the current compilation. That means `PS0010` can summarize what a method may let escape, while `PS0011` can still warn on the exact uncaught call or property-access site that propagates the exception.
 
 Run against a specific assembly:
 
