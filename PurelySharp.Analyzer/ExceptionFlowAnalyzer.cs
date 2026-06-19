@@ -311,9 +311,24 @@ namespace PurelySharp.Analyzer
 
             foreach (var invocation in GetInvocationNodes(methodNode))
             {
-                if (semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol invokedMethod &&
-                    invokedMethod.MethodKind != MethodKind.DelegateInvoke &&
-                    seen.Add(CreateMethodCallSiteKey(invocation, invokedMethod)))
+                if (semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation invocationOperation)
+                {
+                    foreach (var invokedMethod in ResolveInvocationTargets(invocationOperation))
+                    {
+                        if (invokedMethod.MethodKind == MethodKind.DelegateInvoke)
+                        {
+                            continue;
+                        }
+
+                        if (seen.Add(CreateMethodCallSiteKey(invocation, invokedMethod)))
+                        {
+                            yield return new MethodCallCandidate(invocation, invokedMethod);
+                        }
+                    }
+                }
+                else if (semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol invokedMethod &&
+                         invokedMethod.MethodKind != MethodKind.DelegateInvoke &&
+                         seen.Add(CreateMethodCallSiteKey(invocation, invokedMethod)))
                 {
                     yield return new MethodCallCandidate(invocation, invokedMethod);
                 }
@@ -330,9 +345,19 @@ namespace PurelySharp.Analyzer
 
             foreach (var propertyAccess in GetPropertyAccessNodes(methodNode, semanticModel, cancellationToken))
             {
-                if (semanticModel.GetSymbolInfo(propertyAccess, cancellationToken).Symbol is IPropertySymbol propertySymbol &&
-                    propertySymbol.GetMethod != null &&
-                    seen.Add(CreateMethodCallSiteKey(propertyAccess, propertySymbol.GetMethod)))
+                if (semanticModel.GetOperation(propertyAccess, cancellationToken) is IPropertyReferenceOperation propertyReferenceOperation)
+                {
+                    foreach (var getterMethod in ResolvePropertyAccessorTargets(propertyReferenceOperation, preferSetter: false))
+                    {
+                        if (seen.Add(CreateMethodCallSiteKey(propertyAccess, getterMethod)))
+                        {
+                            yield return new MethodCallCandidate(propertyAccess, getterMethod);
+                        }
+                    }
+                }
+                else if (semanticModel.GetSymbolInfo(propertyAccess, cancellationToken).Symbol is IPropertySymbol propertySymbol &&
+                         propertySymbol.GetMethod != null &&
+                         seen.Add(CreateMethodCallSiteKey(propertyAccess, propertySymbol.GetMethod)))
                 {
                     yield return new MethodCallCandidate(propertyAccess, propertySymbol.GetMethod);
                 }
@@ -340,9 +365,19 @@ namespace PurelySharp.Analyzer
 
             foreach (var propertyWrite in GetPropertyWriteNodes(methodNode, semanticModel, cancellationToken))
             {
-                if (TryGetPropertySetterMethod(propertyWrite, semanticModel, cancellationToken, out var setterMethod) &&
-                    setterMethod != null &&
-                    seen.Add(CreateMethodCallSiteKey(propertyWrite, setterMethod)))
+                if (semanticModel.GetOperation(propertyWrite, cancellationToken) is IPropertyReferenceOperation propertyReferenceOperation)
+                {
+                    foreach (var setterMethod in ResolvePropertyAccessorTargets(propertyReferenceOperation, preferSetter: true))
+                    {
+                        if (seen.Add(CreateMethodCallSiteKey(propertyWrite, setterMethod)))
+                        {
+                            yield return new MethodCallCandidate(propertyWrite, setterMethod);
+                        }
+                    }
+                }
+                else if (TryGetPropertySetterMethod(propertyWrite, semanticModel, cancellationToken, out var setterMethod) &&
+                         setterMethod != null &&
+                         seen.Add(CreateMethodCallSiteKey(propertyWrite, setterMethod)))
                 {
                     yield return new MethodCallCandidate(propertyWrite, setterMethod);
                 }
@@ -396,6 +431,67 @@ namespace PurelySharp.Analyzer
                 callSite.Span.End.ToString(System.Globalization.CultureInfo.InvariantCulture) +
                 "|" +
                 method.OriginalDefinition.ToDisplayString();
+        }
+
+        private static IEnumerable<IMethodSymbol> ResolveInvocationTargets(IInvocationOperation invocationOperation)
+        {
+            var invokedMethod = invocationOperation.TargetMethod;
+            if (invokedMethod == null)
+            {
+                yield break;
+            }
+
+            if (IsBaseReference(invocationOperation.Instance))
+            {
+                yield return invokedMethod.OriginalDefinition;
+                yield break;
+            }
+
+            if (TryResolveExactConcreteType(invocationOperation.Instance, out var exactReceiverType))
+            {
+                var exactTarget = ResolveMethodTargetForConcreteReceiver(invokedMethod, exactReceiverType);
+                if (exactTarget != null)
+                {
+                    yield return exactTarget.OriginalDefinition;
+                    yield break;
+                }
+            }
+
+            yield return invokedMethod.OriginalDefinition;
+        }
+
+        private static IEnumerable<IMethodSymbol> ResolvePropertyAccessorTargets(
+            IPropertyReferenceOperation propertyReferenceOperation,
+            bool preferSetter)
+        {
+            var accessor = preferSetter
+                ? propertyReferenceOperation.Property?.SetMethod
+                : propertyReferenceOperation.Property?.GetMethod;
+            if (accessor == null)
+            {
+                yield break;
+            }
+
+            if (IsBaseReference(propertyReferenceOperation.Instance))
+            {
+                yield return accessor.OriginalDefinition;
+                yield break;
+            }
+
+            if (TryResolveExactConcreteType(propertyReferenceOperation.Instance, out var exactReceiverType))
+            {
+                var exactAccessor = ResolvePropertyAccessorTargetForConcreteReceiver(
+                    propertyReferenceOperation.Property,
+                    exactReceiverType,
+                    preferSetter);
+                if (exactAccessor != null)
+                {
+                    yield return exactAccessor.OriginalDefinition;
+                    yield break;
+                }
+            }
+
+            yield return accessor.OriginalDefinition;
         }
 
         private static IEnumerable<SyntaxNode> GetThrowNodes(SyntaxNode methodNode)
@@ -542,9 +638,82 @@ namespace PurelySharp.Analyzer
                 ReferenceEquals(assignment.Left, node);
         }
 
+        private static bool TryResolveExactConcreteType(IOperation? operation, out INamedTypeSymbol exactReceiverType)
+        {
+            exactReceiverType = null!;
+            var current = operation;
+
+            while (true)
+            {
+                current = SkipImplicitConversions(current);
+                if (current == null)
+                {
+                    return false;
+                }
+
+                if (current is IObjectCreationOperation objectCreationOperation &&
+                    objectCreationOperation.Type is INamedTypeSymbol objectCreationType)
+                {
+                    exactReceiverType = objectCreationType;
+                    return true;
+                }
+
+                if (current is IConditionalOperation conditionalOperation)
+                {
+                    if (TryResolveExactConcreteType(conditionalOperation.WhenTrue, out var whenTrueType) &&
+                        TryResolveExactConcreteType(conditionalOperation.WhenFalse, out var whenFalseType) &&
+                        SymbolEqualityComparer.Default.Equals(whenTrueType, whenFalseType))
+                    {
+                        exactReceiverType = whenTrueType;
+                        return true;
+                    }
+
+                    return false;
+                }
+
+                if (current is IConversionOperation conversionOperation)
+                {
+                    current = conversionOperation.Operand;
+                    continue;
+                }
+
+                if (current is IParenthesizedOperation parenthesizedOperation)
+                {
+                    current = parenthesizedOperation.Operand;
+                    continue;
+                }
+
+                return false;
+            }
+        }
+
+        private static IOperation? SkipImplicitConversions(IOperation? operation)
+        {
+            while (operation is IConversionOperation conversionOperation &&
+                   conversionOperation.IsImplicit)
+            {
+                operation = conversionOperation.Operand;
+            }
+
+            return operation;
+        }
+
         private static bool IsNestedCallableBoundary(SyntaxNode node)
         {
             return ExecutionVisibility.IsNestedCallableBoundary(node);
+        }
+
+        private static bool IsBaseReference(IOperation? operation)
+        {
+            var current = operation;
+            while (current is IConversionOperation conversionOperation && conversionOperation.IsImplicit)
+            {
+                current = conversionOperation.Operand;
+            }
+
+            return current is IInstanceReferenceOperation instanceReferenceOperation &&
+                instanceReferenceOperation.ReferenceKind == InstanceReferenceKind.ContainingTypeInstance &&
+                current.Syntax.IsKind(SyntaxKind.BaseExpression);
         }
 
         private static ITypeSymbol? GetThrownExceptionType(
@@ -1108,6 +1277,140 @@ namespace PurelySharp.Analyzer
             return typeSymbol != null &&
                 typeSymbol.TypeKind != TypeKind.TypeParameter &&
                 typeSymbol.IsReferenceType;
+        }
+
+        private static IMethodSymbol? ResolveMethodTargetForConcreteReceiver(
+            IMethodSymbol targetMethod,
+            INamedTypeSymbol exactReceiverType)
+        {
+            var originalTarget = targetMethod.OriginalDefinition;
+            if (targetMethod.ContainingType?.TypeKind == TypeKind.Interface)
+            {
+                var interfaceImplementation = exactReceiverType.FindImplementationForInterfaceMember(targetMethod) as IMethodSymbol
+                    ?? exactReceiverType.FindImplementationForInterfaceMember(originalTarget) as IMethodSymbol;
+                if (interfaceImplementation != null)
+                {
+                    return interfaceImplementation;
+                }
+
+                return !originalTarget.IsAbstract || HasMethodBody(originalTarget)
+                    ? originalTarget
+                    : null;
+            }
+
+            if (!(originalTarget.IsVirtual || originalTarget.IsAbstract || originalTarget.IsOverride))
+            {
+                return originalTarget;
+            }
+
+            for (var type = exactReceiverType; type != null; type = type.BaseType)
+            {
+                foreach (var member in type.GetMembers())
+                {
+                    if (member is IMethodSymbol method &&
+                        (SymbolEqualityComparer.Default.Equals(method.OriginalDefinition, originalTarget) ||
+                         OverridesTargetMethod(method, originalTarget) ||
+                         ExplicitlyImplements(method, originalTarget)))
+                    {
+                        return method;
+                    }
+                }
+            }
+
+            return !originalTarget.IsAbstract
+                ? originalTarget
+                : null;
+        }
+
+        private static IMethodSymbol? ResolvePropertyAccessorTargetForConcreteReceiver(
+            IPropertySymbol propertySymbol,
+            INamedTypeSymbol exactReceiverType,
+            bool preferSetter)
+        {
+            if (propertySymbol.ContainingType?.TypeKind == TypeKind.Interface)
+            {
+                var implementation = exactReceiverType.FindImplementationForInterfaceMember(propertySymbol) ??
+                    (preferSetter
+                        ? propertySymbol.SetMethod == null
+                            ? null
+                            : exactReceiverType.FindImplementationForInterfaceMember(propertySymbol.SetMethod)
+                        : propertySymbol.GetMethod == null
+                            ? null
+                            : exactReceiverType.FindImplementationForInterfaceMember(propertySymbol.GetMethod));
+                return GetAccessorFromImplementation(implementation, preferSetter);
+            }
+
+            for (var current = exactReceiverType; current != null; current = current.BaseType)
+            {
+                var implementation = current
+                    .GetMembers(propertySymbol.Name)
+                    .OfType<IPropertySymbol>()
+                    .FirstOrDefault(property =>
+                        SymbolEqualityComparer.Default.Equals(property.OriginalDefinition, propertySymbol.OriginalDefinition) ||
+                        OverridesProperty(property, propertySymbol));
+                if (implementation == null)
+                {
+                    continue;
+                }
+
+                return preferSetter ? implementation.SetMethod : implementation.GetMethod;
+            }
+
+            return preferSetter ? propertySymbol.SetMethod : propertySymbol.GetMethod;
+        }
+
+        private static IMethodSymbol? GetAccessorFromImplementation(ISymbol? implementation, bool preferSetter)
+        {
+            if (implementation is IPropertySymbol propertyImplementation)
+            {
+                return preferSetter ? propertyImplementation.SetMethod : propertyImplementation.GetMethod;
+            }
+
+            return implementation as IMethodSymbol;
+        }
+
+        private static bool OverridesProperty(IPropertySymbol property, IPropertySymbol target)
+        {
+            for (var current = property; current != null; current = current.OverriddenProperty)
+            {
+                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool OverridesTargetMethod(IMethodSymbol method, IMethodSymbol target)
+        {
+            for (var current = method; current != null; current = current.OverriddenMethod)
+            {
+                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ExplicitlyImplements(IMethodSymbol methodSymbol, IMethodSymbol interfaceMethod)
+        {
+            foreach (var implemented in methodSymbol.ExplicitInterfaceImplementations)
+            {
+                if (SymbolEqualityComparer.Default.Equals(implemented.OriginalDefinition, interfaceMethod.OriginalDefinition))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasMethodBody(IMethodSymbol methodSymbol)
+        {
+            return methodSymbol.DeclaringSyntaxReferences.Length > 0;
         }
 
         private static ITypeSymbol? GetRethrownExceptionType(
