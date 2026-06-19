@@ -97,7 +97,7 @@ Propagate root candidate labels through same-assembly calls:
 dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix System.String.Format --include-callees --max-depth 2 --transitive-roots --limit 50
 ```
 
-When transitive roots are enabled, the JSON also includes `TransitiveThrownExceptionTypes`. For example, `System.ArgumentNullException.ThrowIfNull(...)` can surface `System.ArgumentNullException` from its helper callee even when the public guard method does not directly contain the `throw` instruction.
+When transitive roots are enabled, the JSON also includes `TransitiveThrownExceptionTypes`. For example, `System.ArgumentNullException.ThrowIfNull(...)` can surface `System.ArgumentNullException` from its helper callee even when the public guard method does not directly contain the `throw` instruction. The tool also emits `TransitiveThrownExceptionEdges`, which preserve the recursive callee chain as structured records with `ExceptionType`, `SourcePath`, `CalleeExactSymbolKey`, and `Depth`.
 
 Add report-only purity classification to the JSON:
 
@@ -129,14 +129,14 @@ duplicating its full reviewed symbol list in the spec.
 
 The analyzer can consume generated exception summaries when the JSON is supplied as an additional file named `PurelySharp.EffectSummary.json` or `*.PurelySharp.EffectSummary.json`.
 
-With `purelysharp_report_exceptions = true`, `PS0010` and `PS0011` use `ThrownExceptionTypes` and `TransitiveThrownExceptionTypes` for matching metadata/library method calls. This extends exception-flow reporting beyond current-compilation source without doing slow live decompilation inside Roslyn analyzer callbacks.
+With `purelysharp_report_exceptions = true`, `PS0010` and `PS0011` use `ThrownExceptionTypes` and `TransitiveThrownExceptionTypes` for matching metadata/library method calls. This extends exception-flow reporting beyond current-compilation source without doing slow live decompilation inside Roslyn analyzer callbacks. The analyzer also accepts `TransitiveThrownExceptionEdges` as additive metadata and folds their `SourcePath` provenance back into the existing diagnostics model.
 
 The lookup is exact and evidence-based: summaries are keyed by method symbol strings emitted by this tool, and catch filtering still happens at the source call site when the exception type resolves in the current compilation. That means `PS0010` can summarize what a method may let escape, while `PS0011` can still warn on the exact uncaught call or property-access site that propagates the exception.
 
 Depth behavior is different for source and metadata on purpose:
 
 - Same-compilation source analysis walks callees recursively until it reaches the originating throw site or a cycle, so multi-hop chains like `Render -> LoadAcceptedDocument -> RequireAcceptedDocument -> Voucher.AcceptedDocument.get -> throw` stay intact.
-- Metadata/library analysis does not recurse by decompiling assemblies inside the analyzer. Instead, it trusts the transitive exception closure already recorded in `TransitiveThrownExceptionTypes` and `TransitiveThrownExceptionSourcePaths`.
+- Metadata/library analysis does not recurse by decompiling assemblies inside the analyzer. Instead, it trusts the transitive exception closure already recorded in `TransitiveThrownExceptionTypes`, `TransitiveThrownExceptionSourcePaths`, and the structured `TransitiveThrownExceptionEdges`.
 
 If you want effectively "unbounded" metadata propagation, generate the summary with the full reachable closure for the slice you care about:
 

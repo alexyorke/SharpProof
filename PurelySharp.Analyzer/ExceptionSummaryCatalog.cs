@@ -197,6 +197,8 @@ namespace PurelySharp.Analyzer
                     AddExceptionTypes(exceptionTypes, methodElement, "TransitiveThrownExceptionTypes");
                     AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "ThrownExceptionSourcePaths");
                     AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "TransitiveThrownExceptionSourcePaths");
+                    AddExceptionEdges(exceptionTypes, exceptionSources, methodElement, "ThrownExceptionEdges");
+                    AddExceptionEdges(exceptionTypes, exceptionSources, methodElement, "TransitiveThrownExceptionEdges");
                     if (exceptionTypes.Count == 0)
                     {
                         continue;
@@ -271,6 +273,54 @@ namespace PurelySharp.Analyzer
                 }
 
                 exceptionTypes.Add(exceptionType);
+                if (sourcePath == null)
+                {
+                    continue;
+                }
+
+                if (!exceptionSources.TryGetValue(exceptionType, out var sources))
+                {
+                    sources = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+                    exceptionSources.Add(exceptionType, sources);
+                }
+
+                sources.Add(sourcePath);
+            }
+        }
+
+        private static void AddExceptionEdges(
+            ImmutableSortedSet<string>.Builder exceptionTypes,
+            Dictionary<string, ImmutableSortedSet<string>.Builder> exceptionSources,
+            JsonElement methodElement,
+            string propertyName)
+        {
+            if (!methodElement.TryGetProperty(propertyName, out var valuesElement) ||
+                valuesElement.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            foreach (var valueElement in valuesElement.EnumerateArray())
+            {
+                if (valueElement.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                var exceptionType = CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "ExceptionType");
+                if (exceptionType == null)
+                {
+                    continue;
+                }
+
+                exceptionTypes.Add(exceptionType);
+
+                var sourcePath =
+                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "SourcePath") ??
+                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "ExceptionSourcePath") ??
+                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CallPath") ??
+                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CalleeExactSymbolKey") ??
+                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CalleeSymbol");
                 if (sourcePath == null)
                 {
                     continue;

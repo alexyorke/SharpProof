@@ -123,7 +123,12 @@ public static class ExceptionFixture
             AssertThrownExceptions(summary, "ExceptionFixture.ThrowDirect()", "System.InvalidOperationException");
             AssertThrownExceptions(summary, "ExceptionFixture.ThrowViaLocal()", "System.ObjectDisposedException");
             AssertTransitiveExceptions(summary, "ExceptionFixture.ThrowViaCallee()", "System.InvalidOperationException");
+            AssertTransitiveExceptionEdges(
+                summary,
+                "ExceptionFixture.ThrowViaCallee()",
+                ("System.InvalidOperationException", "ExceptionFixture.ThrowDirect()->void", "ExceptionFixture.ThrowViaCallee() -> ExceptionFixture.ThrowDirect()", 1));
             AssertThrownExceptions(summary, "ExceptionFixture.HandleLocally()");
+            AssertTransitiveExceptionEdges(summary, "ExceptionFixture.HandleLocally()");
             AssertThrownExceptions(summary, "ExceptionFixture.RethrowOverflow()", "System.OverflowException");
             AssertThrownExceptions(summary, "ExceptionFixture.RethrowFormatCaughtByOuter()");
         }
@@ -171,6 +176,12 @@ public static class ExceptionFixture
                 boundedSummary,
                 "ExceptionFixture.Outer(string)",
                 ("System.InvalidOperationException", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)"));
+            AssertTransitiveExceptionEdges(
+                boundedSummary,
+                "ExceptionFixture.Outer(string)",
+                ("System.InvalidOperationException", "ExceptionFixture.Inner(string)->string", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)", 2),
+                ("System.InvalidOperationException", "ExceptionFixture.Leaf(string)->string", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)", 3),
+                ("System.InvalidOperationException", "ExceptionFixture.Middle(string)->string", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)", 1));
             Assert.That(
                 FindMethodsByPrefix(boundedSummary, "ExceptionFixture.")
                     .Select(method => method.GetProperty("Symbol").GetString())
@@ -189,6 +200,12 @@ public static class ExceptionFixture
                 unboundedSummary,
                 "ExceptionFixture.Outer(string)",
                 ("System.InvalidOperationException", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)"));
+            AssertTransitiveExceptionEdges(
+                unboundedSummary,
+                "ExceptionFixture.Outer(string)",
+                ("System.InvalidOperationException", "ExceptionFixture.Inner(string)->string", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)", 2),
+                ("System.InvalidOperationException", "ExceptionFixture.Leaf(string)->string", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)", 3),
+                ("System.InvalidOperationException", "ExceptionFixture.Middle(string)->string", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)", 1));
             Assert.That(
                 FindMethodsByPrefix(unboundedSummary, "ExceptionFixture.")
                     .Select(method => method.GetProperty("Symbol").GetString())
@@ -7180,6 +7197,39 @@ public static class CallvirtFixture
             var normalizedExpectedEntries = expectedEntries
                 .OrderBy(entry => entry.ExceptionType, StringComparer.Ordinal)
                 .ThenBy(entry => entry.SourcePath, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(actualEntries, Is.EqualTo(normalizedExpectedEntries));
+        }
+
+        private static void AssertTransitiveExceptionEdges(
+            JsonDocument summary,
+            string methodSymbol,
+            params (string ExceptionType, string CalleeExactSymbolKey, string SourcePath, int Depth)[] expectedEntries)
+        {
+            var method = FindMethod(summary, methodSymbol);
+            var actualEntries = method.GetProperty("TransitiveThrownExceptionEdges")
+                .EnumerateArray()
+                .Select(entry => (
+                    ExceptionType: entry.GetProperty("ExceptionType").GetString(),
+                    CalleeExactSymbolKey: entry.GetProperty("CalleeExactSymbolKey").GetString(),
+                    SourcePath: entry.GetProperty("SourcePath").GetString(),
+                    Depth: entry.GetProperty("Depth").GetInt32()))
+                .Where(entry =>
+                    !string.IsNullOrWhiteSpace(entry.ExceptionType) &&
+                    !string.IsNullOrWhiteSpace(entry.CalleeExactSymbolKey) &&
+                    !string.IsNullOrWhiteSpace(entry.SourcePath))
+                .OrderBy(entry => entry.ExceptionType, StringComparer.Ordinal)
+                .ThenBy(entry => entry.CalleeExactSymbolKey, StringComparer.Ordinal)
+                .ThenBy(entry => entry.SourcePath, StringComparer.Ordinal)
+                .ThenBy(entry => entry.Depth)
+                .ToArray();
+
+            var normalizedExpectedEntries = expectedEntries
+                .OrderBy(entry => entry.ExceptionType, StringComparer.Ordinal)
+                .ThenBy(entry => entry.CalleeExactSymbolKey, StringComparer.Ordinal)
+                .ThenBy(entry => entry.SourcePath, StringComparer.Ordinal)
+                .ThenBy(entry => entry.Depth)
                 .ToArray();
 
             Assert.That(actualEntries, Is.EqualTo(normalizedExpectedEntries));

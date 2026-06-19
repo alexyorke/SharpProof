@@ -580,6 +580,80 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_TransitiveThrownExceptionEdges_RoundTripsWithoutChangingDiagnostics()
+        {
+            const string boundarySource = """
+using System;
+
+public static class SummaryBoundary
+{
+    public static string Outer(string value)
+    {
+        return Middle(value);
+    }
+
+    private static string Middle(string value)
+    {
+        return Inner(value);
+    }
+
+    private static string Inner(string value)
+    {
+        return Leaf(value);
+    }
+
+    private static string Leaf(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException();
+        }
+
+        return value;
+    }
+}
+""";
+
+            const string callerSource = """
+public class TestClass
+{
+    public string TestMethod(string value)
+    {
+        return SummaryBoundary.Outer(value);
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryEdgeRoundTrip", boundarySource);
+            var references = ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath));
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+            const string expectedSourceChain = "SummaryBoundary.Outer(string) -> SummaryBoundary.Middle(string) -> SummaryBoundary.Inner(string) -> SummaryBoundary.Leaf(string)";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                callerSource,
+                CreateEffectSummaryJson(
+                    identity,
+                    "SummaryBoundary.Outer(string)",
+                    thrownExceptionTypesJson: "[]",
+                    transitiveThrownExceptionTypesJson: "[]",
+                    transitiveThrownExceptionEdgesJson:
+                        $$"""[ { "ExceptionType": "System.InvalidOperationException", "CallPath": "{{expectedSourceChain}}", "Depth": 3 } ]"""),
+                references);
+
+            var summaryDiagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId);
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.InvalidOperationException=effect_summary:" + expectedSourceChain));
+
+            var siteDiagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId);
+            Assert.That(siteDiagnostic.GetMessage(), Does.Contain("SummaryBoundary.Outer"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.InvalidOperationException=effect_summary:" + expectedSourceChain));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSymbolProperty], Does.Contain("SummaryBoundary.Outer"));
+        }
+
+        [Test]
         public async Task Ps0010_EffectSummary_ToolOutput_PropagatesCommonMetadataExceptions()
         {
             const string boundarySource = """
@@ -1420,11 +1494,19 @@ public class TestClass
             string? methodBodySha256 = null,
             string? actualMethodLookupSymbol = null,
             string? thrownExceptionTypesJson = null,
-            string? transitiveThrownExceptionTypesJson = null)
+            string? transitiveThrownExceptionTypesJson = null,
+            string? thrownExceptionSourcePathsJson = null,
+            string? transitiveThrownExceptionSourcePathsJson = null,
+            string? thrownExceptionEdgesJson = null,
+            string? transitiveThrownExceptionEdgesJson = null)
         {
             var methodIdentity = GetMethodIdentity(assemblyIdentity.AssemblyPath, actualMethodLookupSymbol ?? symbol);
             thrownExceptionTypesJson ??= "[]";
             transitiveThrownExceptionTypesJson ??= """[ "System.ArgumentNullException" ]""";
+            thrownExceptionSourcePathsJson ??= "[]";
+            transitiveThrownExceptionSourcePathsJson ??= "[]";
+            thrownExceptionEdgesJson ??= "[]";
+            transitiveThrownExceptionEdgesJson ??= "[]";
             assemblySha256 ??= assemblyIdentity.AssemblySha256;
             moduleVersionId ??= assemblyIdentity.ModuleVersionId;
             metadataToken ??= methodIdentity.MetadataToken;
@@ -1453,6 +1535,10 @@ public class TestClass
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": {{thrownExceptionTypesJson}},
           "TransitiveThrownExceptionTypes": {{transitiveThrownExceptionTypesJson}},
+          "ThrownExceptionSourcePaths": {{thrownExceptionSourcePathsJson}},
+          "TransitiveThrownExceptionSourcePaths": {{transitiveThrownExceptionSourcePathsJson}},
+          "ThrownExceptionEdges": {{thrownExceptionEdgesJson}},
+          "TransitiveThrownExceptionEdges": {{transitiveThrownExceptionEdgesJson}},
           "Calls": [],
           "Fields": []
         }

@@ -993,17 +993,21 @@ internal static class AssemblyEffectSummarizer
 
         var rootMemo = new Dictionary<string, string[]>(StringComparer.Ordinal);
         var rootVisiting = new HashSet<string>(StringComparer.Ordinal);
-        var exceptionMemo = new Dictionary<string, ExceptionSourcePath[]>(StringComparer.Ordinal);
+        var exceptionMemo = new Dictionary<string, ThrownExceptionEdgeSummary[]>(StringComparer.Ordinal);
         var exceptionVisiting = new HashSet<string>(StringComparer.Ordinal);
 
         return summaries
             .Select(summary =>
             {
-                var transitiveExceptionSources = VisitThrownExceptionSourcePaths(
+                var transitiveExceptionEdges = VisitThrownExceptionEdges(
                     summary.ExactSymbolKey,
                     bySymbol,
                     exceptionMemo,
                     exceptionVisiting);
+                var transitiveExceptionSources = OrderExceptionSourcePaths(
+                    transitiveExceptionEdges
+                        .Select(edge => new ExceptionSourcePath(edge.ExceptionType, edge.SourcePath))
+                        .DistinctBy(CreateExceptionSourcePathKey));
                 return summary with
                 {
                     TransitiveRootCandidates = VisitRootCandidates(summary.ExactSymbolKey, bySymbol, rootMemo, rootVisiting),
@@ -1013,6 +1017,7 @@ internal static class AssemblyEffectSummarizer
                         .OrderBy(type => type, StringComparer.Ordinal)
                         .ToArray(),
                     TransitiveThrownExceptionSourcePaths = transitiveExceptionSources,
+                    TransitiveThrownExceptionEdges = transitiveExceptionEdges,
                 };
             })
             .ToList();
@@ -1054,10 +1059,10 @@ internal static class AssemblyEffectSummarizer
         return result;
     }
 
-    private static ExceptionSourcePath[] VisitThrownExceptionSourcePaths(
+    private static ThrownExceptionEdgeSummary[] VisitThrownExceptionEdges(
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
-        Dictionary<string, ExceptionSourcePath[]> memo,
+        Dictionary<string, ThrownExceptionEdgeSummary[]> memo,
         HashSet<string> visiting)
     {
         if (memo.TryGetValue(symbol, out var cached))
@@ -1067,36 +1072,54 @@ internal static class AssemblyEffectSummarizer
 
         if (!bySymbol.TryGetValue(symbol, out var summary))
         {
-            return Array.Empty<ExceptionSourcePath>();
+            return Array.Empty<ThrownExceptionEdgeSummary>();
         }
 
-        var thrownSources = new Dictionary<string, ExceptionSourcePath>(StringComparer.Ordinal);
+        var thrownSources = new Dictionary<string, ThrownExceptionEdgeSummary>(StringComparer.Ordinal);
         foreach (var directSource in summary.ThrownExceptionSourcePaths)
         {
-            thrownSources[CreateExceptionSourcePathKey(directSource)] = directSource;
+            var directEdge = new ThrownExceptionEdgeSummary(
+                directSource.ExceptionType,
+                directSource.SourcePath,
+                CalleeExactSymbolKey: null,
+                Depth: 0);
+            thrownSources[CreateThrownExceptionEdgeKey(directEdge)] = directEdge;
         }
 
         if (!visiting.Add(symbol))
         {
-            return OrderExceptionSourcePaths(thrownSources.Values);
+            return OrderThrownExceptionEdges(thrownSources.Values);
         }
 
         foreach (var call in summary.Calls)
         {
             if (bySymbol.ContainsKey(call))
             {
-                foreach (var nestedSource in VisitThrownExceptionSourcePaths(call, bySymbol, memo, visiting))
+                foreach (var nestedSource in VisitThrownExceptionEdges(call, bySymbol, memo, visiting))
                 {
-                    var chainedSource = new ExceptionSourcePath(
+                    var chainedSourcePath = summary.Symbol + " -> " + nestedSource.SourcePath;
+                    var immediateCalleeEdge = new ThrownExceptionEdgeSummary(
                         nestedSource.ExceptionType,
-                        summary.Symbol + " -> " + nestedSource.SourcePath);
-                    thrownSources[CreateExceptionSourcePathKey(chainedSource)] = chainedSource;
+                        chainedSourcePath,
+                        CalleeExactSymbolKey: call,
+                        Depth: 1);
+                    thrownSources[CreateThrownExceptionEdgeKey(immediateCalleeEdge)] = immediateCalleeEdge;
+
+                    if (!string.IsNullOrWhiteSpace(nestedSource.CalleeExactSymbolKey))
+                    {
+                        var inheritedEdge = new ThrownExceptionEdgeSummary(
+                            nestedSource.ExceptionType,
+                            chainedSourcePath,
+                            nestedSource.CalleeExactSymbolKey,
+                            nestedSource.Depth + 1);
+                        thrownSources[CreateThrownExceptionEdgeKey(inheritedEdge)] = inheritedEdge;
+                    }
                 }
             }
         }
 
         visiting.Remove(symbol);
-        var result = OrderExceptionSourcePaths(thrownSources.Values);
+        var result = OrderThrownExceptionEdges(thrownSources.Values);
         memo[symbol] = result;
         return result;
     }
@@ -1111,6 +1134,24 @@ internal static class AssemblyEffectSummarizer
         return sourcePaths
             .OrderBy(sourcePath => sourcePath.ExceptionType, StringComparer.Ordinal)
             .ThenBy(sourcePath => sourcePath.SourcePath, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static string CreateThrownExceptionEdgeKey(ThrownExceptionEdgeSummary edge)
+    {
+        return edge.ExceptionType + "|" +
+               edge.SourcePath + "|" +
+               (edge.CalleeExactSymbolKey ?? string.Empty) + "|" +
+               edge.Depth.ToString();
+    }
+
+    private static ThrownExceptionEdgeSummary[] OrderThrownExceptionEdges(IEnumerable<ThrownExceptionEdgeSummary> edges)
+    {
+        return edges
+            .OrderBy(edge => edge.ExceptionType, StringComparer.Ordinal)
+            .ThenBy(edge => edge.SourcePath, StringComparer.Ordinal)
+            .ThenBy(edge => edge.CalleeExactSymbolKey, StringComparer.Ordinal)
+            .ThenBy(edge => edge.Depth)
             .ToArray();
     }
 
@@ -2916,12 +2957,20 @@ internal sealed record MethodEffectSummary(
 {
     public CallSiteSummary[] CallSites { get; init; } = Array.Empty<CallSiteSummary>();
 
+    public ThrownExceptionEdgeSummary[] TransitiveThrownExceptionEdges { get; init; } = Array.Empty<ThrownExceptionEdgeSummary>();
+
     public MethodPurityClassification? PurityClassification { get; init; }
 }
 
 internal sealed record ExceptionSourcePath(
     string ExceptionType,
     string SourcePath);
+
+internal sealed record ThrownExceptionEdgeSummary(
+    string ExceptionType,
+    string SourcePath,
+    string? CalleeExactSymbolKey,
+    int Depth);
 
 internal sealed record CallSiteSummary(string ExactSymbolKey)
 {
