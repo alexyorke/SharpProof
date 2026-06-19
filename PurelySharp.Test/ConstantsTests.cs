@@ -393,6 +393,40 @@ public static class LinqDeferredCatalogSignatureSamples
         }
 
         [Test]
+        public void LinqDeferredEnumerableFactoriesAndAdapters_AreNotBackedByStaticPureCatalogs()
+        {
+            var source = @"
+using System.Collections.Generic;
+using System.Linq;
+
+public static class LinqDeferredFactoryCatalogSignatureSamples
+{
+    public static IEnumerable<int[]> Sample(object[] values, int[] numbers)
+    {
+        _ = Enumerable.Empty<int>();
+        _ = Enumerable.Range(0, 4);
+        _ = Enumerable.Repeat(1, 4);
+        _ = values.Cast<int>();
+        _ = values.OfType<string>();
+        return numbers.Chunk(2);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "LinqDeferredFactoryCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Enumerable.Empty<int>()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Enumerable.Range(0, 4)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Enumerable.Repeat(1, 4)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.Cast<int>()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.OfType<string>()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "numbers.Chunk(2)"));
+        }
+
+        [Test]
         public void DeadEnumerablePrefixPlaceholders_AreNotPresentInManualPureCatalogs()
         {
             var deadRows = new[]

@@ -498,6 +498,31 @@ public class TestClass
         }
 
         [Test]
+        public async Task LinqDeferredFactoriesAndAdapters_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections.Generic;
+using System.Linq;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public IEnumerable<int[]> TestMethod(object[] values, int[] numbers)
+    {
+        _ = Enumerable.Empty<int>();
+        _ = Enumerable.Range(0, 4);
+        _ = Enumerable.Repeat(1, 4);
+        _ = values.Cast<int>();
+        _ = values.OfType<string>();
+        return numbers.Chunk(2);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task LinqContainsEqualityComparerDefaultDispatchToImpureEquatable_Diagnostic()
         {
             var test = @"

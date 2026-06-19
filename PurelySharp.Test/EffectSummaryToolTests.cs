@@ -4876,10 +4876,15 @@ public static class PurityFixture
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Linq.dll",
                 160,
+                "System.Linq.Enumerable.Cast(",
+                "System.Linq.Enumerable.Chunk(",
                 "System.Linq.Enumerable.Distinct(",
                 "System.Linq.Enumerable.Reverse(",
                 "System.Linq.Enumerable.TakeWhile(",
-                "System.Linq.Enumerable.Empty(");
+                "System.Linq.Enumerable.Empty(",
+                "System.Linq.Enumerable.OfType(",
+                "System.Linq.Enumerable.Range(",
+                "System.Linq.Enumerable.Repeat(");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -4887,9 +4892,22 @@ public static class PurityFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
+            AssertPurityClassification(summary, "System.Linq.Enumerable.Cast(System.Collections.IEnumerable)", "pure");
+            AssertFreshnessClassification(summary, "System.Linq.Enumerable.Cast(System.Collections.IEnumerable)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Linq.Enumerable.Cast(System.Collections.IEnumerable)", "internal_only");
+            AssertPurityClassification(summary, "System.Linq.Enumerable.Chunk(System.Collections.Generic.IEnumerable`1<!!0>, int)", "pure");
+            AssertFreshnessClassification(summary, "System.Linq.Enumerable.Chunk(System.Collections.Generic.IEnumerable`1<!!0>, int)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Linq.Enumerable.Chunk(System.Collections.Generic.IEnumerable`1<!!0>, int)", "internal_only");
             AssertPurityClassification(summary, "System.Linq.Enumerable.Empty()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Linq.Enumerable.Empty()", "internal_only");
             AssertPurityClassification(summary, "System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable`1<!!0>)", "pure");
+            AssertPurityClassification(summary, "System.Linq.Enumerable.OfType(System.Collections.IEnumerable)", "pure");
+            AssertFreshnessClassification(summary, "System.Linq.Enumerable.OfType(System.Collections.IEnumerable)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Linq.Enumerable.OfType(System.Collections.IEnumerable)", "internal_only");
+            AssertPurityClassification(summary, "System.Linq.Enumerable.Range(int, int)", "pure");
+            AssertFreshnessClassification(summary, "System.Linq.Enumerable.Range(int, int)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Linq.Enumerable.Range(int, int)", "internal_only");
+            AssertPurityClassification(summary, "System.Linq.Enumerable.Repeat(!!0, int)", "pure");
             AssertPurityClassification(summary, "System.Linq.Enumerable.Reverse(System.Collections.Generic.IEnumerable`1<!!0>)", "pure");
             AssertPurityClassification(
                 summary,
@@ -4911,8 +4929,13 @@ public static class PurityFixture
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .ToArray();
 
+            Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.Cast(System.Collections.IEnumerable)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.Chunk(System.Collections.Generic.IEnumerable`1<!!0>, int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.Empty()"));
             Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable`1<!!0>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.OfType(System.Collections.IEnumerable)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.Range(int, int)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.Repeat(!!0, int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.Reverse(System.Collections.Generic.IEnumerable`1<!!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.TakeWhile(System.Collections.Generic.IEnumerable`1<!!0>, System.Func`2<!!0, bool>)"));
         }

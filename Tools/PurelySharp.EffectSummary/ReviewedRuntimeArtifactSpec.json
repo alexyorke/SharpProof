@@ -637,7 +637,19 @@
     {
       "OutputPath": "PurelySharp.Analyzer/Enumerable.Deferred.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Linq.dll",
-      "SourceSummaryPath": "PurelySharp.Analyzer/Enumerable.Deferred.PurelySharp.EffectSummary.json"
+      "SourceSummaryPath": "PurelySharp.Analyzer/Enumerable.Deferred.PurelySharp.EffectSummary.json",
+      "Limit": 240,
+      "SymbolPrefixes": [
+        "System.Linq.Enumerable.Cast(",
+        "System.Linq.Enumerable.Chunk(",
+        "System.Linq.Enumerable.Distinct(",
+        "System.Linq.Enumerable.Empty(",
+        "System.Linq.Enumerable.OfType(",
+        "System.Linq.Enumerable.Range(",
+        "System.Linq.Enumerable.Repeat(",
+        "System.Linq.Enumerable.Reverse(",
+        "System.Linq.Enumerable.TakeWhile("
+      ]
     },
     {
       "OutputPath": "PurelySharp.Analyzer/MemoryExtensions.AsSpan.PurelySharp.EffectSummary.json",

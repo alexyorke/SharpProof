@@ -22,10 +22,8 @@ public sealed class TestClass
     [EnforcePure]
     public IEnumerable<int> {|PS0002:TestMethod|}()
     {
-        return Enumerable.Repeat(GetImpureValue(), 5);
+        return Enumerable.Repeat(Console.Read(), 5);
     }
-
-    private static int GetImpureValue() => DateTime.Now.Millisecond;
 }";
 
             await VerifyCS.VerifyAnalyzerAsync(test);
@@ -45,10 +43,8 @@ public sealed class TestClass
     [EnforcePure]
     public IEnumerable<int> {|PS0002:TestMethod|}()
     {
-        return Enumerable.Range(0, GetImpureCount());
+        return Enumerable.Range(0, Console.Read());
     }
-
-    private static int GetImpureCount() => DateTime.Now.Millisecond;
 }";
 
             await VerifyCS.VerifyAnalyzerAsync(test);
