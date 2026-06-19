@@ -89,6 +89,8 @@ Include same-assembly callees from the matched symbols:
 dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix System.String.Format --include-callees --max-depth 1 --limit 50
 ```
 
+Use `--max-depth -1` when a filtered slice must keep the full reachable same-assembly callee closure instead of a bounded prefix.
+
 Propagate root candidate labels through same-assembly calls:
 
 ```powershell

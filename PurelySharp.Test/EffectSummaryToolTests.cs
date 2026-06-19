@@ -106,6 +106,82 @@ public static class ExceptionFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_FilteredSummary_UnboundedDepth_PreservesDeepTransitiveExceptions()
+        {
+            var source = """
+using System;
+
+public static class ExceptionFixture
+{
+    public static string Outer(string value) => Middle(value);
+
+    private static string Middle(string value) => Inner(value);
+
+    private static string Inner(string value) => Leaf(value);
+
+    private static string Leaf(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException();
+        }
+
+        return value;
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryDeepFilteredExceptions", source);
+            using var boundedSummary = await RunFilteredEffectSummaryAsync(
+                fixture.AssemblyPath,
+                includeTransitiveRoots: true,
+                maxDepth: 1,
+                "ExceptionFixture.Outer");
+            using var unboundedSummary = await RunFilteredEffectSummaryAsync(
+                fixture.AssemblyPath,
+                includeTransitiveRoots: true,
+                maxDepth: -1,
+                "ExceptionFixture.Outer");
+
+            AssertTransitiveExceptions(boundedSummary, "ExceptionFixture.Outer(string)", "System.InvalidOperationException");
+            AssertTransitiveExceptionSourcePaths(
+                boundedSummary,
+                "ExceptionFixture.Outer(string)",
+                ("System.InvalidOperationException", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)"));
+            Assert.That(
+                FindMethodsByPrefix(boundedSummary, "ExceptionFixture.")
+                    .Select(method => method.GetProperty("Symbol").GetString())
+                    .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                    .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                    .ToArray(),
+                Is.EqualTo(new[]
+                {
+                    "ExceptionFixture.Middle(string)",
+                    "ExceptionFixture.Outer(string)",
+                }));
+
+            AssertThrownExceptions(unboundedSummary, "ExceptionFixture.Leaf(string)", "System.InvalidOperationException");
+            AssertTransitiveExceptions(unboundedSummary, "ExceptionFixture.Outer(string)", "System.InvalidOperationException");
+            AssertTransitiveExceptionSourcePaths(
+                unboundedSummary,
+                "ExceptionFixture.Outer(string)",
+                ("System.InvalidOperationException", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)"));
+            Assert.That(
+                FindMethodsByPrefix(unboundedSummary, "ExceptionFixture.")
+                    .Select(method => method.GetProperty("Symbol").GetString())
+                    .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                    .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                    .ToArray(),
+                Is.EqualTo(new[]
+                {
+                    "ExceptionFixture.Inner(string)",
+                    "ExceptionFixture.Leaf(string)",
+                    "ExceptionFixture.Middle(string)",
+                    "ExceptionFixture.Outer(string)",
+                }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_Produces_ReportOnly_Purity_Classifications()
         {
             var source = """
@@ -4874,6 +4950,7 @@ public static class StringComparisonFixture
             }));
         }
 
+
         [Test]
         public async Task EffectSummaryTool_RuntimeObjectTypeMetadataSlice_UsesGeneratedPurityEvidence()
         {
@@ -5951,6 +6028,32 @@ public static class CallvirtFixture
             Assert.That(transitiveExceptions, Is.EqualTo(expectedExceptions));
         }
 
+        private static void AssertTransitiveExceptionSourcePaths(
+            JsonDocument summary,
+            string methodSymbol,
+            params (string ExceptionType, string SourcePath)[] expectedEntries)
+        {
+            var method = FindMethod(summary, methodSymbol);
+            var actualEntries = method.GetProperty("TransitiveThrownExceptionSourcePaths")
+                .EnumerateArray()
+                .Select(entry => (
+                    ExceptionType: entry.GetProperty("ExceptionType").GetString(),
+                    SourcePath: entry.GetProperty("SourcePath").GetString()))
+                .Where(entry =>
+                    !string.IsNullOrWhiteSpace(entry.ExceptionType) &&
+                    !string.IsNullOrWhiteSpace(entry.SourcePath))
+                .OrderBy(entry => entry.ExceptionType, StringComparer.Ordinal)
+                .ThenBy(entry => entry.SourcePath, StringComparer.Ordinal)
+                .ToArray();
+
+            var normalizedExpectedEntries = expectedEntries
+                .OrderBy(entry => entry.ExceptionType, StringComparer.Ordinal)
+                .ThenBy(entry => entry.SourcePath, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(actualEntries, Is.EqualTo(normalizedExpectedEntries));
+        }
+
         private static void AssertPurityClassification(
             JsonDocument summary,
             string methodSymbol,
@@ -6077,6 +6180,64 @@ public static class CallvirtFixture
                 throw new AssertionException(
                     "Effect summary tool failed with exit code " + process.ExitCode + "." + Environment.NewLine +
                     "Assembly: " + assemblyPath + Environment.NewLine +
+                    "Output: " + outputPath);
+            }
+
+            return JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+        }
+
+        private static async Task<JsonDocument> RunFilteredEffectSummaryAsync(
+            string assemblyPath,
+            bool includeTransitiveRoots,
+            int maxDepth,
+            params string[] symbolPrefixes)
+        {
+            var outputPath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-filtered-" + Guid.NewGuid().ToString("N") + ".json");
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                WorkingDirectory = GetRepositoryRoot(),
+                UseShellExecute = false,
+            };
+            startInfo.ArgumentList.Add("run");
+            startInfo.ArgumentList.Add("--project");
+            startInfo.ArgumentList.Add("Tools\\PurelySharp.EffectSummary\\PurelySharp.EffectSummary.csproj");
+            startInfo.ArgumentList.Add("--");
+            startInfo.ArgumentList.Add("--assembly");
+            startInfo.ArgumentList.Add(assemblyPath);
+            foreach (var symbolPrefix in symbolPrefixes)
+            {
+                startInfo.ArgumentList.Add("--symbol-prefix");
+                startInfo.ArgumentList.Add(symbolPrefix);
+            }
+            startInfo.ArgumentList.Add("--include-callees");
+            startInfo.ArgumentList.Add("--max-depth");
+            startInfo.ArgumentList.Add(maxDepth.ToString());
+            if (includeTransitiveRoots)
+            {
+                startInfo.ArgumentList.Add("--transitive-roots");
+            }
+            startInfo.ArgumentList.Add("--output");
+            startInfo.ArgumentList.Add(outputPath);
+
+            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start effect summary tool.");
+            try
+            {
+                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(120));
+            }
+            catch (TimeoutException)
+            {
+                TryKillProcess(process);
+                throw new AssertionException("Effect summary tool timed out after 120 seconds.");
+            }
+            if (process.ExitCode != 0)
+            {
+                throw new AssertionException(
+                    "Effect summary tool failed with exit code " + process.ExitCode + "." + Environment.NewLine +
+                    "Assembly: " + assemblyPath + Environment.NewLine +
+                    "Symbol prefixes: " + string.Join(", ", symbolPrefixes) + Environment.NewLine +
                     "Output: " + outputPath);
             }
 

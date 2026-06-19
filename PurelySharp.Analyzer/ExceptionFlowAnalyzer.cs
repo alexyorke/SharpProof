@@ -1148,18 +1148,25 @@ namespace PurelySharp.Analyzer
                 yield return exception;
             }
 
-            if (!exceptionSummaryCatalog.TryGetExceptions(invokedMethod, compilation, out var summaryExceptions))
+            if (!exceptionSummaryCatalog.TryGetExceptionInfos(invokedMethod, compilation, out var summaryExceptions))
             {
                 yield break;
             }
 
-            foreach (var exceptionType in summaryExceptions)
+            var fallbackSource = invokedMethod.OriginalDefinition.ToDisplayString();
+            foreach (var summaryException in summaryExceptions)
             {
-                yield return new ExceptionCandidate(
-                    TryResolveExceptionType(compilation, exceptionType),
-                    exceptionType,
-                    "effect_summary",
-                    invokedMethod.OriginalDefinition.ToDisplayString());
+                var sources = summaryException.Sources.IsDefaultOrEmpty
+                    ? ImmutableArray.Create(fallbackSource)
+                    : summaryException.Sources;
+                foreach (var source in sources)
+                {
+                    yield return new ExceptionCandidate(
+                        TryResolveExceptionType(compilation, summaryException.ExceptionType),
+                        summaryException.ExceptionType,
+                        "effect_summary",
+                        source);
+                }
             }
         }
 

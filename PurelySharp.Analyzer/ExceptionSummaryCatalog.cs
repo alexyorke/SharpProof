@@ -92,7 +92,25 @@ namespace PurelySharp.Analyzer
             Compilation? compilation,
             out ImmutableArray<string> exceptionTypes)
         {
-            var matchedExceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+            if (!TryGetExceptionInfos(methodSymbol, compilation, out var exceptionInfos))
+            {
+                exceptionTypes = ImmutableArray<string>.Empty;
+                return false;
+            }
+
+            exceptionTypes = exceptionInfos
+                .Select(info => info.ExceptionType)
+                .OrderBy(type => type, StringComparer.Ordinal)
+                .ToImmutableArray();
+            return exceptionTypes.Length > 0;
+        }
+
+        public bool TryGetExceptionInfos(
+            IMethodSymbol methodSymbol,
+            Compilation? compilation,
+            out ImmutableArray<SummaryExceptionInfo> exceptionInfos)
+        {
+            var matchedExceptionSources = new Dictionary<string, ImmutableSortedSet<string>.Builder>(StringComparer.Ordinal);
             var actualAssemblyIdentity = compilation is null
                 ? null
                 : TryResolveActualAssemblyIdentity(methodSymbol, compilation);
@@ -114,17 +132,29 @@ namespace PurelySharp.Analyzer
                         continue;
                     }
 
-                    matchedExceptionTypes.UnionWith(entry.ExceptionTypes);
+                    foreach (var exceptionInfo in entry.ExceptionInfos)
+                    {
+                        if (!matchedExceptionSources.TryGetValue(exceptionInfo.ExceptionType, out var sources))
+                        {
+                            sources = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+                            matchedExceptionSources.Add(exceptionInfo.ExceptionType, sources);
+                        }
+
+                        sources.UnionWith(exceptionInfo.Sources);
+                    }
                 }
             }
 
-            if (matchedExceptionTypes.Count == 0)
+            if (matchedExceptionSources.Count == 0)
             {
-                exceptionTypes = ImmutableArray<string>.Empty;
+                exceptionInfos = ImmutableArray<SummaryExceptionInfo>.Empty;
                 return false;
             }
 
-            exceptionTypes = matchedExceptionTypes.ToImmutableArray();
+            exceptionInfos = matchedExceptionSources
+                .OrderBy(item => item.Key, StringComparer.Ordinal)
+                .Select(item => new SummaryExceptionInfo(item.Key, item.Value.ToImmutableArray()))
+                .ToImmutableArray();
             return true;
         }
 
@@ -162,15 +192,26 @@ namespace PurelySharp.Analyzer
                     }
 
                     var exceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+                    var exceptionSources = new Dictionary<string, ImmutableSortedSet<string>.Builder>(StringComparer.Ordinal);
                     AddExceptionTypes(exceptionTypes, methodElement, "ThrownExceptionTypes");
                     AddExceptionTypes(exceptionTypes, methodElement, "TransitiveThrownExceptionTypes");
+                    AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "ThrownExceptionSourcePaths");
+                    AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "TransitiveThrownExceptionSourcePaths");
                     if (exceptionTypes.Count == 0)
                     {
                         continue;
                     }
+
+                    var exceptionInfos = exceptionTypes
+                        .Select(exceptionType => new SummaryExceptionInfo(
+                            exceptionType,
+                            exceptionSources.TryGetValue(exceptionType, out var sources)
+                                ? sources.ToImmutableArray()
+                                : ImmutableArray<string>.Empty))
+                        .ToImmutableArray();
                     yield return new SummaryEntry(
                         symbol,
-                        exceptionTypes.ToImmutableArray(),
+                        exceptionInfos,
                         assemblyIdentity,
                         SummaryMethodIdentity.FromJson(methodElement));
                 }
@@ -200,6 +241,48 @@ namespace PurelySharp.Analyzer
                 {
                     exceptionTypes.Add(value.Trim());
                 }
+            }
+        }
+
+        private static void AddExceptionSources(
+            ImmutableSortedSet<string>.Builder exceptionTypes,
+            Dictionary<string, ImmutableSortedSet<string>.Builder> exceptionSources,
+            JsonElement methodElement,
+            string propertyName)
+        {
+            if (!methodElement.TryGetProperty(propertyName, out var valuesElement) ||
+                valuesElement.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            foreach (var valueElement in valuesElement.EnumerateArray())
+            {
+                if (valueElement.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                var exceptionType = CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "ExceptionType");
+                var sourcePath = CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "SourcePath");
+                if (exceptionType == null)
+                {
+                    continue;
+                }
+
+                exceptionTypes.Add(exceptionType);
+                if (sourcePath == null)
+                {
+                    continue;
+                }
+
+                if (!exceptionSources.TryGetValue(exceptionType, out var sources))
+                {
+                    sources = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+                    exceptionSources.Add(exceptionType, sources);
+                }
+
+                sources.Add(sourcePath);
             }
         }
 
@@ -717,19 +800,19 @@ namespace PurelySharp.Analyzer
         {
             public SummaryEntry(
                 string symbol,
-                ImmutableArray<string> exceptionTypes,
+                ImmutableArray<SummaryExceptionInfo> exceptionInfos,
                 SummaryAssemblyIdentity? assemblyIdentity,
                 SummaryMethodIdentity? methodIdentity)
             {
                 Symbol = symbol;
-                ExceptionTypes = exceptionTypes;
+                ExceptionInfos = exceptionInfos;
                 AssemblyIdentity = assemblyIdentity;
                 MethodIdentity = methodIdentity;
             }
 
             public string Symbol { get; }
 
-            public ImmutableArray<string> ExceptionTypes { get; }
+            public ImmutableArray<SummaryExceptionInfo> ExceptionInfos { get; }
 
             public SummaryAssemblyIdentity? AssemblyIdentity { get; }
 
@@ -754,6 +837,19 @@ namespace PurelySharp.Analyzer
                     AssemblyIdentity.Matches(actualAssemblyIdentity) &&
                     MethodIdentity.Matches(actualMethodIdentity);
             }
+        }
+
+        internal sealed class SummaryExceptionInfo
+        {
+            public SummaryExceptionInfo(string exceptionType, ImmutableArray<string> sources)
+            {
+                ExceptionType = exceptionType;
+                Sources = sources;
+            }
+
+            public string ExceptionType { get; }
+
+            public ImmutableArray<string> Sources { get; }
         }
 
         private sealed class SummaryAssemblyIdentity

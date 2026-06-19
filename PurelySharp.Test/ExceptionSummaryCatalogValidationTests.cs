@@ -407,6 +407,76 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_FilteredToolOutput_PreservesDeepMetadataSourceChain()
+        {
+            const string boundarySource = """
+using System;
+
+public static class SummaryBoundary
+{
+    public static string Outer(string value)
+    {
+        return Middle(value);
+    }
+
+    private static string Middle(string value)
+    {
+        return Inner(value);
+    }
+
+    private static string Inner(string value)
+    {
+        return Leaf(value);
+    }
+
+    private static string Leaf(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException();
+        }
+
+        return value;
+    }
+}
+""";
+
+            const string callerSource = """
+public class TestClass
+{
+    public string TestMethod(string value)
+    {
+        return SummaryBoundary.Outer(value);
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryFilteredGenerated", boundarySource);
+            var references = ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath));
+
+            var summaryJson = await RunFilteredEffectSummaryJsonAsync(
+                fixture.AssemblyPath,
+                includeTransitiveRoots: true,
+                maxDepth: 1,
+                "SummaryBoundary.Outer");
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(callerSource, summaryJson, references);
+
+            var expectedSourceChain = "SummaryBoundary.Outer(string) -> SummaryBoundary.Middle(string) -> SummaryBoundary.Inner(string) -> SummaryBoundary.Leaf(string)";
+
+            var summaryDiagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId);
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.InvalidOperationException=effect_summary:" + expectedSourceChain));
+
+            var siteDiagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId);
+            Assert.That(siteDiagnostic.GetMessage(), Does.Contain("SummaryBoundary.Outer"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.InvalidOperationException=effect_summary:" + expectedSourceChain));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSymbolProperty], Does.Contain("SummaryBoundary.Outer"));
+        }
+
+        [Test]
         public async Task Ps0010_EffectSummary_ToolOutput_PropagatesCommonMetadataExceptions()
         {
             const string boundarySource = """
@@ -1611,6 +1681,57 @@ public class TestClass
             startInfo.ArgumentList.Add("--");
             startInfo.ArgumentList.Add("--assembly");
             startInfo.ArgumentList.Add(assemblyPath);
+            startInfo.ArgumentList.Add("--output");
+            startInfo.ArgumentList.Add(outputPath);
+            if (includeTransitiveRoots)
+            {
+                startInfo.ArgumentList.Add("--transitive-roots");
+            }
+
+            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start effect summary tool.");
+            var standardOutput = await process.StandardOutput.ReadToEndAsync();
+            var standardError = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            if (process.ExitCode != 0)
+            {
+                throw new AssertionException(
+                    "Effect summary tool failed." + Environment.NewLine +
+                    standardOutput + Environment.NewLine +
+                    standardError);
+            }
+
+            return await File.ReadAllTextAsync(outputPath);
+        }
+
+        private static async Task<string> RunFilteredEffectSummaryJsonAsync(
+            string assemblyPath,
+            bool includeTransitiveRoots,
+            int maxDepth,
+            params string[] symbolPrefixes)
+        {
+            var outputPath = Path.Combine(Path.GetDirectoryName(assemblyPath)!, Guid.NewGuid().ToString("N") + ".json");
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                WorkingDirectory = GetRepositoryRoot(),
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            startInfo.ArgumentList.Add("run");
+            startInfo.ArgumentList.Add("--project");
+            startInfo.ArgumentList.Add("Tools\\PurelySharp.EffectSummary\\PurelySharp.EffectSummary.csproj");
+            startInfo.ArgumentList.Add("--");
+            startInfo.ArgumentList.Add("--assembly");
+            startInfo.ArgumentList.Add(assemblyPath);
+            foreach (var symbolPrefix in symbolPrefixes)
+            {
+                startInfo.ArgumentList.Add("--symbol-prefix");
+                startInfo.ArgumentList.Add(symbolPrefix);
+            }
+            startInfo.ArgumentList.Add("--include-callees");
+            startInfo.ArgumentList.Add("--max-depth");
+            startInfo.ArgumentList.Add(maxDepth.ToString());
             startInfo.ArgumentList.Add("--output");
             startInfo.ArgumentList.Add(outputPath);
             if (includeTransitiveRoots)

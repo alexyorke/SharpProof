@@ -123,7 +123,7 @@ internal static class EffectSummaryCli
         Console.Error.WriteLine("  --runtime-assembly <name>  Runtime assembly name when --assembly is omitted. Default: System.Private.CoreLib.dll");
         Console.Error.WriteLine("  --symbol-prefix <prefix>   Emit only methods whose decoded symbol starts with this prefix. Can be repeated.");
         Console.Error.WriteLine("  --include-callees          Also emit same-assembly callees reachable from matched symbols.");
-        Console.Error.WriteLine("  --max-depth <count>        Maximum same-assembly callee depth when --include-callees is used. Default: 1.");
+        Console.Error.WriteLine("  --max-depth <count>        Maximum same-assembly callee depth when --include-callees is used. Use -1 for unbounded depth. Default: 1.");
         Console.Error.WriteLine("  --transitive-roots         Propagate root candidate labels through same-assembly calls.");
         Console.Error.WriteLine("  --classify-purity         Add report-only fixed-point purity classifications to the JSON output.");
         Console.Error.WriteLine("  --compare-manual-catalogs Compare emitted methods against the current reviewed manual catalogs.");
@@ -665,7 +665,7 @@ internal static class AssemblyEffectSummarizer
         while (queue.Count > 0)
         {
             var (exactSymbolKey, depth) = queue.Dequeue();
-            if (depth >= maxDepth || !bySymbol.TryGetValue(exactSymbolKey, out var summary))
+            if ((maxDepth >= 0 && depth >= maxDepth) || !bySymbol.TryGetValue(exactSymbolKey, out var summary))
             {
                 continue;
             }
@@ -731,8 +731,12 @@ internal static class AssemblyEffectSummarizer
         var metadataToken = $"0x{MetadataTokens.GetToken(handle):X8}";
         var cacheKey = $"mvid:{moduleVersionId}|token:{metadataToken}|il:{methodBodySha256 ?? "no-il"}";
         var isConstructor = string.Equals(reader.GetString(definition.Name), ".ctor", StringComparison.Ordinal);
+        var symbol = GetMethodDisplaySymbol(reader, handle);
+        var directThrownExceptionSources = thrownExceptionTypes
+            .Select(exceptionType => new ExceptionSourcePath(exceptionType, symbol))
+            .ToArray();
         return new MethodEffectSummary(
-            Symbol: GetMethodDisplaySymbol(reader, handle),
+            Symbol: symbol,
             ExactSymbolKey: GetMethodExactKey(reader, handle),
             MetadataToken: metadataToken,
             RelativeVirtualAddress: definition.RelativeVirtualAddress,
@@ -743,6 +747,8 @@ internal static class AssemblyEffectSummarizer
             TransitiveRootCandidates: Array.Empty<string>(),
             ThrownExceptionTypes: thrownExceptionTypes.ToArray(),
             TransitiveThrownExceptionTypes: Array.Empty<string>(),
+            ThrownExceptionSourcePaths: directThrownExceptionSources,
+            TransitiveThrownExceptionSourcePaths: Array.Empty<ExceptionSourcePath>(),
             Calls: calls.ToArray(),
             Fields: fields.ToArray())
         {
@@ -776,14 +782,27 @@ internal static class AssemblyEffectSummarizer
 
         var rootMemo = new Dictionary<string, string[]>(StringComparer.Ordinal);
         var rootVisiting = new HashSet<string>(StringComparer.Ordinal);
-        var exceptionMemo = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        var exceptionMemo = new Dictionary<string, ExceptionSourcePath[]>(StringComparer.Ordinal);
         var exceptionVisiting = new HashSet<string>(StringComparer.Ordinal);
 
         return summaries
-            .Select(summary => summary with
+            .Select(summary =>
             {
-                TransitiveRootCandidates = VisitRootCandidates(summary.ExactSymbolKey, bySymbol, rootMemo, rootVisiting),
-                TransitiveThrownExceptionTypes = VisitThrownExceptionTypes(summary.ExactSymbolKey, bySymbol, exceptionMemo, exceptionVisiting)
+                var transitiveExceptionSources = VisitThrownExceptionSourcePaths(
+                    summary.ExactSymbolKey,
+                    bySymbol,
+                    exceptionMemo,
+                    exceptionVisiting);
+                return summary with
+                {
+                    TransitiveRootCandidates = VisitRootCandidates(summary.ExactSymbolKey, bySymbol, rootMemo, rootVisiting),
+                    TransitiveThrownExceptionTypes = transitiveExceptionSources
+                        .Select(source => source.ExceptionType)
+                        .Distinct(StringComparer.Ordinal)
+                        .OrderBy(type => type, StringComparer.Ordinal)
+                        .ToArray(),
+                    TransitiveThrownExceptionSourcePaths = transitiveExceptionSources,
+                };
             })
             .ToList();
     }
@@ -824,10 +843,10 @@ internal static class AssemblyEffectSummarizer
         return result;
     }
 
-    private static string[] VisitThrownExceptionTypes(
+    private static ExceptionSourcePath[] VisitThrownExceptionSourcePaths(
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
-        Dictionary<string, string[]> memo,
+        Dictionary<string, ExceptionSourcePath[]> memo,
         HashSet<string> visiting)
     {
         if (memo.TryGetValue(symbol, out var cached))
@@ -837,27 +856,51 @@ internal static class AssemblyEffectSummarizer
 
         if (!bySymbol.TryGetValue(symbol, out var summary))
         {
-            return Array.Empty<string>();
+            return Array.Empty<ExceptionSourcePath>();
         }
 
-        var thrownTypes = new SortedSet<string>(summary.ThrownExceptionTypes, StringComparer.Ordinal);
+        var thrownSources = new Dictionary<string, ExceptionSourcePath>(StringComparer.Ordinal);
+        foreach (var directSource in summary.ThrownExceptionSourcePaths)
+        {
+            thrownSources[CreateExceptionSourcePathKey(directSource)] = directSource;
+        }
+
         if (!visiting.Add(symbol))
         {
-            return thrownTypes.ToArray();
+            return OrderExceptionSourcePaths(thrownSources.Values);
         }
 
         foreach (var call in summary.Calls)
         {
             if (bySymbol.ContainsKey(call))
             {
-                thrownTypes.UnionWith(VisitThrownExceptionTypes(call, bySymbol, memo, visiting));
+                foreach (var nestedSource in VisitThrownExceptionSourcePaths(call, bySymbol, memo, visiting))
+                {
+                    var chainedSource = new ExceptionSourcePath(
+                        nestedSource.ExceptionType,
+                        summary.Symbol + " -> " + nestedSource.SourcePath);
+                    thrownSources[CreateExceptionSourcePathKey(chainedSource)] = chainedSource;
+                }
             }
         }
 
         visiting.Remove(symbol);
-        var result = thrownTypes.ToArray();
+        var result = OrderExceptionSourcePaths(thrownSources.Values);
         memo[symbol] = result;
         return result;
+    }
+
+    private static string CreateExceptionSourcePathKey(ExceptionSourcePath sourcePath)
+    {
+        return sourcePath.ExceptionType + "|" + sourcePath.SourcePath;
+    }
+
+    private static ExceptionSourcePath[] OrderExceptionSourcePaths(IEnumerable<ExceptionSourcePath> sourcePaths)
+    {
+        return sourcePaths
+            .OrderBy(sourcePath => sourcePath.ExceptionType, StringComparer.Ordinal)
+            .ThenBy(sourcePath => sourcePath.SourcePath, StringComparer.Ordinal)
+            .ToArray();
     }
 
     private static IEnumerable<string> GetRootCandidates(
@@ -2611,6 +2654,8 @@ internal sealed record MethodEffectSummary(
     string[] TransitiveRootCandidates,
     string[] ThrownExceptionTypes,
     string[] TransitiveThrownExceptionTypes,
+    ExceptionSourcePath[] ThrownExceptionSourcePaths,
+    ExceptionSourcePath[] TransitiveThrownExceptionSourcePaths,
     string[] Calls,
     string[] Fields)
 {
@@ -2618,6 +2663,10 @@ internal sealed record MethodEffectSummary(
 
     public MethodPurityClassification? PurityClassification { get; init; }
 }
+
+internal sealed record ExceptionSourcePath(
+    string ExceptionType,
+    string SourcePath);
 
 internal sealed record CallSiteSummary(string ExactSymbolKey)
 {
