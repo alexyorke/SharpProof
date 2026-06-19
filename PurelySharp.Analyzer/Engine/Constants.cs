@@ -1009,7 +1009,6 @@ public static class Constants
         "System.AggregateException.Flatten()",
         "System.Array.IndexOf<T>(T[], T)",
         "System.Array.LastIndexOf<T>(T[], T)",
-        "double.PositiveInfinity.get",
         "System.FormattableString.Format.get",
         "System.FormattableString.Invariant(System.FormattableString)",
         "System.FormattableString.ToString(System.IFormatProvider)",

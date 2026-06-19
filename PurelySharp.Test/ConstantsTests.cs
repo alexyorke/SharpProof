@@ -643,6 +643,37 @@ public static class CancellationTokenCatalogSignatureSamples
         }
 
         [Test]
+        public void DoublePositiveInfinity_IsNotBackedByStaticPureCatalogs()
+        {
+            var source = @"
+using System;
+
+public static class FloatingPointCatalogSignatureSamples
+{
+    public static double Sample()
+    {
+        return double.PositiveInfinity;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "FloatingPointCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var memberAccess = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Single(node => node.ToString() == "double.PositiveInfinity");
+            var symbol = compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(memberAccess).Symbol;
+
+            Assert.That(symbol, Is.AssignableTo<IFieldSymbol>());
+            Assert.That(((IFieldSymbol)symbol!).IsConst, Is.True);
+            AssertNotInManualCatalogs(symbol.OriginalDefinition.ToDisplayString());
+            AssertNotInManualCatalogs("double.PositiveInfinity.get");
+        }
+
+        [Test]
         public void NullableComparisonHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"
