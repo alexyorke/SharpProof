@@ -188,6 +188,11 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
+                if (IsShadowedByDefinitelyThrowingFinally(throwNode))
+                {
+                    continue;
+                }
+
                 var exceptionType = GetThrownExceptionType(throwNode, semanticModel, cancellationToken);
                 if (IsCaughtWithinMethod(throwNode, exceptionType, methodNode, semanticModel, cancellationToken))
                 {
@@ -207,6 +212,11 @@ namespace PurelySharp.Analyzer
             foreach (var calleeCallSite in GetCalleeCallSites(methodNode, semanticModel, cancellationToken))
             {
                 if (IsInStaticallyUnreachableBranch(calleeCallSite.CallSite, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByDefinitelyThrowingFinally(calleeCallSite.CallSite))
                 {
                     continue;
                 }
@@ -235,6 +245,11 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
+                if (IsShadowedByDefinitelyThrowingFinally(divideByZeroNode))
+                {
+                    continue;
+                }
+
                 var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.DivideByZeroException");
                 if (IsCaughtWithinMethod(divideByZeroNode, exceptionType, methodNode, semanticModel, cancellationToken))
                 {
@@ -254,6 +269,11 @@ namespace PurelySharp.Analyzer
             foreach (var nullDereferenceNode in GetDefiniteNullDereferenceNodes(methodNode, semanticModel, cancellationToken))
             {
                 if (IsInStaticallyUnreachableBranch(nullDereferenceNode, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByDefinitelyThrowingFinally(nullDereferenceNode))
                 {
                     continue;
                 }
@@ -1051,6 +1071,36 @@ namespace PurelySharp.Analyzer
                 default:
                     return false;
             }
+        }
+
+        private static bool IsShadowedByDefinitelyThrowingFinally(SyntaxNode site)
+        {
+            foreach (var tryStatement in site.Ancestors().OfType<TryStatementSyntax>())
+            {
+                if (!tryStatement.Span.Contains(site.SpanStart))
+                {
+                    continue;
+                }
+
+                if (tryStatement.Finally == null ||
+                    !StatementDefinitelyExits(tryStatement.Finally.Block))
+                {
+                    continue;
+                }
+
+                if (tryStatement.Finally.Block.Span.Contains(site.SpanStart))
+                {
+                    continue;
+                }
+
+                if (tryStatement.Block.Span.Contains(site.SpanStart) ||
+                    tryStatement.Catches.Any(catchClause => catchClause.Block.Span.Contains(site.SpanStart)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsReferenceType(ITypeSymbol? typeSymbol)

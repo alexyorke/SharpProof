@@ -8845,6 +8845,66 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_FinallyThrow_ShadowsEarlierEscapingThrow()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        try
+        {
+            throw new InvalidOperationException();
+        }
+        finally
+        {
+            throw new ArgumentNullException();
+        }
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            var diagnostic = SingleDiagnostic(diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(), PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("'TestMethod'"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentNullException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.ArgumentNullException=direct_throw:throw"));
+        }
+
+        [Test]
+        public async Task Ps0011_FinallyThrow_ShadowsEarlierEscapingThrowSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        try
+        {
+            throw new InvalidOperationException();
+        }
+        finally
+        {
+            throw new ArgumentNullException();
+        }
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            var siteDiagnostics = diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToArray();
+
+            Assert.That(siteDiagnostics.Length, Is.EqualTo(1));
+            Assert.That(siteDiagnostics[0].GetMessage(), Does.Contain("throw new ArgumentNullException()"));
+            Assert.That(siteDiagnostics[0].Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentNullException"));
+            Assert.That(siteDiagnostics[0].Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
         public async Task Ps0010_DefaultReferenceMemberAccess_Caught_IsSuppressed()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
