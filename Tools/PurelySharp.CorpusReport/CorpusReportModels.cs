@@ -22,7 +22,7 @@ public sealed record CorpusReportSummary(
     ImmutableArray<RankedItem> CatalogMisses,
     ImmutableArray<RankedItem> FalsePositiveCandidates)
 {
-    public const string CurrentSchemaVersion = "1.3";
+    public const string CurrentSchemaVersion = "1.4";
 
     public string SchemaVersion { get; init; } = CurrentSchemaVersion;
 
@@ -64,4 +64,5 @@ public sealed record DiagnosticEvidenceItem(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExceptionSymbol,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExceptionTypes,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExceptionCategories,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExceptionSources);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExceptionSources,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExceptionEdges = null);

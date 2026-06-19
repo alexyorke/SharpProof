@@ -17,6 +17,7 @@ public static class SarifCorpusReport
     private const string ExceptionTypesProperty = "purelysharp.exceptions.types";
     private const string ExceptionCategoriesProperty = "purelysharp.exceptions.categories";
     private const string ExceptionSourcesProperty = "purelysharp.exceptions.sources";
+    private const string ExceptionEdgesProperty = "purelysharp.exceptions.edges";
 
     private static readonly ImmutableHashSet<string> CatalogMissCategories =
         ImmutableHashSet.Create(StringComparer.Ordinal, "unknown_external_call", "unsupported_operation");
@@ -163,6 +164,7 @@ public static class SarifCorpusReport
             var exceptionTypes = GetEvidenceProperty(properties, ExceptionTypesProperty);
             var exceptionCategories = GetEvidenceProperty(properties, ExceptionCategoriesProperty);
             var exceptionSources = GetEvidenceProperty(properties, ExceptionSourcesProperty);
+            var exceptionEdges = GetEvidenceProperty(properties, ExceptionEdgesProperty);
 
             _diagnostics.Add(new DiagnosticEvidenceItem(
                 inputName,
@@ -177,12 +179,19 @@ public static class SarifCorpusReport
                 exceptionSymbol,
                 exceptionTypes,
                 exceptionCategories,
-                exceptionSources));
+                exceptionSources,
+                exceptionEdges));
 
             if (ruleId == "PS0010" || ruleId == "PS0011")
             {
                 IncrementSeparatedValues(_exceptionCategories, exceptionCategories);
                 IncrementSeparatedValues(_exceptionSources, exceptionSources);
+
+                if (string.IsNullOrWhiteSpace(exceptionSources))
+                {
+                    IncrementExceptionEdgeSources(_exceptionSources, exceptionEdges);
+                }
+
                 return;
             }
 
@@ -268,6 +277,51 @@ public static class SarifCorpusReport
                 {
                     Increment(values, value);
                 }
+            }
+        }
+
+        private static void IncrementExceptionEdgeSources(Dictionary<string, int> values, string? exceptionEdges)
+        {
+            if (string.IsNullOrWhiteSpace(exceptionEdges))
+            {
+                return;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(exceptionEdges);
+                if (document.RootElement.ValueKind != JsonValueKind.Array)
+                {
+                    return;
+                }
+
+                var uniqueSources = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var edge in document.RootElement.EnumerateArray())
+                {
+                    if (edge.ValueKind != JsonValueKind.Object)
+                    {
+                        continue;
+                    }
+
+                    var exceptionType = GetStringProperty(edge, "ExceptionType");
+                    var category = GetStringProperty(edge, "Category");
+                    var sourcePath = GetStringProperty(edge, "SourcePath");
+                    if (!string.IsNullOrWhiteSpace(exceptionType) &&
+                        !string.IsNullOrWhiteSpace(category) &&
+                        !string.IsNullOrWhiteSpace(sourcePath))
+                    {
+                        uniqueSources.Add(exceptionType.Trim() + "=" + category.Trim() + ":" + sourcePath.Trim());
+                    }
+                }
+
+                foreach (var source in uniqueSources)
+                {
+                    Increment(values, source);
+                }
+            }
+            catch (JsonException)
+            {
+                // Ignore malformed additive edge payloads and preserve legacy aggregation behavior.
             }
         }
 

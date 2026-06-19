@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using NUnit.Framework;
@@ -372,6 +373,130 @@ public class KnownImpureConsoleCase
                     exceptionDiagnostics.Length > 0,
                     Is.EqualTo(expectation.ExpectPs0010),
                     expectation.Family + " PS0010 expectation mismatch");
+            }
+        }
+
+        [Test]
+        public async Task ExceptionCoverageFamily_DiagnosticSignatures_PreserveExceptionEdgesProperty_WhenPresent()
+        {
+            var generator = new FuzzCaseGenerator(20260614);
+            var registryEntry = FuzzCaseGenerator.RegistryEntries.Single(entry => entry.Id == "ExceptionInvokedLocalFunctionThrow");
+            var fuzzCase = generator.GenerateForRegistryEntry(registryEntry, 0);
+            var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
+            var exceptionDiagnostics = analysis.Diagnostics
+                .Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId)
+                .ToArray();
+            var exceptionDiagnostic = exceptionDiagnostics
+                .First(diagnostic =>
+                    diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.ExceptionTypesProperty) &&
+                    diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.ExceptionCategoriesProperty) &&
+                    diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.ExceptionSourcesProperty));
+
+            Assert.That(analysis.CompilationErrors, Is.Empty);
+            AssertRequiredProperties(
+                exceptionDiagnostics,
+                fuzzCase.Family,
+                PurelySharpDiagnostics.ExceptionTypesProperty,
+                PurelySharpDiagnostics.ExceptionCategoriesProperty,
+                PurelySharpDiagnostics.ExceptionSourcesProperty);
+
+            if (exceptionDiagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ExceptionEdgesProperty, out var edges))
+            {
+                Assert.That(string.IsNullOrWhiteSpace(edges), Is.False);
+                Assert.That(
+                    analysis.DiagnosticSignatures.Any(signature => signature.Contains(
+                        PurelySharpDiagnostics.ExceptionEdgesProperty + "=" + edges,
+                        StringComparison.Ordinal)),
+                    Is.True,
+                    "Diagnostic signature should preserve purelysharp.exceptions.edges when the analyzer emits it.");
+            }
+        }
+
+        [Test]
+        public async Task RunCasesAsync_SummaryReport_PreservesExceptionEdgesProperty_InUnexpectedPs0010Finding_WhenPresent()
+        {
+            var outputDirectory = CreateOutputDirectory();
+            try
+            {
+                const string source = """
+using System;
+using PurelySharp.Attributes;
+
+public class FuzzExceptionEdgesReportCase
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        throw new InvalidOperationException("boom");
+    }
+}
+""";
+
+                var fuzzCase = new FuzzCase(
+                    "FuzzExceptionEdgesReportCase",
+                    "FuzzExceptionEdgesReportCase",
+                    source,
+                    AllowUnsafe: false,
+                    new FuzzExpectation(
+                        Ps0002ExpectationKind.MayEmitConservatively,
+                        Ps0010ExpectationKind.MustNotEmit,
+                        ImmutableArray.Create(
+                            PurelySharpDiagnostics.ImpurityCategoryProperty,
+                            PurelySharpDiagnostics.ImpurityRuleProperty,
+                            PurelySharpDiagnostics.ImpurityOperationKindProperty),
+                        ImmutableArray.Create(
+                            PurelySharpDiagnostics.ExceptionTypesProperty,
+                            PurelySharpDiagnostics.ExceptionCategoriesProperty,
+                            PurelySharpDiagnostics.ExceptionSourcesProperty)));
+
+                var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
+                var exceptionDiagnostic = analysis.Diagnostics.Single(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId);
+                var summary = await FuzzRunner.RunCasesAsync(
+                    ImmutableArray.Create(fuzzCase),
+                    new FuzzOptions
+                    {
+                        OutputDirectory = outputDirectory,
+                        MaxInterestingCases = 4,
+                        MaxInterestingCasesPerFamily = 4,
+                        CheckpointEvery = 1,
+                        Parallelism = 4,
+                        Quiet = true
+                    });
+
+                Assert.That(analysis.CompilationErrors, Is.Empty);
+                AssertRequiredProperties(
+                    new[] { exceptionDiagnostic },
+                    fuzzCase.Family,
+                    PurelySharpDiagnostics.ExceptionTypesProperty,
+                    PurelySharpDiagnostics.ExceptionCategoriesProperty,
+                    PurelySharpDiagnostics.ExceptionSourcesProperty);
+                Assert.That(summary.FindingCount, Is.GreaterThan(0));
+
+                var summaryPath = Path.Combine(outputDirectory, "summary.json");
+                Assert.That(File.Exists(summaryPath), Is.True);
+
+                var summaryJson = await File.ReadAllTextAsync(summaryPath);
+                var persistedSummary = JsonSerializer.Deserialize<FuzzRunSummary>(summaryJson);
+                Assert.That(persistedSummary, Is.Not.Null);
+
+                var unexpectedPs0010Finding = persistedSummary!.Findings.Single(finding => finding.Category == "unexpected_ps0010");
+                var expectedSignature = analysis.DiagnosticSignatures.Single(signature => signature.Contains("PS0010", StringComparison.Ordinal));
+                Assert.That(unexpectedPs0010Finding.Details, Does.Contain(expectedSignature));
+
+                if (exceptionDiagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ExceptionEdgesProperty, out var edges))
+                {
+                    Assert.That(string.IsNullOrWhiteSpace(edges), Is.False);
+                    Assert.That(
+                        unexpectedPs0010Finding.Details.Any(detail => detail.Contains(
+                            PurelySharpDiagnostics.ExceptionEdgesProperty + "=" + edges,
+                            StringComparison.Ordinal)),
+                        Is.True,
+                        "summary.json findings should preserve purelysharp.exceptions.edges when the analyzer emits it.");
+                }
+            }
+            finally
+            {
+                DeleteOutputDirectory(outputDirectory);
             }
         }
 

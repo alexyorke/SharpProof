@@ -129,6 +129,66 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void CreateFromSarifJson_PreservesExceptionEdges_WithoutChangingLegacyExceptionFields()
+        {
+            const string summaryEdges = """
+[{"ExceptionType":"System.ArgumentNullException","Category":"effect_summary","SourcePath":"System.ArgumentNullException.ThrowIfNull(object, string)","CalleeExactSymbolKey":"System.ArgumentNullException.ThrowIfNull(System.Object,System.String)","Depth":0}]
+""";
+            const string siteEdges = """
+[{"ExceptionType":"System.InvalidOperationException","Category":"source_callee","SourcePath":"VoucherService.LoadAcceptedDocument(Voucher) -> VoucherService.RequireAcceptedDocument(Voucher) -> Voucher.get_AcceptedDocument() -> direct_throw:throw","CalleeExactSymbolKey":"Voucher.get_AcceptedDocument()","Depth":2}]
+""";
+
+            var report = SarifCorpusReport.CreateFromSarifJson("sample.sarif", $$"""
+{
+  "version": "2.1.0",
+  "runs": [
+    {
+      "results": [
+        {
+          "ruleId": "PS0010",
+          "message": { "text": "Method 'TestMethod' can throw: System.ArgumentNullException" },
+          "properties": {
+            "purelysharp.exceptions.types": "System.ArgumentNullException",
+            "purelysharp.exceptions.categories": "effect_summary",
+            "purelysharp.exceptions.sources": "System.ArgumentNullException=effect_summary:System.ArgumentNullException.ThrowIfNull(object, string)",
+            "purelysharp.exceptions.edges": {{JsonSerializer.Serialize(summaryEdges)}}
+          }
+        },
+        {
+          "ruleId": "PS0011",
+          "message": { "text": "Operation 'LoadAcceptedDocument(voucher)' may throw uncaught exceptions: System.InvalidOperationException" },
+          "properties": {
+            "purelysharp.exceptions.symbol": "VoucherService.LoadAcceptedDocument(Voucher)",
+            "purelysharp.exceptions.types": "System.InvalidOperationException",
+            "purelysharp.exceptions.categories": "source_callee",
+            "purelysharp.exceptions.sources": "System.InvalidOperationException=source_callee:VoucherService.LoadAcceptedDocument(Voucher) -> VoucherService.RequireAcceptedDocument(Voucher) -> Voucher.get_AcceptedDocument() -> direct_throw:throw",
+            "purelysharp.exceptions.edges": {{JsonSerializer.Serialize(siteEdges)}}
+          }
+        }
+      ]
+    }
+  ]
+}
+""");
+
+            Assert.That(report.Ps0010Count, Is.EqualTo(1));
+            Assert.That(report.Ps0011Count, Is.EqualTo(1));
+            Assert.That(report.ExceptionCategories["effect_summary"], Is.EqualTo(1));
+            Assert.That(report.ExceptionCategories["source_callee"], Is.EqualTo(1));
+            Assert.That(report.ExceptionSources, Does.Contain(new RankedItem("System.ArgumentNullException=effect_summary:System.ArgumentNullException.ThrowIfNull(object, string)", 1)));
+            Assert.That(report.ExceptionSources, Does.Contain(new RankedItem("System.InvalidOperationException=source_callee:VoucherService.LoadAcceptedDocument(Voucher) -> VoucherService.RequireAcceptedDocument(Voucher) -> Voucher.get_AcceptedDocument() -> direct_throw:throw", 1)));
+            Assert.That(report.Diagnostics[0].ExceptionTypes, Is.EqualTo("System.ArgumentNullException"));
+            Assert.That(report.Diagnostics[0].ExceptionCategories, Is.EqualTo("effect_summary"));
+            Assert.That(report.Diagnostics[0].ExceptionSources, Is.EqualTo("System.ArgumentNullException=effect_summary:System.ArgumentNullException.ThrowIfNull(object, string)"));
+            Assert.That(report.Diagnostics[0].ExceptionEdges, Is.EqualTo(summaryEdges));
+            Assert.That(report.Diagnostics[1].ExceptionSymbol, Is.EqualTo("VoucherService.LoadAcceptedDocument(Voucher)"));
+            Assert.That(report.Diagnostics[1].ExceptionTypes, Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(report.Diagnostics[1].ExceptionCategories, Is.EqualTo("source_callee"));
+            Assert.That(report.Diagnostics[1].ExceptionSources, Is.EqualTo("System.InvalidOperationException=source_callee:VoucherService.LoadAcceptedDocument(Voucher) -> VoucherService.RequireAcceptedDocument(Voucher) -> Voucher.get_AcceptedDocument() -> direct_throw:throw"));
+            Assert.That(report.Diagnostics[1].ExceptionEdges, Is.EqualTo(siteEdges));
+        }
+
+        [Test]
         public void CreateFromNamedSarifFiles_UsesStableInputNameForReportRows()
         {
             var sarifPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, Guid.NewGuid() + ".sarif");
