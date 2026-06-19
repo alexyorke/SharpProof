@@ -2775,6 +2775,152 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ProcessGetCurrentProcess_UsesGeneratedPuritySummarySource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Diagnostics;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Process TestMethod()
+    {
+        return Process.GetCurrentProcess();
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.Process.GetCurrentProcess"));
+        }
+
+        [Test]
+        public async Task GeneratedPurityCatalog_Resolves_ProcessMembersAsImpureEvidence()
+        {
+            const string source = @"
+using System.Diagnostics;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Process Current()
+    {
+        return Process.GetCurrentProcess();
+    }
+
+    [EnforcePure]
+    public int Id(Process process)
+    {
+        return process.Id;
+    }
+
+    [EnforcePure]
+    public ProcessStartInfo StartInfo(Process process)
+    {
+        return process.StartInfo;
+    }
+
+    [EnforcePure]
+    public int ExitCode(Process process)
+    {
+        return process.ExitCode;
+    }
+
+    [EnforcePure]
+    public Process Start()
+    {
+        return Process.Start(""tool"");
+    }
+
+    [EnforcePure]
+    public Process[] ByName()
+    {
+        return Process.GetProcessesByName(""dotnet"");
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics
+                .Where(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMembers = new (string Label, ISymbol Symbol)[]
+            {
+                (
+                    "System.Diagnostics.Process.GetCurrentProcess()",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "Process.GetCurrentProcess()"))
+                        .Symbol!),
+                (
+                    "System.Diagnostics.Process.get_Id()",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "process.Id"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Diagnostics.Process.get_StartInfo()",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "process.StartInfo"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Diagnostics.Process.get_ExitCode()",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "process.ExitCode"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Diagnostics.Process.Start(string)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "Process.Start(\"tool\")"))
+                        .Symbol!),
+                (
+                    "System.Diagnostics.Process.GetProcessesByName(string)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "Process.GetProcessesByName(\"dotnet\")"))
+                        .Symbol!),
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = trackedMembers.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(6));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "generated_purity_summary" }));
+            foreach (var label in classifications.Keys)
+            {
+                Assert.That(classifications[label].matched, Is.True,
+                    "Generated purity catalog should resolve " + label + ".");
+                Assert.That(classifications[label].classification, Is.EqualTo("impure"),
+                    "Generated purity catalog should classify " + label + " as impure.");
+            }
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_EnvironmentSystemDirectoryAsImpureEvidence()
         {
             const string source = @"

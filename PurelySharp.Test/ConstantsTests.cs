@@ -180,6 +180,25 @@ public static class EnvironmentCatalogSignatureSamples
         }
 
         [Test]
+        public void ProcessHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Diagnostics.Process.GetCurrentProcess()",
+                "System.Diagnostics.Process.Id.get",
+                "System.Diagnostics.Process.StartInfo.get",
+                "System.Diagnostics.Process.Start(string)",
+                "System.Diagnostics.Process.GetProcessesByName(string)",
+                "System.Diagnostics.Process.ExitCode.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void CultureAndRegionAmbientStateHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             var members = new[]

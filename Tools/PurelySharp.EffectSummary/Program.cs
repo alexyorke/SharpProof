@@ -70,9 +70,11 @@ internal static class EffectSummaryCli
         GeneratedPurityCatalogDocument? generatedPurityCatalog = null;
         if (options.IncludePurityClassification || options.CompareManualCatalogs)
         {
+            var externalGeneratedPurityEntries = ReviewedSummaryCatalogLoader.Load();
             var classificationOutput = PurityClassificationEngine.Classify(
                 reports,
-                includeCatalogComparison: options.CompareManualCatalogs);
+                includeCatalogComparison: options.CompareManualCatalogs,
+                externalGeneratedPurityEntries: externalGeneratedPurityEntries);
             reports = classificationOutput.Assemblies;
             purityClassificationReport = classificationOutput.Report;
             generatedPurityCatalog = classificationOutput.GeneratedPurityCatalog;
@@ -436,6 +438,160 @@ internal static class ArtifactSpecSymbolSource
 internal sealed record ArtifactSpecSymbolSet(
     string[] Symbols,
     string[] ExactSymbolKeys);
+
+internal static class ReviewedSummaryCatalogLoader
+{
+    public static IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> Load()
+    {
+        var summaryDirectory = TryFindAnalyzerSummaryDirectory();
+        if (summaryDirectory == null)
+        {
+            return new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
+        }
+
+        var entriesByKey = new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
+        foreach (var path in Directory.EnumerateFiles(summaryDirectory, "*.PurelySharp.EffectSummary.json", SearchOption.TopDirectoryOnly)
+                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            if (!document.RootElement.TryGetProperty("GeneratedPurityCatalog", out var generatedPurityCatalog) ||
+                generatedPurityCatalog.ValueKind != JsonValueKind.Object ||
+                !generatedPurityCatalog.TryGetProperty("Entries", out var entriesElement) ||
+                entriesElement.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            foreach (var entryElement in entriesElement.EnumerateArray())
+            {
+                var entry = TryParseEntry(entryElement);
+                if (entry == null || string.IsNullOrWhiteSpace(entry.ExactSymbolKey))
+                {
+                    continue;
+                }
+
+                if (!entriesByKey.TryGetValue(entry.ExactSymbolKey, out var existing) ||
+                    GetClassificationStrength(entry.Classification) > GetClassificationStrength(existing.Classification))
+                {
+                    entriesByKey[entry.ExactSymbolKey] = entry;
+                }
+            }
+        }
+
+        return entriesByKey;
+    }
+
+    private static string? TryFindAnalyzerSummaryDirectory()
+    {
+        var current = new DirectoryInfo(Directory.GetCurrentDirectory());
+        while (current != null)
+        {
+            var candidate = Path.Combine(current.FullName, "PurelySharp.Analyzer");
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            current = current.Parent;
+        }
+
+        return null;
+    }
+
+    private static GeneratedPurityCatalogEntry? TryParseEntry(JsonElement entryElement)
+    {
+        var symbol = GetTrimmedStringProperty(entryElement, "Symbol");
+        var exactSymbolKey = GetTrimmedStringProperty(entryElement, "ExactSymbolKey");
+        var cacheKey = GetTrimmedStringProperty(entryElement, "CacheKey");
+        var assemblyName = GetTrimmedStringProperty(entryElement, "AssemblyName");
+        var assemblyPath = GetTrimmedStringProperty(entryElement, "AssemblyPath");
+        var assemblySha256 = GetTrimmedStringProperty(entryElement, "AssemblySha256");
+        var moduleVersionId = GetTrimmedStringProperty(entryElement, "ModuleVersionId");
+        var metadataToken = GetTrimmedStringProperty(entryElement, "MetadataToken");
+        var classification = GetTrimmedStringProperty(entryElement, "Classification");
+        var primaryCategory = GetTrimmedStringProperty(entryElement, "PrimaryCategory");
+        var freshnessClassification = GetTrimmedStringProperty(entryElement, "FreshnessClassification");
+        var effectVisibilityClassification = GetTrimmedStringProperty(entryElement, "EffectVisibilityClassification");
+        if (string.IsNullOrWhiteSpace(symbol) ||
+            string.IsNullOrWhiteSpace(exactSymbolKey) ||
+            string.IsNullOrWhiteSpace(cacheKey) ||
+            string.IsNullOrWhiteSpace(assemblyName) ||
+            string.IsNullOrWhiteSpace(assemblyPath) ||
+            string.IsNullOrWhiteSpace(assemblySha256) ||
+            string.IsNullOrWhiteSpace(moduleVersionId) ||
+            string.IsNullOrWhiteSpace(metadataToken) ||
+            string.IsNullOrWhiteSpace(classification) ||
+            string.IsNullOrWhiteSpace(primaryCategory) ||
+            string.IsNullOrWhiteSpace(freshnessClassification) ||
+            string.IsNullOrWhiteSpace(effectVisibilityClassification))
+        {
+            return null;
+        }
+
+        return new GeneratedPurityCatalogEntry(
+            Symbol: symbol,
+            ExactSymbolKey: exactSymbolKey,
+            CacheKey: cacheKey,
+            AssemblyName: assemblyName,
+            AssemblyPath: assemblyPath,
+            AssemblySha256: assemblySha256,
+            ModuleVersionId: moduleVersionId,
+            MetadataToken: metadataToken,
+            MethodBodySha256: GetTrimmedStringProperty(entryElement, "MethodBodySha256"),
+            Classification: classification,
+            PrimaryCategory: primaryCategory,
+            Categories: ReadStringArray(entryElement, "Categories"),
+            FirstBlockingCallChain: ReadStringArray(entryElement, "FirstBlockingCallChain"),
+            HasFreshArrayAllocationEvidence: ReadBoolean(entryElement, "HasFreshArrayAllocationEvidence"),
+            HasFreshObjectAllocationEvidence: ReadBoolean(entryElement, "HasFreshObjectAllocationEvidence"),
+            HasUnsupportedEffects: ReadBoolean(entryElement, "HasUnsupportedEffects"),
+            FreshnessClassification: freshnessClassification,
+            EffectVisibilityClassification: effectVisibilityClassification);
+    }
+
+    private static string[] ReadStringArray(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var valuesElement) ||
+            valuesElement.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<string>();
+        }
+
+        return valuesElement.EnumerateArray()
+            .Where(value => value.ValueKind == JsonValueKind.String)
+            .Select(value => value.GetString())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .ToArray();
+    }
+
+    private static bool ReadBoolean(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var propertyElement) &&
+            propertyElement.ValueKind == JsonValueKind.True;
+    }
+
+    private static string? GetTrimmedStringProperty(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        return property.GetString()?.Trim();
+    }
+
+    private static int GetClassificationStrength(string classification)
+    {
+        return classification switch
+        {
+            "impure" => 3,
+            "conservative_unknown" => 2,
+            "pure" => 1,
+            _ => 0,
+        };
+    }
+}
 
 internal static class RuntimeAssemblyResolver
 {

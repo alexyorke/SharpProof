@@ -4699,6 +4699,64 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeProcessSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Diagnostics.Process.dll",
+                200,
+                2,
+                "System.Diagnostics.Process.GetCurrentProcess",
+                "System.Diagnostics.Process.get_Id",
+                "System.Diagnostics.Process.get_StartInfo",
+                "System.Diagnostics.Process.Start",
+                "System.Diagnostics.Process.GetProcessesByName",
+                "System.Diagnostics.Process.get_ExitCode");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Diagnostics.Process.GetCurrentProcess()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Process.GetCurrentProcess()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Process.get_Id()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Process.get_Id()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Process.get_StartInfo()", "impure", "object_state_write", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Process.get_StartInfo()", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Process.Start(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Process.Start(string)", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Process.GetProcessesByName(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Process.GetProcessesByName(string)", "caller_visible");
+            AssertPurityClassification(summary, "System.Diagnostics.Process.get_ExitCode()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Process.get_ExitCode()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Diagnostics.Process.GetCurrentProcess()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Diagnostics.Process.get_Id()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Diagnostics.Process.get_StartInfo()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Diagnostics.Process.Start(string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Diagnostics.Process.GetProcessesByName(string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Diagnostics.Process.get_ExitCode()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Diagnostics.Process.GetCurrentProcess()",
+                "System.Diagnostics.Process.GetProcessesByName(string)",
+                "System.Diagnostics.Process.Start(string)",
+                "System.Diagnostics.Process.get_ExitCode()",
+                "System.Diagnostics.Process.get_Id()",
+                "System.Diagnostics.Process.get_StartInfo()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeEnvironmentCommandLineAndVersionSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

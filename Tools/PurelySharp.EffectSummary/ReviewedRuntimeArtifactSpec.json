@@ -375,6 +375,21 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Process.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Process.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Diagnostics.Process.dll",
+      "Limit": 200,
+      "MaxDepth": 2,
+      "SymbolPrefixes": [
+        "System.Diagnostics.Process.GetCurrentProcess",
+        "System.Diagnostics.Process.get_Id",
+        "System.Diagnostics.Process.get_StartInfo",
+        "System.Diagnostics.Process.Start",
+        "System.Diagnostics.Process.GetProcessesByName",
+        "System.Diagnostics.Process.get_ExitCode"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/DateTimeOffset.Additional.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/DateTimeOffset.Additional.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [
