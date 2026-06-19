@@ -171,6 +171,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Environment.VariableMutation.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Environment.VariableMutation.PurelySharp.EffectSummary.json",
+      "Limit": 120,
+      "MaxDepth": 2,
+      "SymbolPrefixes": [
+        "System.Environment.SetEnvironmentVariable"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Directory.CurrentDirectory.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Environment.PurelySharp.EffectSummary.json",
       "Limit": 80,

@@ -215,8 +215,6 @@ public static class Constants
         "System.Environment.CurrentManagedThreadId.get",
         "System.Environment.ExitCode.get",
         "System.Environment.Exit(int)",
-        "System.Environment.SetEnvironmentVariable(string, string)",
-        "System.Environment.SetEnvironmentVariable(string, string, System.EnvironmentVariableTarget)",
         "System.Environment.TickCount.get",
         "System.Environment.TickCount64.get",
         "System.GC.Collect()",

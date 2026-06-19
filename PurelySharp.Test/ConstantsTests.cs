@@ -180,6 +180,21 @@ public static class EnvironmentCatalogSignatureSamples
         }
 
         [Test]
+        public void EnvironmentVariableMutationHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Environment.SetEnvironmentVariable(string, string)",
+                "System.Environment.SetEnvironmentVariable(string, string, System.EnvironmentVariableTarget)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void ProcessHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             var members = new[]
