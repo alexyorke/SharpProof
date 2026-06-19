@@ -498,8 +498,7 @@ internal static class PurityClassificationEngine
                 EffectVisibilityClassification: effectVisibilityClassification);
         }
 
-        if (string.Equals(result.Classification, "conservative_unknown", StringComparison.Ordinal) &&
-            TryResolveReviewedSameBodyClassification(
+        if (TryResolveReviewedImplementationClassification(
                 assembly,
                 symbol,
                 summary,
@@ -586,9 +585,7 @@ internal static class PurityClassificationEngine
     {
         return symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
             symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Runtime.CompilerServices.Unsafe.SizeOf()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Object.GetType()", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Reflection.MemberInfo.get_Name()", StringComparison.Ordinal);
+            string.Equals(symbol, "System.Runtime.CompilerServices.Unsafe.SizeOf()", StringComparison.Ordinal);
     }
 
     private static bool HasOnlyDeterministicStringComparisonDispatch(MethodEffectSummary summary)
@@ -1768,7 +1765,7 @@ internal static class PurityClassificationEngine
         return false;
     }
 
-    private static bool TryResolveReviewedSameBodyClassification(
+    private static bool TryResolveReviewedImplementationClassification(
         AssemblyEffectReport assembly,
         string symbol,
         MethodEffectSummary summary,
@@ -1777,7 +1774,7 @@ internal static class PurityClassificationEngine
     {
         classification = default!;
         if (!TryGetExternalEntry(symbol, externalGeneratedPurityEntries, out _, out var entry) ||
-            !IsSameReviewedMethodBody(assembly, summary, entry))
+            !IsSameReviewedMethodImplementation(assembly, summary, entry))
         {
             return false;
         }
@@ -1811,18 +1808,32 @@ internal static class PurityClassificationEngine
         return false;
     }
 
-    private static bool IsSameReviewedMethodBody(
+    private static bool IsSameReviewedMethodImplementation(
         AssemblyEffectReport assembly,
         MethodEffectSummary summary,
         GeneratedPurityCatalogEntry entry)
     {
-        return !string.IsNullOrWhiteSpace(summary.MethodBodySha256) &&
-            !string.IsNullOrWhiteSpace(entry.MethodBodySha256) &&
-            string.Equals(assembly.AssemblyName, entry.AssemblyName, StringComparison.Ordinal) &&
-            string.Equals(assembly.AssemblySha256, entry.AssemblySha256, StringComparison.Ordinal) &&
-            string.Equals(assembly.ModuleVersionId, entry.ModuleVersionId, StringComparison.Ordinal) &&
-            string.Equals(summary.MetadataToken, entry.MetadataToken, StringComparison.Ordinal) &&
-            string.Equals(summary.MethodBodySha256, entry.MethodBodySha256, StringComparison.Ordinal);
+        if (!string.Equals(assembly.AssemblyName, entry.AssemblyName, StringComparison.Ordinal) ||
+            !string.Equals(assembly.AssemblySha256, entry.AssemblySha256, StringComparison.Ordinal) ||
+            !string.Equals(assembly.ModuleVersionId, entry.ModuleVersionId, StringComparison.Ordinal) ||
+            !string.Equals(summary.MetadataToken, entry.MetadataToken, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var summaryBodyHash = string.IsNullOrWhiteSpace(summary.MethodBodySha256)
+            ? null
+            : summary.MethodBodySha256;
+        var entryBodyHash = string.IsNullOrWhiteSpace(entry.MethodBodySha256)
+            ? null
+            : entry.MethodBodySha256;
+
+        if (summaryBodyHash == null || entryBodyHash == null)
+        {
+            return summaryBodyHash == null && entryBodyHash == null;
+        }
+
+        return string.Equals(summaryBodyHash, entryBodyHash, StringComparison.Ordinal);
     }
 
     private static MethodPurityClassification CreateClassification(GeneratedPurityCatalogEntry entry)
