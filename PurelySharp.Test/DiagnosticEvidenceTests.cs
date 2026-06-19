@@ -2560,6 +2560,128 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_DateTimeAndDateTimeOffsetAmbientStateAsImpureEvidence()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public object Today()
+    {
+        return DateTime.Today;
+    }
+
+    [EnforcePure]
+    public object Now()
+    {
+        return DateTime.Now;
+    }
+
+    [EnforcePure]
+    public object UtcNow()
+    {
+        return DateTime.UtcNow;
+    }
+
+    [EnforcePure]
+    public object OffsetNow()
+    {
+        return DateTimeOffset.Now;
+    }
+
+    [EnforcePure]
+    public object OffsetUtcNow()
+    {
+        return DateTimeOffset.UtcNow;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics
+                .Where(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedGetters = new (string Label, IMethodSymbol Symbol)[]
+            {
+                (
+                    "System.DateTime.Today.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "DateTime.Today"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.DateTime.Now.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "DateTime.Now"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.DateTime.UtcNow.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "DateTime.UtcNow"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.DateTimeOffset.Now.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "DateTimeOffset.Now"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.DateTimeOffset.UtcNow.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "DateTimeOffset.UtcNow"))
+                        .Symbol!).GetMethod!),
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = trackedGetters.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(5));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "generated_purity_summary" }));
+            foreach (var label in classifications.Keys)
+            {
+                Assert.That(classifications[label].matched, Is.True,
+                    "Generated purity catalog should resolve " + label + ".");
+                Assert.That(classifications[label].classification, Is.EqualTo("impure"),
+                    "Generated purity catalog should classify " + label + " as impure.");
+            }
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_StringBuilderLengthAndHttpResponseSuccessStatusCode()
         {
             const string source = @"

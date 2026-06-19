@@ -2145,6 +2145,59 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeDateTimeAmbientStateSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                120,
+                2,
+                "System.DateTime.get_Now",
+                "System.DateTime.get_Today",
+                "System.DateTime.get_UtcNow",
+                "System.DateTimeOffset.get_Now",
+                "System.DateTimeOffset.get_UtcNow");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.DateTime.get_Now()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.DateTime.get_Now()", "caller_visible");
+            AssertPurityClassification(summary, "System.DateTime.get_Today()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.DateTime.get_Today()", "caller_visible");
+            AssertPurityClassification(summary, "System.DateTime.get_UtcNow()", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.DateTime.get_UtcNow()", "caller_visible");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_Now()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.DateTimeOffset.get_Now()", "caller_visible");
+            AssertPurityClassification(summary, "System.DateTimeOffset.get_UtcNow()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.DateTimeOffset.get_UtcNow()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.DateTime.get_Now()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.DateTime.get_Today()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.DateTime.get_UtcNow()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.DateTimeOffset.get_Now()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.DateTimeOffset.get_UtcNow()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.DateTime.get_Now()",
+                "System.DateTime.get_Today()",
+                "System.DateTime.get_UtcNow()",
+                "System.DateTimeOffset.get_Now()",
+                "System.DateTimeOffset.get_UtcNow()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeDateTimeOffsetStablePureSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(

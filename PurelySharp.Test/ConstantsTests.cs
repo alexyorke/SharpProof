@@ -199,6 +199,24 @@ public static class EnvironmentCatalogSignatureSamples
         }
 
         [Test]
+        public void DateTimeAndDateTimeOffsetAmbientStateHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.DateTime.Now.get",
+                "System.DateTime.Today.get",
+                "System.DateTime.UtcNow.get",
+                "System.DateTimeOffset.Now.get",
+                "System.DateTimeOffset.UtcNow.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void AbstractDispatchFallbacks_AreNotBackedByManualImpureCatalogEntries()
         {
             AssertNotInManualCatalogs("object.ToString()");
@@ -2587,7 +2605,6 @@ public static class CatalogSignatureSamples
         object leftObject = new object();
         object rightObject = new object();
         list.Add(1);
-        var now = DateTime.Now;
         _ = IPAddress.Loopback;
         _ = names.Contains(""alpha"");
         _ = new FileNotFoundException(""missing.txt"");
@@ -2624,7 +2641,7 @@ public static class CatalogSignatureSamples
         _ = new UIntPtr(1u);
         _ = new CallerArgumentExpressionAttribute(""value"");
         _ = new MethodImplAttribute(MethodImplOptions.AggressiveInlining);
-        return Array.Empty<int>().Length + list.Count + now.Day;
+        return Array.Empty<int>().Length + list.Count + values.Length;
     }
 }";
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
@@ -2636,9 +2653,6 @@ public static class CatalogSignatureSamples
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "list.Add(1)"), Is.EqualTo("System.Collections.Generic.List<T>.Add(T)"));
             Assert.That(Constants.KnownImpureMethods, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "list.Add(1)")));
-
-            Assert.That(GetPropertySignature(compilation, syntaxTree, "DateTime.Now"), Is.EqualTo("System.DateTime.Now.get"));
-            Assert.That(Constants.KnownImpureMethods, Does.Contain(GetPropertySignature(compilation, syntaxTree, "DateTime.Now")));
 
             Assert.That(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback"), Is.EqualTo("System.Net.IPAddress.Loopback.get"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback")));
@@ -2738,7 +2752,6 @@ public static class CatalogConflictSamples
         list.Add(1);
         _ = list.Count;
         _ = Array.Empty<int>();
-        _ = DateTime.Now;
         _ = IPAddress.Loopback;
     }
 }";
@@ -2750,7 +2763,6 @@ public static class CatalogConflictSamples
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "list.Add(1)"), expectedPure: false, expectedImpure: true);
-            AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "DateTime.Now"), expectedPure: false, expectedImpure: true);
             AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback"), expectedPure: false, expectedImpure: false);
             AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "list.Count"), expectedPure: false, expectedImpure: false);
         }
