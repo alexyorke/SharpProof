@@ -339,6 +339,55 @@ public static class GenericArrayIndexLookupCatalogSignatureSamples
         }
 
         [Test]
+        public void AggregateExceptionHelpers_AreNotBackedByStaticPureCatalogs()
+        {
+            var source = @"
+using System;
+using System.Collections.Generic;
+
+public static class AggregateExceptionCatalogSignatureSamples
+{
+    public static AggregateException Sample(IEnumerable<Exception> values, AggregateException aggregate)
+    {
+        _ = new AggregateException(values);
+        return aggregate.Flatten();
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "AggregateExceptionCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new AggregateException(values)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "aggregate.Flatten()"));
+        }
+
+        [Test]
+        public void DeadEnumerablePrefixPlaceholders_AreNotPresentInManualPureCatalogs()
+        {
+            var deadRows = new[]
+            {
+                "System.Linq.Enumerable.Aggregate",
+                "System.Linq.Enumerable.GroupBy",
+                "System.Linq.Enumerable.OrderBy",
+                "System.Linq.Enumerable.Sum",
+                "System.Linq.Enumerable.Average",
+                "System.Linq.Enumerable.Max",
+                "System.Linq.Enumerable.Min",
+                "System.Linq.Enumerable.OrderByDescending",
+                "System.Linq.Enumerable.ThenBy",
+                "System.Linq.Enumerable.Zip",
+            };
+
+            foreach (var deadRow in deadRows)
+            {
+                Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(deadRow));
+            }
+        }
+
+        [Test]
         public void ArrayGetLength_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             var source = @"

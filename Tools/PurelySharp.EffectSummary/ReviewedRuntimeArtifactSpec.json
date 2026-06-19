@@ -41,6 +41,14 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/AggregateException.PurelySharp.EffectSummary.json",
+      "Limit": 120,
+      "SymbolPrefixes": [
+        "System.AggregateException..ctor(System.Collections.Generic.IEnumerable",
+        "System.AggregateException.Flatten"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Contract.PurelySharp.EffectSummary.json",
       "Limit": 40,
       "SymbolPrefixes": [

@@ -4829,6 +4829,48 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeAggregateExceptionSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                120,
+                "System.AggregateException..ctor(System.Collections.Generic.IEnumerable",
+                "System.AggregateException.Flatten");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(
+                summary,
+                "System.AggregateException..ctor(System.Collections.Generic.IEnumerable`1<System.Exception>)",
+                "impure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.AggregateException..ctor(System.Collections.Generic.IEnumerable`1<System.Exception>)",
+                "caller_visible");
+            AssertPurityClassification(
+                summary,
+                "System.AggregateException.Flatten()",
+                "impure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.AggregateException.Flatten()",
+                "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.AggregateException..ctor(System.Collections.Generic.IEnumerable`1<System.Exception>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.AggregateException.Flatten()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimePureConstructorsSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(

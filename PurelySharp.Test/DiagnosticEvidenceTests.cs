@@ -755,6 +755,85 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_AggregateExceptionMembersAsImpureEvidence()
+        {
+            const string source = @"
+using System;
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public AggregateException Create(IEnumerable<Exception> values)
+    {
+        return new AggregateException(values);
+    }
+
+    [EnforcePure]
+    public AggregateException Flatten(AggregateException value)
+    {
+        return value.Flatten();
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .Where(node =>
+                    node is ObjectCreationExpressionSyntax objectCreation &&
+                    objectCreation.ToString() == "new AggregateException(values)" ||
+                    node is InvocationExpressionSyntax invocation &&
+                    invocation.ToString() == "value.Flatten()")
+                .Select(node => node switch
+                {
+                    ObjectCreationExpressionSyntax objectCreation => semanticModel.GetSymbolInfo(objectCreation).Symbol as IMethodSymbol,
+                    InvocationExpressionSyntax invocation => semanticModel.GetSymbolInfo(invocation).Symbol as IMethodSymbol,
+                    _ => null,
+                })
+                .Where(method => method is not null)
+                .Select(method => method!)
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = trackedMethods
+                .ToDictionary(
+                    method => method.ToDisplayString(),
+                    method =>
+                    {
+                        var args = new object?[] { method.OriginalDefinition, compilation, null };
+                        var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                        var purityEntry = args[2]!;
+                        var classification = matched
+                            ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                            : string.Empty;
+                        return (matched, classification);
+                    });
+
+            Assert.That(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId).Select(candidate => candidate.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "generated_purity_summary" }),
+                "AggregateException constructor and Flatten should now diagnose via reviewed generated runtime evidence.");
+            Assert.That(classifications["System.AggregateException.AggregateException(System.Collections.Generic.IEnumerable<System.Exception>)"].matched, Is.True,
+                "Generated purity catalog should resolve AggregateException(IEnumerable<Exception>).");
+            Assert.That(classifications["System.AggregateException.AggregateException(System.Collections.Generic.IEnumerable<System.Exception>)"].classification, Is.EqualTo("impure"),
+                "AggregateException(IEnumerable<Exception>) should classify impure from reviewed runtime evidence.");
+            Assert.That(classifications["System.AggregateException.Flatten()"].matched, Is.True,
+                "Generated purity catalog should resolve AggregateException.Flatten().");
+            Assert.That(classifications["System.AggregateException.Flatten()"].classification, Is.EqualTo("impure"),
+                "AggregateException.Flatten() should classify impure from reviewed runtime evidence.");
+        }
+
+        [Test]
         public void GeneratedPurityCatalog_Resolves_NullableComparisonAsConservativeUnknown()
         {
             const string source = @"
