@@ -4499,13 +4499,26 @@ public readonly struct ConversionFixture
                 .GetProperty("Entries")
                 .EnumerateArray()
                 .Select(entry => entry.GetProperty("Symbol").GetString())
-                .Where(symbol =>
-                    string.Equals(symbol, "System.IO.Directory.GetCurrentDirectory()", StringComparison.Ordinal) ||
-                    string.Equals(symbol, "System.IO.Directory.SetCurrentDirectory(string)", StringComparison.Ordinal))
                 .OrderBy(symbol => symbol, StringComparer.Ordinal)
                 .ToArray();
 
-            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            Assert.That(generatedSymbols, Does.Contain("System.IO.Directory.GetCurrentDirectory()"));
+            Assert.That(generatedSymbols, Does.Contain("System.IO.Directory.SetCurrentDirectory(string)"));
+            Assert.That(
+                generatedSymbols.Any(symbol =>
+                    string.Equals(symbol, "System.Environment.GetEnvironmentVariables()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.GetEnvironmentVariables(System.EnvironmentVariableTarget)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.GetEnvironmentVariablesFromRegistry(bool)", StringComparison.Ordinal)),
+                Is.False,
+                "Directory.CurrentDirectory regeneration should not import unrelated Environment variable helpers.");
+
+            var directorySymbols = generatedSymbols
+                .Where(symbol =>
+                    string.Equals(symbol, "System.IO.Directory.GetCurrentDirectory()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.IO.Directory.SetCurrentDirectory(string)", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(directorySymbols, Is.EqualTo(new[]
             {
                 "System.IO.Directory.GetCurrentDirectory()",
                 "System.IO.Directory.SetCurrentDirectory(string)",
