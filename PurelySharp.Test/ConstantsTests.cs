@@ -195,6 +195,25 @@ public static class EnvironmentCatalogSignatureSamples
         }
 
         [Test]
+        public void EnvironmentVolatileStateHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Environment.CurrentManagedThreadId.get",
+                "System.Environment.ExitCode.get",
+                "System.Environment.Exit(int)",
+                "System.Environment.TickCount.get",
+                "System.Environment.TickCount64.get",
+                "System.Environment.StackTrace.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void ProcessHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             var members = new[]

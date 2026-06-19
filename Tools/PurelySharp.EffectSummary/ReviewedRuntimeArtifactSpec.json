@@ -180,6 +180,19 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Environment.VolatileState.PurelySharp.EffectSummary.json",
+      "Limit": 120,
+      "MaxDepth": 2,
+      "SymbolPrefixes": [
+        "System.Environment.get_CurrentManagedThreadId",
+        "System.Environment.get_ExitCode",
+        "System.Environment.Exit",
+        "System.Environment.get_TickCount",
+        "System.Environment.get_TickCount64",
+        "System.Environment.get_StackTrace"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Directory.CurrentDirectory.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Environment.PurelySharp.EffectSummary.json",
       "Limit": 80,
