@@ -109,6 +109,7 @@ internal static class PurityClassificationEngine
                 .Select(method => method with
                 {
                     PurityClassification = ClassifyMethod(
+                        assembly,
                         method.ExactSymbolKey,
                         bySymbol,
                         externalGeneratedPurityEntries,
@@ -122,6 +123,7 @@ internal static class PurityClassificationEngine
     }
 
     private static MethodPurityClassification ClassifyMethod(
+        AssemblyEffectReport assembly,
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
@@ -285,6 +287,7 @@ internal static class PurityClassificationEngine
                              (treatsDelegateDispatchAsSemantic &&
                               IsSemanticallyNeutralValidationThrowHelper(externalEntry.Symbol))) ||
                             IsValidationThrowHelperCompatible(
+                                assembly,
                                 externalCallKey,
                                 bySymbol,
                                 externalGeneratedPurityEntries,
@@ -344,6 +347,7 @@ internal static class PurityClassificationEngine
             }
 
             var calleeClassification = ClassifyMethod(
+                assembly,
                 resolvedCallKey,
                 bySymbol,
                 externalGeneratedPurityEntries,
@@ -364,6 +368,7 @@ internal static class PurityClassificationEngine
                      (treatsDelegateDispatchAsSemantic &&
                       IsSemanticallyNeutralValidationThrowHelper(resolvedCallSummary.Symbol))) ||
                     IsValidationThrowHelperCompatible(
+                        assembly,
                         resolvedCallKey,
                         bySymbol,
                         externalGeneratedPurityEntries,
@@ -373,6 +378,7 @@ internal static class PurityClassificationEngine
                         visiting) ||
                     (treatsObjectStateAsFreshOwned &&
                      IsFreshOwnedObjectInitializationCompatible(
+                         assembly,
                          resolvedCallKey,
                          bySymbol,
                          externalGeneratedPurityEntries,
@@ -490,6 +496,17 @@ internal static class PurityClassificationEngine
                 HasUnsupportedEffects: false,
                 FreshnessClassification: freshnessClassification,
                 EffectVisibilityClassification: effectVisibilityClassification);
+        }
+
+        if (string.Equals(result.Classification, "conservative_unknown", StringComparison.Ordinal) &&
+            TryResolveReviewedSameBodyClassification(
+                assembly,
+                symbol,
+                summary,
+                externalGeneratedPurityEntries,
+                out var reviewedClassification))
+        {
+            result = reviewedClassification;
         }
 
         memo[symbol] = result;
@@ -1751,6 +1768,24 @@ internal static class PurityClassificationEngine
         return false;
     }
 
+    private static bool TryResolveReviewedSameBodyClassification(
+        AssemblyEffectReport assembly,
+        string symbol,
+        MethodEffectSummary summary,
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
+        out MethodPurityClassification classification)
+    {
+        classification = default!;
+        if (!TryGetExternalEntry(symbol, externalGeneratedPurityEntries, out _, out var entry) ||
+            !IsSameReviewedMethodBody(assembly, summary, entry))
+        {
+            return false;
+        }
+
+        classification = CreateClassification(entry);
+        return !string.Equals(classification.Classification, "conservative_unknown", StringComparison.Ordinal);
+    }
+
     private static bool TryGetExternalEntry(
         string call,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
@@ -1774,6 +1809,20 @@ internal static class PurityClassificationEngine
         resolvedCallKey = string.Empty;
         resolvedEntry = default!;
         return false;
+    }
+
+    private static bool IsSameReviewedMethodBody(
+        AssemblyEffectReport assembly,
+        MethodEffectSummary summary,
+        GeneratedPurityCatalogEntry entry)
+    {
+        return !string.IsNullOrWhiteSpace(summary.MethodBodySha256) &&
+            !string.IsNullOrWhiteSpace(entry.MethodBodySha256) &&
+            string.Equals(assembly.AssemblyName, entry.AssemblyName, StringComparison.Ordinal) &&
+            string.Equals(assembly.AssemblySha256, entry.AssemblySha256, StringComparison.Ordinal) &&
+            string.Equals(assembly.ModuleVersionId, entry.ModuleVersionId, StringComparison.Ordinal) &&
+            string.Equals(summary.MetadataToken, entry.MetadataToken, StringComparison.Ordinal) &&
+            string.Equals(summary.MethodBodySha256, entry.MethodBodySha256, StringComparison.Ordinal);
     }
 
     private static MethodPurityClassification CreateClassification(GeneratedPurityCatalogEntry entry)
@@ -1918,6 +1967,7 @@ internal static class PurityClassificationEngine
     }
 
     private static bool IsFreshOwnedObjectInitializationCompatible(
+        AssemblyEffectReport assembly,
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
@@ -1933,6 +1983,7 @@ internal static class PurityClassificationEngine
 
         var compatibilityVisiting = new HashSet<string>(StringComparer.Ordinal);
         var compatible = IsFreshOwnedObjectInitializationCompatibleCore(
+            assembly,
             symbol,
             bySymbol,
             externalGeneratedPurityEntries,
@@ -1946,6 +1997,7 @@ internal static class PurityClassificationEngine
     }
 
     private static bool IsFreshOwnedObjectInitializationCompatibleCore(
+        AssemblyEffectReport assembly,
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
@@ -2014,6 +2066,7 @@ internal static class PurityClassificationEngine
             }
 
             var calleeClassification = ClassifyMethod(
+                assembly,
                 resolvedCallKey,
                 bySymbol,
                 externalGeneratedPurityEntries,
@@ -2033,6 +2086,7 @@ internal static class PurityClassificationEngine
 
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal) &&
                 IsFreshOwnedObjectInitializationCompatibleCore(
+                    assembly,
                     resolvedCallKey,
                     bySymbol,
                     externalGeneratedPurityEntries,
@@ -2055,6 +2109,7 @@ internal static class PurityClassificationEngine
     }
 
     private static bool IsValidationThrowHelperCompatible(
+        AssemblyEffectReport assembly,
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
@@ -2070,6 +2125,7 @@ internal static class PurityClassificationEngine
 
         var compatibilityVisiting = new HashSet<string>(StringComparer.Ordinal);
         var compatible = IsValidationThrowHelperCompatibleCore(
+            assembly,
             symbol,
             bySymbol,
             externalGeneratedPurityEntries,
@@ -2083,6 +2139,7 @@ internal static class PurityClassificationEngine
     }
 
     private static bool IsValidationThrowHelperCompatibleCore(
+        AssemblyEffectReport assembly,
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
@@ -2151,6 +2208,7 @@ internal static class PurityClassificationEngine
             }
 
             var calleeClassification = ClassifyMethod(
+                assembly,
                 resolvedCallKey,
                 bySymbol,
                 externalGeneratedPurityEntries,
@@ -2170,6 +2228,7 @@ internal static class PurityClassificationEngine
 
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal) &&
                 IsValidationThrowHelperCompatibleCore(
+                    assembly,
                     resolvedCallKey,
                     bySymbol,
                     externalGeneratedPurityEntries,
@@ -2289,7 +2348,6 @@ internal static class PurityClassificationEngine
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.BitCast(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(", StringComparison.Ordinal) ||
-            callSymbol.StartsWith("System.SpanHelpers.ContainsValueType(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("string.GetRawStringData()", StringComparison.Ordinal) ||
             callSymbol.StartsWith("string.get_Length()", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains(".get_Length()", StringComparison.Ordinal) ||
