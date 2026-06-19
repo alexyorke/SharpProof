@@ -738,6 +738,28 @@ public class TestClass
         }
 
         [Test]
+        public async Task ContextStaticFieldImpurity_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [ContextStatic]
+    private static int _contextCounter;
+
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}()
+    {
+        return _contextCounter;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
 
 
         public async Task LazyInitializationImpurity_Diagnostic()

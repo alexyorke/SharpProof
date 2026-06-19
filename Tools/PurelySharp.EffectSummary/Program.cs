@@ -1560,24 +1560,19 @@ internal static class AssemblyEffectSummarizer
         IReadOnlySet<int> sameAssemblyStaticReadFieldTokens,
         IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts)
     {
-        if (fields.Count == 0)
-        {
-            return false;
-        }
-
-        if (!HasOnlySameAssemblyFieldFacts(
+        if (fields.Count > 0 &&
+            HasOnlySameAssemblyFieldFacts(
                 fields,
                 sameAssemblyStaticReadFieldTokens,
                 staticFieldFacts,
                 static kind => kind is StaticFieldFactKind.Constant or StaticFieldFactKind.StableIdentity,
                 IsKnownExternalSafeStaticCacheField))
         {
-            return false;
+            return true;
         }
 
-        return calls.Count == 0 ||
-            calls.Count == 1 && calls.Any(static call =>
-                call.StartsWith("System.ReadOnlySpan`1<byte>..ctor(void*, int)", StringComparison.Ordinal));
+        return calls.Count == 1 && calls.Any(static call =>
+            call.StartsWith("System.ReadOnlySpan`1<byte>..ctor(void*, int)", StringComparison.Ordinal));
     }
 
     private static bool IsKnownExternalSafeStaticCacheField(string field)
@@ -1590,16 +1585,7 @@ internal static class AssemblyEffectSummarizer
         }
 
         if (
-            string.Equals(field, "System.StringComparer._ordinal", StringComparison.Ordinal) ||
-            string.Equals(field, "System.StringComparer._ordinalIgnoreCase", StringComparison.Ordinal) ||
-            string.Equals(field, "System.StringComparer._invariantCulture", StringComparison.Ordinal) ||
-            string.Equals(field, "System.StringComparer._invariantCultureIgnoreCase", StringComparison.Ordinal) ||
-            string.Equals(field, "System.Threading.Tasks.Task.s_cachedCompleted", StringComparison.Ordinal) ||
             string.Equals(field, "System.Globalization.CultureInfo.s_InvariantCultureInfo", StringComparison.Ordinal) ||
-            string.Equals(field, "System.OrdinalCaseSensitiveComparer.Instance", StringComparison.Ordinal) ||
-            string.Equals(field, "System.OrdinalIgnoreCaseComparer.Instance", StringComparison.Ordinal) ||
-            string.Equals(field, "System.CultureAwareComparer.InvariantCaseSensitiveInstance", StringComparison.Ordinal) ||
-            string.Equals(field, "System.CultureAwareComparer.InvariantIgnoreCaseInstance", StringComparison.Ordinal) ||
             string.Equals(field, "System.String.Empty", StringComparison.Ordinal) ||
             string.Equals(field, "System.Text.ASCIIEncoding.s_default", StringComparison.Ordinal) ||
             string.Equals(field, "System.UriHelper.Unreserved", StringComparison.Ordinal) ||
@@ -3264,6 +3250,7 @@ internal static class AssemblyEffectSummarizer
                 factKind = StaticFieldFactKind.Constant;
             }
             else if ((definition.Attributes & FieldAttributes.InitOnly) != 0 &&
+                !HasRejectedStaticFieldStorageAttribute(reader, definition) &&
                 usageByFieldToken.TryGetValue(fieldToken, out var usage) &&
                 !usage.HasAddressExposure &&
                 !usage.HasWritesOutsideTypeInitializer &&
@@ -3366,6 +3353,47 @@ internal static class AssemblyEffectSummarizer
         }
 
         return usageByFieldToken;
+    }
+
+    private static bool HasRejectedStaticFieldStorageAttribute(MetadataReader reader, FieldDefinition definition)
+    {
+        foreach (var customAttributeHandle in definition.GetCustomAttributes())
+        {
+            var attributeTypeName = TryGetCustomAttributeTypeName(reader, customAttributeHandle);
+            if (string.Equals(attributeTypeName, "System.ThreadStaticAttribute", StringComparison.Ordinal) ||
+                string.Equals(attributeTypeName, "System.ContextStaticAttribute", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string? TryGetCustomAttributeTypeName(MetadataReader reader, CustomAttributeHandle handle)
+    {
+        try
+        {
+            var attribute = reader.GetCustomAttribute(handle);
+            return attribute.Constructor.Kind switch
+            {
+                HandleKind.MethodDefinition => GetTypeName(
+                    reader,
+                    reader.GetMethodDefinition((MethodDefinitionHandle)attribute.Constructor).GetDeclaringType()),
+                HandleKind.MemberReference => GetMemberReferenceParentName(
+                    reader,
+                    reader.GetMemberReference((MemberReferenceHandle)attribute.Constructor).Parent),
+                _ => null,
+            };
+        }
+        catch (BadImageFormatException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     private static Dictionary<int, StaticFieldInitializerValue> AnalyzeStaticFieldInitializerAssignments(

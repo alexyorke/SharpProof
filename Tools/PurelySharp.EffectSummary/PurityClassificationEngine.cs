@@ -279,6 +279,23 @@ internal static class PurityClassificationEngine
                 {
                     if (string.Equals(externalClassification.Classification, "impure", StringComparison.Ordinal))
                     {
+                        if (IsPureArgumentGuardWrapper(externalEntry.Symbol) ||
+                            ((treatsArgumentGuardThrowHelpersAsPure &&
+                              IsArgumentGuardThrowHelper(externalEntry.Symbol)) ||
+                             (treatsDelegateDispatchAsSemantic &&
+                              IsSemanticallyNeutralValidationThrowHelper(externalEntry.Symbol))) ||
+                            IsValidationThrowHelperCompatible(
+                                externalCallKey,
+                                bySymbol,
+                                externalGeneratedPurityEntries,
+                                memo,
+                                freshOwnedInitializationMemo,
+                                validationThrowHelperMemo,
+                                visiting))
+                        {
+                            continue;
+                        }
+
                         impureCategories.Add("impure_callee");
                         if (blockingCallChain.Length == 0)
                         {
@@ -341,7 +358,8 @@ internal static class PurityClassificationEngine
 
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal))
             {
-                if (((treatsArgumentGuardThrowHelpersAsPure &&
+                if (IsPureArgumentGuardWrapper(resolvedCallSummary.Symbol) ||
+                    ((treatsArgumentGuardThrowHelpersAsPure &&
                       IsArgumentGuardThrowHelper(resolvedCallSummary.Symbol)) ||
                      (treatsDelegateDispatchAsSemantic &&
                       IsSemanticallyNeutralValidationThrowHelper(resolvedCallSummary.Symbol))) ||

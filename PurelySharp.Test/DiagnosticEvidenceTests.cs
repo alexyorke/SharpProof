@@ -7479,6 +7479,32 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ContextStaticRead_IncludesDistinctCategory()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [ContextStatic]
+    private static int s_value;
+
+    [EnforcePure]
+    public int TestMethod()
+    {
+        return s_value;
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("mutable_state_read"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("FieldReferencePurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("TestClass.s_value"));
+        }
+
+        [Test]
         public async Task Ps0002_StaticPropertyGetterImpurity_PreservesGetterEvidence()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
