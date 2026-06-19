@@ -517,10 +517,19 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            PurityAnalysisEngine.LogDebug($"  [MIR] Checking IsKnownImpure with signature: '{originalDefinitionSymbol.ToDisplayString()}'");
-            if (PurityAnalysisEngine.IsKnownImpure(originalDefinitionSymbol))
+            var knownImpureMemberSource = PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinitionSymbol);
+            var hasConfiguredKnownImpureMember = string.Equals(
+                knownImpureMemberSource,
+                "config_known_impure",
+                StringComparison.Ordinal);
+
+            bool isExplicitlyPure = PurityAnalysisEngine.IsPureEnforced(
+                invokedMethodSymbol,
+                context.EnforcePureAttributeSymbol,
+                context.PureAttributeSymbol);
+            if (hasConfiguredKnownImpureMember)
             {
-                PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (Known Impure)");
+                PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (Configured Known Impure)");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     invocationOperation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(
@@ -528,13 +537,9 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         nameof(MethodInvocationPurityRule),
                         invocationOperation,
                         symbol: originalDefinitionSymbol,
-                        catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinitionSymbol) ?? "known_impure"));
+                        catalogSource: knownImpureMemberSource));
             }
 
-            bool isExplicitlyPure = PurityAnalysisEngine.IsPureEnforced(
-                invokedMethodSymbol,
-                context.EnforcePureAttributeSymbol,
-                context.PureAttributeSymbol);
             if (hasTrustedGeneratedPurity)
             {
                 if (generatedPurity.IsPure)
@@ -555,6 +560,20 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: originalDefinitionSymbol,
                         catalogSource: "generated_purity_summary"));
                 }
+            }
+
+            PurityAnalysisEngine.LogDebug($"  [MIR] Checking IsKnownImpure with signature: '{originalDefinitionSymbol.ToDisplayString()}'");
+            if (knownImpureMemberSource != null)
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (Known Impure)");
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    invocationOperation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        GetCatalogHitCategory(originalDefinitionSymbol),
+                        nameof(MethodInvocationPurityRule),
+                        invocationOperation,
+                        symbol: originalDefinitionSymbol,
+                        catalogSource: knownImpureMemberSource));
             }
 
             if (PurityAnalysisEngine.IsInConfiguredImpureNamespaceOrType(originalDefinitionSymbol) &&

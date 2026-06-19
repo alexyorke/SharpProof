@@ -952,26 +952,33 @@ namespace PurelySharp.Analyzer.Engine
                     return configuredImpureResult;
                 }
 
-                if (IsKnownImpure(methodSymbol))
+                var knownImpureMemberSource = GetKnownImpureMemberSource(methodSymbol);
+                var hasConfiguredKnownImpureMember = string.Equals(
+                    knownImpureMemberSource,
+                    "config_known_impure",
+                    StringComparison.Ordinal);
+
+                GeneratedPurityCatalog.PurityEntry generatedPurity = default;
+                var hasTrustedGeneratedPurity = methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                    !hasConfiguredKnownImpureMember &&
+                    TryGetTrustedGeneratedPurity(methodSymbol, semanticModel.Compilation, out generatedPurity);
+
+                if (hasConfiguredKnownImpureMember)
                 {
-                    LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is known impure.");
+                    LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is configured known impure.");
                     var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
-                    var knownImpureResult = ImpureResult(
+                    var configuredKnownImpureResult = ImpureResult(
                         syntax,
                         PurityEvidence.Create(
                             "catalog_hit",
                             "KnownImpureMethod",
                             syntaxNode: syntax,
                             symbol: methodSymbol,
-                            catalogSource: GetKnownImpureMemberSource(methodSymbol) ?? "known_impure"));
-                    purityCache[methodSymbol] = knownImpureResult;
-                    LogDebug($"{indent}<< Exit DeterminePurity (Known Impure): {methodSymbol.ToDisplayString()}");
-                    return knownImpureResult;
+                            catalogSource: knownImpureMemberSource));
+                    purityCache[methodSymbol] = configuredKnownImpureResult;
+                    LogDebug($"{indent}<< Exit DeterminePurity (Configured Known Impure): {methodSymbol.ToDisplayString()}");
+                    return configuredKnownImpureResult;
                 }
-
-                GeneratedPurityCatalog.PurityEntry generatedPurity = default;
-                var hasTrustedGeneratedPurity = methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                    TryGetTrustedGeneratedPurity(methodSymbol, semanticModel.Compilation, out generatedPurity);
 
                 if (hasTrustedGeneratedPurity)
                 {
@@ -996,6 +1003,23 @@ namespace PurelySharp.Analyzer.Engine
                         purityCache[methodSymbol] = generatedResult;
                         return generatedResult;
                     }
+                }
+
+                if (knownImpureMemberSource != null)
+                {
+                    LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is known impure.");
+                    var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+                    var knownImpureResult = ImpureResult(
+                        syntax,
+                        PurityEvidence.Create(
+                            "catalog_hit",
+                            "KnownImpureMethod",
+                            syntaxNode: syntax,
+                            symbol: methodSymbol,
+                            catalogSource: knownImpureMemberSource));
+                    purityCache[methodSymbol] = knownImpureResult;
+                    LogDebug($"{indent}<< Exit DeterminePurity (Known Impure): {methodSymbol.ToDisplayString()}");
+                    return knownImpureResult;
                 }
 
 
@@ -1297,25 +1321,91 @@ namespace PurelySharp.Analyzer.Engine
                                 invocationOp,
                                 out var semanticKnownImpureCatalogSource);
                             if (invocationOp.TargetMethod != null &&
-                                (hasSemanticKnownImpureCatalogSource ||
-                                 (IsKnownImpure(invocationOp.TargetMethod.OriginalDefinition) &&
-                                  !IsInvariantCultureDeterministicParseInvocation(invocationOp))) &&
                                 !IsArrayAsReadOnlyOwnedLocalArrayInvocation(invocationOp, postCfgReturnState) &&
                                 !IsTransientCharArrayConsumedByStringConstructor(invocationOp, semanticModel))
                             {
-                                LogDebug($"{indent}    Post-CFG: Found Known Impure Invocation IMPURE: {invocationOp.Syntax} calling {invocationOp.TargetMethod.ToDisplayString()}");
                                 var targetMethod = invocationOp.TargetMethod.OriginalDefinition;
-                                result = PurityAnalysisResult.Impure(
-                                    invocationOp.Syntax,
-                                    PurityEvidence.Create(
-                                        "catalog_hit",
-                                        "MethodInvocationPurityRule",
-                                        invocationOp,
-                                        symbol: targetMethod,
-                                        catalogSource: hasSemanticKnownImpureCatalogSource
-                                            ? semanticKnownImpureCatalogSource
-                                            : GetKnownImpureMemberSource(targetMethod) ?? "known_impure"));
-                                goto PostCfgChecksDone;
+                                if (hasSemanticKnownImpureCatalogSource)
+                                {
+                                    LogDebug($"{indent}    Post-CFG: Found semantically known impure invocation IMPURE: {invocationOp.Syntax} calling {invocationOp.TargetMethod.ToDisplayString()}");
+                                    result = PurityAnalysisResult.Impure(
+                                        invocationOp.Syntax,
+                                        PurityEvidence.Create(
+                                            "catalog_hit",
+                                            "MethodInvocationPurityRule",
+                                            invocationOp,
+                                            symbol: targetMethod,
+                                            catalogSource: semanticKnownImpureCatalogSource));
+                                    goto PostCfgChecksDone;
+                                }
+
+                                if (IsInvariantCultureDeterministicParseInvocation(invocationOp))
+                                {
+                                    continue;
+                                }
+
+                                var knownImpureSource = GetKnownImpureMemberSource(targetMethod);
+                                var hasConfiguredKnownImpure = string.Equals(
+                                    knownImpureSource,
+                                    "config_known_impure",
+                                    StringComparison.Ordinal);
+                                GeneratedPurityCatalog.PurityEntry postCfgGeneratedPurity = default;
+                                var hasTrustedGeneratedPurityForInvocation = targetMethod.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                                    !hasConfiguredKnownImpure &&
+                                    TryGetTrustedGeneratedPurity(
+                                        targetMethod,
+                                        semanticModel.Compilation,
+                                        out postCfgGeneratedPurity);
+
+                                if (hasConfiguredKnownImpure)
+                                {
+                                    LogDebug($"{indent}    Post-CFG: Found configured known impure invocation IMPURE: {invocationOp.Syntax} calling {invocationOp.TargetMethod.ToDisplayString()}");
+                                    result = PurityAnalysisResult.Impure(
+                                        invocationOp.Syntax,
+                                        PurityEvidence.Create(
+                                            "catalog_hit",
+                                            "MethodInvocationPurityRule",
+                                            invocationOp,
+                                            symbol: targetMethod,
+                                            catalogSource: knownImpureSource));
+                                    goto PostCfgChecksDone;
+                                }
+
+                                if (hasTrustedGeneratedPurityForInvocation)
+                                {
+                                    if (postCfgGeneratedPurity.IsPure)
+                                    {
+                                        continue;
+                                    }
+
+                                    if (postCfgGeneratedPurity.IsImpure)
+                                    {
+                                        LogDebug($"{indent}    Post-CFG: Found generated-summary impure invocation IMPURE: {invocationOp.Syntax} calling {invocationOp.TargetMethod.ToDisplayString()}");
+                                        result = PurityAnalysisResult.Impure(
+                                            invocationOp.Syntax,
+                                            PurityEvidence.Create(
+                                                postCfgGeneratedPurity.PrimaryCategory,
+                                                "MethodInvocationPurityRule",
+                                                invocationOp,
+                                                symbol: targetMethod,
+                                                catalogSource: "generated_purity_summary"));
+                                        goto PostCfgChecksDone;
+                                    }
+                                }
+
+                                if (knownImpureSource != null)
+                                {
+                                    LogDebug($"{indent}    Post-CFG: Found known impure invocation IMPURE: {invocationOp.Syntax} calling {invocationOp.TargetMethod.ToDisplayString()}");
+                                    result = PurityAnalysisResult.Impure(
+                                        invocationOp.Syntax,
+                                        PurityEvidence.Create(
+                                            "catalog_hit",
+                                            "MethodInvocationPurityRule",
+                                            invocationOp,
+                                            symbol: targetMethod,
+                                            catalogSource: knownImpureSource));
+                                    goto PostCfgChecksDone;
+                                }
                             }
                         }
                         LogDebug($"{indent}  Post-CFG: Known Impure Invocations check complete (result still pure).");

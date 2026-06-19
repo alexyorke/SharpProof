@@ -1095,6 +1095,42 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_EffectSummary_OverridesKnownImpureEnvironmentMethod_WhenGeneratedSummaryIsPure()
+        {
+            var identity = GetAssemblyIdentity(typeof(System.Environment).Assembly.Location);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod()
+    {
+        return Environment.GetEnvironmentVariable("PATH");
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "System.Environment.GetEnvironmentVariable(string)",
+                            "pure",
+                            """[]"""))
+                });
+
+            Assert.That(
+                diagnostics.Any(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should override the built-in known-impure member fallback for metadata methods.");
+        }
+
+        [Test]
         public async Task Ps0002_EffectSummary_WithTrustedGeneratedPureConstructorClassification_SuppressesUnknownExternalCall()
         {
             const string boundarySource = """
