@@ -4613,8 +4613,10 @@ public static class StringComparisonFixture
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
-                80,
+                120,
+                "System.Environment.ExpandEnvironmentVariables",
                 "System.Environment.GetEnvironmentVariable",
+                "System.Environment.GetEnvironmentVariables",
                 "System.Environment.get_UserInteractive",
                 "System.Environment.get_UserName");
 
@@ -4628,6 +4630,12 @@ public static class StringComparisonFixture
             AssertEffectVisibilityClassification(summary, "System.Environment.GetEnvironmentVariable(string)", "caller_visible");
             AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariables()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Environment.GetEnvironmentVariables()", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariables(System.EnvironmentVariableTarget)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Environment.GetEnvironmentVariables(System.EnvironmentVariableTarget)", "caller_visible");
+            AssertPurityClassification(summary, "System.Environment.ExpandEnvironmentVariables(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Environment.ExpandEnvironmentVariables(string)", "caller_visible");
             AssertPurityClassification(summary, "System.Environment.get_UserInteractive()", "impure", "caller_visible_memory_write", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_UserInteractive()", "caller_visible");
             AssertPurityClassification(summary, "System.Environment.get_UserName()", "impure", "impure_callee");
@@ -4640,8 +4648,11 @@ public static class StringComparisonFixture
                 .EnumerateArray()
                 .Select(entry => entry.GetProperty("Symbol").GetString())
                 .Where(symbol =>
+                    string.Equals(symbol, "System.Environment.ExpandEnvironmentVariables(string)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Environment.GetEnvironmentVariable(string)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.GetEnvironmentVariables()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Environment.GetEnvironmentVariables(System.EnvironmentVariableTarget)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Environment.get_UserInteractive()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Environment.get_UserName()", StringComparison.Ordinal))
                 .OrderBy(symbol => symbol, StringComparer.Ordinal)
@@ -4649,8 +4660,11 @@ public static class StringComparisonFixture
 
             Assert.That(generatedSymbols, Is.EqualTo(new[]
             {
+                "System.Environment.ExpandEnvironmentVariables(string)",
                 "System.Environment.GetEnvironmentVariable(string)",
                 "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)",
+                "System.Environment.GetEnvironmentVariables()",
+                "System.Environment.GetEnvironmentVariables(System.EnvironmentVariableTarget)",
                 "System.Environment.get_UserInteractive()",
                 "System.Environment.get_UserName()",
             }));

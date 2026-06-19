@@ -500,6 +500,65 @@ public class TestClass
         }
 
         [Test]
+        public async Task Environment_GetEnvironmentVariables_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.Collections;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public IDictionary {|PS0002:TestMethod|}()
+    {
+        return Environment.GetEnvironmentVariables();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Environment_GetEnvironmentVariablesWithTarget_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.Collections;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public IDictionary {|PS0002:TestMethod|}()
+    {
+        return Environment.GetEnvironmentVariables(EnvironmentVariableTarget.Process);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Environment_ExpandEnvironmentVariables_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}()
+    {
+        return Environment.ExpandEnvironmentVariables(""%PATH%"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task Environment_GetFolderPath_Diagnostic()
         {
             var test = @"

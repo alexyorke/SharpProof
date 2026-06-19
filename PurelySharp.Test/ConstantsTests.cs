@@ -154,8 +154,11 @@ public static class EnvironmentCatalogSignatureSamples
             var members = new[]
             {
                 "System.Environment.CommandLine.get",
+                "System.Environment.ExpandEnvironmentVariables(string)",
                 "System.Environment.GetEnvironmentVariable(string)",
                 "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)",
+                "System.Environment.GetEnvironmentVariables()",
+                "System.Environment.GetEnvironmentVariables(System.EnvironmentVariableTarget)",
                 "System.Environment.MachineName.get",
                 "System.Environment.OSVersion.get",
                 "System.Environment.ProcessId.get",
