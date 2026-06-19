@@ -203,14 +203,14 @@ For source methods in the same compilation, propagation follows the call graph r
   - **Message:** `Method '{0}' can throw: {1}`
   - **Severity:** Info
   - **Enabled by:** `.editorconfig` option `purelysharp_report_exceptions = true`
-  - **Meaning:** The analyzer found uncaught source-level `throw` or throw-expression paths, or propagated exception facts from source callees or `PurelySharp.EffectSummary.json`, and reports the exception type list in the diagnostic message and `purelysharp.exceptions.types` property. `PS0010` also emits structured `purelysharp.exceptions.categories` and `purelysharp.exceptions.sources` properties for report tooling.
+  - **Meaning:** The analyzer found uncaught source-level `throw` or throw-expression paths, or propagated exception facts from source callees or `PurelySharp.EffectSummary.json`, and reports the exception type list in the diagnostic message and `purelysharp.exceptions.types` property. `PS0010` also emits structured `purelysharp.exceptions.categories` and `purelysharp.exceptions.sources` properties for report tooling, plus additive `purelysharp.exceptions.edges` JSON when structured callee-edge provenance is available.
 
 - **PS0011: Operation May Throw Uncaught Exceptions**
 
   - **Message:** `Operation '{0}' may throw uncaught exceptions: {1}`
   - **Severity:** Warning
   - **Enabled by:** `.editorconfig` option `purelysharp_report_exceptions = true`
-  - **Meaning:** The analyzer found an uncaught exception at a specific call, property access, object creation, direct `throw`, definite divide-by-zero, or definite null-dereference site. `PS0011` emits the same structured exception type/category/source evidence as `PS0010`, plus `purelysharp.exceptions.symbol` for the underlying callee when one is known.
+  - **Meaning:** The analyzer found an uncaught exception at a specific call, property access, object creation, direct `throw`, definite divide-by-zero, or definite null-dereference site. `PS0011` emits the same structured exception type/category/source evidence as `PS0010`, the same additive `purelysharp.exceptions.edges` JSON when available, plus `purelysharp.exceptions.symbol` for the underlying callee when one is known.
 
 - **PS0003: Misplaced Attribute**
   - **Message:** `The [EnforcePure] attribute can only be applied to method declarations.`
@@ -270,7 +270,7 @@ dotnet run --project Tools/PurelySharp.CorpusReport -- artifacts/purelysharp.sar
 dotnet run --project Tools/PurelySharp.CorpusReport -- --output artifacts/purelysharp-report.json PurelySharp.sln
 ```
 
-The JSON report includes a stable `SchemaVersion`, `PS0002`, `PS0004`, `PS0009`, `PS0010`, and `PS0011` counts, per-diagnostic evidence rows, impurity categories, exception categories/sources, rule-name counts, operation kinds, unsupported/unknown operation kinds, top impure APIs, catalog/config-source details, catalog-miss candidates, and false-positive candidates based on the structured diagnostic properties emitted by `PS0002`, `PS0010`, and `PS0011`. Explanation diagnostics (`PS0009`) remain visible as diagnostic rows but do not double-count impurity aggregates.
+The JSON report includes a stable `SchemaVersion`, `PS0002`, `PS0004`, `PS0009`, `PS0010`, and `PS0011` counts, per-diagnostic evidence rows, impurity categories, exception categories/sources, rule-name counts, operation kinds, unsupported/unknown operation kinds, top impure APIs, catalog/config-source details, catalog-miss candidates, and false-positive candidates based on the structured diagnostic properties emitted by `PS0002`, `PS0010`, and `PS0011`. Exception-flow rows also preserve additive `purelysharp.exceptions.edges` payloads when present. Explanation diagnostics (`PS0009`) remain visible as diagnostic rows but do not double-count impurity aggregates.
 
 For framework and library calibration, `Tools/PurelySharp.EffectSummary` can now emit implementation-derived purity classifications in its own JSON output. This is the preferred starting point for reviewing which manual pure entries are still justified by the current runtime implementation before changing analyzer behavior.
 
