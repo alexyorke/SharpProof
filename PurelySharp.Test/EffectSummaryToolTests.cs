@@ -95,6 +95,25 @@ public static class ExceptionFixture
             throw;
         }
     }
+
+    public static int RethrowFormatCaughtByOuter()
+    {
+        try
+        {
+            try
+            {
+                throw new FormatException();
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+        catch (FormatException)
+        {
+            return 0;
+        }
+    }
 }
 """;
 
@@ -106,6 +125,7 @@ public static class ExceptionFixture
             AssertTransitiveExceptions(summary, "ExceptionFixture.ThrowViaCallee()", "System.InvalidOperationException");
             AssertThrownExceptions(summary, "ExceptionFixture.HandleLocally()");
             AssertThrownExceptions(summary, "ExceptionFixture.RethrowOverflow()", "System.OverflowException");
+            AssertThrownExceptions(summary, "ExceptionFixture.RethrowFormatCaughtByOuter()");
         }
 
         [Test]

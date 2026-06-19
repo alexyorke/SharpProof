@@ -8605,6 +8605,49 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0011_EffectSummaryLibraryCall_PartiallyCaughtAtCallSite_ReportsOnlyEscapingType()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(object value)
+    {
+        try
+        {
+            ArgumentNullException.ThrowIfNull(value);
+        }
+        catch (ArgumentNullException)
+        {
+        }
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
+                    "PurelySharp.EffectSummary.json",
+                    CreateEffectSummaryJson(
+                        typeof(ArgumentNullException).Assembly.Location,
+                        "System.ArgumentNullException.ThrowIfNull(object, string)",
+                        new[] { "System.ArgumentNullException", "System.InvalidOperationException" }))));
+
+            var summaryDiagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.InvalidOperationException=effect_summary:System.ArgumentNullException.ThrowIfNull"));
+
+            var siteDiagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+            Assert.That(siteDiagnostic.GetMessage(), Does.Contain("ArgumentNullException.ThrowIfNull(value)"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.InvalidOperationException=effect_summary:System.ArgumentNullException.ThrowIfNull"));
+        }
+
+        [Test]
         public async Task Ps0011_EffectSummaryConstructor_UncaughtAtCallSite_ReportsWarning()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

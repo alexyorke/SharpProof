@@ -1269,6 +1269,7 @@ internal static class AssemblyEffectSummarizer
         var offset = 0;
         string? lastConstructedExceptionType = null;
         var localExceptionTypes = new Dictionary<int, string?>();
+        var knownThrownExceptionSites = new List<KnownThrownExceptionSite>();
         var trackedLocals = new Dictionary<int, TrackedStackValue>();
         var trackedStack = new List<TrackedStackValue>();
         var suppressDynamicDispatchForNextCallvirt = false;
@@ -1404,8 +1405,13 @@ internal static class AssemblyEffectSummarizer
             {
                 effects.Add("throws");
                 var thrownExceptionType = opCode == OpCodes.Rethrow
-                    ? GetEnclosingCatchExceptionType(reader, exceptionRegions, instructionOffset)
+                    ? TryResolveRethrowExceptionType(reader, exceptionRegions, instructionOffset, knownThrownExceptionSites)
                     : lastConstructedExceptionType;
+                if (opCode == OpCodes.Throw && thrownExceptionType != null)
+                {
+                    knownThrownExceptionSites.Add(new KnownThrownExceptionSite(instructionOffset, thrownExceptionType));
+                }
+
                 if (thrownExceptionType != null &&
                     IsEscapingThrow(reader, exceptionRegions, instructionOffset, thrownExceptionType))
                 {
@@ -2064,6 +2070,35 @@ internal static class AssemblyEffectSummarizer
         return typeName.EndsWith("Exception", StringComparison.Ordinal) ? typeName : null;
     }
 
+    private static string? TryResolveRethrowExceptionType(
+        MetadataReader reader,
+        ImmutableArray<ExceptionRegion> exceptionRegions,
+        int instructionOffset,
+        IReadOnlyList<KnownThrownExceptionSite> knownThrownExceptionSites)
+    {
+        if (TryGetEnclosingCatchRegion(exceptionRegions, instructionOffset, out var catchRegion))
+        {
+            var catchExceptionType = GetCatchExceptionType(reader, catchRegion);
+            if (!string.IsNullOrWhiteSpace(catchExceptionType))
+            {
+                var protectedTryExceptionTypes = knownThrownExceptionSites
+                    .Where(site =>
+                        ContainsOffset(catchRegion.TryOffset, catchRegion.TryLength, site.InstructionOffset) &&
+                        CatchHandlesException(reader, site.ExceptionType, catchExceptionType))
+                    .Select(site => site.ExceptionType)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray();
+
+                if (protectedTryExceptionTypes.Length == 1)
+                {
+                    return protectedTryExceptionTypes[0];
+                }
+            }
+        }
+
+        return GetEnclosingCatchExceptionType(reader, exceptionRegions, instructionOffset);
+    }
+
     private static bool IsEscapingThrow(
         MetadataReader reader,
         ImmutableArray<ExceptionRegion> exceptionRegions,
@@ -2088,32 +2123,39 @@ internal static class AssemblyEffectSummarizer
         return true;
     }
 
+    private static bool TryGetEnclosingCatchRegion(
+        ImmutableArray<ExceptionRegion> exceptionRegions,
+        int instructionOffset,
+        out ExceptionRegion catchRegion)
+    {
+        catchRegion = default;
+        var smallestHandlerLength = int.MaxValue;
+        var found = false;
+        foreach (var exceptionRegion in exceptionRegions)
+        {
+            if (exceptionRegion.Kind != ExceptionRegionKind.Catch ||
+                !ContainsOffset(exceptionRegion.HandlerOffset, exceptionRegion.HandlerLength, instructionOffset) ||
+                exceptionRegion.HandlerLength >= smallestHandlerLength)
+            {
+                continue;
+            }
+
+            catchRegion = exceptionRegion;
+            smallestHandlerLength = exceptionRegion.HandlerLength;
+            found = true;
+        }
+
+        return found;
+    }
+
     private static string? GetEnclosingCatchExceptionType(
         MetadataReader reader,
         ImmutableArray<ExceptionRegion> exceptionRegions,
         int instructionOffset)
     {
-        string? catchExceptionType = null;
-        var smallestHandlerLength = int.MaxValue;
-        foreach (var exceptionRegion in exceptionRegions)
-        {
-            if (exceptionRegion.Kind != ExceptionRegionKind.Catch ||
-                !ContainsOffset(exceptionRegion.HandlerOffset, exceptionRegion.HandlerLength, instructionOffset))
-            {
-                continue;
-            }
-
-            var currentCatchExceptionType = GetCatchExceptionType(reader, exceptionRegion);
-            if (currentCatchExceptionType == null || exceptionRegion.HandlerLength >= smallestHandlerLength)
-            {
-                continue;
-            }
-
-            catchExceptionType = currentCatchExceptionType;
-            smallestHandlerLength = exceptionRegion.HandlerLength;
-        }
-
-        return catchExceptionType;
+        return TryGetEnclosingCatchRegion(exceptionRegions, instructionOffset, out var catchRegion)
+            ? GetCatchExceptionType(reader, catchRegion)
+            : null;
     }
 
     private static bool ContainsOffset(int startOffset, int length, int instructionOffset)
@@ -2674,6 +2716,8 @@ internal static class AssemblyEffectSummarizer
             return "type-spec";
         }
     }
+
+    internal readonly record struct KnownThrownExceptionSite(int InstructionOffset, string ExceptionType);
 }
 
 internal sealed class TypeNameProvider : ISignatureTypeProvider<string, object?>

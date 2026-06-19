@@ -702,6 +702,55 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_ToolOutput_SuppressesMetadataRethrowCaughtByOuterHandler()
+        {
+            const string boundarySource = """
+using System;
+
+public static class SummaryBoundary
+{
+    public static int RethrowFormatCaughtByOuter()
+    {
+        try
+        {
+            try
+            {
+                throw new FormatException();
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+        catch (FormatException)
+        {
+            return 0;
+        }
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryCaughtRethrowException", boundarySource);
+            var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+public class TestClass
+{
+    public int TestMethod()
+    {
+        return SummaryBoundary.RethrowFormatCaughtByOuter();
+    }
+}
+""",
+                summaryJson,
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_EffectSummary_WithTrustedGeneratedPureClassification_SuppressesUnknownExternalCall()
         {
             const string boundarySource = """
