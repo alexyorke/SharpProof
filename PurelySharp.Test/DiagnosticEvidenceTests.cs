@@ -4591,6 +4591,128 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_ListConstructorsAsImpureEvidence()
+        {
+            const string source = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public List<int> DefaultMethod()
+    {
+        return new List<int>();
+    }
+
+    [EnforcePure]
+    public List<int> CapacityMethod()
+    {
+        return new List<int>(4);
+    }
+
+    [EnforcePure]
+    public List<int> EnumerableMethod(IEnumerable<int> values)
+    {
+        return new List<int>(values);
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics
+                .Where(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<ObjectCreationExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "new List<int>()" ||
+                    node.ToString() == "new List<int>(4)" ||
+                    node.ToString() == "new List<int>(values)")
+                .ToDictionary(
+                    node => node.ToString(),
+                    node => (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!);
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var resolutions = trackedMethods.ToDictionary(
+                pair => pair.Key,
+                pair =>
+                {
+                    var args = new object?[] { pair.Value.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = matched
+                        ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                        : string.Empty;
+                    var primaryCategory = matched
+                        ? (string)purityEntry.GetType().GetProperty("PrimaryCategory")!.GetValue(purityEntry)!
+                        : string.Empty;
+                    var categories = matched
+                        ? ((IEnumerable<string>)purityEntry.GetType().GetProperty("Categories")!.GetValue(purityEntry)!).ToArray()
+                        : Array.Empty<string>();
+                    var freshnessClassification = matched
+                        ? (string)purityEntry.GetType().GetProperty("FreshnessClassification")!.GetValue(purityEntry)!
+                        : string.Empty;
+                    return (matched, classification, primaryCategory, categories, freshnessClassification);
+                });
+            var impuritySymbols = purityDiagnostics
+                .Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty])
+                .ToArray();
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(3));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "generated_purity_summary" }));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "ObjectCreationPurityRule" }));
+            Assert.That(impuritySymbols, Has.Some.Contain("System.Collections.Generic.List<int>.List()"));
+            Assert.That(impuritySymbols, Has.Some.Contain("System.Collections.Generic.List<int>.List(int)"));
+            Assert.That(impuritySymbols, Has.Some.Contain("System.Collections.Generic.List<int>.List(System.Collections.Generic.IEnumerable<int>)"));
+
+            Assert.That(resolutions["new List<int>()"].matched, Is.True,
+                "Generated purity catalog should resolve List<T>..ctor().");
+            Assert.That(resolutions["new List<int>()"].classification, Is.EqualTo("impure"),
+                "List<T>..ctor() now resolves through generated impure runtime evidence.");
+            Assert.That(resolutions["new List<int>()"].primaryCategory, Is.EqualTo("global_state_read"));
+            Assert.That(resolutions["new List<int>()"].categories, Has.Member("global_state_read"));
+            Assert.That(resolutions["new List<int>()"].categories, Has.Member("object_state_write"));
+            Assert.That(resolutions["new List<int>()"].freshnessClassification, Is.EqualTo("none"));
+
+            Assert.That(resolutions["new List<int>(4)"].matched, Is.True,
+                "Generated purity catalog should resolve List<T>..ctor(int).");
+            Assert.That(resolutions["new List<int>(4)"].classification, Is.EqualTo("impure"),
+                "List<T>..ctor(int) now resolves through generated impure runtime evidence.");
+            Assert.That(resolutions["new List<int>(4)"].primaryCategory, Is.EqualTo("global_state_read"));
+            Assert.That(resolutions["new List<int>(4)"].categories, Has.Member("global_state_read"));
+            Assert.That(resolutions["new List<int>(4)"].categories, Has.Member("object_state_write"));
+            Assert.That(
+                resolutions["new List<int>(4)"].freshnessClassification,
+                Is.EqualTo("fresh_array_candidate_requires_non_pure_resolution"));
+
+            Assert.That(resolutions["new List<int>(values)"].matched, Is.True,
+                "Generated purity catalog should resolve List<T>..ctor(IEnumerable<T>).");
+            Assert.That(resolutions["new List<int>(values)"].classification, Is.EqualTo("impure"),
+                "List<T>..ctor(IEnumerable<T>) now resolves through generated impure runtime evidence.");
+            Assert.That(resolutions["new List<int>(values)"].primaryCategory, Is.EqualTo("global_state_read"));
+            Assert.That(resolutions["new List<int>(values)"].categories, Has.Member("global_state_read"));
+            Assert.That(resolutions["new List<int>(values)"].categories, Has.Member("impure_callee"));
+            Assert.That(resolutions["new List<int>(values)"].categories, Has.Member("object_state_write"));
+            Assert.That(
+                resolutions["new List<int>(values)"].freshnessClassification,
+                Is.EqualTo("fresh_array_candidate_requires_non_pure_resolution"));
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_ListCapacitySetterAsImpureEvidence()
         {
             const string source = @"
@@ -7944,10 +8066,10 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("known_mutable_collection"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Collections.Generic.List<int>"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Collections.Generic.List<int>.List()"));
         }
 
         [Test]
