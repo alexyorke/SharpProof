@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -89,16 +90,28 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
                 if (fieldSymbol.IsReadOnly)
                 {
-                    if (PurityAnalysisEngine.IsKnownImpure(fieldSymbol))
+                    var knownImpureMemberSource = PurityAnalysisEngine.GetKnownImpureMemberSource(fieldSymbol);
+                    var hasConfiguredKnownImpureMember = string.Equals(
+                        knownImpureMemberSource,
+                        "config_known_impure",
+                        StringComparison.Ordinal);
+
+                    if (hasConfiguredKnownImpureMember)
                     {
-                        PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static readonly field '{fieldSymbol.Name}' is explicitly known impure.");
-                        return ImpureFieldRead(fieldReferenceOperation, "known_impure_member");
+                        PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static readonly field '{fieldSymbol.Name}' is configured known impure.");
+                        return ImpureFieldRead(fieldReferenceOperation, "known_impure_member", knownImpureMemberSource);
                     }
 
                     if (hasTrustedGeneratedFieldPurity && generatedPurity.IsPure)
                     {
                         PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static readonly field '{fieldSymbol.Name}' is trusted pure from generated purity summary.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                    }
+
+                    if (knownImpureMemberSource != null)
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static readonly field '{fieldSymbol.Name}' is built-in known impure.");
+                        return ImpureFieldRead(fieldReferenceOperation, "known_impure_member", knownImpureMemberSource);
                     }
 
                     PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static readonly field '{fieldSymbol.Name}' - Pure");
