@@ -1653,6 +1653,7 @@ public static class StringJoinCatalogSignatureSamples
         public void ListCapacity_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.Collections.Generic.List<T>.Capacity.get");
+            AssertNotInManualCatalogs("System.Collections.Generic.List<T>.Capacity.set");
         }
 
         [Test]

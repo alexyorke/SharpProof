@@ -661,7 +661,6 @@ public static class Constants
         "System.Collections.Generic.HashSet<T>.Clear()",
         "System.Collections.Generic.HashSet<T>.Remove(T)",
         "System.Collections.Generic.List<T>.AddRange(System.Collections.Generic.IEnumerable<T>)",
-        "System.Collections.Generic.List<T>.Capacity.set",
         "System.Collections.Generic.List<T>.InsertRange(int, System.Collections.Generic.IEnumerable<T>)",
         "System.Collections.Generic.List<T>.RemoveAll(System.Predicate<T>)",
         "System.Collections.Generic.List<T>.RemoveAt(int)",

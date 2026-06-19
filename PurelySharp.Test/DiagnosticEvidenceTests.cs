@@ -4370,6 +4370,53 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_ListCapacitySetterAsImpureEvidence()
+        {
+            const string source = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(List<int> values)
+    {
+        values.Capacity = 1;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var methodSymbol = ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<MemberAccessExpressionSyntax>()
+                        .Single(node => node.ToString() == "values.Capacity"))
+                .Symbol!).SetMethod!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
+            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+            var purityEntry = args[2]!;
+            var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("Capacity.set"));
+            Assert.That(matched, Is.True, "Generated purity catalog should resolve List<T>.Capacity.set.");
+            Assert.That(classification, Is.EqualTo("impure"),
+                "List<T>.Capacity.set mutates list state and should remain generated impure.");
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_ListFindIndex()
         {
             const string source = @"

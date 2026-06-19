@@ -280,6 +280,26 @@ public class TestClass
         }
 
         [Test]
+        public async Task MethodWithListCapacitySetter_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(List<int> list)
+    {
+        list.Capacity = 1;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task PureMethodWithListContains_NoDiagnostic()
         {
             var test = @"

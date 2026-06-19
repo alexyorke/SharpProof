@@ -6121,24 +6121,18 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
             var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
-            var capacitySetterRow = knownImpureRows.Single(row => string.Equals(
-                row.GetProperty("Symbol").GetString(),
-                "System.Collections.Generic.List<T>.Capacity.set",
-                StringComparison.Ordinal));
-            var capacitySetterMatchedKeys = capacitySetterRow
-                .GetProperty("MatchedExactSymbolKeys")
-                .EnumerateArray()
-                .Select(static value => value.GetString())
-                .OfType<string>()
-                .ToArray();
-
-            Assert.That(capacitySetterRow.GetProperty("Classification").GetString(), Is.EqualTo("impure"));
             Assert.That(
-                capacitySetterMatchedKeys.Any(static key => key.StartsWith("System.Collections.Generic.List`1.set_Capacity(int)", StringComparison.Ordinal)),
-                Is.True);
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.Capacity.set",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.Capacity.set should no longer overlap the manual impure catalog.");
 
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Capacity()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.get_Capacity()", "none");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.set_Capacity(int)", "impure", "global_state_read", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.set_Capacity(int)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Count()", "pure");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.Exists(System.Predicate`1<!0>)", "pure");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.FindIndex(System.Predicate`1<!0>)", "pure");
@@ -6158,6 +6152,7 @@ public static class StringComparisonFixture
                 .ToArray();
 
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Capacity()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.set_Capacity(int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Count()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Exists(System.Predicate`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.FindIndex(System.Predicate`1<!0>)"));
