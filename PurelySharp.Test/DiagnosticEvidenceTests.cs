@@ -30,6 +30,7 @@ namespace PurelySharp.Test
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
+using System.Diagnostics;
 using PurelySharp.Attributes;
 
 public class TestClass
@@ -37,7 +38,7 @@ public class TestClass
     [EnforcePure]
     public void TestMethod()
     {
-        Console.Clear();
+        Debug.WriteLine(""impure"");
     }
 }");
 
@@ -47,7 +48,7 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityOperationKindProperty], Is.EqualTo("Invocation"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("known_impure_namespace_or_type"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.Clear"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.Debug.WriteLine"));
         }
 
         [Test]
@@ -70,6 +71,28 @@ public class TestClass
 
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.WriteLine"));
+        }
+
+        [Test]
+        public async Task Ps0002_ConsoleClear_UsesGeneratedPuritySummarySource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        Console.Clear();
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.Clear"));
         }
 
         [Test]
@@ -2451,6 +2474,155 @@ public class TestClass
                 entry =>
                 {
                     var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(8));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "generated_purity_summary" }));
+            foreach (var label in classifications.Keys)
+            {
+                Assert.That(classifications[label].matched, Is.True,
+                    "Generated purity catalog should resolve " + label + ".");
+                Assert.That(classifications[label].classification, Is.EqualTo("impure"),
+                    "Generated purity catalog should classify " + label + " as impure.");
+            }
+        }
+
+        [Test]
+        public async Task GeneratedPurityCatalog_Resolves_ConsoleControlMembersAsImpureEvidence()
+        {
+            const string source = @"
+using System;
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void Clear()
+    {
+        Console.Clear();
+    }
+
+    [EnforcePure]
+    public void Beep()
+    {
+        Console.Beep();
+    }
+
+    [EnforcePure]
+    public ConsoleKeyInfo ReadKey()
+    {
+        return Console.ReadKey();
+    }
+
+    [EnforcePure]
+    public void SetCursorPosition()
+    {
+        Console.SetCursorPosition(0, 0);
+    }
+
+    [EnforcePure]
+    public void SetIn(TextReader reader)
+    {
+        Console.SetIn(reader);
+    }
+
+    [EnforcePure]
+    public bool KeyAvailable()
+    {
+        return Console.KeyAvailable;
+    }
+
+    [EnforcePure]
+    public void SetBufferHeight()
+    {
+        Console.BufferHeight = 1;
+    }
+
+    [EnforcePure]
+    public void SetTitle()
+    {
+        Console.Title = ""impure"";
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics
+                .Where(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMembers = new (string Label, ISymbol Symbol)[]
+            {
+                (
+                    "System.Console.Clear()",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.Clear()"))
+                        .Symbol!),
+                (
+                    "System.Console.Beep()",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.Beep()"))
+                        .Symbol!),
+                (
+                    "System.Console.ReadKey()",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.ReadKey()"))
+                        .Symbol!),
+                (
+                    "System.Console.SetCursorPosition(int, int)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.SetCursorPosition(0, 0)"))
+                        .Symbol!),
+                (
+                    "System.Console.SetIn(System.IO.TextReader)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.SetIn(reader)"))
+                        .Symbol!),
+                (
+                    "System.Console.get_KeyAvailable()",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.KeyAvailable"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.set_BufferHeight(int)",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.BufferHeight"))
+                        .Symbol!).SetMethod!),
+                (
+                    "System.Console.set_Title(string)",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.Title"))
+                        .Symbol!).SetMethod!),
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = trackedMembers.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol, compilation, null };
                     var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
                     var purityEntry = args[2]!;
                     var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;

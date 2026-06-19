@@ -5191,6 +5191,78 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeConsoleControlSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Console.dll",
+                160,
+                2,
+                "System.Console.Beep",
+                "System.Console.Clear",
+                "System.Console.ReadKey",
+                "System.Console.SetCursorPosition",
+                "System.Console.SetIn",
+                "System.Console.get_KeyAvailable",
+                "System.Console.set_BufferHeight",
+                "System.Console.set_Title");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Console.Beep()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.Beep()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.Clear()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.Clear()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.ReadKey()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.ReadKey()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.SetCursorPosition(int, int)", "impure", "impure_callee", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Console.SetCursorPosition(int, int)", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.SetIn(System.IO.TextReader)", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Console.SetIn(System.IO.TextReader)", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_KeyAvailable()", "impure", "impure_callee", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_KeyAvailable()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.set_BufferHeight(int)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.set_BufferHeight(int)", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.set_Title(string)", "impure", "impure_callee", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Console.set_Title(string)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Console.Beep()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Beep(int, int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Clear()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.ReadKey()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.ReadKey(bool)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.SetCursorPosition(int, int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.SetIn(System.IO.TextReader)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_KeyAvailable()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.set_BufferHeight(int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.set_Title(string)", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Console.Beep()",
+                "System.Console.Beep(int, int)",
+                "System.Console.Clear()",
+                "System.Console.ReadKey()",
+                "System.Console.ReadKey(bool)",
+                "System.Console.SetCursorPosition(int, int)",
+                "System.Console.SetIn(System.IO.TextReader)",
+                "System.Console.get_KeyAvailable()",
+                "System.Console.set_BufferHeight(int)",
+                "System.Console.set_Title(string)",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeObjectTypeMetadataSlice_UsesGeneratedPurityEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

@@ -293,6 +293,27 @@ public static class EnvironmentCatalogSignatureSamples
         }
 
         [Test]
+        public void ConsoleControlHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Console.Beep()",
+                "System.Console.Clear()",
+                "System.Console.ReadKey()",
+                "System.Console.SetCursorPosition(int, int)",
+                "System.Console.SetIn(System.IO.TextReader)",
+                "System.Console.get_KeyAvailable()",
+                "System.Console.set_BufferHeight(int)",
+                "System.Console.set_Title(string)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void AbstractDispatchFallbacks_AreNotBackedByManualImpureCatalogEntries()
         {
             AssertNotInManualCatalogs("object.ToString()");

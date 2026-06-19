@@ -358,6 +358,23 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Console.Control.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Console.Control.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Console.dll",
+      "Limit": 160,
+      "MaxDepth": 2,
+      "SymbolPrefixes": [
+        "System.Console.Beep",
+        "System.Console.Clear",
+        "System.Console.ReadKey",
+        "System.Console.SetCursorPosition",
+        "System.Console.SetIn",
+        "System.Console.get_KeyAvailable",
+        "System.Console.set_BufferHeight",
+        "System.Console.set_Title"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/DateTimeOffset.Additional.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/DateTimeOffset.Additional.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [
