@@ -7587,6 +7587,39 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_PureGeneratedPurity_DoesNotOverrideReflectionCategory_ForEnvironmentTickCountProperty()
+        {
+            const string metadataSymbol = "System.Environment.get_TickCount()";
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        return Environment.TickCount;
+    }
+}",
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new InMemoryAdditionalText(
+                        "Synthetic.Environment.TickCount.PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            typeof(Environment).Assembly.Location,
+                            metadataSymbol,
+                            "pure",
+                            "[]"))));
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("reflection_environment_source"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
+            Assert.That(diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.ImpurityCatalogSourceProperty), Is.False);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Environment.TickCount"));
+        }
+
+        [Test]
         public async Task Ps0002_EnvironmentStackTrace_UsesGeneratedPuritySummaryEvidence()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
@@ -7631,6 +7664,69 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("reflection_environment_source"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Type.GetType"));
+        }
+
+        [Test]
+        public async Task Ps0002_PureGeneratedPurity_DoesNotOverrideReflectionCategory_ForTypeToString()
+        {
+            const string metadataSymbol = "System.Type.ToString()";
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(System.Type type)
+    {
+        return type.ToString();
+    }
+}",
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new InMemoryAdditionalText(
+                        "Synthetic.TypeToString.PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            typeof(Type).Assembly.Location,
+                            metadataSymbol,
+                            "pure",
+                            "[]"))));
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("reflection_environment_source"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.ImpurityCatalogSourceProperty), Is.False);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Type.ToString"));
+        }
+
+        [Test]
+        public async Task Ps0002_PureGeneratedPurity_DoesNotOverrideReflectionCategory_ForTypeGetTypeFromHandle()
+        {
+            const string metadataSymbol = "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)";
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Type TestMethod(RuntimeTypeHandle handle)
+    {
+        return Type.GetTypeFromHandle(handle);
+    }
+}",
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new InMemoryAdditionalText(
+                        "Synthetic.TypeGetTypeFromHandle.PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            typeof(Type).Assembly.Location,
+                            metadataSymbol,
+                            "pure",
+                            "[]"))));
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("reflection_environment_source"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.ImpurityCatalogSourceProperty), Is.False);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Type.GetTypeFromHandle"));
         }
 
         [Test]

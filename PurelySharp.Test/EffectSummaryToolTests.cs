@@ -4221,6 +4221,134 @@ public readonly struct ConversionFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_ExcludesReflectionSensitiveReviewedMembers()
+        {
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-artifact-source-exclusions-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var metadataSeedOutputPath = Path.Combine(workingDirectory, "metadata-seed.PurelySharp.EffectSummary.json");
+            var metadataOutputPath = Path.Combine(workingDirectory, "metadata-regenerated.PurelySharp.EffectSummary.json");
+            var environmentSeedOutputPath = Path.Combine(workingDirectory, "environment-seed.PurelySharp.EffectSummary.json");
+            var environmentOutputPath = Path.Combine(workingDirectory, "environment-regenerated.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            await RunEffectSummaryToolAsync(
+                "--framework",
+                "net8.0",
+                "--runtime-assembly",
+                "System.Private.CoreLib.dll",
+                "--symbol-prefix",
+                "System.Exception.get_Message",
+                "--symbol-prefix",
+                "System.Object.GetType",
+                "--symbol-prefix",
+                "System.Type.ToString",
+                "--include-callees",
+                "--classify-purity",
+                "--compare-manual-catalogs",
+                "--limit",
+                "80",
+                "--output",
+                metadataSeedOutputPath);
+
+            await RunEffectSummaryToolAsync(
+                "--framework",
+                "net8.0",
+                "--runtime-assembly",
+                "System.Private.CoreLib.dll",
+                "--symbol-prefix",
+                "System.Environment.get_CommandLine",
+                "--symbol-prefix",
+                "System.Environment.get_Version",
+                "--include-callees",
+                "--classify-purity",
+                "--compare-manual-catalogs",
+                "--limit",
+                "24",
+                "--output",
+                environmentSeedOutputPath);
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Defaults = new
+                    {
+                        Framework = "net8.0",
+                        RuntimeAssemblyName = "System.Private.CoreLib.dll",
+                        IncludeCallees = true,
+                        IncludePurityClassification = true,
+                        CompareManualCatalogs = true,
+                        ExcludedSymbolPrefixes = new[]
+                        {
+                            "System.Reflection.MemberInfo.get_Name",
+                            "System.Type.GetTypeFromHandle",
+                            "System.Type.ToString",
+                        },
+                    },
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = metadataOutputPath,
+                            SourceSummaryPath = metadataSeedOutputPath,
+                            Limit = 80,
+                            SymbolPrefixes = new[]
+                            {
+                                "System.Exception.get_Message",
+                                "System.Object.GetType",
+                            },
+                        },
+                        new
+                        {
+                            OutputPath = environmentOutputPath,
+                            SourceSummaryPath = environmentSeedOutputPath,
+                            Limit = 24,
+                            SymbolPrefixes = new[]
+                            {
+                                "System.Environment.get_CommandLine",
+                                "System.Environment.get_Version",
+                            },
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
+
+            using var metadataSummary = JsonDocument.Parse(await File.ReadAllTextAsync(metadataOutputPath));
+            var metadataGeneratedSymbols = metadataSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(metadataGeneratedSymbols, Does.Contain("System.Exception.get_Message()"));
+            Assert.That(metadataGeneratedSymbols, Does.Contain("System.Object.GetType()"));
+            Assert.That(metadataGeneratedSymbols, Does.Not.Contain("System.Reflection.MemberInfo.get_Name()"));
+            Assert.That(metadataGeneratedSymbols, Does.Not.Contain("System.Type.ToString()"));
+
+            using var environmentSummary = JsonDocument.Parse(await File.ReadAllTextAsync(environmentOutputPath));
+            var environmentGeneratedSymbols = environmentSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(environmentGeneratedSymbols, Does.Contain("System.Environment.get_CommandLine()"));
+            Assert.That(environmentGeneratedSymbols, Does.Contain("System.Environment.get_Version()"));
+            Assert.That(environmentGeneratedSymbols, Does.Not.Contain("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_Classifies_DirectoryCurrentDirectory_AsImpure()
         {
             var workingDirectory = Path.Combine(

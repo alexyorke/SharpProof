@@ -5,7 +5,12 @@
     "RuntimeAssemblyName": "System.Private.CoreLib.dll",
     "IncludeCallees": true,
     "IncludePurityClassification": true,
-    "CompareManualCatalogs": true
+    "CompareManualCatalogs": true,
+    "ExcludedSymbolPrefixes": [
+      "System.Reflection.MemberInfo.get_Name",
+      "System.Type.GetTypeFromHandle",
+      "System.Type.ToString"
+    ]
   },
   "Artifacts": [
     {
@@ -486,8 +491,7 @@
         "System.Exception.get_HResult",
         "System.Exception.get_InnerException",
         "System.Exception.get_Message",
-        "System.Object.GetType",
-        "System.Type.ToString"
+        "System.Object.GetType"
       ]
     },
     {
@@ -495,8 +499,7 @@
       "SourceSummaryPath": "PurelySharp.Analyzer/Object.TypeMetadata.PurelySharp.EffectSummary.json",
       "Limit": 20,
       "SymbolPrefixes": [
-        "System.Object.GetType",
-        "System.Type.ToString"
+        "System.Object.GetType"
       ]
     },
     {

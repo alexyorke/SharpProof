@@ -66,6 +66,13 @@ internal static class EffectSummaryCli
                 options.IncludeTransitiveRoots))
             .ToArray();
 
+        if (options.ExcludedSymbolPrefixes.Count > 0)
+        {
+            reports = reports
+                .Select(report => ArtifactSpecSymbolFilter.Exclude(report, options.ExcludedSymbolPrefixes))
+                .ToArray();
+        }
+
         PurityClassificationReport? purityClassificationReport = null;
         GeneratedPurityCatalogDocument? generatedPurityCatalog = null;
         if (options.IncludePurityClassification || options.CompareManualCatalogs)
@@ -144,6 +151,8 @@ internal sealed class CliOptions
     public List<string> ExactSymbols { get; } = new();
 
     public List<string> ExactSymbolKeys { get; } = new();
+
+    public List<string> ExcludedSymbolPrefixes { get; } = new();
 
     public string? ArtifactSpecPath { get; private set; }
 
@@ -250,9 +259,20 @@ internal sealed class CliOptions
             options.SymbolPrefixes.AddRange(artifact.SymbolPrefixes);
         }
 
+        if (artifact.ExcludedSymbolPrefixes != null)
+        {
+            options.ExcludedSymbolPrefixes.AddRange(artifact.ExcludedSymbolPrefixes);
+        }
+        else if (defaults?.ExcludedSymbolPrefixes != null)
+        {
+            options.ExcludedSymbolPrefixes.AddRange(defaults.ExcludedSymbolPrefixes);
+        }
+
         if (!string.IsNullOrWhiteSpace(artifact.SourceSummaryPath))
         {
-            var sourceSymbols = ArtifactSpecSymbolSource.LoadSymbols(artifact.SourceSummaryPath!);
+            var sourceSymbols = ArtifactSpecSymbolSource.LoadSymbols(
+                artifact.SourceSummaryPath!,
+                options.ExcludedSymbolPrefixes);
             options.ExactSymbols.AddRange(sourceSymbols.Symbols);
             options.ExactSymbolKeys.AddRange(sourceSymbols.ExactSymbolKeys);
         }
@@ -327,6 +347,8 @@ internal sealed class ArtifactSpecDefaults
     public bool? IncludePurityClassification { get; set; }
 
     public bool? CompareManualCatalogs { get; set; }
+
+    public string[]? ExcludedSymbolPrefixes { get; set; }
 }
 
 internal sealed class ArtifactSpecEntry
@@ -354,15 +376,18 @@ internal sealed class ArtifactSpecEntry
     public bool? IncludePurityClassification { get; set; }
 
     public bool? CompareManualCatalogs { get; set; }
+
+    public string[]? ExcludedSymbolPrefixes { get; set; }
 }
 
 internal static class ArtifactSpecSymbolSource
 {
-    public static ArtifactSpecSymbolSet LoadSymbols(string path)
+    public static ArtifactSpecSymbolSet LoadSymbols(string path, IReadOnlyList<string>? excludedSymbolPrefixes = null)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(path));
         var symbols = new HashSet<string>(StringComparer.Ordinal);
         var exactSymbolKeys = new HashSet<string>(StringComparer.Ordinal);
+        var exclusionPrefixes = excludedSymbolPrefixes ?? Array.Empty<string>();
 
         if (document.RootElement.TryGetProperty("GeneratedPurityCatalog", out var generatedPurityCatalog) &&
             generatedPurityCatalog.ValueKind == JsonValueKind.Object &&
@@ -372,7 +397,8 @@ internal static class ArtifactSpecSymbolSource
             foreach (var entryElement in entriesElement.EnumerateArray())
             {
                 var symbol = GetTrimmedStringProperty(entryElement, "Symbol");
-                if (!string.IsNullOrWhiteSpace(symbol))
+                if (!string.IsNullOrWhiteSpace(symbol) &&
+                    !ArtifactSpecSymbolFilter.MatchesExcludedPrefix(symbol, exclusionPrefixes))
                 {
                     symbols.Add(symbol);
                 }
@@ -400,7 +426,8 @@ internal static class ArtifactSpecSymbolSource
                 foreach (var methodElement in methodsElement.EnumerateArray())
                 {
                     var symbol = GetTrimmedStringProperty(methodElement, "Symbol");
-                    if (!string.IsNullOrWhiteSpace(symbol))
+                    if (!string.IsNullOrWhiteSpace(symbol) &&
+                        !ArtifactSpecSymbolFilter.MatchesExcludedPrefix(symbol, exclusionPrefixes))
                     {
                         symbols.Add(symbol);
                     }
@@ -438,6 +465,34 @@ internal static class ArtifactSpecSymbolSource
 internal sealed record ArtifactSpecSymbolSet(
     string[] Symbols,
     string[] ExactSymbolKeys);
+
+internal static class ArtifactSpecSymbolFilter
+{
+    public static AssemblyEffectReport Exclude(
+        AssemblyEffectReport report,
+        IReadOnlyList<string> excludedSymbolPrefixes)
+    {
+        var filteredMethods = report.Methods
+            .Where(method => !MatchesExcludedPrefix(method.Symbol, excludedSymbolPrefixes))
+            .ToArray();
+
+        return report with
+        {
+            EmittedMethodCount = filteredMethods.Length,
+            Methods = filteredMethods,
+        };
+    }
+
+    public static bool MatchesExcludedPrefix(string symbol, IReadOnlyList<string> excludedSymbolPrefixes)
+    {
+        if (string.IsNullOrWhiteSpace(symbol) || excludedSymbolPrefixes.Count == 0)
+        {
+            return false;
+        }
+
+        return excludedSymbolPrefixes.Any(prefix => symbol.StartsWith(prefix, StringComparison.Ordinal));
+    }
+}
 
 internal static class ReviewedSummaryCatalogLoader
 {
