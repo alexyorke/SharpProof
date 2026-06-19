@@ -69,6 +69,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 IsPotentiallyDispatchedProperty(propertySymbol, context.SemanticModel.Compilation) &&
                 !(allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol));
             var dispatchGetterWasProvenPure = false;
+            var knownImpureMemberSource = PurityAnalysisEngine.GetKnownImpureMemberSource(propertySymbol);
+            var hasConfiguredKnownImpureMember = string.Equals(
+                knownImpureMemberSource,
+                "config_known_impure",
+                StringComparison.Ordinal);
 
             if (isPureEnforcedProperty && !requiresDispatchCheck)
             {
@@ -80,9 +85,9 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             string impureSig = propertySymbol.OriginalDefinition.ToDisplayString();
             PurityAnalysisEngine.LogDebug($"      [PropRefRule] Checking IsKnownImpure for property: '{impureSig}'");
-            if (PurityAnalysisEngine.IsKnownImpure(propertySymbol))
+            if (hasConfiguredKnownImpureMember)
             {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is known impure. Impure.");
+                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is configured known impure. Impure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     propertyReferenceOperation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(
@@ -91,7 +96,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         operation: propertyReferenceOperation,
                         syntaxNode: propertyReferenceOperation.Syntax,
                         symbol: propertySymbol,
-                        catalogSource: "known_impure_member"));
+                        catalogSource: knownImpureMemberSource));
             }
 
             if (!requiresDispatchCheck && hasTrustedGeneratedPurity)
@@ -115,6 +120,34 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: getterSymbol,
                         catalogSource: "generated_purity_summary"));
                 }
+            }
+
+            if (knownImpureMemberSource != null)
+            {
+                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is built-in known impure. Impure.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    propertyReferenceOperation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        GetCatalogHitCategory(propertySymbol),
+                        ruleName: nameof(PropertyReferencePurityRule),
+                        operation: propertyReferenceOperation,
+                        syntaxNode: propertyReferenceOperation.Syntax,
+                        symbol: propertySymbol,
+                        catalogSource: knownImpureMemberSource));
+            }
+
+            if (PurityAnalysisEngine.IsKnownImpure(propertySymbol))
+            {
+                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is known impure via non-member fallback. Impure.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    propertyReferenceOperation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        GetCatalogHitCategory(propertySymbol),
+                        ruleName: nameof(PropertyReferencePurityRule),
+                        operation: propertyReferenceOperation,
+                        syntaxNode: propertyReferenceOperation.Syntax,
+                        symbol: propertySymbol,
+                        catalogSource: "known_impure_member"));
             }
 
             if (!requiresDispatchCheck &&

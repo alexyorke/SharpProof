@@ -1368,6 +1368,43 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_EffectSummary_OverridesKnownImpureThreadCurrentThreadProperty_WhenGeneratedSummaryIsPure()
+        {
+            var identity = GetAssemblyIdentity(typeof(System.Threading.Thread).Assembly.Location);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+using System.Threading;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public Thread TestMethod()
+    {
+        return Thread.CurrentThread;
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "System.Threading.Thread.get_CurrentThread()",
+                            "pure",
+                            """[]"""))
+                });
+
+            Assert.That(
+                diagnostics.Any(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated getter purity should override the built-in known-impure property fallback for metadata properties.");
+        }
+
+        [Test]
         public async Task Ps0002_EffectSummary_WithTrustedGeneratedPureBinaryOperatorClassification_SuppressesUnknownExternalCall()
         {
             const string boundarySource = """
