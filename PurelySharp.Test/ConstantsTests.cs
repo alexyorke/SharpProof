@@ -2841,6 +2841,8 @@ public static class CatalogSignatureSamples
         _ = new UIntPtr(1u);
         _ = new CallerArgumentExpressionAttribute(""value"");
         _ = new MethodImplAttribute(MethodImplOptions.AggressiveInlining);
+        IntPtr ptr = IntPtr.Zero;
+        _ = System.Runtime.InteropServices.Marshal.PtrToStructure<int>(ptr);
         return Array.Empty<int>().Length + list.Count + values.Length;
     }
 }";
@@ -2868,6 +2870,9 @@ public static class CatalogSignatureSamples
 
             Assert.That(GetObjectCreationSignature(compilation, syntaxTree, "new string(chars)"), Is.EqualTo("string.String(System.ReadOnlySpan<char>)"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetObjectCreationSignature(compilation, syntaxTree, "new string(chars)")));
+
+            Assert.That(GetInvocationSignature(compilation, syntaxTree, "System.Runtime.InteropServices.Marshal.PtrToStructure<int>(ptr)"), Is.EqualTo("System.Runtime.InteropServices.Marshal.PtrToStructure<T>(System.IntPtr)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "System.Runtime.InteropServices.Marshal.PtrToStructure<int>(ptr)"));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "CryptographicOperations.FixedTimeEquals(left, right)"), Is.EqualTo("System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan<byte>, System.ReadOnlySpan<byte>)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "CryptographicOperations.FixedTimeEquals(left, right)"));

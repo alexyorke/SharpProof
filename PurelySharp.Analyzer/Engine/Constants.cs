@@ -822,7 +822,6 @@ public static class Constants
 
         "System.Reflection.FieldInfo.GetValue(object)",
         "System.Reflection.PropertyInfo.GetValue(object)",
-        "System.Runtime.InteropServices.Marshal.PtrToStructure<T>(System.IntPtr)",
 
 
         "System.Security.Claims.ClaimsPrincipal.IsInRole(string)",

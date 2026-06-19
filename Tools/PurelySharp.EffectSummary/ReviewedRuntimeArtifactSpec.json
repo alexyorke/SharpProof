@@ -794,6 +794,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Marshal.PtrToStructure.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Marshal.PtrToStructure.PurelySharp.EffectSummary.json",
+      "IncludeCallees": false,
+      "Limit": 12,
+      "SymbolPrefixes": [
+        "System.Runtime.InteropServices.Marshal.PtrToStructure"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Cryptography.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Cryptography.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [

@@ -6127,6 +6127,75 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_Classifies_MarshalPtrToStructure_AsImpure()
+        {
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-marshal-ptrtostructure-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var outputPath = Path.Combine(workingDirectory, "Marshal.PtrToStructure.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Defaults = new
+                    {
+                        Framework = "net8.0",
+                        RuntimeAssemblyName = "System.Private.CoreLib.dll",
+                        IncludeCallees = true,
+                        IncludePurityClassification = true,
+                        CompareManualCatalogs = true,
+                    },
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = outputPath,
+                            SourceSummaryPath = "PurelySharp.Analyzer/Marshal.PtrToStructure.PurelySharp.EffectSummary.json",
+                            IncludeCallees = false,
+                            SymbolPrefixes = new[]
+                            {
+                                "System.Runtime.InteropServices.Marshal.PtrToStructure",
+                            },
+                            Limit = 12,
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
+
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Runtime.InteropServices.Marshal.PtrToStructure(nint)", "impure", "global_state_read", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Runtime.InteropServices.Marshal.PtrToStructure(nint)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => string.Equals(symbol, "System.Runtime.InteropServices.Marshal.PtrToStructure(nint)", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Runtime.InteropServices.Marshal.PtrToStructure(nint)",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeWebUtilitySlice_TreatsHelpersAsGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Net.WebUtility", limit: 40);
