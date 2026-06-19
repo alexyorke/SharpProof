@@ -365,10 +365,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     originalDefinitionSymbol,
                     context.SemanticModel.Compilation,
                     out generatedPurity);
-            var suppressGeneratedPureTrust = hasTrustedGeneratedPurity &&
-                generatedPurity.IsPure &&
-                string.Equals(GetCatalogHitCategory(originalDefinitionSymbol), "reflection_environment_source", StringComparison.Ordinal);
-            var allowsKnownPureFallback = !hasTrustedGeneratedPurity || suppressGeneratedPureTrust;
+            var allowsKnownPureFallback = !hasTrustedGeneratedPurity;
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Checking purity of {invocationOperation.Arguments.Length} arguments for {originalDefinitionSymbol.Name}.");
             foreach (var argument in invocationOperation.Arguments)
@@ -553,7 +550,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: "known_impure_namespace_or_type"));
             }
 
-            if (hasTrustedGeneratedPurity && !suppressGeneratedPureTrust)
+            if (hasTrustedGeneratedPurity)
             {
                 if (generatedPurity.IsPure)
                 {
@@ -571,19 +568,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             nameof(MethodInvocationPurityRule),
                             invocationOperation,
                             symbol: originalDefinitionSymbol,
-                            catalogSource: "generated_purity_summary"));
+                        catalogSource: "generated_purity_summary"));
                 }
-            }
-            else if (suppressGeneratedPureTrust)
-            {
-                PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (reflection-sensitive metadata symbol cannot trust generated pure summary)");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "reflection_environment_source",
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: originalDefinitionSymbol));
             }
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Checking IsKnownPureBCLMember with signature: '{originalDefinitionSymbol.ToDisplayString()}'");

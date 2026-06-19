@@ -3536,6 +3536,49 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_PathCombineAsPureEvidence()
+        {
+            const string source = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(string left, string right)
+    {
+        return Path.Combine(left, right);
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var invocation = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Single(node => node.ToString() == "Path.Combine(left, right)");
+            var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
+            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow Path.Combine(string, string).");
+            Assert.That(matched, Is.True,
+                "Generated purity catalog should resolve Path.Combine(string, string) from runtime metadata evidence.");
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_ObjectReferenceEqualsTupleFactoriesAndArraySegmentConstructors()
         {
             const string source = @"
@@ -7564,7 +7607,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task Ps0002_EnvironmentProperty_IncludesReflectionEnvironmentCategory()
+        public async Task Ps0002_EnvironmentTickCountProperty_UsesGeneratedConservativeUnknownEvidence()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
@@ -7581,13 +7624,12 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("reflection_environment_source"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("unknown_external_call"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Environment.TickCount"));
         }
 
         [Test]
-        public async Task Ps0002_PureGeneratedPurity_DoesNotOverrideReflectionCategory_ForEnvironmentTickCountProperty()
+        public async Task GeneratedPuritySummary_Allows_EnvironmentTickCount_WhenSyntheticMetadataEvidenceIsPure()
         {
             const string metadataSymbol = "System.Environment.get_TickCount()";
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
@@ -7611,12 +7653,10 @@ public class TestClass
                             "pure",
                             "[]"))));
 
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("reflection_environment_source"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
-            Assert.That(diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.ImpurityCatalogSourceProperty), Is.False);
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Environment.TickCount"));
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated pure summaries should override the conservative TickCount fallback.");
         }
 
         [Test]
@@ -7667,7 +7707,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task Ps0002_PureGeneratedPurity_DoesNotOverrideReflectionCategory_ForTypeToString()
+        public async Task GeneratedPuritySummary_Allows_TypeToString_WhenMetadataEvidenceIsPure()
         {
             const string metadataSymbol = "System.Type.ToString()";
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
@@ -7690,15 +7730,14 @@ public class TestClass
                             "pure",
                             "[]"))));
 
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("reflection_environment_source"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.ImpurityCatalogSourceProperty), Is.False);
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Type.ToString"));
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated pure summaries should override the conservative reflection fallback for Type.ToString().");
         }
 
         [Test]
-        public async Task Ps0002_PureGeneratedPurity_DoesNotOverrideReflectionCategory_ForTypeGetTypeFromHandle()
+        public async Task GeneratedPuritySummary_Allows_TypeGetTypeFromHandle_WhenMetadataEvidenceIsPure()
         {
             const string metadataSymbol = "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)";
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
@@ -7722,11 +7761,10 @@ public class TestClass
                             "pure",
                             "[]"))));
 
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("reflection_environment_source"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.ImpurityCatalogSourceProperty), Is.False);
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Type.GetTypeFromHandle"));
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated pure summaries should override the conservative reflection fallback for Type.GetTypeFromHandle(RuntimeTypeHandle).");
         }
 
         [Test]
