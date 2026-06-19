@@ -202,8 +202,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 var dispatchResult = CheckDispatchedGetterPurity(
                     propertyReferenceOperation,
                     context,
-                    currentState,
-                    isPureEnforcedProperty);
+                    currentState);
                 if (!dispatchResult.IsPure)
                 {
                     return dispatchResult;
@@ -1086,8 +1085,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static PurityAnalysisEngine.PurityAnalysisResult CheckDispatchedGetterPurity(
             IPropertyReferenceOperation propertyReferenceOperation,
             PurityAnalysisContext context,
-            PurityAnalysisEngine.PurityAnalysisState currentState,
-            bool trustContractWhenNoTargets)
+            PurityAnalysisEngine.PurityAnalysisState currentState)
         {
             var hasExactReceiverType = PurityAnalysisEngine.TryResolveKnownConcreteType(
                 propertyReferenceOperation.Instance,
@@ -1121,11 +1119,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (candidates.IsDefaultOrEmpty)
             {
-                if (trustContractWhenNoTargets)
-                {
-                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-                }
-
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                     propertyReferenceOperation.Syntax,
                     PurityAnalysisEngine.PurityEvidence.Create(

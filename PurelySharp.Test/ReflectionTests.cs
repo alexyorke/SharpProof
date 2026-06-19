@@ -341,7 +341,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeToString_Diagnostic()
+        public async Task TypeToString_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -349,7 +349,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string {|PS0002:TestMethod|}(System.Type type)
+    public string TestMethod(System.Type type)
     {
         return type.ToString();
     }
@@ -675,7 +675,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeGetTypeFromHandle_Diagnostic()
+        public async Task TypeGetTypeFromHandle_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -684,7 +684,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public Type {|PS0002:TestMethod|}(RuntimeTypeHandle handle)
+    public Type TestMethod(RuntimeTypeHandle handle)
     {
         return Type.GetTypeFromHandle(handle);
     }

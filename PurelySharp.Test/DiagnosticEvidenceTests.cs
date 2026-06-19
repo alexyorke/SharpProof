@@ -7375,6 +7375,34 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ClosedWorldInterfaceDispatchWithoutImplementation_UsesDynamicDispatchEvidence()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using PurelySharp.Attributes;
+
+internal interface IWorker
+{
+    int Compute(int value);
+}
+
+public class WorkerHost
+{
+    [EnforcePure]
+    internal int ComputeWithUnknownImplementation(IWorker worker, int value)
+    {
+        return worker.Compute(value);
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("dynamic_dispatch"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.ImpurityCatalogSourceProperty), Is.False);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("IWorker.Compute"));
+        }
+
+        [Test]
         public async Task Ps0002_SourceExternCall_IncludesUnknownExternalCallCategory()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

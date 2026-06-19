@@ -96,7 +96,7 @@ public class Service
         }
 
         [Test]
-        public async Task InternalInterfaceWithoutKnownImplementation_NoDiagnostic()
+        public async Task InternalInterfaceWithoutKnownImplementation_Diagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -110,7 +110,7 @@ internal interface IWorker
 public class WorkerHost
 {
     [EnforcePure]
-    internal int ComputeWithUnknownImplementation(IWorker worker, int value)
+    internal int {|PS0002:ComputeWithUnknownImplementation|}(IWorker worker, int value)
     {
         return worker.Compute(value);
     }

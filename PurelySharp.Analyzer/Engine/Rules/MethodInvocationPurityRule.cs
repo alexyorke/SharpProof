@@ -1017,8 +1017,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (candidateMethods.Count == 0)
             {
-                PurityAnalysisEngine.LogDebug($"  [MIR] No concrete dispatch candidates found for {invokedMethodSymbol.Name}; assuming pure when external dispatch is impossible.");
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                PurityAnalysisEngine.LogDebug($"  [MIR] No concrete dispatch candidates found for {invokedMethodSymbol.Name}; treating unresolved closed-world dispatch as impure conservatively.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    invocationOperation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        "dynamic_dispatch",
+                        nameof(MethodInvocationPurityRule),
+                        invocationOperation,
+                        symbol: invokedMethodSymbol));
             }
 
             foreach (var candidateMethod in candidateMethods)
