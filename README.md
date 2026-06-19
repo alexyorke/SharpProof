@@ -33,7 +33,7 @@ The analyzer provides the following checks:
 
 - **Code fixes** (`PurelySharp.CodeFixes`) for `PS0002`-`PS0008` (remove/add attributes, resolve conflicts). The demo and tests reference the code-fix project where applicable.
 - **Configuration** via `.editorconfig` / MSBuild `global analyzerconfig`: `purelysharp_known_impure_methods`, `purelysharp_known_pure_methods`, `purelysharp_known_impure_namespaces`, `purelysharp_known_impure_types`, `purelysharp_purity_profile` (`balanced`, `strict`, `pragmatic`; default `balanced`), `purelysharp_enable_debug_logging`, `purelysharp_suggest_missing_enforce_pure` (`true`/`false`, default `true`), and `purelysharp_suggest_missing_enforce_pure_scope` (`all`, `public`, `internal`, `off`, default `all`) to tune `PS0004` suggestions. The `strict` profile currently tightens mutable `this` field reads; `balanced` preserves the default adoption behavior. Optional PS0004 filters include `purelysharp_suggest_missing_enforce_pure_exclude_generated`, `purelysharp_suggest_missing_enforce_pure_exclude_tests`, `purelysharp_suggest_missing_enforce_pure_min_complexity`, and `purelysharp_suggest_missing_enforce_pure_namespace_filters`; these PS0004 controls honor per-file `.editorconfig` sections. Adoption baselines are supported through an additional file named `PurelySharp.Baseline.json`, matching diagnostics by ID, symbol documentation ID, and relative path. Boundary attributes `[PureExternal]` and `[Impure]` let teams explicitly trust or reject boundary methods, properties, constructors, or whole assemblies without broad catalog changes.
-- **Exception-flow reporting** is available as opt-in `PS0010` and `PS0011` diagnostics with `purelysharp_report_exceptions = true`. The current implementation reports method-level uncaught exception summaries, warns on uncaught call sites, reports source-level uncaught `throw` / throw-expression exception types, infers typed `throw;` rethrows from enclosing catch clauses, detects definite integer/decimal divide-by-zero and modulo-by-zero expressions, detects branch-implied zero divisors including simple short-circuit and guard-if cases, detects definite null dereferences on literal/default-null receivers and branch-implied null receivers including `is not null` else branches, propagates summaries through same-compilation source method calls, constructors, and property getters, suppresses simple caught throws at throw, call, object-creation, property-read, definite divide-by-zero, and definite null-dereference sites, preserves multi-hop source-callee evidence chains, and keeps nested lambdas/local functions separate. Metadata/library-call propagation is supported when a generated effect summary additional file named `PurelySharp.EffectSummary.json` is supplied.
+- **Exception-flow reporting** is available as opt-in `PS0010` and `PS0011` diagnostics with `purelysharp_report_exceptions = true`. The current implementation reports method-level uncaught exception summaries, warns on uncaught call sites, reports source-level uncaught `throw` / throw-expression exception types, infers typed `throw;` rethrows from enclosing catch clauses, detects definite integer/decimal divide-by-zero and modulo-by-zero expressions, detects branch-implied zero divisors including simple short-circuit and guard-if cases, detects definite null dereferences on literal/default-null receivers and branch-implied null receivers including `is not null` else branches, propagates summaries recursively through same-compilation source method calls, constructors, and property getters with cycle detection, suppresses simple caught throws at throw, call, object-creation, property-read, definite divide-by-zero, and definite null-dereference sites, preserves multi-hop source-callee evidence chains, and keeps nested lambdas/local functions separate. Metadata/library-call propagation is supported when a generated effect summary additional file named `PurelySharp.EffectSummary.json` is supplied.
 - **Bottom-up SDK purity calibration** now has a report-first path in `Tools/PurelySharp.EffectSummary`: the tool can emit implementation-derived fixed-point purity classifications (`pure`, `impure`, `conservative_unknown`) plus optional comparisons against the current reviewed manual catalogs. This is calibration/reporting only in the current tranche; live `PS0002` behavior still uses the existing analyzer rules and catalog fallback.
 - **`[AllowSynchronization]`** is supported alongside `[EnforcePure]`/`[Pure]` (`PS0006`-`PS0008`).
 
@@ -128,6 +128,66 @@ Use the provided script to produce a VSIX for Visual Studio plus local NuGet pac
 4.  Observe the `PS0003` diagnostic during build or in the IDE (if VSIX is installed).
 
 Note: Diagnostic messages refer to `[EnforcePure]` and `[Pure]` interchangeably.
+
+To also surface uncaught exceptions and their propagated types, enable:
+
+```ini
+is_global = true
+
+[*.cs]
+dotnet_diagnostic.PS0010.severity = suggestion
+dotnet_diagnostic.PS0011.severity = warning
+purelysharp_report_exceptions = true
+```
+
+Example:
+
+```csharp
+using System;
+
+public sealed class VoucherService
+{
+    public AcceptedDocument Render(Voucher voucher) => LoadAcceptedDocument(voucher);
+
+    private static AcceptedDocument LoadAcceptedDocument(Voucher voucher) => RequireAcceptedDocument(voucher);
+
+    private static AcceptedDocument RequireAcceptedDocument(Voucher voucher) => voucher.AcceptedDocument;
+}
+
+public sealed class Voucher
+{
+    private readonly AcceptedDocument? _acceptedDocument;
+
+    public Voucher(AcceptedDocument? acceptedDocument)
+    {
+        _acceptedDocument = acceptedDocument;
+    }
+
+    public AcceptedDocument AcceptedDocument
+    {
+        get
+        {
+            if (_acceptedDocument is null)
+            {
+                throw new InvalidOperationException();
+            }
+
+            return _acceptedDocument;
+        }
+    }
+}
+
+public sealed class AcceptedDocument
+{
+}
+```
+
+With `purelysharp_report_exceptions = true`, the analyzer reports:
+
+- `PS0010` on `Render`, because `System.InvalidOperationException` can escape the method.
+- `PS0011` on the uncaught `LoadAcceptedDocument(voucher)` call site, with the propagated exception type and source chain.
+
+For source methods in the same compilation, propagation follows the call graph recursively until it reaches the throw origin or a cycle. For metadata/library methods, propagation follows the checked-in or generated `PurelySharp.EffectSummary.json` exception facts instead of live decompilation.
 
 ## Diagnostics
 
