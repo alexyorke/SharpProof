@@ -1633,7 +1633,7 @@ namespace PurelySharp.Analyzer
                     exceptionSummaryCatalog,
                     visitedMethods);
 
-                var invokedMethodDisplay = invokedMethod.OriginalDefinition.ToDisplayString();
+                var invokedMethodDisplay = GetExceptionSourceMethodDisplay(invokedMethod.OriginalDefinition);
                 return exceptions.EnumerateEntries()
                     .SelectMany(entry =>
                     {
@@ -1716,20 +1716,72 @@ namespace PurelySharp.Analyzer
         {
             var (_, source) = SplitQualifiedSource(qualifiedSource);
             var nestedChain = ParseCalleeChainFromSource(source);
+            var invokedChain = ParseCalleeChainFromSource(invokedMethodDisplay);
+            if (invokedChain.IsDefaultOrEmpty && !string.IsNullOrWhiteSpace(invokedMethodDisplay))
+            {
+                invokedChain = ImmutableArray.Create(invokedMethodDisplay);
+            }
+
             if (nestedChain.IsDefaultOrEmpty)
             {
-                return ImmutableArray.Create(invokedMethodDisplay);
+                return invokedChain;
             }
 
-            if (string.Equals(nestedChain[0], invokedMethodDisplay, StringComparison.Ordinal))
+            if (!invokedChain.IsDefaultOrEmpty &&
+                string.Equals(nestedChain[0], invokedChain[invokedChain.Length - 1], StringComparison.Ordinal))
             {
-                return nestedChain;
+                var deduplicatedBuilder = ImmutableArray.CreateBuilder<string>(invokedChain.Length + nestedChain.Length - 1);
+                deduplicatedBuilder.AddRange(invokedChain);
+                for (var index = 1; index < nestedChain.Length; index++)
+                {
+                    deduplicatedBuilder.Add(nestedChain[index]);
+                }
+
+                return deduplicatedBuilder.ToImmutable();
             }
 
-            var builder = ImmutableArray.CreateBuilder<string>(nestedChain.Length + 1);
-            builder.Add(invokedMethodDisplay);
+            var builder = ImmutableArray.CreateBuilder<string>(invokedChain.Length + nestedChain.Length);
+            builder.AddRange(invokedChain);
             builder.AddRange(nestedChain);
             return builder.ToImmutable();
+        }
+
+        private static string GetExceptionSourceMethodDisplay(IMethodSymbol methodSymbol)
+        {
+            if (methodSymbol.MethodKind != MethodKind.LocalFunction &&
+                methodSymbol.MethodKind != MethodKind.AnonymousFunction)
+            {
+                return methodSymbol.ToDisplayString();
+            }
+
+            var containingMethod = methodSymbol.ContainingSymbol as IMethodSymbol;
+            var containingDisplay = containingMethod?.OriginalDefinition.ToDisplayString();
+            var nestedDisplay = CreateNestedCallableDisplay(methodSymbol);
+            if (string.IsNullOrWhiteSpace(containingDisplay) || string.IsNullOrWhiteSpace(nestedDisplay))
+            {
+                return methodSymbol.ToDisplayString();
+            }
+
+            return containingDisplay + " -> " + nestedDisplay;
+        }
+
+        private static string CreateNestedCallableDisplay(IMethodSymbol methodSymbol)
+        {
+            var containingType = methodSymbol.ContainingType?.ToDisplayString();
+            var methodName = methodSymbol.MethodKind == MethodKind.Constructor
+                ? ".ctor"
+                : string.IsNullOrWhiteSpace(methodSymbol.MetadataName)
+                    ? methodSymbol.Name
+                    : methodSymbol.MetadataName;
+            var parameterList = string.Join(
+                ", ",
+                methodSymbol.Parameters.Select(parameter => parameter.Type.ToDisplayString()));
+            if (string.IsNullOrWhiteSpace(containingType) || string.IsNullOrWhiteSpace(methodName))
+            {
+                return methodSymbol.ToDisplayString();
+            }
+
+            return containingType + "." + methodName + "(" + parameterList + ")";
         }
 
         private static ImmutableArray<string> CreateSummaryCalleeChain(string source, string fallbackSource)
@@ -1805,6 +1857,17 @@ namespace PurelySharp.Analyzer
             }
 
             var builder = ImmutableArray.CreateBuilder<ExceptionEdgeDiagnosticEntry>();
+            if (calleeChain.Length == 1)
+            {
+                builder.Add(new ExceptionEdgeDiagnosticEntry(
+                    exceptionType,
+                    category,
+                    sourcePath,
+                    calleeChain[0],
+                    1));
+                return builder.ToImmutable();
+            }
+
             for (var index = 1; index < calleeChain.Length; index++)
             {
                 var callee = calleeChain[index];

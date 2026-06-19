@@ -64,10 +64,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     getterSymbol.OriginalDefinition,
                     context.SemanticModel.Compilation,
                     out generatedPurity);
-            var suppressGeneratedPureTrust = hasTrustedGeneratedPurity &&
-                generatedPurity.IsPure &&
-                string.Equals(GetCatalogHitCategory(propertySymbol), "reflection_environment_source", StringComparison.Ordinal);
-            var allowsKnownPureFallback = !hasTrustedGeneratedPurity || suppressGeneratedPureTrust;
+            var allowsKnownPureFallback = !hasTrustedGeneratedPurity;
             var requiresDispatchCheck = getterSymbol != null &&
                 IsPotentiallyDispatchedProperty(propertySymbol, context.SemanticModel.Compilation) &&
                 !(allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol));
@@ -97,7 +94,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: "known_impure_member"));
             }
 
-            if (!requiresDispatchCheck && hasTrustedGeneratedPurity && !suppressGeneratedPureTrust)
+            if (!requiresDispatchCheck && hasTrustedGeneratedPurity)
             {
                 if (generatedPurity.IsPure)
                 {
@@ -116,20 +113,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             operation: propertyReferenceOperation,
                             syntaxNode: propertyReferenceOperation.Syntax,
                             symbol: getterSymbol,
-                            catalogSource: "generated_purity_summary"));
+                        catalogSource: "generated_purity_summary"));
                 }
-            }
-            else if (suppressGeneratedPureTrust)
-            {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Ignoring trusted generated pure summary for reflection-sensitive property '{propertySymbol.ToDisplayString()}'.");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    propertyReferenceOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "reflection_environment_source",
-                        ruleName: nameof(PropertyReferencePurityRule),
-                        operation: propertyReferenceOperation,
-                        syntaxNode: propertyReferenceOperation.Syntax,
-                        symbol: propertySymbol));
             }
 
             if (!requiresDispatchCheck &&

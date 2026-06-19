@@ -8848,6 +8848,74 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0011_SourceCallee_LocalFunctionPropagation_EmitsExceptionEdges()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        Local();
+
+        void Local()
+        {
+            throw new InvalidOperationException();
+        }
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            var diagnostic = SingleDiagnostic(
+                diagnostics
+                    .Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId)
+                    .Where(d => d.GetMessage().Contains("Local()", StringComparison.Ordinal))
+                    .ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("source_callee"));
+            AssertExceptionEdgesPropertyContains(
+                diagnostic,
+                "System.InvalidOperationException",
+                "TestMethod",
+                "TestClass.Local()");
+        }
+
+        [Test]
+        public async Task Ps0011_SourceCallee_LambdaPropagation_EmitsExceptionEdges()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        Action thunk = () => throw new InvalidOperationException();
+        thunk();
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            var diagnostic = SingleDiagnostic(
+                diagnostics
+                    .Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId)
+                    .Where(d => d.GetMessage().Contains("thunk()", StringComparison.Ordinal))
+                    .ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("source_callee"));
+            AssertExceptionEdgesPropertyContains(
+                diagnostic,
+                "System.InvalidOperationException",
+                "TestMethod",
+                "lambda expression");
+        }
+
+        [Test]
         public async Task Ps0011_SourceCallee_CaughtAtCallSite_IsSuppressed()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
@@ -9464,6 +9532,20 @@ public class TestClass
         private static Diagnostic SingleDiagnostic(ImmutableArray<Diagnostic> diagnostics, string diagnosticId)
         {
             return diagnostics.Single(d => d.Id == diagnosticId);
+        }
+
+        private static void AssertExceptionEdgesPropertyContains(Diagnostic diagnostic, params string[] expectedFragments)
+        {
+            Assert.That(
+                diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ExceptionEdgesProperty, out var serializedEdges) &&
+                !string.IsNullOrWhiteSpace(serializedEdges),
+                Is.True,
+                "Expected purelysharp.exceptions.edges on diagnostic.");
+
+            foreach (var expectedFragment in expectedFragments)
+            {
+                Assert.That(serializedEdges, Does.Contain(expectedFragment));
+            }
         }
 
         private static void AssertExceptionEdgesPropertyContainsIfPresent(Diagnostic diagnostic, params string[] expectedFragments)

@@ -332,9 +332,17 @@ public class KnownImpureConsoleCase
                 AssertRequiredProperties(
                     exceptionDiagnostics,
                     family,
-                    PurelySharpDiagnostics.ExceptionTypesProperty,
-                    PurelySharpDiagnostics.ExceptionCategoriesProperty,
-                    PurelySharpDiagnostics.ExceptionSourcesProperty);
+                    registryEntry.Expectation.RequiredPs0010Properties.ToArray());
+
+                if (!registryEntry.Expectation.RequiredAnyPs0010Properties.IsDefaultOrEmpty)
+                {
+                    Assert.That(
+                        exceptionDiagnostics.Any(diagnostic => HasRequiredProperties(
+                            diagnostic,
+                            registryEntry.Expectation.RequiredAnyPs0010Properties.ToArray())),
+                        Is.True,
+                        family + " missing additive PS0010 evidence");
+                }
             }
         }
 
@@ -447,7 +455,8 @@ public class FuzzExceptionEdgesReportCase
                         ImmutableArray.Create(
                             PurelySharpDiagnostics.ExceptionTypesProperty,
                             PurelySharpDiagnostics.ExceptionCategoriesProperty,
-                            PurelySharpDiagnostics.ExceptionSourcesProperty)));
+                            PurelySharpDiagnostics.ExceptionSourcesProperty),
+                        ImmutableArray<string>.Empty));
 
                 var analysis = await FuzzRunner.AnalyzeCaseAsync(fuzzCase);
                 var exceptionDiagnostic = analysis.Diagnostics.Single(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId);
@@ -516,6 +525,13 @@ public class FuzzExceptionEdgesReportCase
                         $"{family} missing property {propertyName}");
                 }
             }
+        }
+
+        private static bool HasRequiredProperties(Diagnostic diagnostic, params string[] propertyNames)
+        {
+            return propertyNames.All(propertyName =>
+                diagnostic.Properties.TryGetValue(propertyName, out var value) &&
+                !string.IsNullOrWhiteSpace(value));
         }
 
         private static string CreateOutputDirectory()

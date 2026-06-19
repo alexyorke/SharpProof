@@ -595,6 +595,20 @@ public static class FuzzRunner
                         ImmutableArray.Create(ToDiagnosticSignature(diagnostic))));
                 }
             }
+
+            if (!fuzzCase.Expectation.RequiredAnyPs0010Properties.IsDefaultOrEmpty &&
+                ps0010Diagnostics.Length > 0 &&
+                !ps0010Diagnostics.Any(diagnostic =>
+                    !MissingAnyRequiredProperties(diagnostic, fuzzCase.Expectation.RequiredAnyPs0010Properties)))
+            {
+                findings.Add(new FuzzFinding(
+                    fuzzCase.Name,
+                    fuzzCase.Family,
+                    "missing_ps0010_edge_evidence",
+                    "No emitted PS0010 included the expected additive exception-edge evidence.",
+                    null,
+                    ToDiagnosticSignatures(ps0010Diagnostics)));
+            }
         }
 
         return findings;
@@ -1031,7 +1045,7 @@ public sealed class FuzzCaseGenerator
                 RoslynShapeManifest.OperationShapeId(OperationKind.Throw)),
             ImmutableArray.Create("LocalFunction", "Throw"),
             ImmutableArray.Create("LocalFunctionStatement", "ThrowStatement"),
-            ExceptionWithOptionalPs0002Expectation(),
+            ExceptionWithOptionalPs0002Expectation().RequireExceptionEdgesOnAnyPs0010(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: false,
             BuildExceptionInvokedLocalFunctionThrow),
@@ -1042,7 +1056,7 @@ public sealed class FuzzCaseGenerator
                 RoslynShapeManifest.OperationShapeId(OperationKind.Throw)),
             ImmutableArray.Create("AnonymousFunction", "Throw"),
             ImmutableArray.Create("ParenthesizedLambdaExpression", "ThrowExpression"),
-            ExceptionWithOptionalPs0002Expectation(),
+            ExceptionWithOptionalPs0002Expectation().RequireExceptionEdgesOnAnyPs0010(),
             AllowUnsafe: false,
             AllowEffectPreservingWrappers: false,
             BuildExceptionInvokedLambdaThrow),
@@ -2716,7 +2730,8 @@ public class {{className}}
             ImmutableArray.Create(
                 PurelySharpDiagnostics.ExceptionTypesProperty,
                 PurelySharpDiagnostics.ExceptionCategoriesProperty,
-                PurelySharpDiagnostics.ExceptionSourcesProperty));
+                PurelySharpDiagnostics.ExceptionSourcesProperty),
+            ImmutableArray<string>.Empty);
     }
 
     private static FuzzExpectation ImpureWithoutExceptionExpectation()
@@ -2731,7 +2746,8 @@ public class {{className}}
             ImmutableArray.Create(
                 PurelySharpDiagnostics.ExceptionTypesProperty,
                 PurelySharpDiagnostics.ExceptionCategoriesProperty,
-                PurelySharpDiagnostics.ExceptionSourcesProperty));
+                PurelySharpDiagnostics.ExceptionSourcesProperty),
+            ImmutableArray<string>.Empty);
     }
 
     private static FuzzExpectation ExceptionWithOptionalPs0002Expectation()
@@ -2746,7 +2762,8 @@ public class {{className}}
             ImmutableArray.Create(
                 PurelySharpDiagnostics.ExceptionTypesProperty,
                 PurelySharpDiagnostics.ExceptionCategoriesProperty,
-                PurelySharpDiagnostics.ExceptionSourcesProperty));
+                PurelySharpDiagnostics.ExceptionSourcesProperty),
+            ImmutableArray<string>.Empty);
     }
 
     private static FuzzExpectation PureWithoutExceptionExpectation()
@@ -2761,7 +2778,8 @@ public class {{className}}
             ImmutableArray.Create(
                 PurelySharpDiagnostics.ExceptionTypesProperty,
                 PurelySharpDiagnostics.ExceptionCategoriesProperty,
-                PurelySharpDiagnostics.ExceptionSourcesProperty));
+                PurelySharpDiagnostics.ExceptionSourcesProperty),
+            ImmutableArray<string>.Empty);
     }
 
     private static string BuildIntMethodFromExpression(string expression, Random random, string parameterList = "int x")

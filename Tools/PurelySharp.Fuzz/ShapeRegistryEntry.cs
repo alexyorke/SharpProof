@@ -22,7 +22,8 @@ public sealed record FuzzExpectation(
     Ps0002ExpectationKind Ps0002,
     Ps0010ExpectationKind Ps0010,
     ImmutableArray<string> RequiredPs0002Properties,
-    ImmutableArray<string> RequiredPs0010Properties)
+    ImmutableArray<string> RequiredPs0010Properties,
+    ImmutableArray<string> RequiredAnyPs0010Properties)
 {
     private static readonly ImmutableArray<string> DefaultPs0002Properties = ImmutableArray.Create(
         PurelySharpDiagnostics.ImpurityCategoryProperty,
@@ -40,7 +41,8 @@ public sealed record FuzzExpectation(
             Ps0002ExpectationKind.MustNotEmit,
             Ps0010ExpectationKind.Ignore,
             DefaultPs0002Properties,
-            DefaultPs0010Properties);
+            DefaultPs0010Properties,
+            ImmutableArray<string>.Empty);
     }
 
     public static FuzzExpectation DefinitelyImpure()
@@ -49,7 +51,8 @@ public sealed record FuzzExpectation(
             Ps0002ExpectationKind.MustEmit,
             Ps0010ExpectationKind.Ignore,
             DefaultPs0002Properties,
-            DefaultPs0010Properties);
+            DefaultPs0010Properties,
+            ImmutableArray<string>.Empty);
     }
 
     public static FuzzExpectation Conservative()
@@ -58,7 +61,24 @@ public sealed record FuzzExpectation(
             Ps0002ExpectationKind.MayEmitConservatively,
             Ps0010ExpectationKind.Ignore,
             DefaultPs0002Properties,
-            DefaultPs0010Properties);
+            DefaultPs0010Properties,
+            ImmutableArray<string>.Empty);
+    }
+
+    public FuzzExpectation RequireAnyPs0010Properties(params string[] propertyNames)
+    {
+        return this with
+        {
+            RequiredAnyPs0010Properties = ImmutableArray.Create(propertyNames)
+        };
+    }
+
+    public FuzzExpectation RequireExceptionEdgesOnAnyPs0010()
+    {
+        return this with
+        {
+            RequiredAnyPs0010Properties = ImmutableArray.Create(PurelySharpDiagnostics.ExceptionEdgesProperty)
+        };
     }
 }
 
