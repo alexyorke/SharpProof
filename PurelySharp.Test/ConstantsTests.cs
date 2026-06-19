@@ -180,6 +180,25 @@ public static class EnvironmentCatalogSignatureSamples
         }
 
         [Test]
+        public void CultureAndRegionAmbientStateHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Globalization.CultureInfo.CurrentCulture.get",
+                "System.Globalization.CultureInfo.CurrentUICulture.get",
+                "System.Globalization.CultureInfo.DefaultThreadCurrentCulture.get",
+                "System.Globalization.CultureInfo.DefaultThreadCurrentUICulture.get",
+                "System.Globalization.CultureInfo.InstalledUICulture.get",
+                "System.Globalization.RegionInfo.CurrentRegion.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void AbstractDispatchFallbacks_AreNotBackedByManualImpureCatalogEntries()
         {
             AssertNotInManualCatalogs("object.ToString()");

@@ -150,6 +150,20 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Culture.Region.State.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Culture.Region.State.PurelySharp.EffectSummary.json",
+      "Limit": 120,
+      "MaxDepth": 2,
+      "SymbolPrefixes": [
+        "System.Globalization.CultureInfo.get_CurrentCulture",
+        "System.Globalization.CultureInfo.get_CurrentUICulture",
+        "System.Globalization.CultureInfo.get_DefaultThreadCurrentCulture",
+        "System.Globalization.CultureInfo.get_DefaultThreadCurrentUICulture",
+        "System.Globalization.CultureInfo.get_InstalledUICulture",
+        "System.Globalization.RegionInfo.get_CurrentRegion"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Environment.HasShutdownStarted.PurelySharp.EffectSummary.json",
       "Limit": 4,
       "SymbolPrefixes": [

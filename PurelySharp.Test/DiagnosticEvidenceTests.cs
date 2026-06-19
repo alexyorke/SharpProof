@@ -1674,6 +1674,142 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_CultureAndRegionAmbientStateAsImpureEvidence()
+        {
+            const string source = @"
+using System.Globalization;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public object CurrentCulture()
+    {
+        return CultureInfo.CurrentCulture;
+    }
+
+    [EnforcePure]
+    public object CurrentUICulture()
+    {
+        return CultureInfo.CurrentUICulture;
+    }
+
+    [EnforcePure]
+    public object DefaultThreadCurrentCulture()
+    {
+        return CultureInfo.DefaultThreadCurrentCulture;
+    }
+
+    [EnforcePure]
+    public object DefaultThreadCurrentUICulture()
+    {
+        return CultureInfo.DefaultThreadCurrentUICulture;
+    }
+
+    [EnforcePure]
+    public object InstalledUICulture()
+    {
+        return CultureInfo.InstalledUICulture;
+    }
+
+    [EnforcePure]
+    public object CurrentRegion()
+    {
+        return RegionInfo.CurrentRegion;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics
+                .Where(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedGetters = new (string Label, IMethodSymbol Symbol)[]
+            {
+                (
+                    "System.Globalization.CultureInfo.CurrentCulture.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "CultureInfo.CurrentCulture"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Globalization.CultureInfo.CurrentUICulture.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "CultureInfo.CurrentUICulture"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Globalization.CultureInfo.DefaultThreadCurrentCulture.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "CultureInfo.DefaultThreadCurrentCulture"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Globalization.CultureInfo.DefaultThreadCurrentUICulture.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "CultureInfo.DefaultThreadCurrentUICulture"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Globalization.CultureInfo.InstalledUICulture.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "CultureInfo.InstalledUICulture"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Globalization.RegionInfo.CurrentRegion.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "RegionInfo.CurrentRegion"))
+                        .Symbol!).GetMethod!),
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = trackedGetters.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(6));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "generated_purity_summary" }));
+            foreach (var label in classifications.Keys)
+            {
+                Assert.That(classifications[label].matched, Is.True,
+                    "Generated purity catalog should resolve " + label + ".");
+                Assert.That(classifications[label].classification, Is.EqualTo("impure"),
+                    "Generated purity catalog should classify " + label + " as impure.");
+            }
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_EnvironmentCommandLineAsImpureEvidence()
         {
             const string source = @"
@@ -6893,6 +7029,163 @@ public class TestClass
                         "System.ArgumentNullException"))));
 
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0011_EffectSummaryLibraryCall_UncaughtAtCallSite_ReportsWarning()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(object value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
+                    "PurelySharp.EffectSummary.json",
+                    CreateEffectSummaryJson(
+                        typeof(ArgumentNullException).Assembly.Location,
+                        "System.ArgumentNullException.ThrowIfNull(object, string)",
+                        Array.Empty<string>(),
+                        "System.ArgumentNullException"))));
+
+            var diagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("ArgumentNullException.ThrowIfNull(value)"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentNullException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.ArgumentNullException=effect_summary:System.ArgumentNullException.ThrowIfNull"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSymbolProperty], Does.Contain("System.ArgumentNullException.ThrowIfNull"));
+        }
+
+        [Test]
+        public async Task Ps0011_EffectSummaryLibraryCall_CaughtAtCallSite_IsSuppressed()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(object value)
+    {
+        try
+        {
+            ArgumentNullException.ThrowIfNull(value);
+        }
+        catch (ArgumentNullException)
+        {
+        }
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
+                    "PurelySharp.EffectSummary.json",
+                    CreateEffectSummaryJson(
+                        typeof(ArgumentNullException).Assembly.Location,
+                        "System.ArgumentNullException.ThrowIfNull(object, string)",
+                        Array.Empty<string>(),
+                        "System.ArgumentNullException"))));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0011_EffectSummaryConstructor_UncaughtAtCallSite_ReportsWarning()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public Uri Create(string value)
+    {
+        return new Uri(value);
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
+                    "PurelySharp.EffectSummary.json",
+                    CreateEffectSummaryJson(
+                        typeof(Uri).Assembly.Location,
+                        "System.Uri..ctor(string)",
+                        new[] { "System.UriFormatException" }))));
+
+            var diagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("new Uri(value)"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.UriFormatException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSymbolProperty], Does.Contain("System.Uri"));
+        }
+
+        [Test]
+        public async Task Ps0011_EffectSummaryConstructor_CaughtAtCallSite_IsSuppressed()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public Uri? Create(string value)
+    {
+        try
+        {
+            return new Uri(value);
+        }
+        catch (UriFormatException)
+        {
+            return null;
+        }
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
+                    "PurelySharp.EffectSummary.json",
+                    CreateEffectSummaryJson(
+                        typeof(Uri).Assembly.Location,
+                        "System.Uri..ctor(string)",
+                        new[] { "System.UriFormatException" }))));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0011_SourceCallee_UncaughtAtCallSite_ReportsWarning()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void Caller()
+    {
+        Callee();
+    }
+
+    private void Callee()
+    {
+        throw new InvalidOperationException();
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            var diagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("Callee"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("source_callee"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.InvalidOperationException=source_callee:"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSymbolProperty], Does.Contain("Callee"));
         }
 
         [Test]

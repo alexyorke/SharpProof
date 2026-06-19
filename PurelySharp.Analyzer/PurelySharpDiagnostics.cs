@@ -62,6 +62,7 @@ namespace PurelySharp.Analyzer
         public const string ExceptionTypesProperty = "purelysharp.exceptions.types";
         public const string ExceptionCategoriesProperty = "purelysharp.exceptions.categories";
         public const string ExceptionSourcesProperty = "purelysharp.exceptions.sources";
+        public const string ExceptionSymbolProperty = "purelysharp.exceptions.symbol";
         private static readonly LocalizableString ExceptionSummaryTitle = "Method May Throw Exceptions";
         private static readonly LocalizableString ExceptionSummaryMessageFormat = "Method '{0}' can throw: {1}";
         private static readonly LocalizableString ExceptionSummaryDescription = "Reports exception types that can escape a method. Enable with purelysharp_report_exceptions = true.";
@@ -74,6 +75,20 @@ namespace PurelySharp.Analyzer
             defaultSeverity: DiagnosticSeverity.Info,
             isEnabledByDefault: true,
             description: ExceptionSummaryDescription);
+
+        public const string UncaughtExceptionSiteId = "PS0011";
+        private static readonly LocalizableString UncaughtExceptionSiteTitle = "Operation May Throw Uncaught Exceptions";
+        private static readonly LocalizableString UncaughtExceptionSiteMessageFormat = "Operation '{0}' may throw uncaught exceptions: {1}";
+        private static readonly LocalizableString UncaughtExceptionSiteDescription = "Reports uncaught exceptions at specific operations. Enable with purelysharp_report_exceptions = true.";
+
+        public static readonly DiagnosticDescriptor UncaughtExceptionSiteRule = new DiagnosticDescriptor(
+            id: UncaughtExceptionSiteId,
+            title: UncaughtExceptionSiteTitle,
+            messageFormat: UncaughtExceptionSiteMessageFormat,
+            category: "ExceptionFlow",
+            defaultSeverity: DiagnosticSeverity.Warning,
+            isEnabledByDefault: true,
+            description: UncaughtExceptionSiteDescription);
 
 
         public const string MisplacedAttributeId = "PS0003";

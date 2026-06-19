@@ -4676,6 +4676,64 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeCultureAndRegionStateSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                120,
+                2,
+                "System.Globalization.CultureInfo.get_CurrentCulture",
+                "System.Globalization.CultureInfo.get_CurrentUICulture",
+                "System.Globalization.CultureInfo.get_DefaultThreadCurrentCulture",
+                "System.Globalization.CultureInfo.get_DefaultThreadCurrentUICulture",
+                "System.Globalization.CultureInfo.get_InstalledUICulture",
+                "System.Globalization.RegionInfo.get_CurrentRegion");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Globalization.CultureInfo.get_CurrentCulture()", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Globalization.CultureInfo.get_CurrentCulture()", "caller_visible");
+            AssertPurityClassification(summary, "System.Globalization.CultureInfo.get_CurrentUICulture()", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Globalization.CultureInfo.get_CurrentUICulture()", "caller_visible");
+            AssertPurityClassification(summary, "System.Globalization.CultureInfo.get_DefaultThreadCurrentCulture()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Globalization.CultureInfo.get_DefaultThreadCurrentCulture()", "caller_visible");
+            AssertPurityClassification(summary, "System.Globalization.CultureInfo.get_DefaultThreadCurrentUICulture()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Globalization.CultureInfo.get_DefaultThreadCurrentUICulture()", "caller_visible");
+            AssertPurityClassification(summary, "System.Globalization.CultureInfo.get_InstalledUICulture()", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Globalization.CultureInfo.get_InstalledUICulture()", "caller_visible");
+            AssertPurityClassification(summary, "System.Globalization.RegionInfo.get_CurrentRegion()", "impure", "global_state_read", "global_state_write", "impure_callee", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Globalization.RegionInfo.get_CurrentRegion()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Globalization.CultureInfo.get_CurrentCulture()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Globalization.CultureInfo.get_CurrentUICulture()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Globalization.CultureInfo.get_DefaultThreadCurrentCulture()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Globalization.CultureInfo.get_DefaultThreadCurrentUICulture()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Globalization.CultureInfo.get_InstalledUICulture()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Globalization.RegionInfo.get_CurrentRegion()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Globalization.CultureInfo.get_CurrentCulture()",
+                "System.Globalization.CultureInfo.get_CurrentUICulture()",
+                "System.Globalization.CultureInfo.get_DefaultThreadCurrentCulture()",
+                "System.Globalization.CultureInfo.get_DefaultThreadCurrentUICulture()",
+                "System.Globalization.CultureInfo.get_InstalledUICulture()",
+                "System.Globalization.RegionInfo.get_CurrentRegion()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeObjectTypeMetadataSlice_UsesGeneratedPurityEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

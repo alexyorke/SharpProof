@@ -47,6 +47,14 @@ namespace PurelySharp.Analyzer
                 return;
             }
 
+            AnalyzeUncaughtExceptionSites(
+                context,
+                context.Node,
+                context.SemanticModel,
+                context.CancellationToken,
+                methodSymbol,
+                exceptionSummaryCatalog);
+
             var exceptionEvidence = CollectUncaughtExceptions(
                 context.Node,
                 context.SemanticModel,
@@ -80,6 +88,71 @@ namespace PurelySharp.Analyzer
                 messageArgs: new object[] { methodSymbol.Name, exceptionList }));
         }
 
+        private static void AnalyzeUncaughtExceptionSites(
+            SyntaxNodeAnalysisContext context,
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            IMethodSymbol methodSymbol,
+            ExceptionSummaryCatalog exceptionSummaryCatalog)
+        {
+            foreach (var calleeCallSite in GetCalleeCallSites(methodNode, semanticModel, cancellationToken))
+            {
+                if (IsInStaticallyUnreachableBranch(calleeCallSite.CallSite, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                var siteEvidence = new ExceptionEvidenceSet();
+                var visitedMethods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
+                {
+                    methodSymbol.OriginalDefinition
+                };
+                foreach (var exception in CollectCalleeExceptions(
+                             calleeCallSite.Method,
+                             semanticModel.Compilation,
+                             cancellationToken,
+                             exceptionSummaryCatalog,
+                             visitedMethods))
+                {
+                    if (IsCaughtWithinMethod(calleeCallSite.CallSite, exception.Type, methodNode, semanticModel, cancellationToken))
+                    {
+                        continue;
+                    }
+
+                    siteEvidence.Add(exception.DisplayName, exception.Category, exception.Source);
+                }
+
+                if (siteEvidence.Count == 0)
+                {
+                    continue;
+                }
+
+                var siteLocation = GetExceptionSiteLocation(calleeCallSite.CallSite);
+                if (siteLocation == null)
+                {
+                    continue;
+                }
+
+                var sortedTypes = siteEvidence.Types;
+                var exceptionList = string.Join(", ", sortedTypes);
+                var calleeDisplay = calleeCallSite.Method.OriginalDefinition.ToDisplayString();
+                var operationDisplay = GetExceptionSiteDisplay(calleeCallSite.CallSite, calleeCallSite.Method);
+                var properties = ImmutableDictionary<string, string?>.Empty
+                    .Add(PurelySharpDiagnostics.ExceptionTypesProperty, string.Join(";", sortedTypes))
+                    .Add(PurelySharpDiagnostics.ExceptionCategoriesProperty, siteEvidence.FormatCategories())
+                    .Add(PurelySharpDiagnostics.ExceptionSourcesProperty, siteEvidence.FormatSources())
+                    .Add(PurelySharpDiagnostics.ExceptionSymbolProperty, calleeDisplay);
+
+                context.ReportDiagnostic(Diagnostic.Create(
+                    PurelySharpDiagnostics.UncaughtExceptionSiteRule,
+                    siteLocation,
+                    additionalLocations: null,
+                    properties: properties,
+                    messageArgs: new object[] { operationDisplay, exceptionList }));
+            }
+        }
+
         private static ExceptionEvidenceSet CollectUncaughtExceptions(
             SyntaxNode methodNode,
             SemanticModel semanticModel,
@@ -109,182 +182,17 @@ namespace PurelySharp.Analyzer
                     "throw");
             }
 
-            foreach (var invocation in GetInvocationNodes(methodNode))
+            foreach (var calleeCallSite in GetCalleeCallSites(methodNode, semanticModel, cancellationToken))
             {
-                if (IsInStaticallyUnreachableBranch(invocation, semanticModel, cancellationToken))
-                {
-                    continue;
-                }
-
-                if (!(semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol invokedMethod))
+                if (IsInStaticallyUnreachableBranch(calleeCallSite.CallSite, semanticModel, cancellationToken))
                 {
                     continue;
                 }
 
                 AddUncaughtCalleeExceptions(
                     exceptionEvidence,
-                    invocation,
-                    invokedMethod,
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    exceptionSummaryCatalog,
-                    visitedMethods);
-            }
-
-            foreach (var creation in GetObjectCreationNodes(methodNode))
-            {
-                if (IsInStaticallyUnreachableBranch(creation, semanticModel, cancellationToken))
-                {
-                    continue;
-                }
-
-                if (!(semanticModel.GetSymbolInfo(creation, cancellationToken).Symbol is IMethodSymbol constructorSymbol))
-                {
-                    continue;
-                }
-
-                AddUncaughtCalleeExceptions(
-                    exceptionEvidence,
-                    creation,
-                    constructorSymbol,
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    exceptionSummaryCatalog,
-                    visitedMethods);
-            }
-
-            foreach (var propertyAccess in GetPropertyAccessNodes(methodNode, semanticModel, cancellationToken))
-            {
-                if (IsInStaticallyUnreachableBranch(propertyAccess, semanticModel, cancellationToken))
-                {
-                    continue;
-                }
-
-                if (!(semanticModel.GetSymbolInfo(propertyAccess, cancellationToken).Symbol is IPropertySymbol propertySymbol) ||
-                    propertySymbol.GetMethod == null)
-                {
-                    continue;
-                }
-
-                AddUncaughtCalleeExceptions(
-                    exceptionEvidence,
-                    propertyAccess,
-                    propertySymbol.GetMethod,
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    exceptionSummaryCatalog,
-                    visitedMethods);
-            }
-
-            foreach (var propertyWrite in GetPropertyWriteNodes(methodNode, semanticModel, cancellationToken))
-            {
-                if (IsInStaticallyUnreachableBranch(propertyWrite, semanticModel, cancellationToken))
-                {
-                    continue;
-                }
-
-                if (!TryGetPropertySetterMethod(propertyWrite, semanticModel, cancellationToken, out var setterMethod))
-                {
-                    continue;
-                }
-
-                AddUncaughtCalleeExceptions(
-                    exceptionEvidence,
-                    propertyWrite,
-                    setterMethod,
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    exceptionSummaryCatalog,
-                    visitedMethods);
-            }
-
-            foreach (var usingDisposeNode in GetUsingDisposeNodes(methodNode, semanticModel, cancellationToken))
-            {
-                if (IsInStaticallyUnreachableBranch(usingDisposeNode.CallSite, semanticModel, cancellationToken))
-                {
-                    continue;
-                }
-
-                AddUncaughtCalleeExceptions(
-                    exceptionEvidence,
-                    usingDisposeNode.CallSite,
-                    usingDisposeNode.Method,
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    exceptionSummaryCatalog,
-                    visitedMethods);
-            }
-
-            foreach (var forEachRuntimeNode in GetForEachRuntimeMethodNodes(methodNode, semanticModel, cancellationToken))
-            {
-                if (IsInStaticallyUnreachableBranch(forEachRuntimeNode.CallSite, semanticModel, cancellationToken))
-                {
-                    continue;
-                }
-
-                AddUncaughtCalleeExceptions(
-                    exceptionEvidence,
-                    forEachRuntimeNode.CallSite,
-                    forEachRuntimeNode.Method,
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    exceptionSummaryCatalog,
-                    visitedMethods);
-            }
-
-            foreach (var operatorNode in GetOperatorAndConversionNodes(methodNode, semanticModel, cancellationToken))
-            {
-                if (IsInStaticallyUnreachableBranch(operatorNode.CallSite, semanticModel, cancellationToken))
-                {
-                    continue;
-                }
-
-                AddUncaughtCalleeExceptions(
-                    exceptionEvidence,
-                    operatorNode.CallSite,
-                    operatorNode.Method,
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    exceptionSummaryCatalog,
-                    visitedMethods);
-            }
-
-            foreach (var delegateInvocationNode in GetLocalDelegateTargetInvocationNodes(methodNode, semanticModel, cancellationToken))
-            {
-                if (IsInStaticallyUnreachableBranch(delegateInvocationNode.CallSite, semanticModel, cancellationToken))
-                {
-                    continue;
-                }
-
-                AddUncaughtCalleeExceptions(
-                    exceptionEvidence,
-                    delegateInvocationNode.CallSite,
-                    delegateInvocationNode.Method,
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    exceptionSummaryCatalog,
-                    visitedMethods);
-            }
-
-            foreach (var handlerConstructorNode in GetInterpolatedStringHandlerConstructorNodes(methodNode, semanticModel, cancellationToken))
-            {
-                if (IsInStaticallyUnreachableBranch(handlerConstructorNode.CallSite, semanticModel, cancellationToken))
-                {
-                    continue;
-                }
-
-                AddUncaughtCalleeExceptions(
-                    exceptionEvidence,
-                    handlerConstructorNode.CallSite,
-                    handlerConstructorNode.Method,
+                    calleeCallSite.CallSite,
+                    calleeCallSite.Method,
                     methodNode,
                     semanticModel,
                     cancellationToken,
@@ -351,6 +259,102 @@ namespace PurelySharp.Analyzer
 
                 exceptionEvidence.Add(exception.DisplayName, exception.Category, exception.Source);
             }
+        }
+
+        private static IEnumerable<MethodCallCandidate> GetCalleeCallSites(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var invocation in GetInvocationNodes(methodNode))
+            {
+                if (semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol invokedMethod &&
+                    invokedMethod.MethodKind != MethodKind.DelegateInvoke &&
+                    seen.Add(CreateMethodCallSiteKey(invocation, invokedMethod)))
+                {
+                    yield return new MethodCallCandidate(invocation, invokedMethod);
+                }
+            }
+
+            foreach (var creation in GetObjectCreationNodes(methodNode))
+            {
+                if (semanticModel.GetSymbolInfo(creation, cancellationToken).Symbol is IMethodSymbol constructorSymbol &&
+                    seen.Add(CreateMethodCallSiteKey(creation, constructorSymbol)))
+                {
+                    yield return new MethodCallCandidate(creation, constructorSymbol);
+                }
+            }
+
+            foreach (var propertyAccess in GetPropertyAccessNodes(methodNode, semanticModel, cancellationToken))
+            {
+                if (semanticModel.GetSymbolInfo(propertyAccess, cancellationToken).Symbol is IPropertySymbol propertySymbol &&
+                    propertySymbol.GetMethod != null &&
+                    seen.Add(CreateMethodCallSiteKey(propertyAccess, propertySymbol.GetMethod)))
+                {
+                    yield return new MethodCallCandidate(propertyAccess, propertySymbol.GetMethod);
+                }
+            }
+
+            foreach (var propertyWrite in GetPropertyWriteNodes(methodNode, semanticModel, cancellationToken))
+            {
+                if (TryGetPropertySetterMethod(propertyWrite, semanticModel, cancellationToken, out var setterMethod) &&
+                    setterMethod != null &&
+                    seen.Add(CreateMethodCallSiteKey(propertyWrite, setterMethod)))
+                {
+                    yield return new MethodCallCandidate(propertyWrite, setterMethod);
+                }
+            }
+
+            foreach (var usingDisposeNode in GetUsingDisposeNodes(methodNode, semanticModel, cancellationToken))
+            {
+                if (seen.Add(CreateMethodCallSiteKey(usingDisposeNode.CallSite, usingDisposeNode.Method)))
+                {
+                    yield return usingDisposeNode;
+                }
+            }
+
+            foreach (var forEachRuntimeNode in GetForEachRuntimeMethodNodes(methodNode, semanticModel, cancellationToken))
+            {
+                if (seen.Add(CreateMethodCallSiteKey(forEachRuntimeNode.CallSite, forEachRuntimeNode.Method)))
+                {
+                    yield return forEachRuntimeNode;
+                }
+            }
+
+            foreach (var operatorNode in GetOperatorAndConversionNodes(methodNode, semanticModel, cancellationToken))
+            {
+                if (seen.Add(CreateMethodCallSiteKey(operatorNode.CallSite, operatorNode.Method)))
+                {
+                    yield return operatorNode;
+                }
+            }
+
+            foreach (var delegateInvocationNode in GetLocalDelegateTargetInvocationNodes(methodNode, semanticModel, cancellationToken))
+            {
+                if (seen.Add(CreateMethodCallSiteKey(delegateInvocationNode.CallSite, delegateInvocationNode.Method)))
+                {
+                    yield return delegateInvocationNode;
+                }
+            }
+
+            foreach (var handlerConstructorNode in GetInterpolatedStringHandlerConstructorNodes(methodNode, semanticModel, cancellationToken))
+            {
+                if (seen.Add(CreateMethodCallSiteKey(handlerConstructorNode.CallSite, handlerConstructorNode.Method)))
+                {
+                    yield return handlerConstructorNode;
+                }
+            }
+        }
+
+        private static string CreateMethodCallSiteKey(SyntaxNode callSite, IMethodSymbol method)
+        {
+            return callSite.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                ":" +
+                callSite.Span.End.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                "|" +
+                method.OriginalDefinition.ToDisplayString();
         }
 
         private static IEnumerable<SyntaxNode> GetThrowNodes(SyntaxNode methodNode)
@@ -1655,6 +1659,28 @@ namespace PurelySharp.Analyzer
                     } ?? accessor.Keyword.GetLocation(),
                 _ => node.GetLocation()
             };
+        }
+
+        private static Location? GetExceptionSiteLocation(SyntaxNode node)
+        {
+            return node switch
+            {
+                InvocationExpressionSyntax invocation => invocation.Expression.GetLocation(),
+                ObjectCreationExpressionSyntax creation => creation.GetLocation(),
+                ImplicitObjectCreationExpressionSyntax creation => creation.GetLocation(),
+                MemberAccessExpressionSyntax memberAccess => memberAccess.Name.GetLocation(),
+                IdentifierNameSyntax identifier => identifier.Identifier.GetLocation(),
+                ElementAccessExpressionSyntax elementAccess => elementAccess.GetLocation(),
+                _ => node.GetLocation()
+            };
+        }
+
+        private static string GetExceptionSiteDisplay(SyntaxNode node, IMethodSymbol method)
+        {
+            var display = node.ToString();
+            return string.IsNullOrWhiteSpace(display)
+                ? method.OriginalDefinition.ToDisplayString()
+                : display;
         }
 
         private sealed class ExceptionCandidate
