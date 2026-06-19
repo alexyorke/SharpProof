@@ -965,7 +965,6 @@ public static class Constants
         "System.MemoryExtensions.BinarySearch<T>(System.ReadOnlySpan<T>, T)",
         "System.Numerics.Quaternion.Quaternion(float, float, float, float)",
         "System.Reflection.Emit.OpCodes.Ldarg_0.get",
-        "System.Reflection.MemberInfo.Name.get",
         "System.Runtime.CompilerServices.IsExternalInit",
         "System.Runtime.Serialization.DataContractAttribute.DataContractAttribute()",
         "System.Security.AllowPartiallyTrustedCallersAttribute.AllowPartiallyTrustedCallersAttribute()",

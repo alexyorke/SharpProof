@@ -191,6 +191,64 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_CapturesDeterministicStringComparisonArgumentEvidence()
+        {
+            var source = """
+using System;
+
+public static class StringComparisonFixture
+{
+    public static bool Deterministic(string left, string right)
+    {
+        return left.Equals(right, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool CurrentCulture(string left, string right)
+    {
+        return left.Equals(right, StringComparison.CurrentCulture);
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryStringComparisonCallsites", source);
+            using var summary = await RunEffectSummaryAsync(
+                fixture.AssemblyPath,
+                includeTransitiveRoots: true,
+                classifyPurity: true,
+                compareManualCatalogs: true);
+
+            var deterministicCallSite = FindMethod(summary, "StringComparisonFixture.Deterministic(string, string)")
+                .GetProperty("CallSites")
+                .EnumerateArray()
+                .Single(callSite => string.Equals(
+                    callSite.GetProperty("ExactSymbolKey").GetString(),
+                    "string.Equals(string, System.StringComparison)->bool",
+                    StringComparison.Ordinal));
+            var deterministicEvidence = deterministicCallSite.GetProperty("ArgumentEvidence")
+                .EnumerateArray()
+                .Single(evidence => string.Equals(
+                    evidence.GetProperty("Type").GetString(),
+                    "System.StringComparison",
+                    StringComparison.Ordinal));
+            Assert.That(deterministicEvidence.GetProperty("Value").GetString(), Is.EqualTo("System.StringComparison.OrdinalIgnoreCase"));
+
+            var currentCultureCallSite = FindMethod(summary, "StringComparisonFixture.CurrentCulture(string, string)")
+                .GetProperty("CallSites")
+                .EnumerateArray()
+                .Single(callSite => string.Equals(
+                    callSite.GetProperty("ExactSymbolKey").GetString(),
+                    "string.Equals(string, System.StringComparison)->bool",
+                    StringComparison.Ordinal));
+            var currentCultureEvidence = currentCultureCallSite.GetProperty("ArgumentEvidence")
+                .EnumerateArray()
+                .Single(evidence => string.Equals(
+                    evidence.GetProperty("Type").GetString(),
+                    "System.StringComparison",
+                    StringComparison.Ordinal));
+            Assert.That(currentCultureEvidence.GetProperty("Value").GetString(), Is.EqualTo("System.StringComparison.CurrentCulture"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeBitConverterSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.BitConverter.GetBytes", limit: 20);
@@ -2735,7 +2793,7 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeStringContainsSlice_TreatsSelectedOverloadsAsPure()
+        public async Task EffectSummaryTool_RuntimeStringContainsSlice_DistinguishesPureAndParameterizedStringComparisonOverloads()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.String.Contains", limit: 20);
 
@@ -2747,8 +2805,11 @@ public static class PurityFixture
             AssertPurityClassification(summary, "System.String.Contains(string)", "pure");
             AssertEffectVisibilityClassification(summary, "System.String.Contains(string)", "none");
             AssertPurityClassification(summary, "System.String.Contains(char)", "pure");
-            AssertPurityClassification(summary, "System.String.Contains(char, System.StringComparison)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Contains(char)", "none");
+            AssertPurityClassification(summary, "System.String.Contains(char, System.StringComparison)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.String.Contains(char, System.StringComparison)", "caller_visible");
             AssertPurityClassification(summary, "System.String.Contains(string, System.StringComparison)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Contains(string, System.StringComparison)", "none");
 
             var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
             var rows = generatedCatalog.GetProperty("Entries")
@@ -2766,7 +2827,8 @@ public static class PurityFixture
                     "System.String.Contains(string)",
                     "System.String.Contains(string, System.StringComparison)",
                 }));
-            Assert.That(rows.Count(row => row.GetProperty("Classification").GetString() == "pure"), Is.EqualTo(4));
+            Assert.That(rows.Count(row => row.GetProperty("Classification").GetString() == "pure"), Is.EqualTo(3));
+            Assert.That(rows.Count(row => row.GetProperty("Classification").GetString() == "impure"), Is.EqualTo(1));
         }
 
         [Test]
@@ -3960,15 +4022,12 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeOperatingSystemSlice_UsesGeneratedPurityCatalogEntries()
+        public async Task EffectSummaryTool_RuntimeOperatingSystemSlice_TreatsDeterministicStringComparisonPathAsPure()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
                 120,
-                "System.OperatingSystem.IsWindows",
-                "System.OperatingSystem.IsLinux",
-                "System.OperatingSystem.IsOSPlatform",
-                "System.OperatingSystem.IsWindowsVersionAtLeast",
+                "System.OperatingSystem.Is",
                 "System.OperatingSystem.get_Platform");
 
             var report = summary.RootElement.GetProperty("PurityReport");
@@ -3981,21 +4040,44 @@ public static class PurityFixture
             AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsWindows()", "none");
             AssertPurityClassification(summary, "System.OperatingSystem.IsLinux()", "pure");
             AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsLinux()", "none");
+            AssertPurityClassification(summary, "System.OperatingSystem.IsAndroid()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsAndroid()", "none");
+            AssertPurityClassification(summary, "System.OperatingSystem.IsMacOS()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsMacOS()", "none");
             AssertPurityClassification(summary, "System.OperatingSystem.IsOSPlatform(string)", "pure");
             AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsOSPlatform(string)", "none");
+            AssertPurityClassification(summary, "System.OperatingSystem.IsAndroidVersionAtLeast(int, int, int, int)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsAndroidVersionAtLeast(int, int, int, int)", "none");
+            AssertPurityClassification(summary, "System.OperatingSystem.IsMacOSVersionAtLeast(int, int, int)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsMacOSVersionAtLeast(int, int, int)", "none");
+            AssertPurityClassification(summary, "System.OperatingSystem.IsOSPlatformVersionAtLeast(string, int, int, int, int)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsOSPlatformVersionAtLeast(string, int, int, int, int)", "none");
             AssertPurityClassification(summary, "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)", "pure");
             AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)", "none");
             AssertPurityClassification(summary, "System.OperatingSystem.get_Platform()", "pure");
             AssertEffectVisibilityClassification(summary, "System.OperatingSystem.get_Platform()", "none");
+
+            var isOsPlatformCalls = FindMethod(summary, "System.OperatingSystem.IsOSPlatform(string)")
+                .GetProperty("Calls")
+                .EnumerateArray()
+                .Select(value => value.GetString())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
+            Assert.That(isOsPlatformCalls, Does.Contain("string.Equals(string, System.StringComparison)->bool"));
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
                 .EnumerateArray()
                 .Select(entry => entry.GetProperty("Symbol").GetString())
                 .Where(symbol =>
+                    string.Equals(symbol, "System.OperatingSystem.IsAndroid()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.OperatingSystem.IsAndroidVersionAtLeast(int, int, int, int)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.OperatingSystem.IsWindows()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.OperatingSystem.IsLinux()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.OperatingSystem.IsMacOS()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.OperatingSystem.IsMacOSVersionAtLeast(int, int, int)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.OperatingSystem.IsOSPlatform(string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.OperatingSystem.IsOSPlatformVersionAtLeast(string, int, int, int, int)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.OperatingSystem.get_Platform()", StringComparison.Ordinal))
                 .OrderBy(symbol => symbol, StringComparer.Ordinal)
@@ -4003,8 +4085,13 @@ public static class PurityFixture
 
             Assert.That(generatedSymbols, Is.EqualTo(new[]
             {
+                "System.OperatingSystem.IsAndroid()",
+                "System.OperatingSystem.IsAndroidVersionAtLeast(int, int, int, int)",
                 "System.OperatingSystem.IsLinux()",
+                "System.OperatingSystem.IsMacOS()",
+                "System.OperatingSystem.IsMacOSVersionAtLeast(int, int, int)",
                 "System.OperatingSystem.IsOSPlatform(string)",
+                "System.OperatingSystem.IsOSPlatformVersionAtLeast(string, int, int, int, int)",
                 "System.OperatingSystem.IsWindows()",
                 "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)",
                 "System.OperatingSystem.get_Platform()",

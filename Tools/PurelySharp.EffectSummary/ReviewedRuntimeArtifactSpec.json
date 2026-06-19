@@ -197,10 +197,7 @@
       "OutputPath": "PurelySharp.Analyzer/OperatingSystem.PurelySharp.EffectSummary.json",
       "Limit": 120,
       "SymbolPrefixes": [
-        "System.OperatingSystem.IsWindows",
-        "System.OperatingSystem.IsLinux",
-        "System.OperatingSystem.IsOSPlatform",
-        "System.OperatingSystem.IsWindowsVersionAtLeast",
+        "System.OperatingSystem.Is",
         "System.OperatingSystem.get_Platform"
       ]
     },

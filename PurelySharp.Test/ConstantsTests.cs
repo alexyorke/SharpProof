@@ -1609,6 +1609,42 @@ public static class StopwatchCatalogSignatureSamples
         }
 
         [Test]
+        public void MemberInfoName_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System.Reflection;
+
+public static class MemberInfoNameCatalogSignatureSamples
+{
+    public static string Sample(MemberInfo member)
+    {
+        return member.Name;
+    }
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "MemberInfoNameCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var signature = GetPropertySignature(compilation, syntaxTree, "member.Name");
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var memberAccess = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Single(node => node.ToString() == "member.Name");
+            var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(memberAccess).Symbol!;
+            var (matched, classification) = GetGeneratedPurityClassification(propertySymbol.GetMethod!, compilation);
+
+            Assert.That(signature, Is.EqualTo("System.Reflection.MemberInfo.Name.get"));
+            AssertNotInManualCatalogs(signature);
+            Assert.That(matched, Is.True,
+                "Generated purity catalog should resolve System.Reflection.MemberInfo.Name.get from runtime metadata evidence.");
+            Assert.That(classification, Is.EqualTo("pure"));
+        }
+
+        [Test]
         public void ArgumentGuardHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var legacyMembers = new[]
@@ -3070,6 +3106,21 @@ public static class DecimalNegateCatalogSignatureSamples
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(signature), signature);
             Assert.That(Constants.KnownImpureMethods, Does.Not.Contain(signature), signature);
             Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(signature), signature);
+        }
+
+        private static (bool matched, string classification) GetGeneratedPurityClassification(IMethodSymbol methodSymbol, Compilation compilation)
+        {
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var currentProperty = catalogType.GetProperty("Current", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var currentCatalog = currentProperty.GetValue(null)!;
+            var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
+            var matched = (bool)tryGetPurity.Invoke(currentCatalog, args)!;
+            var purityEntry = args[2];
+            var classification = matched
+                ? (string)purityEntry!.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                : string.Empty;
+            return (matched, classification);
         }
 
         private static string GetInvocationSignature(Compilation compilation, SyntaxTree syntaxTree, string expressionText)

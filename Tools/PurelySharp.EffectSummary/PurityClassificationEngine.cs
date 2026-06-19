@@ -150,11 +150,14 @@ internal static class PurityClassificationEngine
 
         var treatsObjectStateAsFreshOwned = IsFreshOwnedObjectConstructor(summary);
         var treatsVirtualDispatchAsResolved = HasOnlyResolvedVirtualCallTargets(summary, bySymbol);
+        var treatsDeterministicStringComparisonDispatchAsSemantic = HasOnlyDeterministicStringComparisonDispatch(summary);
         var treatsArgumentGuardThrowHelpersAsPure = IsPureArgumentGuardWrapper(summary.Symbol);
         var treatsDelegateDispatchAsSemantic = IsSemanticallyCheckedDelegateInvokingBclMethod(summary.Symbol);
         foreach (var root in summary.RootCandidates)
         {
-            if ((treatsVirtualDispatchAsResolved || treatsDelegateDispatchAsSemantic) &&
+            if ((treatsVirtualDispatchAsResolved ||
+                 treatsDeterministicStringComparisonDispatchAsSemantic ||
+                 treatsDelegateDispatchAsSemantic) &&
                 string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal))
             {
                 continue;
@@ -192,7 +195,9 @@ internal static class PurityClassificationEngine
 
         foreach (var effect in summary.Effects)
         {
-            if ((treatsVirtualDispatchAsResolved || treatsDelegateDispatchAsSemantic) &&
+            if ((treatsVirtualDispatchAsResolved ||
+                 treatsDeterministicStringComparisonDispatchAsSemantic ||
+                 treatsDelegateDispatchAsSemantic) &&
                 string.Equals(effect, "virtual_call", StringComparison.Ordinal))
             {
                 continue;
@@ -242,8 +247,9 @@ internal static class PurityClassificationEngine
         string[] blockingCallChain = Array.Empty<string>();
         var freshOwnedArrayCalleeSeen = false;
         var freshOwnedObjectCalleeSeen = false;
-        foreach (var call in summary.Calls)
+        foreach (var callSite in EnumerateCallSites(summary))
         {
+            var call = callSite.ExactSymbolKey;
             if (IsPurityNeutralIntrinsicHelperCall(call))
             {
                 continue;
@@ -275,6 +281,11 @@ internal static class PurityClassificationEngine
                 freshOwnedInitializationMemo,
                 validationThrowHelperMemo,
                 visiting);
+            if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, calleeClassification))
+            {
+                continue;
+            }
+
             if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal))
             {
                 if (((treatsArgumentGuardThrowHelpersAsPure &&
@@ -412,6 +423,34 @@ internal static class PurityClassificationEngine
         return result;
     }
 
+    private static IEnumerable<CallSiteSummary> EnumerateCallSites(MethodEffectSummary summary)
+    {
+        if (summary.CallSites.Length != 0)
+        {
+            return summary.CallSites;
+        }
+
+        return summary.Calls.Select(static call => new CallSiteSummary(call));
+    }
+
+    private static bool ShouldTreatCallAsSemanticallyPure(
+        MethodEffectSummary callerSummary,
+        CallSiteSummary callSite,
+        MethodEffectSummary resolvedCallSummary,
+        MethodPurityClassification calleeClassification)
+    {
+        return IsStableOperatingSystemVersionProbe(callerSummary.Symbol, resolvedCallSummary.Symbol) ||
+            !string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+            HasDeterministicStringComparisonEvidence(callSite) &&
+            IsContextSensitiveStringComparisonMethod(resolvedCallSummary.ExactSymbolKey);
+    }
+
+    private static bool IsStableOperatingSystemVersionProbe(string callerSymbol, string calleeSymbol)
+    {
+        return string.Equals(callerSymbol, "System.OperatingSystem.IsOSVersionAtLeast(int, int, int, int)", StringComparison.Ordinal) &&
+            string.Equals(calleeSymbol, "System.Environment.get_OSVersion()", StringComparison.Ordinal);
+    }
+
     private static bool TryClassifyRuntimeIntrinsicStub(
         MethodEffectSummary summary,
         out MethodPurityClassification classification)
@@ -460,6 +499,103 @@ internal static class PurityClassificationEngine
             string.Equals(symbol, "System.Runtime.CompilerServices.Unsafe.SizeOf()", StringComparison.Ordinal) ||
             string.Equals(symbol, "System.Object.GetType()", StringComparison.Ordinal) ||
             string.Equals(symbol, "System.Reflection.MemberInfo.get_Name()", StringComparison.Ordinal);
+    }
+
+    private static bool HasOnlyDeterministicStringComparisonDispatch(MethodEffectSummary summary)
+    {
+        if (!summary.Effects.Contains("virtual_call", StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        var dynamicDispatchCallSites = EnumerateCallSites(summary)
+            .Where(static callSite => callSite.UsesDynamicDispatch)
+            .ToArray();
+        if (dynamicDispatchCallSites.Length == 0)
+        {
+            return false;
+        }
+
+        return dynamicDispatchCallSites.All(static callSite =>
+            HasDeterministicStringComparisonEvidence(callSite) &&
+            IsContextSensitiveStringComparisonMethod(callSite.ExactSymbolKey));
+    }
+
+    private static bool HasDeterministicStringComparisonEvidence(CallSiteSummary callSite)
+    {
+        foreach (var argumentEvidence in callSite.ArgumentEvidence)
+        {
+            if (string.Equals(argumentEvidence.Type, "System.StringComparison", StringComparison.Ordinal) &&
+                IsDeterministicStringComparisonValue(argumentEvidence.Value))
+            {
+                return true;
+            }
+
+            if (string.Equals(argumentEvidence.Type, "System.StringComparer", StringComparison.Ordinal) &&
+                IsDeterministicStringComparerValue(argumentEvidence.Value))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsDeterministicStringComparisonValue(string value)
+    {
+        return string.Equals(value, "System.StringComparison.InvariantCulture", StringComparison.Ordinal) ||
+            string.Equals(value, "System.StringComparison.InvariantCultureIgnoreCase", StringComparison.Ordinal) ||
+            string.Equals(value, "System.StringComparison.Ordinal", StringComparison.Ordinal) ||
+            string.Equals(value, "System.StringComparison.OrdinalIgnoreCase", StringComparison.Ordinal);
+    }
+
+    private static bool IsDeterministicStringComparerValue(string value)
+    {
+        return string.Equals(value, "System.StringComparer.Ordinal", StringComparison.Ordinal) ||
+            string.Equals(value, "System.StringComparer.OrdinalIgnoreCase", StringComparison.Ordinal) ||
+            string.Equals(value, "System.StringComparer.InvariantCulture", StringComparison.Ordinal) ||
+            string.Equals(value, "System.StringComparer.InvariantCultureIgnoreCase", StringComparison.Ordinal);
+    }
+
+    private static bool IsContextSensitiveStringComparisonMethod(string exactSymbolKey)
+    {
+        var methodBaseSymbol = GetMethodBaseSymbol(exactSymbolKey);
+        var lastDotIndex = methodBaseSymbol.LastIndexOf('.');
+        if (lastDotIndex <= 0 || lastDotIndex == methodBaseSymbol.Length - 1)
+        {
+            return false;
+        }
+
+        var containingType = methodBaseSymbol[..lastDotIndex];
+        var methodName = methodBaseSymbol[(lastDotIndex + 1)..];
+        return containingType switch
+        {
+            "string" or "System.String" => methodName is
+                "Compare" or
+                "Contains" or
+                "EndsWith" or
+                "Equals" or
+                "GetHashCode" or
+                "IndexOf" or
+                "LastIndexOf" or
+                "StartsWith",
+            "System.MemoryExtensions" => methodName is
+                "CompareTo" or
+                "Contains" or
+                "EndsWith" or
+                "Equals" or
+                "IndexOf" or
+                "LastIndexOf" or
+                "StartsWith",
+            "System.StringComparer" or
+            "System.OrdinalCaseSensitiveComparer" or
+            "System.OrdinalIgnoreCaseComparer" or
+            "System.CultureAwareComparer" => methodName is
+                "Compare" or
+                "Equals" or
+                "GetHashCode",
+            _ => false
+        };
     }
 
     private static string[] JoinCallChain(string callee, IReadOnlyList<string> nested)
@@ -1214,14 +1350,15 @@ internal static class PurityClassificationEngine
             return false;
         }
 
-        foreach (var call in summary.Calls)
+        foreach (var callSite in EnumerateCallSites(summary))
         {
+            var call = callSite.ExactSymbolKey;
             if (IsPurityNeutralIntrinsicHelperCall(call))
             {
                 continue;
             }
 
-            if (!TryResolveCallSummary(call, bySymbol, out var resolvedCallKey, out _))
+            if (!TryResolveCallSummary(call, bySymbol, out var resolvedCallKey, out var resolvedCallSummary))
             {
                 if (TryClassifyUnresolvedInteropBoundaryCall(call, out _))
                 {
@@ -1240,6 +1377,11 @@ internal static class PurityClassificationEngine
                 validationThrowHelperMemo,
                 purityVisiting);
             if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, calleeClassification))
             {
                 continue;
             }
@@ -1340,14 +1482,15 @@ internal static class PurityClassificationEngine
             return false;
         }
 
-        foreach (var call in summary.Calls)
+        foreach (var callSite in EnumerateCallSites(summary))
         {
+            var call = callSite.ExactSymbolKey;
             if (IsPurityNeutralIntrinsicHelperCall(call))
             {
                 continue;
             }
 
-            if (!TryResolveCallSummary(call, bySymbol, out var resolvedCallKey, out _))
+            if (!TryResolveCallSummary(call, bySymbol, out var resolvedCallKey, out var resolvedCallSummary))
             {
                 if (TryClassifyUnresolvedInteropBoundaryCall(call, out _))
                 {
@@ -1366,6 +1509,11 @@ internal static class PurityClassificationEngine
                 validationThrowHelperMemo,
                 purityVisiting);
             if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, calleeClassification))
             {
                 continue;
             }
