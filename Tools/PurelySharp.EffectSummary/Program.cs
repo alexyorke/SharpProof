@@ -77,7 +77,9 @@ internal static class EffectSummaryCli
         GeneratedPurityCatalogDocument? generatedPurityCatalog = null;
         if (options.IncludePurityClassification || options.CompareManualCatalogs)
         {
-            var externalGeneratedPurityEntries = ReviewedSummaryCatalogLoader.Load();
+            var externalGeneratedPurityEntries = options.IgnoreReviewedPurityEntries
+                ? EmptyReviewedSummaryEntries
+                : ReviewedSummaryCatalogLoader.Load();
             var classificationOutput = PurityClassificationEngine.Classify(
                 reports,
                 includeCatalogComparison: options.CompareManualCatalogs,
@@ -96,6 +98,9 @@ internal static class EffectSummaryCli
 
         return document;
     }
+
+    private static readonly IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> EmptyReviewedSummaryEntries =
+        new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
 
     private static void WriteDocument(EffectSummaryDocument document, string? outputPath)
     {
@@ -136,6 +141,7 @@ internal static class EffectSummaryCli
         Console.Error.WriteLine("  --transitive-roots         Propagate root candidate labels through same-assembly calls.");
         Console.Error.WriteLine("  --classify-purity         Add report-only fixed-point purity classifications to the JSON output.");
         Console.Error.WriteLine("  --compare-manual-catalogs Compare emitted methods against the current reviewed manual catalogs.");
+        Console.Error.WriteLine("  --ignore-reviewed-purity-entries  Classify without loading checked-in reviewed purity summaries.");
         Console.Error.WriteLine("  --output <path>            Write JSON to a file instead of stdout.");
         Console.Error.WriteLine("  --limit <count>            Limit emitted method summaries for smoke testing.");
         Console.Error.WriteLine("  --help                     Show this help.");
@@ -173,6 +179,8 @@ internal sealed class CliOptions
     public bool IncludePurityClassification { get; private set; }
 
     public bool CompareManualCatalogs { get; private set; }
+
+    public bool IgnoreReviewedPurityEntries { get; private set; }
 
     public bool ShowHelp { get; private set; }
 
@@ -215,6 +223,9 @@ internal sealed class CliOptions
                     options.IncludePurityClassification = true;
                     options.CompareManualCatalogs = true;
                     break;
+                case "--ignore-reviewed-purity-entries":
+                    options.IgnoreReviewedPurityEntries = true;
+                    break;
                 case "--output":
                     options.OutputPath = ReadRequiredValue(args, ref i, arg);
                     break;
@@ -247,6 +258,7 @@ internal sealed class CliOptions
             IncludeTransitiveRoots = artifact.IncludeTransitiveRoots ?? defaults?.IncludeTransitiveRoots ?? false,
             IncludePurityClassification = artifact.IncludePurityClassification ?? defaults?.IncludePurityClassification ?? false,
             CompareManualCatalogs = artifact.CompareManualCatalogs ?? defaults?.CompareManualCatalogs ?? false,
+            IgnoreReviewedPurityEntries = artifact.IgnoreReviewedPurityEntries ?? defaults?.IgnoreReviewedPurityEntries ?? false,
         };
 
         if (artifact.AssemblyPaths != null)
@@ -349,6 +361,8 @@ internal sealed class ArtifactSpecDefaults
 
     public bool? CompareManualCatalogs { get; set; }
 
+    public bool? IgnoreReviewedPurityEntries { get; set; }
+
     public string[]? ExcludedSymbolPrefixes { get; set; }
 }
 
@@ -377,6 +391,8 @@ internal sealed class ArtifactSpecEntry
     public bool? IncludePurityClassification { get; set; }
 
     public bool? CompareManualCatalogs { get; set; }
+
+    public bool? IgnoreReviewedPurityEntries { get; set; }
 
     public string[]? ExcludedSymbolPrefixes { get; set; }
 }

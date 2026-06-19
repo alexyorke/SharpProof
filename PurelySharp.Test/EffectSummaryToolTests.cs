@@ -4973,11 +4973,13 @@ public readonly struct ConversionFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeOperatingSystemSlice_TreatsDeterministicStringComparisonPathAsPure()
+        public async Task EffectSummaryTool_RuntimeOperatingSystemSlice_UsesGeneratedCurrentRuntimeEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
                 120,
+                1,
+                true,
                 "System.OperatingSystem.Is",
                 "System.OperatingSystem.get_Platform");
 
@@ -5001,10 +5003,12 @@ public readonly struct ConversionFixture
             AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsAndroidVersionAtLeast(int, int, int, int)", "none");
             AssertPurityClassification(summary, "System.OperatingSystem.IsMacOSVersionAtLeast(int, int, int)", "pure");
             AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsMacOSVersionAtLeast(int, int, int)", "none");
-            AssertPurityClassification(summary, "System.OperatingSystem.IsOSPlatformVersionAtLeast(string, int, int, int, int)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsOSPlatformVersionAtLeast(string, int, int, int, int)", "none");
-            AssertPurityClassification(summary, "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)", "none");
+            AssertPurityClassification(summary, "System.OperatingSystem.IsOSPlatformVersionAtLeast(string, int, int, int, int)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsOSPlatformVersionAtLeast(string, int, int, int, int)", "caller_visible");
+            AssertPurityClassification(summary, "System.OperatingSystem.IsOSVersionAtLeast(int, int, int, int)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsOSVersionAtLeast(int, int, int, int)", "caller_visible");
+            AssertPurityClassification(summary, "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)", "caller_visible");
             AssertPurityClassification(summary, "System.OperatingSystem.get_Platform()", "pure");
             AssertEffectVisibilityClassification(summary, "System.OperatingSystem.get_Platform()", "none");
 
@@ -5029,6 +5033,7 @@ public readonly struct ConversionFixture
                     string.Equals(symbol, "System.OperatingSystem.IsMacOSVersionAtLeast(int, int, int)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.OperatingSystem.IsOSPlatform(string)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.OperatingSystem.IsOSPlatformVersionAtLeast(string, int, int, int, int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.OperatingSystem.IsOSVersionAtLeast(int, int, int, int)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.OperatingSystem.get_Platform()", StringComparison.Ordinal))
                 .OrderBy(symbol => symbol, StringComparer.Ordinal)
@@ -5043,6 +5048,7 @@ public readonly struct ConversionFixture
                 "System.OperatingSystem.IsMacOSVersionAtLeast(int, int, int)",
                 "System.OperatingSystem.IsOSPlatform(string)",
                 "System.OperatingSystem.IsOSPlatformVersionAtLeast(string, int, int, int, int)",
+                "System.OperatingSystem.IsOSVersionAtLeast(int, int, int, int)",
                 "System.OperatingSystem.IsWindows()",
                 "System.OperatingSystem.IsWindowsVersionAtLeast(int, int, int, int)",
                 "System.OperatingSystem.get_Platform()",
@@ -7783,7 +7789,7 @@ public sealed class StableCacheDerived : StaticFieldBase
 
         private static async Task<JsonDocument> RunRuntimeEffectSummaryAsync(int limit, params string[] symbolPrefixes)
         {
-            return await RunRuntimeEffectSummaryAsyncCore(limit, null, 1, symbolPrefixes);
+            return await RunRuntimeEffectSummaryAsyncCore(limit, null, 1, false, symbolPrefixes);
         }
 
         private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(
@@ -7791,7 +7797,7 @@ public sealed class StableCacheDerived : StaticFieldBase
             int limit,
             params string[] symbolPrefixes)
         {
-            return RunRuntimeEffectSummaryAsyncForAssembly(runtimeAssemblyName, limit, 1, symbolPrefixes);
+            return RunRuntimeEffectSummaryAsyncForAssembly(runtimeAssemblyName, limit, 1, false, symbolPrefixes);
         }
 
         private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(
@@ -7800,13 +7806,24 @@ public sealed class StableCacheDerived : StaticFieldBase
             int maxDepth,
             params string[] symbolPrefixes)
         {
-            return RunRuntimeEffectSummaryAsyncCore(limit, runtimeAssemblyName, maxDepth, symbolPrefixes);
+            return RunRuntimeEffectSummaryAsyncForAssembly(runtimeAssemblyName, limit, maxDepth, false, symbolPrefixes);
+        }
+
+        private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(
+            string runtimeAssemblyName,
+            int limit,
+            int maxDepth,
+            bool ignoreReviewedPurityEntries,
+            params string[] symbolPrefixes)
+        {
+            return RunRuntimeEffectSummaryAsyncCore(limit, runtimeAssemblyName, maxDepth, ignoreReviewedPurityEntries, symbolPrefixes);
         }
 
         private static async Task<JsonDocument> RunRuntimeEffectSummaryAsyncCore(
             int limit,
             string? runtimeAssemblyName,
             int maxDepth,
+            bool ignoreReviewedPurityEntries,
             params string[] symbolPrefixes)
         {
             if (symbolPrefixes.Length == 0)
@@ -7841,6 +7858,10 @@ public sealed class StableCacheDerived : StaticFieldBase
             startInfo.ArgumentList.Add(maxDepth.ToString());
             startInfo.ArgumentList.Add("--classify-purity");
             startInfo.ArgumentList.Add("--compare-manual-catalogs");
+            if (ignoreReviewedPurityEntries)
+            {
+                startInfo.ArgumentList.Add("--ignore-reviewed-purity-entries");
+            }
             startInfo.ArgumentList.Add("--limit");
             startInfo.ArgumentList.Add(limit.ToString());
             startInfo.ArgumentList.Add("--output");

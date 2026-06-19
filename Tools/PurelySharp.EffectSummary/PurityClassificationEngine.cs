@@ -528,16 +528,9 @@ internal static class PurityClassificationEngine
         MethodEffectSummary resolvedCallSummary,
         MethodPurityClassification calleeClassification)
     {
-        return IsStableOperatingSystemVersionProbe(callerSummary.Symbol, resolvedCallSummary.Symbol) ||
-            !string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+        return !string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
             HasDeterministicStringComparisonEvidence(callSite) &&
             IsContextSensitiveStringComparisonMethod(resolvedCallSummary.ExactSymbolKey);
-    }
-
-    private static bool IsStableOperatingSystemVersionProbe(string callerSymbol, string calleeSymbol)
-    {
-        return string.Equals(callerSymbol, "System.OperatingSystem.IsOSVersionAtLeast(int, int, int, int)", StringComparison.Ordinal) &&
-            string.Equals(calleeSymbol, "System.Environment.get_OSVersion()", StringComparison.Ordinal);
     }
 
     private static bool TryClassifyRuntimeIntrinsicStub(

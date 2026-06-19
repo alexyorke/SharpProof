@@ -273,6 +273,7 @@
     },
     {
       "OutputPath": "PurelySharp.Analyzer/OperatingSystem.PurelySharp.EffectSummary.json",
+      "IgnoreReviewedPurityEntries": true,
       "Limit": 120,
       "SymbolPrefixes": [
         "System.OperatingSystem.Is",
