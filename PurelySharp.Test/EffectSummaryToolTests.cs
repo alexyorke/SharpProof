@@ -4133,6 +4133,94 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_ReusesDistinctExactKeys_ForDuplicateDisplaySymbols()
+        {
+            var source = """
+public readonly struct ConversionFixture
+{
+    private readonly int _value;
+
+    public ConversionFixture(int value)
+    {
+        _value = value;
+    }
+
+    public static explicit operator int(ConversionFixture value) => value._value;
+
+    public static explicit operator long(ConversionFixture value) => value._value;
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryArtifactSpecDuplicateDisplaySymbols", source);
+
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-artifact-source-duplicate-symbols-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var seedOutputPath = Path.Combine(workingDirectory, "seed.PurelySharp.EffectSummary.json");
+            var regeneratedOutputPath = Path.Combine(workingDirectory, "regenerated.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            using (var seedSummary = await RunEffectSummaryAsync(
+                       fixture.AssemblyPath,
+                       includeTransitiveRoots: true,
+                       classifyPurity: true,
+                       compareManualCatalogs: false))
+            {
+                await File.WriteAllTextAsync(seedOutputPath, seedSummary.RootElement.GetRawText());
+            }
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = regeneratedOutputPath,
+                            SourceSummaryPath = seedOutputPath,
+                            AssemblyPaths = new[]
+                            {
+                                fixture.AssemblyPath,
+                            },
+                            IncludeCallees = true,
+                            IncludePurityClassification = true,
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
+
+            using var regeneratedSummary = JsonDocument.Parse(await File.ReadAllTextAsync(regeneratedOutputPath));
+            var operatorEntries = regeneratedSummary.RootElement
+                .GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Where(entry => string.Equals(
+                    entry.GetProperty("Symbol").GetString(),
+                    "ConversionFixture.op_Explicit(ConversionFixture)",
+                    StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(operatorEntries.Length, Is.EqualTo(2));
+            Assert.That(
+                operatorEntries
+                    .Select(entry => entry.GetProperty("ExactSymbolKey").GetString())
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Distinct(StringComparer.Ordinal)
+                    .Count(),
+                Is.EqualTo(2),
+                "Artifact-spec regeneration should preserve both exact symbol keys when SourceSummaryPath reuses a reviewed symbol set with duplicate display symbols.");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_Classifies_DirectoryCurrentDirectory_AsImpure()
         {
             var workingDirectory = Path.Combine(

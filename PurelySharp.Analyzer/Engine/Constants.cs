@@ -820,10 +820,6 @@ public static class Constants
         "System.Numerics.Complex.Complex(double, double)",
         "System.Numerics.Complex.Abs(System.Numerics.Complex)",
 
-        "System.Reflection.FieldInfo.GetValue(object)",
-        "System.Reflection.PropertyInfo.GetValue(object)",
-
-
         "System.Security.Cryptography.Aes.DecryptCbc(byte[], byte[], byte[], System.Security.Cryptography.PaddingMode)",
         "System.Security.Cryptography.Aes.EncryptCbc(byte[], byte[], byte[], System.Security.Cryptography.PaddingMode)",
         "System.Security.Cryptography.MD5.ComputeHash(byte[])",
