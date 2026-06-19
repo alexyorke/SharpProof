@@ -16,6 +16,7 @@
 - `PS0010` reports definite null dereferences on literal/default-null receivers and suppresses them when caught.
 - `PS0010` emits structured exception evidence properties for categories and sources.
 - `PS0011` pinpoints uncaught call sites that can propagate exceptions discovered from source analysis or generated `PurelySharp.EffectSummary.json` summaries.
+- `PS0011` also reports uncaught direct throws plus analyzer-proven divide-by-zero and null-dereference sites, and preserves multi-hop source-callee evidence chains.
 - Corpus reports aggregate `PS0010` counts plus exception categories and sources.
 - Effect summary IL exception extraction recognizes constructed exception objects stored to and reloaded from locals before `throw`.
 - Effect summary output includes assembly SHA-256, per-method IL SHA-256, and method cache keys for self-validating generated indexes.

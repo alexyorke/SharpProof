@@ -96,31 +96,25 @@ namespace PurelySharp.Analyzer
             IMethodSymbol methodSymbol,
             ExceptionSummaryCatalog exceptionSummaryCatalog)
         {
-            foreach (var calleeCallSite in GetCalleeCallSites(methodNode, semanticModel, cancellationToken))
+            foreach (var siteGroup in CollectUncaughtExceptionSiteEntries(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         methodSymbol,
+                         exceptionSummaryCatalog,
+                         new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
+                         {
+                             methodSymbol.OriginalDefinition
+                         })
+                     .GroupBy(entry => CreateExceptionSiteKey(entry.Site), StringComparer.Ordinal))
             {
-                if (IsInStaticallyUnreachableBranch(calleeCallSite.CallSite, semanticModel, cancellationToken))
-                {
-                    continue;
-                }
-
+                var firstEntry = siteGroup.First();
                 var siteEvidence = new ExceptionEvidenceSet();
-                var visitedMethods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
+                string? exceptionSymbol = null;
+                foreach (var siteEntry in siteGroup)
                 {
-                    methodSymbol.OriginalDefinition
-                };
-                foreach (var exception in CollectCalleeExceptions(
-                             calleeCallSite.Method,
-                             semanticModel.Compilation,
-                             cancellationToken,
-                             exceptionSummaryCatalog,
-                             visitedMethods))
-                {
-                    if (IsCaughtWithinMethod(calleeCallSite.CallSite, exception.Type, methodNode, semanticModel, cancellationToken))
-                    {
-                        continue;
-                    }
-
-                    siteEvidence.Add(exception.DisplayName, exception.Category, exception.Source);
+                    siteEvidence.Add(siteEntry.Exception.DisplayName, siteEntry.Exception.Category, siteEntry.Exception.Source);
+                    exceptionSymbol ??= siteEntry.ExceptionSymbol;
                 }
 
                 if (siteEvidence.Count == 0)
@@ -128,7 +122,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                var siteLocation = GetExceptionSiteLocation(calleeCallSite.CallSite);
+                var siteLocation = GetExceptionSiteLocation(firstEntry.Site);
                 if (siteLocation == null)
                 {
                     continue;
@@ -136,13 +130,15 @@ namespace PurelySharp.Analyzer
 
                 var sortedTypes = siteEvidence.Types;
                 var exceptionList = string.Join(", ", sortedTypes);
-                var calleeDisplay = calleeCallSite.Method.OriginalDefinition.ToDisplayString();
-                var operationDisplay = GetExceptionSiteDisplay(calleeCallSite.CallSite, calleeCallSite.Method);
+                var operationDisplay = GetExceptionSiteDisplay(firstEntry.Site, firstEntry.Method);
                 var properties = ImmutableDictionary<string, string?>.Empty
                     .Add(PurelySharpDiagnostics.ExceptionTypesProperty, string.Join(";", sortedTypes))
                     .Add(PurelySharpDiagnostics.ExceptionCategoriesProperty, siteEvidence.FormatCategories())
-                    .Add(PurelySharpDiagnostics.ExceptionSourcesProperty, siteEvidence.FormatSources())
-                    .Add(PurelySharpDiagnostics.ExceptionSymbolProperty, calleeDisplay);
+                    .Add(PurelySharpDiagnostics.ExceptionSourcesProperty, siteEvidence.FormatSources());
+                if (!string.IsNullOrWhiteSpace(exceptionSymbol))
+                {
+                    properties = properties.Add(PurelySharpDiagnostics.ExceptionSymbolProperty, exceptionSymbol);
+                }
 
                 context.ReportDiagnostic(Diagnostic.Create(
                     PurelySharpDiagnostics.UncaughtExceptionSiteRule,
@@ -163,6 +159,28 @@ namespace PurelySharp.Analyzer
         {
             visitedMethods.Add(methodSymbol.OriginalDefinition);
             var exceptionEvidence = new ExceptionEvidenceSet();
+            foreach (var siteEntry in CollectUncaughtExceptionSiteEntries(
+                         methodNode,
+                         semanticModel,
+                         cancellationToken,
+                         methodSymbol,
+                         exceptionSummaryCatalog,
+                         visitedMethods))
+            {
+                exceptionEvidence.Add(siteEntry.Exception.DisplayName, siteEntry.Exception.Category, siteEntry.Exception.Source);
+            }
+
+            return exceptionEvidence;
+        }
+
+        private static IEnumerable<UncaughtExceptionSiteEntry> CollectUncaughtExceptionSiteEntries(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            IMethodSymbol methodSymbol,
+            ExceptionSummaryCatalog exceptionSummaryCatalog,
+            HashSet<IMethodSymbol> visitedMethods)
+        {
             foreach (var throwNode in GetThrowNodes(methodNode))
             {
                 if (IsInStaticallyUnreachableBranch(throwNode, semanticModel, cancellationToken))
@@ -176,10 +194,14 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                exceptionEvidence.Add(
-                    exceptionType?.ToDisplayString(ExceptionTypeDisplayFormat) ?? UnknownExceptionType,
-                    IsRethrow(throwNode) ? "rethrow" : "direct_throw",
-                    "throw");
+                yield return new UncaughtExceptionSiteEntry(
+                    throwNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        exceptionType?.ToDisplayString(ExceptionTypeDisplayFormat) ?? UnknownExceptionType,
+                        IsRethrow(throwNode) ? "rethrow" : "direct_throw",
+                        "throw"));
             }
 
             foreach (var calleeCallSite in GetCalleeCallSites(methodNode, semanticModel, cancellationToken))
@@ -189,15 +211,21 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                AddUncaughtCalleeExceptions(
-                    exceptionEvidence,
-                    calleeCallSite.CallSite,
-                    calleeCallSite.Method,
-                    methodNode,
-                    semanticModel,
-                    cancellationToken,
-                    exceptionSummaryCatalog,
-                    visitedMethods);
+                var calleeDisplay = calleeCallSite.Method.OriginalDefinition.ToDisplayString();
+                foreach (var exception in CollectCalleeExceptions(
+                             calleeCallSite.Method,
+                             semanticModel.Compilation,
+                             cancellationToken,
+                             exceptionSummaryCatalog,
+                             visitedMethods))
+                {
+                    if (IsCaughtWithinMethod(calleeCallSite.CallSite, exception.Type, methodNode, semanticModel, cancellationToken))
+                    {
+                        continue;
+                    }
+
+                    yield return new UncaughtExceptionSiteEntry(calleeCallSite.CallSite, calleeCallSite.Method, exception, calleeDisplay);
+                }
             }
 
             foreach (var divideByZeroNode in GetDefiniteDivideByZeroNodes(methodNode, semanticModel, cancellationToken))
@@ -213,7 +241,14 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                exceptionEvidence.Add("System.DivideByZeroException", "definite_divide_by_zero", "binary_operator");
+                yield return new UncaughtExceptionSiteEntry(
+                    divideByZeroNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        "System.DivideByZeroException",
+                        "definite_divide_by_zero",
+                        "binary_operator"));
             }
 
             foreach (var nullDereferenceNode in GetDefiniteNullDereferenceNodes(methodNode, semanticModel, cancellationToken))
@@ -229,36 +264,22 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                exceptionEvidence.Add("System.NullReferenceException", "definite_null_dereference", "null_receiver");
+                yield return new UncaughtExceptionSiteEntry(
+                    nullDereferenceNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        "System.NullReferenceException",
+                        "definite_null_dereference",
+                        "null_receiver"));
             }
-
-            return exceptionEvidence;
         }
 
-        private static void AddUncaughtCalleeExceptions(
-            ExceptionEvidenceSet exceptionEvidence,
-            SyntaxNode callSite,
-            IMethodSymbol callee,
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            ExceptionSummaryCatalog exceptionSummaryCatalog,
-            HashSet<IMethodSymbol> visitedMethods)
+        private static string CreateExceptionSiteKey(SyntaxNode node)
         {
-            foreach (var exception in CollectCalleeExceptions(
-                         callee,
-                         semanticModel.Compilation,
-                         cancellationToken,
-                         exceptionSummaryCatalog,
-                         visitedMethods))
-            {
-                if (IsCaughtWithinMethod(callSite, exception.Type, methodNode, semanticModel, cancellationToken))
-                {
-                    continue;
-                }
-
-                exceptionEvidence.Add(exception.DisplayName, exception.Category, exception.Source);
-            }
+            return node.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                ":" +
+                node.Span.End.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private static IEnumerable<MethodCallCandidate> GetCalleeCallSites(
@@ -1094,12 +1115,19 @@ namespace PurelySharp.Analyzer
                     exceptionSummaryCatalog,
                     visitedMethods);
 
-                return exceptions.Types
-                    .Select(name => new ExceptionCandidate(
-                        TryResolveExceptionType(compilation, name),
-                        name,
-                        "source_callee",
-                        invokedMethod.OriginalDefinition.ToDisplayString()))
+                var invokedMethodDisplay = invokedMethod.OriginalDefinition.ToDisplayString();
+                return exceptions.EnumerateEntries()
+                    .SelectMany(entry =>
+                    {
+                        var chainedSources = entry.Sources.Length == 0
+                            ? new[] { invokedMethodDisplay }
+                            : entry.Sources.Select(source => invokedMethodDisplay + " -> " + source);
+                        return chainedSources.Select(source => new ExceptionCandidate(
+                            TryResolveExceptionType(compilation, entry.ExceptionType),
+                            entry.ExceptionType,
+                            "source_callee",
+                            source));
+                    })
                     .ToArray();
             }
             finally
@@ -1715,6 +1743,45 @@ namespace PurelySharp.Analyzer
             public IMethodSymbol Method { get; }
         }
 
+        private sealed class UncaughtExceptionSiteEntry
+        {
+            public UncaughtExceptionSiteEntry(
+                SyntaxNode site,
+                IMethodSymbol method,
+                ExceptionCandidate exception,
+                string? exceptionSymbol = null)
+            {
+                Site = site;
+                Method = method;
+                Exception = exception;
+                ExceptionSymbol = exceptionSymbol;
+            }
+
+            public SyntaxNode Site { get; }
+
+            public IMethodSymbol Method { get; }
+
+            public ExceptionCandidate Exception { get; }
+
+            public string? ExceptionSymbol { get; }
+        }
+
+        private sealed class ExceptionEvidenceEntry
+        {
+            public ExceptionEvidenceEntry(string exceptionType, string[] categories, string[] sources)
+            {
+                ExceptionType = exceptionType;
+                Categories = categories;
+                Sources = sources;
+            }
+
+            public string ExceptionType { get; }
+
+            public string[] Categories { get; }
+
+            public string[] Sources { get; }
+        }
+
         private sealed class ExceptionEvidenceSet
         {
             private readonly Dictionary<string, SortedSet<string>> _categoriesByType =
@@ -1744,6 +1811,21 @@ namespace PurelySharp.Analyzer
                 }
 
                 sources.Add(category + ":" + source);
+            }
+
+            public ExceptionEvidenceEntry[] EnumerateEntries()
+            {
+                return _categoriesByType.Keys
+                    .OrderBy(type => type, StringComparer.Ordinal)
+                    .Select(type => new ExceptionEvidenceEntry(
+                        type,
+                        _categoriesByType.TryGetValue(type, out var categories)
+                            ? categories.ToArray()
+                            : Array.Empty<string>(),
+                        _sourcesByType.TryGetValue(type, out var sources)
+                            ? sources.ToArray()
+                            : Array.Empty<string>()))
+                    .ToArray();
             }
 
             public string FormatCategories()

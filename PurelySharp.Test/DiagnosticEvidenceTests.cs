@@ -7300,7 +7300,10 @@ public class TestClass
                 ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
 
             var diagnostic = SingleDiagnostic(
-                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                diagnostics
+                    .Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId)
+                    .Where(d => d.GetMessage().Contains("Callee()", StringComparison.Ordinal))
+                    .ToImmutableArray(),
                 PurelySharpDiagnostics.UncaughtExceptionSiteId);
 
             Assert.That(diagnostic.GetMessage(), Does.Contain("Callee"));
@@ -7308,6 +7311,148 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("source_callee"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.InvalidOperationException=source_callee:"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSymbolProperty], Does.Contain("Callee"));
+        }
+
+        [Test]
+        public async Task Ps0011_SourceCallee_CaughtAtCallSite_IsSuppressed()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void Caller()
+    {
+        try
+        {
+            Callee();
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private void Callee()
+    {
+        throw new InvalidOperationException();
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            var siteDiagnostics = diagnostics
+                .Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId)
+                .ToImmutableArray();
+
+            Assert.That(siteDiagnostics.Any(d => d.GetMessage().Contains("Callee()", StringComparison.Ordinal)), Is.False);
+            Assert.That(siteDiagnostics.Any(d => d.GetMessage().Contains("throw new InvalidOperationException()", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public async Task Ps0011_DirectThrow_UncaughtAtSite_ReportsWarning()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        throw new InvalidOperationException();
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            var diagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("throw new InvalidOperationException()"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.InvalidOperationException=direct_throw:throw"));
+        }
+
+        [Test]
+        public async Task Ps0011_DefiniteDivideByZero_UncaughtAtSite_ReportsWarning()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return value / 0;
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            var diagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("value / 0"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.DivideByZeroException=definite_divide_by_zero:binary_operator"));
+        }
+
+        [Test]
+        public async Task Ps0011_DefiniteNullDereference_UncaughtAtSite_ReportsWarning()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        string value = null!;
+        return value.Length;
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            var diagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("value.Length"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_null_dereference"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.NullReferenceException=definite_null_dereference:null_receiver"));
+        }
+
+        [Test]
+        public async Task Ps0011_SourceCallee_MultiHopChain_PreservesRecursiveSourceEvidence()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void Entry()
+    {
+        Outer();
+    }
+
+    private void Outer()
+    {
+        Inner();
+    }
+
+    private void Inner()
+    {
+        throw new InvalidOperationException();
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            var diagnostic = diagnostics
+                .Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId)
+                .Single(d => d.GetMessage().Contains("Outer()", StringComparison.Ordinal));
+
+            var sources = diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty];
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(sources, Does.Contain("Outer()"));
+            Assert.That(sources, Does.Contain("Inner()"));
+            Assert.That(sources, Does.Contain("direct_throw:throw"));
         }
 
         [Test]
