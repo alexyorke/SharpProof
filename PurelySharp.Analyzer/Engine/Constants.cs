@@ -802,12 +802,6 @@ public static class Constants
 
 
 
-        "System.Globalization.CultureInfo.Name.get",
-
-
-
-
-
         "System.Linq.Enumerable.All<TSource>(System.Collections.Generic.IEnumerable<TSource>, System.Func<TSource, bool>)",
         "System.Linq.Enumerable.Any<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
         "System.Linq.Enumerable.Count<TSource>(System.Collections.Generic.IEnumerable<TSource>)",

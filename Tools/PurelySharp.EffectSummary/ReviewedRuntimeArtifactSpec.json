@@ -182,6 +182,14 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Culture.Name.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Culture.Name.PurelySharp.EffectSummary.json",
+      "Limit": 8,
+      "SymbolPrefixes": [
+        "System.Globalization.CultureInfo.get_Name"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Environment.HasShutdownStarted.PurelySharp.EffectSummary.json",
       "Limit": 4,
       "SymbolPrefixes": [

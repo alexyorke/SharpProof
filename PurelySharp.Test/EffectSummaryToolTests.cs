@@ -5178,6 +5178,37 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeCultureInfoNameSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                8,
+                1,
+                "System.Globalization.CultureInfo.get_Name");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Globalization.CultureInfo.get_Name()", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Globalization.CultureInfo.get_Name()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => string.Equals(symbol, "System.Globalization.CultureInfo.get_Name()", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Globalization.CultureInfo.get_Name()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeConsoleStateSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

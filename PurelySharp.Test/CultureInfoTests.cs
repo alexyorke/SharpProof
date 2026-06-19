@@ -126,6 +126,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task CultureInfoName_Diagnostic()
+        {
+            var test = @"
+using System.Globalization;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(CultureInfo culture)
+    {
+        return culture.Name;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task RegionInfoCurrentRegion_Diagnostic()
         {
             var test = @"

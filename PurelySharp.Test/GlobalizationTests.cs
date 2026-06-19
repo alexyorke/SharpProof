@@ -18,7 +18,7 @@ namespace PurelySharp.Test
 
 
         [Test]
-        public async Task CultureInfo_InvariantCulture_NoDiagnostic()
+        public async Task CultureInfo_InvariantCultureName_Diagnostic()
         {
             var test = @"
 #nullable enable
@@ -31,9 +31,8 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod()
+    public string {|PS0002:TestMethod|}()
     {
-        // Pure: InvariantCulture is constant
         CultureInfo invariant = CultureInfo.InvariantCulture;
         return invariant.Name;
     }

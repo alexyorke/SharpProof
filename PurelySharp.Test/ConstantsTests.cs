@@ -2130,6 +2130,42 @@ public static class MemberInfoNameCatalogSignatureSamples
         }
 
         [Test]
+        public void CultureInfoName_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System.Globalization;
+
+public static class CultureInfoNameCatalogSignatureSamples
+{
+    public static string Sample(CultureInfo culture)
+    {
+        return culture.Name;
+    }
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "CultureInfoNameCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var signature = GetPropertySignature(compilation, syntaxTree, "culture.Name");
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var memberAccess = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Single(node => node.ToString() == "culture.Name");
+            var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(memberAccess).Symbol!;
+            var (matched, classification) = GetGeneratedPurityClassification(propertySymbol.GetMethod!, compilation);
+
+            Assert.That(signature, Is.EqualTo("System.Globalization.CultureInfo.Name.get"));
+            AssertNotInManualCatalogs(signature);
+            Assert.That(matched, Is.True,
+                "Generated purity catalog should resolve System.Globalization.CultureInfo.Name.get from runtime metadata evidence.");
+            Assert.That(classification, Is.EqualTo("impure"));
+        }
+
+        [Test]
         public void TypeAssemblyGetter_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             const string source = @"

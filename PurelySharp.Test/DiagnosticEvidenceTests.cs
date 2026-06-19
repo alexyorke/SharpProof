@@ -1943,6 +1943,52 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_CultureInfoNameAsImpureEvidence()
+        {
+            const string source = @"
+using System.Globalization;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(CultureInfo culture)
+    {
+        return culture.Name;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var methodSymbol = ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<MemberAccessExpressionSyntax>()
+                        .Single(node => node.ToString() == "culture.Name"))
+                .Symbol!).GetMethod!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
+            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+            var purityEntry = args[2]!;
+            var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+
+            Assert.That(diagnostic.Id, Is.EqualTo(PurelySharpDiagnostics.PurityNotVerifiedId));
+            Assert.That(matched, Is.True, "Generated purity catalog should resolve System.Globalization.CultureInfo.Name.get.");
+            Assert.That(classification, Is.EqualTo("impure"),
+                "CultureInfo.Name caches instance state and should remain generated impure.");
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_ConsoleAmbientStateAsImpureEvidence()
         {
             const string source = @"
