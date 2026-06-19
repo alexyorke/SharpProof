@@ -740,10 +740,21 @@ internal static class AssemblyEffectSummarizer
             : Path.GetFileNameWithoutExtension(assemblyPath);
         var moduleVersionId = reader.GetGuid(module.Mvid).ToString("D");
 
+        var methodDefinitionHandlesByExactKey = new Dictionary<string, MethodDefinitionHandle>(StringComparer.Ordinal);
+        var knownMethodReturnValues = new Dictionary<int, TrackedStackValue>();
+        var knownMethodReturnValueVisiting = new HashSet<int>();
         var allSummaries = new List<MethodEffectSummary>();
         foreach (var handle in reader.MethodDefinitions)
         {
-            allSummaries.Add(SummarizeMethod(peReader, reader, handle, moduleVersionId));
+            methodDefinitionHandlesByExactKey[GetMethodExactKey(reader, handle)] = handle;
+            allSummaries.Add(SummarizeMethod(
+                peReader,
+                reader,
+                handle,
+                moduleVersionId,
+                methodDefinitionHandlesByExactKey,
+                knownMethodReturnValues,
+                knownMethodReturnValueVisiting));
         }
 
         if (includeTransitiveRoots)
@@ -897,7 +908,10 @@ internal static class AssemblyEffectSummarizer
         PEReader peReader,
         MetadataReader reader,
         MethodDefinitionHandle handle,
-        string moduleVersionId)
+        string moduleVersionId,
+        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
+        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
+        HashSet<int> knownMethodReturnValueVisiting)
     {
         var definition = reader.GetMethodDefinition(handle);
         var effects = new SortedSet<string>(StringComparer.Ordinal);
@@ -935,7 +949,20 @@ internal static class AssemblyEffectSummarizer
             if (il is not null)
             {
                 methodBodySha256 = ComputeSha256(il);
-                AnalyzeIl(reader, il, body.ExceptionRegions, effects, calls, callSites, fields, staticFields, thrownExceptionTypes);
+                AnalyzeIl(
+                    peReader,
+                    reader,
+                    il,
+                    body.ExceptionRegions,
+                    effects,
+                    calls,
+                    callSites,
+                    fields,
+                    staticFields,
+                    thrownExceptionTypes,
+                    methodDefinitionHandlesByExactKey,
+                    knownMethodReturnValues,
+                    knownMethodReturnValueVisiting);
             }
         }
 
@@ -1352,6 +1379,7 @@ internal static class AssemblyEffectSummarizer
     }
 
     private static void AnalyzeIl(
+        PEReader peReader,
         MetadataReader reader,
         byte[] il,
         ImmutableArray<ExceptionRegion> exceptionRegions,
@@ -1360,11 +1388,12 @@ internal static class AssemblyEffectSummarizer
         List<CallSiteSummary> callSites,
         SortedSet<string> fields,
         SortedSet<string> staticFields,
-        SortedSet<string> thrownExceptionTypes)
+        SortedSet<string> thrownExceptionTypes,
+        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
+        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
+        HashSet<int> knownMethodReturnValueVisiting)
     {
         var offset = 0;
-        string? lastConstructedExceptionType = null;
-        var localExceptionTypes = new Dictionary<int, string?>();
         var knownThrownExceptionSites = new List<KnownThrownExceptionSite>();
         var trackedLocals = new Dictionary<int, TrackedStackValue>();
         var trackedStack = new List<TrackedStackValue>();
@@ -1424,7 +1453,18 @@ internal static class AssemblyEffectSummarizer
                             signature,
                             receiverValue,
                             argumentValues));
-                        PushCallReturnValue(trackedStack, calledSymbol, signature, argumentValues, opCode == OpCodes.Newobj);
+                        PushCallReturnValue(
+                            peReader,
+                            reader,
+                            operandToken,
+                            trackedStack,
+                            calledSymbol,
+                            signature,
+                            argumentValues,
+                            opCode == OpCodes.Newobj,
+                            methodDefinitionHandlesByExactKey,
+                            knownMethodReturnValues,
+                            knownMethodReturnValueVisiting);
                     }
                     else
                     {
@@ -1440,28 +1480,6 @@ internal static class AssemblyEffectSummarizer
                         }
                     }
                 }
-
-                if (opCode == OpCodes.Newobj)
-                {
-                    lastConstructedExceptionType = TryGetConstructedExceptionType(calledSymbol);
-                }
-            }
-            else if (TryGetStoreLocalIndex(opCode, il, operandOffset, out var storeLocalIndex))
-            {
-                if (lastConstructedExceptionType == null)
-                {
-                    localExceptionTypes.Remove(storeLocalIndex);
-                }
-                else
-                {
-                    localExceptionTypes[storeLocalIndex] = lastConstructedExceptionType;
-                }
-            }
-            else if (TryGetLoadLocalIndex(opCode, il, operandOffset, out var loadLocalIndex))
-            {
-                lastConstructedExceptionType = localExceptionTypes.TryGetValue(loadLocalIndex, out var localExceptionType)
-                    ? localExceptionType
-                    : null;
             }
             else if (opCode == OpCodes.Calli)
             {
@@ -1502,7 +1520,7 @@ internal static class AssemblyEffectSummarizer
                 effects.Add("throws");
                 var thrownExceptionType = opCode == OpCodes.Rethrow
                     ? TryResolveRethrowExceptionType(reader, exceptionRegions, instructionOffset, knownThrownExceptionSites)
-                    : lastConstructedExceptionType;
+                    : PeekTrackedExceptionType(trackedStack);
                 if (opCode == OpCodes.Throw && thrownExceptionType != null)
                 {
                     knownThrownExceptionSites.Add(new KnownThrownExceptionSite(instructionOffset, thrownExceptionType));
@@ -1542,13 +1560,6 @@ internal static class AssemblyEffectSummarizer
             if (opCode != OpCodes.Call && opCode != OpCodes.Callvirt && opCode != OpCodes.Newobj)
             {
                 ApplyTrackedStackTransition(reader, il, opCode, operandOffset, operandToken, trackedStack, trackedLocals);
-            }
-
-            if (opCode != OpCodes.Newobj &&
-                opCode != OpCodes.Dup &&
-                !IsLoadLocal(opCode))
-            {
-                lastConstructedExceptionType = null;
             }
 
             suppressDynamicDispatchForNextCallvirt = false;
@@ -1616,15 +1627,24 @@ internal static class AssemblyEffectSummarizer
     }
 
     private static void PushCallReturnValue(
+        PEReader peReader,
+        MetadataReader reader,
+        int? operandToken,
         List<TrackedStackValue> trackedStack,
         string calledSymbol,
         CallTargetSignature signature,
         IReadOnlyList<TrackedStackValue> argumentValues,
-        bool isObjectConstruction)
+        bool isObjectConstruction,
+        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
+        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
+        HashSet<int> knownMethodReturnValueVisiting)
     {
         if (isObjectConstruction)
         {
-            trackedStack.Add(TrackedStackValue.Unknown);
+            var exceptionType = TryGetConstructedExceptionType(calledSymbol);
+            trackedStack.Add(exceptionType == null
+                ? TrackedStackValue.Unknown
+                : TrackedStackValue.FromKnownExceptionType(exceptionType));
             return;
         }
 
@@ -1633,7 +1653,16 @@ internal static class AssemblyEffectSummarizer
             return;
         }
 
-        trackedStack.Add(TryGetKnownCallReturnValue(calledSymbol, argumentValues, out var returnValue)
+        trackedStack.Add(TryGetKnownCallReturnValue(
+                peReader,
+                reader,
+                operandToken,
+                calledSymbol,
+                argumentValues,
+                methodDefinitionHandlesByExactKey,
+                knownMethodReturnValues,
+                knownMethodReturnValueVisiting,
+                out var returnValue)
             ? returnValue
             : TrackedStackValue.Unknown);
     }
@@ -1739,8 +1768,14 @@ internal static class AssemblyEffectSummarizer
     }
 
     private static bool TryGetKnownCallReturnValue(
+        PEReader peReader,
+        MetadataReader reader,
+        int? operandToken,
         string calledSymbol,
         IReadOnlyList<TrackedStackValue> argumentValues,
+        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
+        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
+        HashSet<int> knownMethodReturnValueVisiting,
         out TrackedStackValue trackedValue)
     {
         if (TryGetKnownStringComparerIdentity(calledSymbol, out trackedValue))
@@ -1758,8 +1793,254 @@ internal static class AssemblyEffectSummarizer
             return TryGetStringComparerIdentityFromComparison(comparisonValue, out trackedValue);
         }
 
+        if (operandToken is not null &&
+            TryResolveSameAssemblyMethodDefinitionHandle(
+                reader,
+                operandToken.Value,
+                methodDefinitionHandlesByExactKey,
+                out var methodDefinitionHandle) &&
+            TryGetKnownMethodReturnValue(
+                peReader,
+                reader,
+                methodDefinitionHandle,
+                methodDefinitionHandlesByExactKey,
+                knownMethodReturnValues,
+                knownMethodReturnValueVisiting,
+                out trackedValue))
+        {
+            return true;
+        }
+
         trackedValue = TrackedStackValue.Unknown;
         return false;
+    }
+
+    private static bool TryResolveSameAssemblyMethodDefinitionHandle(
+        MetadataReader reader,
+        int metadataToken,
+        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
+        out MethodDefinitionHandle handle)
+    {
+        handle = default;
+        var resolvedHandle = MetadataTokens.Handle(metadataToken);
+        switch (resolvedHandle.Kind)
+        {
+            case HandleKind.MethodDefinition:
+                handle = (MethodDefinitionHandle)resolvedHandle;
+                return true;
+            case HandleKind.MethodSpecification:
+                var specification = reader.GetMethodSpecification((MethodSpecificationHandle)resolvedHandle);
+                if (specification.Method.Kind == HandleKind.MethodDefinition)
+                {
+                    handle = (MethodDefinitionHandle)specification.Method;
+                    return true;
+                }
+
+                if (specification.Method.Kind == HandleKind.MemberReference)
+                {
+                    return methodDefinitionHandlesByExactKey.TryGetValue(
+                        GetMemberReferenceExactKey(reader, (MemberReferenceHandle)specification.Method),
+                        out handle);
+                }
+
+                return false;
+            case HandleKind.MemberReference:
+                return methodDefinitionHandlesByExactKey.TryGetValue(
+                    GetMemberReferenceExactKey(reader, (MemberReferenceHandle)resolvedHandle),
+                    out handle);
+            default:
+                return false;
+        }
+    }
+
+    private static bool TryGetKnownMethodReturnValue(
+        PEReader peReader,
+        MetadataReader reader,
+        MethodDefinitionHandle handle,
+        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
+        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
+        HashSet<int> knownMethodReturnValueVisiting,
+        out TrackedStackValue trackedValue)
+    {
+        var metadataToken = MetadataTokens.GetToken(handle);
+        if (knownMethodReturnValues.TryGetValue(metadataToken, out trackedValue))
+        {
+            return !trackedValue.IsUnknown;
+        }
+
+        if (!knownMethodReturnValueVisiting.Add(metadataToken))
+        {
+            trackedValue = TrackedStackValue.Unknown;
+            return false;
+        }
+
+        try
+        {
+            trackedValue = AnalyzeKnownMethodReturnValue(
+                peReader,
+                reader,
+                handle,
+                methodDefinitionHandlesByExactKey,
+                knownMethodReturnValues,
+                knownMethodReturnValueVisiting);
+            knownMethodReturnValues[metadataToken] = trackedValue;
+            return !trackedValue.IsUnknown;
+        }
+        finally
+        {
+            knownMethodReturnValueVisiting.Remove(metadataToken);
+        }
+    }
+
+    private static TrackedStackValue AnalyzeKnownMethodReturnValue(
+        PEReader peReader,
+        MetadataReader reader,
+        MethodDefinitionHandle handle,
+        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
+        Dictionary<int, TrackedStackValue> knownMethodReturnValues,
+        HashSet<int> knownMethodReturnValueVisiting)
+    {
+        var definition = reader.GetMethodDefinition(handle);
+        if (definition.RelativeVirtualAddress == 0 ||
+            (definition.Attributes & MethodAttributes.Abstract) != 0)
+        {
+            return TrackedStackValue.Unknown;
+        }
+
+        CallTargetSignature signature;
+        try
+        {
+            signature = GetMethodDefinitionCallTargetSignature(reader, handle, isObjectConstruction: false);
+        }
+        catch (BadImageFormatException)
+        {
+            return TrackedStackValue.Unknown;
+        }
+        catch (InvalidOperationException)
+        {
+            return TrackedStackValue.Unknown;
+        }
+
+        if (string.Equals(signature.ReturnType, "void", StringComparison.Ordinal))
+        {
+            return TrackedStackValue.Unknown;
+        }
+
+        var body = peReader.GetMethodBody(definition.RelativeVirtualAddress);
+        var il = body.GetILBytes();
+        if (il is null)
+        {
+            return TrackedStackValue.Unknown;
+        }
+
+        var trackedLocals = new Dictionary<int, TrackedStackValue>();
+        var trackedStack = new List<TrackedStackValue>();
+        var pendingBranchStates = new Dictionary<int, BranchTrackedState>();
+        var offset = 0;
+        TrackedStackValue? knownReturnValue = null;
+        while (offset < il.Length)
+        {
+            var instructionOffset = offset;
+            if (pendingBranchStates.TryGetValue(instructionOffset, out var pendingBranchState))
+            {
+                if ((trackedStack.Count != 0 || trackedLocals.Count != 0) &&
+                    !TrackedStatesEqual(trackedStack, trackedLocals, pendingBranchState))
+                {
+                    return TrackedStackValue.Unknown;
+                }
+
+                RestoreTrackedState(trackedStack, trackedLocals, pendingBranchState);
+            }
+
+            var opCode = ReadOpCode(il, ref offset);
+            var operandOffset = offset;
+            var operandSize = GetOperandSize(opCode.OperandType, il, operandOffset);
+            var operandToken = operandSize == 4 && IsMetadataTokenOperand(opCode.OperandType)
+                ? BitConverter.ToInt32(il, operandOffset)
+                : (int?)null;
+            offset += operandSize;
+
+            if (opCode == OpCodes.Constrained)
+            {
+                continue;
+            }
+
+            if (opCode == OpCodes.Ret)
+            {
+                var returnValue = PopTrackedStackValue(trackedStack);
+                if (returnValue.IsUnknown)
+                {
+                    return TrackedStackValue.Unknown;
+                }
+
+                if (knownReturnValue is null)
+                {
+                    knownReturnValue = returnValue;
+                }
+                else if (knownReturnValue.Value != returnValue)
+                {
+                    return TrackedStackValue.Unknown;
+                }
+
+                trackedStack.Clear();
+                trackedLocals.Clear();
+                continue;
+            }
+
+            if (opCode == OpCodes.Call || opCode == OpCodes.Callvirt || opCode == OpCodes.Newobj)
+            {
+                if (operandToken is not null &&
+                    TryGetCallTargetSignature(reader, operandToken.Value, opCode == OpCodes.Newobj, out var calledSignature))
+                {
+                    var argumentValues = PopTrackedStackValues(trackedStack, calledSignature.ParameterTypes.Length);
+                    if (calledSignature.HasReceiver)
+                    {
+                        PopTrackedStackValue(trackedStack);
+                    }
+
+                    PushCallReturnValue(
+                        peReader,
+                        reader,
+                        operandToken,
+                        trackedStack,
+                        ResolveMethodExactKey(reader, operandToken.Value),
+                        calledSignature,
+                        argumentValues,
+                        opCode == OpCodes.Newobj,
+                        methodDefinitionHandlesByExactKey,
+                        knownMethodReturnValues,
+                        knownMethodReturnValueVisiting);
+                }
+                else
+                {
+                    trackedStack.Clear();
+                    trackedLocals.Clear();
+                    if (opCode == OpCodes.Newobj)
+                    {
+                        trackedStack.Add(TrackedStackValue.Unknown);
+                    }
+                }
+
+                continue;
+            }
+
+            if (opCode.FlowControl == FlowControl.Branch &&
+                TryGetBranchTargetOffset(opCode, il, operandOffset, instructionOffset, out var branchTargetOffset))
+            {
+                var branchState = CaptureTrackedState(trackedStack, trackedLocals);
+                if (pendingBranchStates.TryGetValue(branchTargetOffset, out var existingBranchState) &&
+                    !TrackedStatesEqual(branchState.Stack, branchState.Locals, existingBranchState))
+                {
+                    return TrackedStackValue.Unknown;
+                }
+
+                pendingBranchStates[branchTargetOffset] = branchState;
+            }
+
+            ApplyTrackedStackTransition(reader, il, opCode, operandOffset, operandToken, trackedStack, trackedLocals);
+        }
+
+        return knownReturnValue ?? TrackedStackValue.Unknown;
     }
 
     private static bool TryGetKnownStringComparerIdentity(string symbol, out TrackedStackValue trackedValue)
@@ -1925,6 +2206,13 @@ internal static class AssemblyEffectSummarizer
         return value;
     }
 
+    private static string? PeekTrackedExceptionType(List<TrackedStackValue> trackedStack)
+    {
+        return trackedStack.Count == 0 || string.IsNullOrWhiteSpace(trackedStack[^1].KnownExceptionType)
+            ? null
+            : trackedStack[^1].KnownExceptionType;
+    }
+
     private static bool TryGetStackPopCount(StackBehaviour behavior, out int count)
     {
         count = behavior switch
@@ -1977,6 +2265,82 @@ internal static class AssemblyEffectSummarizer
             or FlowControl.Cond_Branch
             or FlowControl.Return
             or FlowControl.Throw;
+    }
+
+    private static BranchTrackedState CaptureTrackedState(
+        List<TrackedStackValue> trackedStack,
+        Dictionary<int, TrackedStackValue> trackedLocals)
+    {
+        return new BranchTrackedState(
+            new List<TrackedStackValue>(trackedStack),
+            new Dictionary<int, TrackedStackValue>(trackedLocals));
+    }
+
+    private static void RestoreTrackedState(
+        List<TrackedStackValue> trackedStack,
+        Dictionary<int, TrackedStackValue> trackedLocals,
+        BranchTrackedState branchState)
+    {
+        trackedStack.Clear();
+        trackedStack.AddRange(branchState.Stack);
+
+        trackedLocals.Clear();
+        foreach (var pair in branchState.Locals)
+        {
+            trackedLocals[pair.Key] = pair.Value;
+        }
+    }
+
+    private static bool TrackedStatesEqual(
+        List<TrackedStackValue> trackedStack,
+        Dictionary<int, TrackedStackValue> trackedLocals,
+        BranchTrackedState branchState)
+    {
+        if (trackedStack.Count != branchState.Stack.Count || trackedLocals.Count != branchState.Locals.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < trackedStack.Count; i++)
+        {
+            if (trackedStack[i] != branchState.Stack[i])
+            {
+                return false;
+            }
+        }
+
+        foreach (var pair in trackedLocals)
+        {
+            if (!branchState.Locals.TryGetValue(pair.Key, out var value) || value != pair.Value)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryGetBranchTargetOffset(
+        OpCode opCode,
+        byte[] il,
+        int operandOffset,
+        int instructionOffset,
+        out int targetOffset)
+    {
+        targetOffset = 0;
+        if (opCode.OperandType == OperandType.ShortInlineBrTarget)
+        {
+            targetOffset = instructionOffset + opCode.Size + 1 + unchecked((sbyte)il[operandOffset]);
+            return true;
+        }
+
+        if (opCode.OperandType == OperandType.InlineBrTarget)
+        {
+            targetOffset = instructionOffset + opCode.Size + 4 + BitConverter.ToInt32(il, operandOffset);
+            return true;
+        }
+
+        return false;
     }
 
     private static bool TryGetStoreLocalIndex(OpCode opCode, byte[] il, int operandOffset, out int localIndex)
@@ -2626,6 +2990,11 @@ internal static class AssemblyEffectSummarizer
             return null;
         }
 
+        return TryResolveRuntimeType(typeName);
+    }
+
+    private static Type? TryResolveRuntimeType(string typeName)
+    {
         return RuntimeTypeCache.GetOrAdd(typeName, static fullName =>
         {
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
@@ -2990,13 +3359,22 @@ internal readonly record struct CallTargetSignature(
     string[] ParameterTypes,
     string ReturnType);
 
-internal readonly record struct TrackedStackValue(int? Int32Constant, string? KnownStringComparer)
+internal sealed record BranchTrackedState(
+    List<TrackedStackValue> Stack,
+    Dictionary<int, TrackedStackValue> Locals);
+
+internal readonly record struct TrackedStackValue(int? Int32Constant, string? KnownStringComparer, string? KnownExceptionType)
 {
     public static TrackedStackValue Unknown => default;
 
-    public bool IsUnknown => Int32Constant is null && string.IsNullOrWhiteSpace(KnownStringComparer);
+    public bool IsUnknown =>
+        Int32Constant is null &&
+        string.IsNullOrWhiteSpace(KnownStringComparer) &&
+        string.IsNullOrWhiteSpace(KnownExceptionType);
 
-    public static TrackedStackValue FromInt32(int value) => new(value, null);
+    public static TrackedStackValue FromInt32(int value) => new(value, null, null);
 
-    public static TrackedStackValue FromKnownStringComparer(string value) => new(null, value);
+    public static TrackedStackValue FromKnownStringComparer(string value) => new(null, value, null);
+
+    public static TrackedStackValue FromKnownExceptionType(string value) => new(null, null, value);
 }

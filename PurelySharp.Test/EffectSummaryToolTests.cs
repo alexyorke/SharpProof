@@ -67,6 +67,69 @@ public static class ExceptionFixture
         throw ex;
     }
 
+    private static InvalidOperationException CreateInvalidOperation()
+    {
+        return new InvalidOperationException("boom");
+    }
+
+    private static InvalidOperationException CreateInvalidOperation<T>()
+    {
+        return new InvalidOperationException("boom");
+    }
+
+    private static ObjectDisposedException CreateObjectDisposed()
+    {
+        return new ObjectDisposedException("stream");
+    }
+
+    private static Exception CreateBaseException()
+    {
+        return new InvalidOperationException("boom");
+    }
+
+    private static Exception? MaybeNullException()
+    {
+        return null;
+    }
+
+    private static Exception CreateVariantException(bool first)
+    {
+        return first
+            ? new InvalidOperationException("boom")
+            : new ObjectDisposedException("stream");
+    }
+
+    public static void ThrowViaFactoryReturn()
+    {
+        throw CreateInvalidOperation();
+    }
+
+    public static void ThrowViaGenericFactory()
+    {
+        throw CreateInvalidOperation<int>();
+    }
+
+    public static void ThrowViaFactoryLocal()
+    {
+        var ex = CreateObjectDisposed();
+        throw ex;
+    }
+
+    public static void ThrowViaBaseFactory()
+    {
+        throw CreateBaseException();
+    }
+
+    public static void ThrowViaMaybeNullFactory()
+    {
+        throw MaybeNullException();
+    }
+
+    public static void ThrowViaVariantFactory(bool first)
+    {
+        throw CreateVariantException(first);
+    }
+
     public static void ThrowViaCallee()
     {
         ThrowDirect();
@@ -122,6 +185,12 @@ public static class ExceptionFixture
 
             AssertThrownExceptions(summary, "ExceptionFixture.ThrowDirect()", "System.InvalidOperationException");
             AssertThrownExceptions(summary, "ExceptionFixture.ThrowViaLocal()", "System.ObjectDisposedException");
+            AssertThrownExceptions(summary, "ExceptionFixture.ThrowViaFactoryReturn()", "System.InvalidOperationException");
+            AssertThrownExceptions(summary, "ExceptionFixture.ThrowViaGenericFactory()", "System.InvalidOperationException");
+            AssertThrownExceptions(summary, "ExceptionFixture.ThrowViaFactoryLocal()", "System.ObjectDisposedException");
+            AssertThrownExceptions(summary, "ExceptionFixture.ThrowViaBaseFactory()", "System.InvalidOperationException");
+            AssertThrownExceptions(summary, "ExceptionFixture.ThrowViaMaybeNullFactory()");
+            AssertThrownExceptions(summary, "ExceptionFixture.ThrowViaVariantFactory(bool)");
             AssertTransitiveExceptions(summary, "ExceptionFixture.ThrowViaCallee()", "System.InvalidOperationException");
             AssertTransitiveExceptionEdges(
                 summary,
@@ -806,6 +875,8 @@ public static class StringComparisonFixture
 
             AssertPurityClassification(summary, "System.Convert.FromHexString(System.ReadOnlySpan`1<char>)", "impure", "throw");
             AssertPurityClassification(summary, "System.Convert.FromHexString(string)", "impure", "impure_callee");
+            AssertThrownExceptions(summary, "System.Convert.FromHexString(System.ReadOnlySpan`1<char>)", "System.FormatException");
+            AssertThrownExceptions(summary, "System.Convert.FromHexString(string)");
         }
 
         [Test]
@@ -5998,10 +6069,12 @@ public readonly struct ConversionFixture
             AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfGreaterThan(!!0, !!0, string)", "none");
             AssertPurityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(!!0, !!0, string)", "pure");
             AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(!!0, !!0, string)", "none");
-            AssertPurityClassification(summary, "System.ArgumentNullException.ThrowIfNull(void*, string)", "impure", "impure_callee");
-            AssertEffectVisibilityClassification(summary, "System.ArgumentNullException.ThrowIfNull(void*, string)", "caller_visible");
-            AssertPurityClassification(summary, "System.ArgumentNullException.ThrowIfNull(nint, string)", "impure", "global_state_read", "impure_callee");
+            AssertPurityClassification(summary, "System.ArgumentNullException.ThrowIfNull(void*, string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentNullException.ThrowIfNull(void*, string)", "none");
+            AssertPurityClassification(summary, "System.ArgumentNullException.ThrowIfNull(nint, string)", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.ArgumentNullException.ThrowIfNull(nint, string)", "caller_visible");
+            AssertThrownExceptions(summary, "System.ArgumentException.ThrowNullOrEmptyException(string, string)", "System.ArgumentException");
+            AssertThrownExceptions(summary, "System.ArgumentException.ThrowNullOrWhiteSpaceException(string, string)", "System.ArgumentException");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -6034,6 +6107,30 @@ public readonly struct ConversionFixture
                 "System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero(!!0, string)",
                 "System.ArgumentOutOfRangeException.ThrowIfZero(!!0, string)",
             }));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeThrowHelperFactorySlice_CollectsDirectThrownExceptionTypes()
+        {
+            using var memorySummary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Memory.dll",
+                20,
+                "System.ThrowHelper.ThrowStartOrEndArgumentValidationException",
+                "System.ThrowHelper.CreateStartOrEndArgumentValidationException");
+            using var coreLibSummary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.ThrowHelper.ThrowStartIndexArgumentOutOfRange_ArgumentOutOfRange_IndexMustBeLessOrEqual",
+                "System.ThrowHelper.GetArgumentOutOfRangeException");
+
+            AssertThrownExceptions(
+                memorySummary,
+                "System.ThrowHelper.ThrowStartOrEndArgumentValidationException(long)",
+                "System.ArgumentOutOfRangeException");
+            AssertThrownExceptions(
+                coreLibSummary,
+                "System.ThrowHelper.ThrowStartIndexArgumentOutOfRange_ArgumentOutOfRange_IndexMustBeLessOrEqual()",
+                "System.ArgumentOutOfRangeException");
         }
 
         [Test]

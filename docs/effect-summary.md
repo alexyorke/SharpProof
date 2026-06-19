@@ -20,7 +20,7 @@ The summary tool can inspect those assemblies directly and emit JSON facts such 
 - static and instance field writes
 - indirect memory writes through spans, pointers, refs, arrays, or block operations
 - throws
-- direct thrown exception types for simple IL patterns such as `new SomeException(...); throw` and `new SomeException(...); stloc; ldloc; throw`
+- direct thrown exception types for simple IL patterns such as `new SomeException(...); throw`, `new SomeException(...); stloc; ldloc; throw`, and helper-returned exception objects that stay tracked through locals and stack values
 - P/Invoke, native, internal-call, abstract, and no-IL-body roots
 
 Those facts are intentionally lower-level than `pure` or `impure`. Final purity decisions are now generated in a report-only fixed-point classifier layered on top of the emitted evidence, and later analyzer consumption should continue to use the same evidence-first model.
