@@ -314,6 +314,31 @@ public static class ArrayIndexOfLengthCatalogSignatureSamples
         }
 
         [Test]
+        public void GenericArrayIndexLookupHelpers_AreNotBackedByStaticPureCatalogs()
+        {
+            var source = @"
+using System;
+
+public static class GenericArrayIndexLookupCatalogSignatureSamples
+{
+    public static int Sample(int[] values, int target)
+    {
+        _ = Array.IndexOf(values, target);
+        return Array.LastIndexOf(values, target);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GenericArrayIndexLookupCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Array.IndexOf(values, target)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Array.LastIndexOf(values, target)"));
+        }
+
+        [Test]
         public void ArrayGetLength_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             var source = @"

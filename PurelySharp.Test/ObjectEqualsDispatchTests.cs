@@ -381,6 +381,53 @@ public class TestClass
         }
 
         [Test]
+        public async Task ArrayLastIndexOfDispatchToImpureEquatableImplementation_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class MutableRecord : IEquatable<MutableRecord>
+{
+    public bool Equals(MutableRecord other)
+    {
+        Console.WriteLine(""equals"");
+        return true;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(MutableRecord[] values, MutableRecord value)
+    {
+        return Array.LastIndexOf(values, value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ArrayLastIndexOfForBuiltinValueEquality_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(int[] values, int value)
+    {
+        return Array.LastIndexOf(values, value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task LinqContainsDispatchToImpureEquatableImplementation_Diagnostic()
         {
             var test = @"
@@ -855,7 +902,7 @@ public class TestClass
     public sealed class ImpureStringDictionary : Dictionary<string, int>
     {
         [EnforcePure]
-        public ImpureStringDictionary() : base(new ImpureStringComparer()) { }
+        public {|PS0002:ImpureStringDictionary|}() : base(new ImpureStringComparer()) { }
     }
 
     [EnforcePure]

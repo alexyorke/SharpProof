@@ -1007,8 +1007,6 @@ public static class Constants
         "System.Runtime.InteropServices.Marshal.SizeOf<T>()",
         "System.AggregateException.AggregateException(System.Collections.Generic.IEnumerable<System.Exception>)",
         "System.AggregateException.Flatten()",
-        "System.Array.IndexOf<T>(T[], T)",
-        "System.Array.LastIndexOf<T>(T[], T)",
         "System.FormattableString.Format.get",
         "System.FormattableString.Invariant(System.FormattableString)",
         "System.FormattableString.ToString(System.IFormatProvider)",
