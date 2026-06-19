@@ -273,6 +273,26 @@ public static class EnvironmentCatalogSignatureSamples
         }
 
         [Test]
+        public void ConsoleOutputHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Console.SetError(System.IO.TextWriter)",
+                "System.Console.SetOut(System.IO.TextWriter)",
+                "System.Console.Write(object)",
+                "System.Console.Write(string)",
+                "System.Console.WriteLine()",
+                "System.Console.WriteLine(object)",
+                "System.Console.WriteLine(string)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void AbstractDispatchFallbacks_AreNotBackedByManualImpureCatalogEntries()
         {
             AssertNotInManualCatalogs("object.ToString()");

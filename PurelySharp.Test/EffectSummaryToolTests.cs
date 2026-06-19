@@ -5069,6 +5069,128 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeConsoleOutputSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Console.dll",
+                120,
+                2,
+                "System.Console.SetError(System.IO.TextWriter)",
+                "System.Console.SetOut(System.IO.TextWriter)",
+                "System.Console.Write(",
+                "System.Console.WriteLine(");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Console.SetError(System.IO.TextWriter)", "impure", "global_state_read", "global_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Console.SetError(System.IO.TextWriter)", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.SetOut(System.IO.TextWriter)", "impure", "global_state_read", "global_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Console.SetOut(System.IO.TextWriter)", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.Write(object)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.Write(object)", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.Write(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.Write(string)", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.WriteLine()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.WriteLine()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.WriteLine(object)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.WriteLine(object)", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.WriteLine(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.WriteLine(string)", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.WriteLine(int)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.WriteLine(int)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Console.SetError(System.IO.TextWriter)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.SetOut(System.IO.TextWriter)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(bool)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(char)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(char[])", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(char[], int, int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(decimal)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(double)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(float)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(long)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(object)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(string, object)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(string, object, object)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(string, object, object, object)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(string, object[])", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(uint)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.Write(ulong)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(bool)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(char)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(char[])", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(char[], int, int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(decimal)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(double)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(float)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(long)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(object)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(string, object)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(string, object, object)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(string, object, object, object)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(string, object[])", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(uint)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.WriteLine(ulong)", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Console.SetError(System.IO.TextWriter)",
+                "System.Console.SetOut(System.IO.TextWriter)",
+                "System.Console.Write(bool)",
+                "System.Console.Write(char)",
+                "System.Console.Write(char[])",
+                "System.Console.Write(char[], int, int)",
+                "System.Console.Write(decimal)",
+                "System.Console.Write(double)",
+                "System.Console.Write(float)",
+                "System.Console.Write(int)",
+                "System.Console.Write(long)",
+                "System.Console.Write(object)",
+                "System.Console.Write(string)",
+                "System.Console.Write(string, object)",
+                "System.Console.Write(string, object, object)",
+                "System.Console.Write(string, object, object, object)",
+                "System.Console.Write(string, object[])",
+                "System.Console.Write(uint)",
+                "System.Console.Write(ulong)",
+                "System.Console.WriteLine()",
+                "System.Console.WriteLine(bool)",
+                "System.Console.WriteLine(char)",
+                "System.Console.WriteLine(char[])",
+                "System.Console.WriteLine(char[], int, int)",
+                "System.Console.WriteLine(decimal)",
+                "System.Console.WriteLine(double)",
+                "System.Console.WriteLine(float)",
+                "System.Console.WriteLine(int)",
+                "System.Console.WriteLine(long)",
+                "System.Console.WriteLine(object)",
+                "System.Console.WriteLine(string)",
+                "System.Console.WriteLine(string, object)",
+                "System.Console.WriteLine(string, object, object)",
+                "System.Console.WriteLine(string, object, object, object)",
+                "System.Console.WriteLine(string, object[])",
+                "System.Console.WriteLine(uint)",
+                "System.Console.WriteLine(ulong)",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeObjectTypeMetadataSlice_UsesGeneratedPurityEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

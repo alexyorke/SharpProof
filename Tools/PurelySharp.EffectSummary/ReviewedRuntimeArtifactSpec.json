@@ -345,6 +345,19 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Console.Output.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Console.Output.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Console.dll",
+      "Limit": 120,
+      "MaxDepth": 2,
+      "SymbolPrefixes": [
+        "System.Console.SetError(System.IO.TextWriter)",
+        "System.Console.SetOut(System.IO.TextWriter)",
+        "System.Console.Write(",
+        "System.Console.WriteLine("
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/DateTimeOffset.Additional.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/DateTimeOffset.Additional.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [

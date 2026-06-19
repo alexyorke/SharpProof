@@ -89,6 +89,44 @@ public class TestClass
         }
 
         [Test]
+        public async Task ConsoleWriteString_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}()
+    {
+        Console.Write(""impure"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConsoleWriteLineString_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}()
+    {
+        Console.WriteLine(""impure"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ConsoleBackgroundColor_Diagnostic()
         {
             var test = @"
