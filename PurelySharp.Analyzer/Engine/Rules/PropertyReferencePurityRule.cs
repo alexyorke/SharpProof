@@ -66,8 +66,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     out generatedPurity);
             var allowsKnownPureFallback = !hasTrustedGeneratedPurity;
             var requiresDispatchCheck = getterSymbol != null &&
-                IsPotentiallyDispatchedProperty(propertySymbol, context.SemanticModel.Compilation) &&
-                !(allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol));
+                IsPotentiallyDispatchedProperty(propertySymbol, context.SemanticModel.Compilation);
             var dispatchGetterWasProvenPure = false;
             var knownImpureMemberSource = PurityAnalysisEngine.GetKnownImpureMemberSource(propertySymbol);
             var hasConfiguredKnownImpureMember = string.Equals(

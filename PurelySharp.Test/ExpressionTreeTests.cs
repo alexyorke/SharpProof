@@ -42,6 +42,27 @@ public class TestClass
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
 
+        [Test]
+        public async Task IQueryableExpressionProperty_Diagnostic()
+        {
+            var test = @"
+#nullable enable
+using System.Linq;
+using System.Linq.Expressions;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Expression {|PS0002:TestMethod|}(IQueryable<int> query)
+    {
+        return query.Expression;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
 
 
 
