@@ -17,6 +17,11 @@ namespace SearchLib.Smt
 
         public BoolExpr EncodeCondition(SmtFormula formula)
         {
+            if (formula.Kind != SmtValueKind.Bool)
+            {
+                throw new InvalidOperationException("Only boolean SMT formulas can be used as conditions.");
+            }
+
             return (BoolExpr)Encode(formula);
         }
 
@@ -49,6 +54,8 @@ namespace SearchLib.Smt
                 SmtVariable variable => GetOrCreateVariable(variable),
                 SmtUnaryFormula unaryFormula => EncodeUnary(unaryFormula),
                 SmtBinaryFormula binaryFormula => EncodeBinary(binaryFormula),
+                SmtIntegerUnaryTerm integerUnaryTerm => EncodeIntegerUnary(integerUnaryTerm),
+                SmtIntegerBinaryTerm integerBinaryTerm => EncodeIntegerBinary(integerBinaryTerm),
                 _ => throw new InvalidOperationException("Unsupported SMT formula node."),
             };
         }
@@ -62,6 +69,15 @@ namespace SearchLib.Smt
             };
         }
 
+        private Expr EncodeIntegerUnary(SmtIntegerUnaryTerm term)
+        {
+            return term.Operator switch
+            {
+                SmtIntegerUnaryOperator.Negate => _context.MkUnaryMinus(EncodeInteger(term.Operand)),
+                _ => throw new InvalidOperationException("Unsupported SMT integer unary operator."),
+            };
+        }
+
         private Expr EncodeBinary(SmtBinaryFormula formula)
         {
             return formula.Operator switch
@@ -70,12 +86,32 @@ namespace SearchLib.Smt
                 SmtBinaryOperator.Or => _context.MkOr(EncodeCondition(formula.Left), EncodeCondition(formula.Right)),
                 SmtBinaryOperator.Equal => _context.MkEq(Encode(formula.Left), Encode(formula.Right)),
                 SmtBinaryOperator.NotEqual => _context.MkNot(_context.MkEq(Encode(formula.Left), Encode(formula.Right))),
-                SmtBinaryOperator.LessThan => _context.MkLt((ArithExpr)Encode(formula.Left), (ArithExpr)Encode(formula.Right)),
-                SmtBinaryOperator.LessThanOrEqual => _context.MkLe((ArithExpr)Encode(formula.Left), (ArithExpr)Encode(formula.Right)),
-                SmtBinaryOperator.GreaterThan => _context.MkGt((ArithExpr)Encode(formula.Left), (ArithExpr)Encode(formula.Right)),
-                SmtBinaryOperator.GreaterThanOrEqual => _context.MkGe((ArithExpr)Encode(formula.Left), (ArithExpr)Encode(formula.Right)),
+                SmtBinaryOperator.LessThan => _context.MkLt(EncodeInteger(formula.Left), EncodeInteger(formula.Right)),
+                SmtBinaryOperator.LessThanOrEqual => _context.MkLe(EncodeInteger(formula.Left), EncodeInteger(formula.Right)),
+                SmtBinaryOperator.GreaterThan => _context.MkGt(EncodeInteger(formula.Left), EncodeInteger(formula.Right)),
+                SmtBinaryOperator.GreaterThanOrEqual => _context.MkGe(EncodeInteger(formula.Left), EncodeInteger(formula.Right)),
                 _ => throw new InvalidOperationException("Unsupported SMT binary operator."),
             };
+        }
+
+        private Expr EncodeIntegerBinary(SmtIntegerBinaryTerm term)
+        {
+            return term.Operator switch
+            {
+                SmtIntegerBinaryOperator.Add => _context.MkAdd(EncodeInteger(term.Left), EncodeInteger(term.Right)),
+                SmtIntegerBinaryOperator.Subtract => _context.MkSub(EncodeInteger(term.Left), EncodeInteger(term.Right)),
+                _ => throw new InvalidOperationException("Unsupported SMT integer binary operator."),
+            };
+        }
+
+        private ArithExpr EncodeInteger(SmtFormula formula)
+        {
+            if (formula.Kind != SmtValueKind.Int)
+            {
+                throw new InvalidOperationException("Only integer SMT formulas can be encoded as arithmetic expressions.");
+            }
+
+            return (ArithExpr)Encode(formula);
         }
 
         private Expr GetOrCreateVariable(SmtVariable variable)

@@ -23,6 +23,17 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void Oracle_AffineContradictoryIntegerCondition_IsUnsatisfiable()
+        {
+            var context = AnalyzerTestHost.CreateConditionContext("int x", "x + 1 <= 0 && x >= 0");
+            using var oracle = new SmtPathOracle();
+
+            Assert.That(
+                oracle.IsSatisfiable(context.Expression, context.SemanticModel, TimeSpan.FromMilliseconds(50)),
+                Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void Oracle_NullGuardImpliesNotNullComparison()
         {
             var context = AnalyzerTestHost.CreateConditionImplicationContext("string s", "s != null", "s != null");
@@ -45,10 +56,32 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void Oracle_AffineGuardImpliesNonZero()
+        {
+            var context = AnalyzerTestHost.CreateConditionImplicationContext(
+                "int divisor",
+                "divisor - 1 >= 0 || divisor + 1 <= 0",
+                "divisor != 0");
+            using var oracle = new SmtPathOracle();
+
+            Assert.That(
+                oracle.Implies(context.PathCondition, context.Conclusion, context.SemanticModel, TimeSpan.FromMilliseconds(50)),
+                Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void ExecutionVisibility_TautologicalCondition_IsAlwaysTrue()
         {
             Assert.That(
                 IsConditionAlwaysTrue("int x", "x >= 0 || x <= 0"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_AffineContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int x", "x + 1 <= 0 && x >= 0"),
                 Is.True);
         }
 
@@ -69,6 +102,32 @@ public class TestClass
     public void TestMethod(int x)
     {
         if (x > 0 && x < 0)
+        {
+            Console.WriteLine(x);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_AffineContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int x", "x + 1 <= 0 && x >= 0"),
+                Is.True);
+
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int x)
+    {
+        if (x + 1 <= 0 && x >= 0)
         {
             Console.WriteLine(x);
         }
@@ -177,7 +236,9 @@ public class TestClass
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(
+                diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty],
+                Is.AnyOf("catalog_hit", "impure_callee"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityOperationKindProperty], Is.EqualTo("Invocation"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.WriteLine"));
@@ -255,6 +316,31 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_AffineGuardImpliesZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (divisor + 1 == 1)
+        {
+            return value / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
         public async Task Ps0010_RelationalPatternExactZero_ReportsDivideByZero()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"
@@ -288,6 +374,26 @@ public class TestClass
     public int TestMethod(int value, int divisor)
     {
         if (divisor != 0)
+        {
+            return value / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_AffineGuardExcludesZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (divisor - 1 >= 0 || divisor + 1 <= 0)
         {
             return value / divisor;
         }

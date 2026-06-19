@@ -12,6 +12,11 @@ namespace SearchLib.Smt
         Not,
     }
 
+    public enum SmtIntegerUnaryOperator
+    {
+        Negate,
+    }
+
     public enum SmtBinaryOperator
     {
         And,
@@ -22,6 +27,12 @@ namespace SearchLib.Smt
         LessThanOrEqual,
         GreaterThan,
         GreaterThanOrEqual,
+    }
+
+    public enum SmtIntegerBinaryOperator
+    {
+        Add,
+        Subtract,
     }
 
     public abstract record SmtFormula(SmtValueKind Kind);
@@ -37,4 +48,8 @@ namespace SearchLib.Smt
     public sealed record SmtUnaryFormula(SmtUnaryOperator Operator, SmtFormula Operand) : SmtFormula(SmtValueKind.Bool);
 
     public sealed record SmtBinaryFormula(SmtBinaryOperator Operator, SmtFormula Left, SmtFormula Right) : SmtFormula(SmtValueKind.Bool);
+
+    public sealed record SmtIntegerUnaryTerm(SmtIntegerUnaryOperator Operator, SmtFormula Operand) : SmtFormula(SmtValueKind.Int);
+
+    public sealed record SmtIntegerBinaryTerm(SmtIntegerBinaryOperator Operator, SmtFormula Left, SmtFormula Right) : SmtFormula(SmtValueKind.Int);
 }

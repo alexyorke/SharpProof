@@ -271,6 +271,11 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 }
             }
 
+            if (TryTranslateIntegralTerm(expression, semanticModel, cancellationToken, out formula))
+            {
+                return true;
+            }
+
             var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
             if (symbol is not ILocalSymbol && symbol is not IParameterSymbol)
             {
@@ -299,6 +304,61 @@ namespace PurelySharp.Analyzer.Engine.Smt
             {
                 formula = new SmtVariable(GetVariableName(symbol), SmtValueKind.Reference);
                 return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryTranslateIntegralTerm(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula)
+        {
+            formula = null;
+            if (!HasSupportedIntegralType(expression, semanticModel, cancellationToken))
+            {
+                return false;
+            }
+
+            if (expression is PrefixUnaryExpressionSyntax prefixUnary)
+            {
+                if (prefixUnary.IsKind(SyntaxKind.UnaryPlusExpression))
+                {
+                    return TryTranslateValue(prefixUnary.Operand, semanticModel, cancellationToken, out formula) &&
+                        formula is { Kind: SmtValueKind.Int };
+                }
+
+                if (prefixUnary.IsKind(SyntaxKind.UnaryMinusExpression) &&
+                    TryTranslateValue(prefixUnary.Operand, semanticModel, cancellationToken, out var operand) &&
+                    operand is { Kind: SmtValueKind.Int })
+                {
+                    formula = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operand);
+                    return true;
+                }
+            }
+
+            if (expression is BinaryExpressionSyntax binaryExpression)
+            {
+                if (binaryExpression.IsKind(SyntaxKind.AddExpression) &&
+                    TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var addLeft) &&
+                    TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var addRight) &&
+                    addLeft is { Kind: SmtValueKind.Int } &&
+                    addRight is { Kind: SmtValueKind.Int })
+                {
+                    formula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, addLeft, addRight);
+                    return true;
+                }
+
+                if (binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
+                    TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var subtractLeft) &&
+                    TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var subtractRight) &&
+                    subtractLeft is { Kind: SmtValueKind.Int } &&
+                    subtractRight is { Kind: SmtValueKind.Int })
+                {
+                    formula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, subtractLeft, subtractRight);
+                    return true;
+                }
             }
 
             return false;
@@ -351,6 +411,15 @@ namespace PurelySharp.Analyzer.Engine.Smt
                     integralValue = default;
                     return false;
             }
+        }
+
+        private static bool HasSupportedIntegralType(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var type = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
+            return type != null && IsIntegralType(type);
         }
 
         private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)

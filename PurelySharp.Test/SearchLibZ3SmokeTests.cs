@@ -55,6 +55,39 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_AffineEqualityAndConflictingInequality_IsUnsatisfiable()
+        {
+            using var solver = new SmtSolver();
+            var x = new SmtVariable("x", SmtValueKind.Int);
+            var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(1));
+            var affineEquality = new SmtBinaryFormula(SmtBinaryOperator.Equal, xPlusOne, new SmtIntegerConstant(0));
+            var xIsNonNegative = new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(0));
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[] { affineEquality, xIsNonNegative },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_AffineGuardImpliesExactValue_IsUnsatisfiable()
+        {
+            using var solver = new SmtSolver();
+            var x = new SmtVariable("x", SmtValueKind.Int);
+            var xMinusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, x, new SmtIntegerConstant(1));
+            var guard = new SmtBinaryFormula(SmtBinaryOperator.Equal, xMinusOne, new SmtIntegerConstant(0));
+            var conclusion = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(1));
+
+            var result = solver.Implies(
+                new[] { guard },
+                conclusion,
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void SmtSolver_ReferenceNullAndNonNullConjunction_IsUnsatisfiable()
         {
             using var solver = new SmtSolver();
