@@ -803,6 +803,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/ClaimsPrincipal.IsInRole.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/ClaimsPrincipal.IsInRole.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Security.Claims.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Security.Claims.ClaimsPrincipal.IsInRole(string)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Cryptography.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Cryptography.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [

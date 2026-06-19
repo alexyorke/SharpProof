@@ -2873,6 +2873,7 @@ public static class CatalogSignatureSamples
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "System.Runtime.InteropServices.Marshal.PtrToStructure<int>(ptr)"), Is.EqualTo("System.Runtime.InteropServices.Marshal.PtrToStructure<T>(System.IntPtr)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "System.Runtime.InteropServices.Marshal.PtrToStructure<int>(ptr)"));
+            AssertNotInManualCatalogs("System.Security.Claims.ClaimsPrincipal.IsInRole(string)");
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "CryptographicOperations.FixedTimeEquals(left, right)"), Is.EqualTo("System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan<byte>, System.ReadOnlySpan<byte>)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "CryptographicOperations.FixedTimeEquals(left, right)"));

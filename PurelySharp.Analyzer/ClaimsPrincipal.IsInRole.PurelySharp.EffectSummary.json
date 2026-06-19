@@ -1,0 +1,317 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-19T13:26:03.9154337+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.Security.Claims",
+      "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Claims.dll",
+      "AssemblySha256": "20dbae23f8943877ef1b9890bc2d6ae3a2716fbb32e26eb124ad435e9e534737",
+      "ModuleVersionId": "1f58e7f8-503b-4757-b3e8-8fe4f3dd5764",
+      "MethodCount": 188,
+      "EmittedMethodCount": 3,
+      "Methods": [
+        {
+          "Symbol": "System.Security.Claims.ClaimsIdentity.get_RoleClaimType()",
+          "ExactSymbolKey": "System.Security.Claims.ClaimsIdentity.get_RoleClaimType()-\u003Estring",
+          "MetadataToken": "0x06000049",
+          "RelativeVirtualAddress": 37284,
+          "MethodBodySha256": "9abc2bbb8fc411c1186bcab3ede89f376d4e15cdabe702d16ddd19b774f56d81",
+          "CacheKey": "mvid:1f58e7f8-503b-4757-b3e8-8fe4f3dd5764|token:0x06000049|il:9abc2bbb8fc411c1186bcab3ede89f376d4e15cdabe702d16ddd19b774f56d81",
+          "Effects": [
+            "reads_instance_field"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Security.Claims.ClaimsIdentity._roleClaimType"
+          ],
+          "CallSites": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Security.Claims.ClaimsIdentity.HasClaim(string, string)",
+          "ExactSymbolKey": "System.Security.Claims.ClaimsIdentity.HasClaim(string, string)-\u003Ebool",
+          "MetadataToken": "0x06000056",
+          "RelativeVirtualAddress": 38088,
+          "MethodBodySha256": "16861b7656af216c52f23056d25f141e4ecea7866bb82eecc5a32c80b0b1532e",
+          "CacheKey": "mvid:1f58e7f8-503b-4757-b3e8-8fe4f3dd5764|token:0x06000056|il:16861b7656af216c52f23056d25f141e4ecea7866bb82eecc5a32c80b0b1532e",
+          "Effects": [
+            "calls_method",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.Collections.Generic.IEnumerable\u00601\u003CSystem.Security.Claims.Claim\u003E.GetEnumerator()-\u003ESystem.Collections.Generic.IEnumerator\u00601\u003C!0\u003E",
+            "System.Collections.Generic.IEnumerator\u00601\u003CSystem.Security.Claims.Claim\u003E.get_Current()-\u003E!0",
+            "System.Collections.IEnumerator.MoveNext()-\u003Ebool",
+            "System.IDisposable.Dispose()-\u003Evoid",
+            "System.Security.Claims.Claim.get_Type()-\u003Estring",
+            "System.Security.Claims.Claim.get_Value()-\u003Estring",
+            "System.Security.Claims.ClaimsIdentity.get_Claims()-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003CSystem.Security.Claims.Claim\u003E",
+            "string.Equals(string, string, System.StringComparison)-\u003Ebool"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.IEnumerable\u00601\u003CSystem.Security.Claims.Claim\u003E.GetEnumerator()-\u003ESystem.Collections.Generic.IEnumerator\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.IEnumerator\u00601\u003CSystem.Security.Claims.Claim\u003E.get_Current()-\u003E!0",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.IEnumerator.MoveNext()-\u003Ebool",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.IDisposable.Dispose()-\u003Evoid",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Security.Claims.Claim.get_Type()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Security.Claims.Claim.get_Value()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Security.Claims.ClaimsIdentity.get_Claims()-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003CSystem.Security.Claims.Claim\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.Equals(string, string, System.StringComparison)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": [
+                {
+                  "Target": "argument",
+                  "ParameterIndex": 2,
+                  "Type": "System.StringComparison",
+                  "Value": "System.StringComparison.Ordinal"
+                }
+              ]
+            },
+            {
+              "ExactSymbolKey": "string.Equals(string, string, System.StringComparison)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": [
+                {
+                  "Target": "argument",
+                  "ParameterIndex": 2,
+                  "Type": "System.StringComparison",
+                  "Value": "System.StringComparison.OrdinalIgnoreCase"
+                }
+              ]
+            }
+          ],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.ArgumentNullException.ThrowIfNull(object, string)",
+              "System.ArgumentNullException.Throw(string)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Security.Claims.ClaimsPrincipal.IsInRole(string)",
+          "ExactSymbolKey": "System.Security.Claims.ClaimsPrincipal.IsInRole(string)-\u003Ebool",
+          "MetadataToken": "0x06000096",
+          "RelativeVirtualAddress": 41980,
+          "MethodBodySha256": "08117858f9aab3e2b875376642fa358fa2502d2cde166888b853a8b454821aca",
+          "CacheKey": "mvid:1f58e7f8-503b-4757-b3e8-8fe4f3dd5764|token:0x06000096|il:08117858f9aab3e2b875376642fa358fa2502d2cde166888b853a8b454821aca",
+          "Effects": [
+            "calls_method",
+            "reads_instance_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Generic.List\u00601\u003CSystem.Security.Claims.ClaimsIdentity\u003E.get_Count()-\u003Eint",
+            "System.Collections.Generic.List\u00601\u003CSystem.Security.Claims.ClaimsIdentity\u003E.get_Item(int)-\u003E!0",
+            "System.Security.Claims.ClaimsIdentity.HasClaim(string, string)-\u003Ebool",
+            "System.Security.Claims.ClaimsIdentity.get_RoleClaimType()-\u003Estring"
+          ],
+          "Fields": [
+            "System.Security.Claims.ClaimsPrincipal._identities"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Generic.List\u00601\u003CSystem.Security.Claims.ClaimsIdentity\u003E.get_Count()-\u003Eint",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.List\u00601\u003CSystem.Security.Claims.ClaimsIdentity\u003E.get_Item(int)-\u003E!0",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Security.Claims.ClaimsIdentity.HasClaim(string, string)-\u003Ebool",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Security.Claims.ClaimsIdentity.get_RoleClaimType()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Security.Claims.ClaimsIdentity.HasClaim(string, string)",
+              "System.ArgumentNullException.ThrowIfNull(object, string)",
+              "System.ArgumentNullException.Throw(string)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 3,
+    "PureCount": 1,
+    "ImpureCount": 2,
+    "ConservativeUnknownCount": 0,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.Security.Claims.ClaimsIdentity.HasClaim(string, string)",
+        "ExactSymbolKey": "System.Security.Claims.ClaimsIdentity.HasClaim(string, string)-\u003Ebool",
+        "CacheKey": "mvid:1f58e7f8-503b-4757-b3e8-8fe4f3dd5764|token:0x06000056|il:16861b7656af216c52f23056d25f141e4ecea7866bb82eecc5a32c80b0b1532e",
+        "AssemblyName": "System.Security.Claims",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Claims.dll",
+        "AssemblySha256": "20dbae23f8943877ef1b9890bc2d6ae3a2716fbb32e26eb124ad435e9e534737",
+        "ModuleVersionId": "1f58e7f8-503b-4757-b3e8-8fe4f3dd5764",
+        "MetadataToken": "0x06000056",
+        "MethodBodySha256": "16861b7656af216c52f23056d25f141e4ecea7866bb82eecc5a32c80b0b1532e",
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.ArgumentNullException.ThrowIfNull(object, string)",
+          "System.ArgumentNullException.Throw(string)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Security.Claims.ClaimsIdentity.get_RoleClaimType()",
+        "ExactSymbolKey": "System.Security.Claims.ClaimsIdentity.get_RoleClaimType()-\u003Estring",
+        "CacheKey": "mvid:1f58e7f8-503b-4757-b3e8-8fe4f3dd5764|token:0x06000049|il:9abc2bbb8fc411c1186bcab3ede89f376d4e15cdabe702d16ddd19b774f56d81",
+        "AssemblyName": "System.Security.Claims",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Claims.dll",
+        "AssemblySha256": "20dbae23f8943877ef1b9890bc2d6ae3a2716fbb32e26eb124ad435e9e534737",
+        "ModuleVersionId": "1f58e7f8-503b-4757-b3e8-8fe4f3dd5764",
+        "MetadataToken": "0x06000049",
+        "MethodBodySha256": "9abc2bbb8fc411c1186bcab3ede89f376d4e15cdabe702d16ddd19b774f56d81",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Security.Claims.ClaimsPrincipal.IsInRole(string)",
+        "ExactSymbolKey": "System.Security.Claims.ClaimsPrincipal.IsInRole(string)-\u003Ebool",
+        "CacheKey": "mvid:1f58e7f8-503b-4757-b3e8-8fe4f3dd5764|token:0x06000096|il:08117858f9aab3e2b875376642fa358fa2502d2cde166888b853a8b454821aca",
+        "AssemblyName": "System.Security.Claims",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Security.Claims.dll",
+        "AssemblySha256": "20dbae23f8943877ef1b9890bc2d6ae3a2716fbb32e26eb124ad435e9e534737",
+        "ModuleVersionId": "1f58e7f8-503b-4757-b3e8-8fe4f3dd5764",
+        "MetadataToken": "0x06000096",
+        "MethodBodySha256": "08117858f9aab3e2b875376642fa358fa2502d2cde166888b853a8b454821aca",
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Security.Claims.ClaimsIdentity.HasClaim(string, string)",
+          "System.ArgumentNullException.ThrowIfNull(object, string)",
+          "System.ArgumentNullException.Throw(string)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      }
+    ]
+  }
+}

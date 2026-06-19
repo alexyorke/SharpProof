@@ -6196,6 +6196,74 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_Classifies_ClaimsPrincipalIsInRole_AsImpure()
+        {
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-claimsprincipal-isinrole-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var outputPath = Path.Combine(workingDirectory, "ClaimsPrincipal.IsInRole.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Defaults = new
+                    {
+                        Framework = "net8.0",
+                        RuntimeAssemblyName = "System.Security.Claims.dll",
+                        IncludeCallees = true,
+                        IncludePurityClassification = true,
+                        CompareManualCatalogs = true,
+                    },
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = outputPath,
+                            SourceSummaryPath = "PurelySharp.Analyzer/ClaimsPrincipal.IsInRole.PurelySharp.EffectSummary.json",
+                            SymbolPrefixes = new[]
+                            {
+                                "System.Security.Claims.ClaimsPrincipal.IsInRole(string)",
+                            },
+                            Limit = 20,
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
+
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Security.Claims.ClaimsPrincipal.IsInRole(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Security.Claims.ClaimsPrincipal.IsInRole(string)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => string.Equals(symbol, "System.Security.Claims.ClaimsPrincipal.IsInRole(string)", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Security.Claims.ClaimsPrincipal.IsInRole(string)",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeWebUtilitySlice_TreatsHelpersAsGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Net.WebUtility", limit: 40);

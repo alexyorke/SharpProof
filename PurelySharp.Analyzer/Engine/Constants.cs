@@ -824,9 +824,6 @@ public static class Constants
         "System.Reflection.PropertyInfo.GetValue(object)",
 
 
-        "System.Security.Claims.ClaimsPrincipal.IsInRole(string)",
-
-
         "System.Security.Cryptography.Aes.DecryptCbc(byte[], byte[], byte[], System.Security.Cryptography.PaddingMode)",
         "System.Security.Cryptography.Aes.EncryptCbc(byte[], byte[], byte[], System.Security.Cryptography.PaddingMode)",
         "System.Security.Cryptography.MD5.ComputeHash(byte[])",
