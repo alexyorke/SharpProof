@@ -360,6 +360,106 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_MetadataBinaryOperatorSummary_MatchesCall()
+        {
+            const string boundarySource = """
+using System;
+
+public readonly struct OperatorBoundary
+{
+    public OperatorBoundary(int value)
+    {
+        Value = value;
+    }
+
+    public int Value { get; }
+
+    public static OperatorBoundary operator +(OperatorBoundary left, OperatorBoundary right)
+    {
+        throw new InvalidOperationException();
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("OperatorBoundarySummary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+            var methodIdentity = GetMethodIdentity(
+                fixture.AssemblyPath,
+                "OperatorBoundary.op_Addition(OperatorBoundary, OperatorBoundary)");
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+public class TestClass
+{
+    public OperatorBoundary TestMethod(OperatorBoundary left, OperatorBoundary right)
+    {
+        return left + right;
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreateEffectSummaryJson(
+                            identity,
+                            methodIdentity.ExactSymbolKey,
+                            actualMethodLookupSymbol: methodIdentity.Symbol,
+                            thrownExceptionTypesJson: """[ "System.InvalidOperationException" ]""",
+                            transitiveThrownExceptionTypesJson: "[]"))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            AssertEffectSummaryException(diagnostics, "TestMethod", "System.InvalidOperationException");
+        }
+
+        [Test]
+        public async Task Ps0010_EffectSummary_MetadataOutParameterSummary_MatchesCall()
+        {
+            const string boundarySource = """
+using System;
+
+public static class OutBoundary
+{
+    public static void ParseOrThrow(string value, out int result)
+    {
+        throw new InvalidOperationException();
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("OutBoundarySummary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+            var methodIdentity = GetMethodIdentity(
+                fixture.AssemblyPath,
+                "OutBoundary.ParseOrThrow(string, ref int)");
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        OutBoundary.ParseOrThrow(value, out var parsed);
+        return parsed;
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreateEffectSummaryJson(
+                            identity,
+                            methodIdentity.ExactSymbolKey.Replace("ref int", "out int", StringComparison.Ordinal),
+                            actualMethodLookupSymbol: methodIdentity.Symbol,
+                            thrownExceptionTypesJson: """[ "System.InvalidOperationException" ]""",
+                            transitiveThrownExceptionTypesJson: "[]"))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            AssertEffectSummaryException(diagnostics, "TestMethod", "System.InvalidOperationException");
+        }
+
+        [Test]
         public async Task Ps0010_EffectSummary_ToolOutput_PropagatesTransitiveMetadataMethodException()
         {
             const string boundarySource = """
@@ -1452,7 +1552,8 @@ public class TestClass
                 return new MethodIdentity(
                     $"0x{MetadataTokens.GetToken(handle):X8}",
                     methodBodySha256,
-                    GetMethodExactSymbolKey(metadataReader, handle));
+                    GetMethodExactSymbolKey(metadataReader, handle),
+                    methodSymbol);
             }
 
             throw new AssertionException("Method symbol did not resolve in assembly: " + symbol);
@@ -1844,7 +1945,7 @@ public class TestClass
         }
 
         private sealed record AssemblyIdentity(string AssemblyPath, string AssemblyName, string AssemblySha256, string ModuleVersionId);
-        private sealed record MethodIdentity(string MetadataToken, string? MethodBodySha256, string ExactSymbolKey);
+        private sealed record MethodIdentity(string MetadataToken, string? MethodBodySha256, string ExactSymbolKey, string Symbol);
 
         private static string FormatJsonStringOrNull(string? value)
         {

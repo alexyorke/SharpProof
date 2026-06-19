@@ -430,46 +430,7 @@ namespace PurelySharp.Analyzer
 
         private static IEnumerable<string> GetSymbolKeys(IMethodSymbol methodSymbol)
         {
-            var keys = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-            AddSymbolKey(keys, methodSymbol.OriginalDefinition.ToDisplayString());
-            AddSymbolKey(keys, methodSymbol.ToDisplayString());
-            AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol.OriginalDefinition));
-            AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol));
-            AddSymbolKey(keys, CreateExactSummaryKey(methodSymbol.OriginalDefinition));
-            AddSymbolKey(keys, CreateExactSummaryKey(methodSymbol));
-            AddSymbolKey(keys, CreateMetadataEffectSummaryKey(methodSymbol.OriginalDefinition));
-            AddSymbolKey(keys, CreateMetadataEffectSummaryKey(methodSymbol));
-            AddSymbolKey(keys, CreateMetadataExactSummaryKey(methodSymbol.OriginalDefinition));
-            AddSymbolKey(keys, CreateMetadataExactSummaryKey(methodSymbol));
-            AddSymbolKey(keys, CreateMetadataDefinitionEffectSummaryKey(methodSymbol.OriginalDefinition));
-            AddSymbolKey(keys, CreateMetadataDefinitionEffectSummaryKey(methodSymbol));
-            AddSymbolKey(keys, CreateMetadataDefinitionExactSummaryKey(methodSymbol.OriginalDefinition));
-            AddSymbolKey(keys, CreateMetadataDefinitionExactSummaryKey(methodSymbol));
-            AddSymbolKey(keys, CreatePositionalEffectSummaryKey(methodSymbol.OriginalDefinition));
-            AddSymbolKey(keys, CreatePositionalEffectSummaryKey(methodSymbol));
-            AddSymbolKey(keys, CreatePositionalExactSummaryKey(methodSymbol.OriginalDefinition));
-            AddSymbolKey(keys, CreatePositionalExactSummaryKey(methodSymbol));
-            AddSymbolKey(keys, CreateMetadataPositionalEffectSummaryKey(methodSymbol.OriginalDefinition));
-            AddSymbolKey(keys, CreateMetadataPositionalEffectSummaryKey(methodSymbol));
-            AddSymbolKey(keys, CreateMetadataPositionalExactSummaryKey(methodSymbol.OriginalDefinition));
-            AddSymbolKey(keys, CreateMetadataPositionalExactSummaryKey(methodSymbol));
-
-            if (methodSymbol.IsGenericMethod)
-            {
-                AddSymbolKey(keys, methodSymbol.ConstructedFrom.ToDisplayString());
-                AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol.ConstructedFrom));
-                AddSymbolKey(keys, CreateExactSummaryKey(methodSymbol.ConstructedFrom));
-                AddSymbolKey(keys, CreateMetadataEffectSummaryKey(methodSymbol.ConstructedFrom));
-                AddSymbolKey(keys, CreateMetadataExactSummaryKey(methodSymbol.ConstructedFrom));
-                AddSymbolKey(keys, CreateMetadataDefinitionEffectSummaryKey(methodSymbol.ConstructedFrom));
-                AddSymbolKey(keys, CreateMetadataDefinitionExactSummaryKey(methodSymbol.ConstructedFrom));
-                AddSymbolKey(keys, CreatePositionalEffectSummaryKey(methodSymbol.ConstructedFrom));
-                AddSymbolKey(keys, CreatePositionalExactSummaryKey(methodSymbol.ConstructedFrom));
-                AddSymbolKey(keys, CreateMetadataPositionalEffectSummaryKey(methodSymbol.ConstructedFrom));
-                AddSymbolKey(keys, CreateMetadataPositionalExactSummaryKey(methodSymbol.ConstructedFrom));
-            }
-
-            return keys;
+            return EffectSummarySymbolKeyFactory.GetMethodSymbolKeys(methodSymbol);
         }
 
         private static void AddSymbolKey(ImmutableHashSet<string>.Builder keys, string? value)

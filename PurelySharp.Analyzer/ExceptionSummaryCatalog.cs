@@ -288,19 +288,7 @@ namespace PurelySharp.Analyzer
 
         private static IEnumerable<string> GetSymbolKeys(IMethodSymbol methodSymbol)
         {
-            var keys = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-            AddSymbolKey(keys, methodSymbol.OriginalDefinition.ToDisplayString());
-            AddSymbolKey(keys, methodSymbol.ToDisplayString());
-            AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol.OriginalDefinition));
-            AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol));
-
-            if (methodSymbol.IsGenericMethod)
-            {
-                AddSymbolKey(keys, methodSymbol.ConstructedFrom.ToDisplayString());
-                AddSymbolKey(keys, CreateEffectSummaryKey(methodSymbol.ConstructedFrom));
-            }
-
-            return keys;
+            return EffectSummarySymbolKeyFactory.GetMethodSymbolKeys(methodSymbol);
         }
 
         private static void AddSymbolKey(ImmutableHashSet<string>.Builder keys, string? value)
@@ -445,9 +433,36 @@ namespace PurelySharp.Analyzer
                 yield return effectSummaryKey;
             }
 
+            var positionalEffectSummaryKey = GetPositionalEffectSummaryLikeMethodSymbol(reader, handle);
+            if (!string.Equals(positionalEffectSummaryKey, raw, StringComparison.Ordinal) &&
+                !string.Equals(positionalEffectSummaryKey, effectSummaryKey, StringComparison.Ordinal))
+            {
+                yield return positionalEffectSummaryKey;
+            }
+
+            var exactKey = GetExactMethodKey(reader, handle);
+            if (!string.Equals(exactKey, raw, StringComparison.Ordinal) &&
+                !string.Equals(exactKey, effectSummaryKey, StringComparison.Ordinal) &&
+                !string.Equals(exactKey, positionalEffectSummaryKey, StringComparison.Ordinal))
+            {
+                yield return exactKey;
+            }
+
+            var positionalExactKey = GetPositionalExactMethodKey(reader, handle);
+            if (!string.Equals(positionalExactKey, raw, StringComparison.Ordinal) &&
+                !string.Equals(positionalExactKey, effectSummaryKey, StringComparison.Ordinal) &&
+                !string.Equals(positionalExactKey, positionalEffectSummaryKey, StringComparison.Ordinal) &&
+                !string.Equals(positionalExactKey, exactKey, StringComparison.Ordinal))
+            {
+                yield return positionalExactKey;
+            }
+
             var roslynDisplay = GetRoslynLikeMethodSymbol(reader, handle);
             if (!string.Equals(roslynDisplay, raw, StringComparison.Ordinal) &&
-                !string.Equals(roslynDisplay, effectSummaryKey, StringComparison.Ordinal))
+                !string.Equals(roslynDisplay, effectSummaryKey, StringComparison.Ordinal) &&
+                !string.Equals(roslynDisplay, positionalEffectSummaryKey, StringComparison.Ordinal) &&
+                !string.Equals(roslynDisplay, exactKey, StringComparison.Ordinal) &&
+                !string.Equals(roslynDisplay, positionalExactKey, StringComparison.Ordinal))
             {
                 yield return roslynDisplay;
             }
@@ -508,14 +523,97 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        private static string DecodePositionalMethodSignature(MetadataReader reader, MethodDefinition definition)
+        {
+            try
+            {
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
+                return "(" + string.Join(", ", signature.ParameterTypes) + ")";
+            }
+            catch (BadImageFormatException)
+            {
+                return "(?)";
+            }
+        }
+
+        private static string DecodeExactMethodSignature(MetadataReader reader, MethodDefinition definition)
+        {
+            try
+            {
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), CreateGenericContext(reader, definition));
+                return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
+            }
+            catch (BadImageFormatException)
+            {
+                return "(?)->?";
+            }
+        }
+
+        private static string DecodePositionalExactMethodSignature(MetadataReader reader, MethodDefinition definition)
+        {
+            try
+            {
+                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
+                return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
+            }
+            catch (BadImageFormatException)
+            {
+                return "(?)->?";
+            }
+        }
+
         private static string GetEffectSummaryLikeMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
         {
             var definition = reader.GetMethodDefinition(handle);
             var typeName = GetTypeName(reader, definition.GetDeclaringType());
-            var methodName = definition.Attributes.HasFlag(System.Reflection.MethodAttributes.SpecialName)
-                ? reader.GetString(definition.Name)
-                : reader.GetString(definition.Name);
-            return typeName + "." + methodName + DecodeMethodSignature(reader, definition);
+            return typeName + "." + reader.GetString(definition.Name) + DecodeMethodSignature(reader, definition);
+        }
+
+        private static string GetPositionalEffectSummaryLikeMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
+        {
+            var definition = reader.GetMethodDefinition(handle);
+            var typeName = GetTypeName(reader, definition.GetDeclaringType());
+            return typeName + "." + reader.GetString(definition.Name) + DecodePositionalMethodSignature(reader, definition);
+        }
+
+        private static string GetExactMethodKey(MetadataReader reader, MethodDefinitionHandle handle)
+        {
+            var definition = reader.GetMethodDefinition(handle);
+            var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
+            return typeName + "." + reader.GetString(definition.Name) + DecodeExactMethodSignature(reader, definition);
+        }
+
+        private static string GetPositionalExactMethodKey(MetadataReader reader, MethodDefinitionHandle handle)
+        {
+            var definition = reader.GetMethodDefinition(handle);
+            var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
+            return typeName + "." + reader.GetString(definition.Name) + DecodePositionalExactMethodSignature(reader, definition);
+        }
+
+        private static string NormalizeExactTypeName(string typeName)
+        {
+            return typeName switch
+            {
+                "System.Boolean" => "bool",
+                "System.Byte" => "byte",
+                "System.Char" => "char",
+                "System.Decimal" => "decimal",
+                "System.Double" => "double",
+                "System.Int16" => "short",
+                "System.Int32" => "int",
+                "System.Int64" => "long",
+                "System.IntPtr" => "nint",
+                "System.Object" => "object",
+                "System.SByte" => "sbyte",
+                "System.Single" => "float",
+                "System.String" => "string",
+                "System.UInt16" => "ushort",
+                "System.UInt32" => "uint",
+                "System.UInt64" => "ulong",
+                "System.UIntPtr" => "nuint",
+                "System.Void" => "void",
+                _ => typeName
+            };
         }
 
         private static string GetRoslynLikeMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
