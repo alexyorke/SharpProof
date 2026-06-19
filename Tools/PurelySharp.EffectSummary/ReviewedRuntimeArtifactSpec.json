@@ -168,8 +168,10 @@
     {
       "OutputPath": "PurelySharp.Analyzer/FileSystem.State.PurelySharp.EffectSummary.json",
       "Limit": 120,
+      "MaxDepth": 2,
       "SymbolPrefixes": [
         "System.IO.Directory.CreateDirectory(string)",
+        "System.IO.Directory.CreateTempSubdirectory(string)",
         "System.IO.Directory.Exists(string)",
         "System.IO.File.Exists(string)"
       ]

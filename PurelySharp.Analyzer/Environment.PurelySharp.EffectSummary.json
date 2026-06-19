@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-19T02:35:24.780682+00:00",
+  "GeneratedAtUtc": "2026-06-19T02:57:01.8100621+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -5921,23 +5921,7 @@
     "ConservativeUnknownCount": 10,
     "CatalogComparison": {
       "KnownPureMembers": [],
-      "KnownImpureMembers": [
-        {
-          "Symbol": "System.Type.Assembly.get",
-          "Catalog": "known_impure",
-          "Classification": "conservative_unknown",
-          "Categories": [
-            "abstract",
-            "metadata_only_or_external",
-            "no_il_body"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "unknown",
-          "MatchedExactSymbolKeys": [
-            "System.Type.get_Assembly()-\u003ESystem.Reflection.Assembly"
-          ]
-        }
-      ],
+      "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
   },

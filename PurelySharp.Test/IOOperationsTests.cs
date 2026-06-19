@@ -1258,5 +1258,27 @@ public class TestClass
                                     .WithArguments("TestMethod");
             await VerifyCS.VerifyAnalyzerAsync(test, expected22);
         }
+
+        [Test]
+        public async Task IoDirectoryCreateTempSubdirectory_ShouldBeImpure_Test1()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DirectoryInfo TestMethod()
+    {
+        return Directory.CreateTempSubdirectory(""purelysharp-test-"");
+    }
+}";
+
+            var expected23 = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                    .WithSpan(8, 26, 8, 36)
+                                    .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected23);
+        }
     }
 }

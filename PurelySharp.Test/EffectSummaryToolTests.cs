@@ -4722,7 +4722,9 @@ public static class StringComparisonFixture
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
                 120,
+                2,
                 "System.IO.Directory.CreateDirectory(string)",
+                "System.IO.Directory.CreateTempSubdirectory(string)",
                 "System.IO.Directory.Exists(string)",
                 "System.IO.File.Exists(string)");
 
@@ -4734,6 +4736,10 @@ public static class StringComparisonFixture
 
             AssertPurityClassification(summary, "System.IO.Directory.CreateDirectory(string)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.CreateDirectory(string)", "caller_visible");
+            AssertPurityClassification(summary, "System.IO.Directory.CreateTempSubdirectory(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.IO.Directory.CreateTempSubdirectory(string)", "caller_visible");
+            AssertPurityClassification(summary, "System.IO.Directory.CreateTempSubdirectoryCore(string)", "impure", "impure_callee", "throw");
+            AssertEffectVisibilityClassification(summary, "System.IO.Directory.CreateTempSubdirectoryCore(string)", "caller_visible");
             AssertPurityClassification(summary, "System.IO.Directory.Exists(string)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.Exists(string)", "caller_visible");
             AssertPurityClassification(summary, "System.IO.File.Exists(string)", "impure", "impure_callee");
@@ -4745,6 +4751,7 @@ public static class StringComparisonFixture
                 .Select(entry => entry.GetProperty("Symbol").GetString())
                 .Where(symbol =>
                     string.Equals(symbol, "System.IO.Directory.CreateDirectory(string)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.IO.Directory.CreateTempSubdirectory(string)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.IO.Directory.Exists(string)", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.IO.File.Exists(string)", StringComparison.Ordinal))
                 .OrderBy(symbol => symbol, StringComparer.Ordinal)
@@ -4753,6 +4760,7 @@ public static class StringComparisonFixture
             Assert.That(generatedSymbols, Is.EqualTo(new[]
             {
                 "System.IO.Directory.CreateDirectory(string)",
+                "System.IO.Directory.CreateTempSubdirectory(string)",
                 "System.IO.Directory.Exists(string)",
                 "System.IO.File.Exists(string)",
             }));
@@ -5928,17 +5936,30 @@ public static class CallvirtFixture
 
         private static async Task<JsonDocument> RunRuntimeEffectSummaryAsync(int limit, params string[] symbolPrefixes)
         {
-            return await RunRuntimeEffectSummaryAsyncCore(limit, null, symbolPrefixes);
+            return await RunRuntimeEffectSummaryAsyncCore(limit, null, 1, symbolPrefixes);
         }
 
-        private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(string runtimeAssemblyName, int limit, params string[] symbolPrefixes)
+        private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(
+            string runtimeAssemblyName,
+            int limit,
+            params string[] symbolPrefixes)
         {
-            return RunRuntimeEffectSummaryAsyncCore(limit, runtimeAssemblyName, symbolPrefixes);
+            return RunRuntimeEffectSummaryAsyncForAssembly(runtimeAssemblyName, limit, 1, symbolPrefixes);
+        }
+
+        private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(
+            string runtimeAssemblyName,
+            int limit,
+            int maxDepth,
+            params string[] symbolPrefixes)
+        {
+            return RunRuntimeEffectSummaryAsyncCore(limit, runtimeAssemblyName, maxDepth, symbolPrefixes);
         }
 
         private static async Task<JsonDocument> RunRuntimeEffectSummaryAsyncCore(
             int limit,
             string? runtimeAssemblyName,
+            int maxDepth,
             params string[] symbolPrefixes)
         {
             if (symbolPrefixes.Length == 0)
@@ -5972,6 +5993,8 @@ public static class CallvirtFixture
                 startInfo.ArgumentList.Add(symbolPrefix);
             }
             startInfo.ArgumentList.Add("--include-callees");
+            startInfo.ArgumentList.Add("--max-depth");
+            startInfo.ArgumentList.Add(maxDepth.ToString());
             startInfo.ArgumentList.Add("--classify-purity");
             startInfo.ArgumentList.Add("--compare-manual-catalogs");
             startInfo.ArgumentList.Add("--limit");

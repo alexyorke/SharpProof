@@ -199,6 +199,7 @@ public static class EnvironmentCatalogSignatureSamples
             var members = new[]
             {
                 "System.IO.Directory.CreateDirectory(string)",
+                "System.IO.Directory.CreateTempSubdirectory(string)",
                 "System.IO.Directory.Exists(string)",
                 "System.IO.File.Exists(string)",
             };
@@ -1932,6 +1933,43 @@ public static class MemberInfoNameCatalogSignatureSamples
             Assert.That(matched, Is.True,
                 "Generated purity catalog should resolve System.Reflection.MemberInfo.Name.get from runtime metadata evidence.");
             Assert.That(classification, Is.EqualTo("pure"));
+        }
+
+        [Test]
+        public void TypeAssemblyGetter_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System;
+using System.Reflection;
+
+public static class TypeAssemblyCatalogSignatureSamples
+{
+    public static Assembly Sample(Type type)
+    {
+        return type.Assembly;
+    }
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "TypeAssemblyCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var signature = GetPropertySignature(compilation, syntaxTree, "type.Assembly");
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var memberAccess = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Single(node => node.ToString() == "type.Assembly");
+            var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(memberAccess).Symbol!;
+            var (matched, classification) = GetGeneratedPurityClassification(propertySymbol.GetMethod!, compilation);
+
+            Assert.That(signature, Is.EqualTo("System.Type.Assembly.get"));
+            AssertNotInManualCatalogs(signature);
+            Assert.That(matched, Is.True,
+                "Generated purity catalog should resolve System.Type.Assembly.get from runtime metadata evidence.");
+            Assert.That(classification, Is.EqualTo("conservative_unknown"));
         }
 
         [Test]
