@@ -3243,6 +3243,89 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_DecimalComparisonAndConversionsAsMixedEvidence()
+        {
+            const string source = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int Compare(decimal left, decimal right)
+    {
+        return decimal.Compare(left, right);
+    }
+
+    [EnforcePure]
+    public double Convert(decimal value)
+    {
+        return decimal.ToDouble(value);
+    }
+
+    [EnforcePure]
+    public int Narrow(decimal value)
+    {
+        return decimal.ToInt32(value);
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics
+                .Where(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "decimal.Compare(left, right)" ||
+                    node.ToString() == "decimal.ToDouble(value)" ||
+                    node.ToString() == "decimal.ToInt32(value)")
+                .Select(node => (invocation: node.ToString(), method: (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!))
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var resolutions = trackedMethods
+                .Select(trackedMethod =>
+                {
+                    var args = new object?[] { trackedMethod.method.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2];
+                    var classification = matched
+                        ? (string)purityEntry!.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                        : string.Empty;
+                    return (trackedMethod.invocation, matched, classification);
+                })
+                .ToDictionary(
+                    result => result.invocation,
+                    result => (result.matched, result.classification),
+                    StringComparer.Ordinal);
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(1));
+            Assert.That(
+                purityDiagnostics[0].Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty],
+                Is.EqualTo("generated_purity_summary"));
+            Assert.That(
+                purityDiagnostics[0].Properties[PurelySharpDiagnostics.ImpuritySymbolProperty],
+                Does.Contain("decimal.ToInt32(decimal)"));
+
+            Assert.That(resolutions["decimal.Compare(left, right)"].matched, Is.True);
+            Assert.That(resolutions["decimal.Compare(left, right)"].classification, Is.EqualTo("pure"));
+            Assert.That(resolutions["decimal.ToDouble(value)"].matched, Is.True);
+            Assert.That(resolutions["decimal.ToDouble(value)"].classification, Is.EqualTo("pure"));
+            Assert.That(resolutions["decimal.ToInt32(value)"].matched, Is.True);
+            Assert.That(resolutions["decimal.ToInt32(value)"].classification, Is.EqualTo("impure"));
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_ArrayFindAndFindIndex()
         {
             const string source = @"

@@ -555,6 +555,16 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Decimal.ComparisonAndConversions.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Decimal.ComparisonAndConversions.PurelySharp.EffectSummary.json",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Decimal.Compare(decimal, decimal)",
+        "System.Decimal.ToDouble(decimal)",
+        "System.Decimal.ToInt32(decimal)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Convert.CurrentCulture.PurelySharp.EffectSummary.json"
     },

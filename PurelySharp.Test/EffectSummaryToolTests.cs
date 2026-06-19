@@ -3239,6 +3239,41 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeDecimalComparisonAndConversionsSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.Decimal.Compare(decimal, decimal)",
+                "System.Decimal.ToDouble(decimal)",
+                "System.Decimal.ToInt32(decimal)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Decimal.Compare(decimal, decimal)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Decimal.Compare(decimal, decimal)", "none");
+            AssertPurityClassification(summary, "System.Decimal.ToDouble(decimal)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Decimal.ToDouble(decimal)", "none");
+            AssertPurityClassification(summary, "System.Decimal.ToInt32(decimal)", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Decimal.ToInt32(decimal)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(candidate => !string.IsNullOrWhiteSpace(candidate))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Decimal.Compare(decimal, decimal)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Decimal.ToDouble(decimal)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Decimal.ToInt32(decimal)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeEnumTryParseSlice_UsesSemanticHandlingInsteadOfManualCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(80, "System.Enum.TryParse");

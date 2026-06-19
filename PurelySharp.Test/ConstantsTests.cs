@@ -1365,6 +1365,70 @@ public static class StringJoinCatalogSignatureSamples
         }
 
         [Test]
+        public void DecimalComparisonAndConversions_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+public static class DecimalComparisonAndConversionCatalogSignatureSamples
+{
+    public static int Compare(decimal left, decimal right)
+    {
+        return decimal.Compare(left, right);
+    }
+
+    public static double Convert(decimal value)
+    {
+        return decimal.ToDouble(value);
+    }
+
+    public static int Narrow(decimal value)
+    {
+        return decimal.ToInt32(value);
+    }
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "DecimalComparisonAndConversionCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var resolutions = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "decimal.Compare(left, right)" ||
+                    node.ToString() == "decimal.ToDouble(value)" ||
+                    node.ToString() == "decimal.ToInt32(value)")
+                .Select(invocation =>
+                {
+                    var methodSymbol = (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!;
+                    var (matched, classification) = GetGeneratedPurityClassification(methodSymbol, compilation);
+                    return (
+                        invocation: invocation.ToString(),
+                        matched,
+                        classification);
+                })
+                .ToDictionary(
+                    result => result.invocation,
+                    result => (result.matched, result.classification),
+                    StringComparer.Ordinal);
+
+            Assert.That(resolutions.Count, Is.EqualTo(3));
+
+            AssertNotInManualCatalogs("System.Decimal.Compare(decimal, decimal)");
+            AssertNotInManualCatalogs("System.Decimal.ToDouble(decimal)");
+            AssertNotInManualCatalogs("System.Decimal.ToInt32(decimal)");
+
+            Assert.That(resolutions["decimal.Compare(left, right)"].matched, Is.True);
+            Assert.That(resolutions["decimal.Compare(left, right)"].classification, Is.EqualTo("pure"));
+            Assert.That(resolutions["decimal.ToDouble(value)"].matched, Is.True);
+            Assert.That(resolutions["decimal.ToDouble(value)"].classification, Is.EqualTo("pure"));
+            Assert.That(resolutions["decimal.ToInt32(value)"].matched, Is.True);
+            Assert.That(resolutions["decimal.ToInt32(value)"].classification, Is.EqualTo("impure"));
+        }
+
+        [Test]
         public void BooleanParseHelpers_AreHandledSemantically_NotStaticCatalogs()
         {
             var members = new[]
