@@ -654,6 +654,148 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_TransitiveThrownExceptionEdges_WithSchemaFields_MatchLegacyDiagnosticProperties()
+        {
+            const string boundarySource = """
+using System;
+
+public static class SummaryBoundary
+{
+    public static string Outer(string value)
+    {
+        return Middle(value);
+    }
+
+    private static string Middle(string value)
+    {
+        return Inner(value);
+    }
+
+    private static string Inner(string value)
+    {
+        return Leaf(value);
+    }
+
+    private static string Leaf(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException();
+        }
+
+        return value;
+    }
+}
+""";
+
+            const string callerSource = """
+public class TestClass
+{
+    public string TestMethod(string value)
+    {
+        return SummaryBoundary.Outer(value);
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryLegacyParity", boundarySource);
+            var references = ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath));
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+            const string expectedSourceChain = "SummaryBoundary.Outer(string) -> SummaryBoundary.Middle(string) -> SummaryBoundary.Inner(string) -> SummaryBoundary.Leaf(string)";
+
+            var legacyDiagnostics = await GetAnalyzerDiagnosticsAsync(
+                callerSource,
+                CreateEffectSummaryJson(
+                    identity,
+                    "SummaryBoundary.Outer(string)",
+                    thrownExceptionTypesJson: "[]",
+                    transitiveThrownExceptionTypesJson: """[ "System.InvalidOperationException" ]""",
+                    transitiveThrownExceptionSourcePathsJson:
+                        $$"""[ { "ExceptionType": "System.InvalidOperationException", "SourcePath": "{{expectedSourceChain}}" } ]"""),
+                references);
+
+            var edgeDiagnostics = await GetAnalyzerDiagnosticsAsync(
+                callerSource,
+                CreateEffectSummaryJson(
+                    identity,
+                    "SummaryBoundary.Outer(string)",
+                    thrownExceptionTypesJson: "[]",
+                    transitiveThrownExceptionTypesJson: "[]",
+                    transitiveThrownExceptionSourcePathsJson: "[]",
+                    transitiveThrownExceptionEdgesJson:
+                        $$"""[ { "ExceptionType": "System.InvalidOperationException", "SourcePath": "{{expectedSourceChain}}", "CalleeExactSymbolKey": "SummaryBoundary.Leaf(string)", "Depth": 3 } ]"""),
+                references);
+
+            AssertMatchingExceptionDiagnostics(legacyDiagnostics, edgeDiagnostics, PurelySharpDiagnostics.ExceptionSummaryId);
+            AssertMatchingExceptionDiagnostics(legacyDiagnostics, edgeDiagnostics, PurelySharpDiagnostics.UncaughtExceptionSiteId);
+        }
+
+        [Test]
+        public async Task Ps0010_EffectSummary_TransitiveThrownExceptionEdges_WithoutExceptionType_AreIgnored()
+        {
+            const string boundarySource = """
+using System;
+
+public static class SummaryBoundary
+{
+    public static string Outer(string value)
+    {
+        return Middle(value);
+    }
+
+    private static string Middle(string value)
+    {
+        return Inner(value);
+    }
+
+    private static string Inner(string value)
+    {
+        return Leaf(value);
+    }
+
+    private static string Leaf(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException();
+        }
+
+        return value;
+    }
+}
+""";
+
+            const string callerSource = """
+public class TestClass
+{
+    public string TestMethod(string value)
+    {
+        return SummaryBoundary.Outer(value);
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryMalformedEdge", boundarySource);
+            var references = ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath));
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                callerSource,
+                CreateEffectSummaryJson(
+                    identity,
+                    "SummaryBoundary.Outer(string)",
+                    thrownExceptionTypesJson: "[]",
+                    transitiveThrownExceptionTypesJson: "[]",
+                    transitiveThrownExceptionSourcePathsJson: "[]",
+                    transitiveThrownExceptionEdgesJson:
+                        """[ { "SourcePath": "SummaryBoundary.Outer(string) -> SummaryBoundary.Middle(string)", "CalleeExactSymbolKey": "SummaryBoundary.Middle(string)", "Depth": 1 } ]"""),
+                references);
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_EffectSummary_ToolOutput_PropagatesCommonMetadataExceptions()
         {
             const string boundarySource = """
@@ -1547,6 +1689,35 @@ public class TestClass
   ]
 }
 """;
+        }
+
+        private static void AssertMatchingExceptionDiagnostics(
+            ImmutableArray<Diagnostic> expectedDiagnostics,
+            ImmutableArray<Diagnostic> actualDiagnostics,
+            string diagnosticId)
+        {
+            var expected = expectedDiagnostics.Single(d => d.Id == diagnosticId);
+            var actual = actualDiagnostics.Single(d => d.Id == diagnosticId);
+
+            Assert.That(actual.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo(expected.Properties[PurelySharpDiagnostics.ExceptionTypesProperty]));
+            Assert.That(actual.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo(expected.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty]));
+            Assert.That(actual.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo(expected.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty]));
+
+            var expectedHasSymbol = expected.Properties.TryGetValue(PurelySharpDiagnostics.ExceptionSymbolProperty, out var expectedSymbol);
+            var actualHasSymbol = actual.Properties.TryGetValue(PurelySharpDiagnostics.ExceptionSymbolProperty, out var actualSymbol);
+            Assert.That(actualHasSymbol, Is.EqualTo(expectedHasSymbol));
+            if (expectedHasSymbol)
+            {
+                Assert.That(actualSymbol, Is.EqualTo(expectedSymbol));
+            }
+
+            var expectedHasEdges = expected.Properties.TryGetValue(PurelySharpDiagnostics.ExceptionEdgesProperty, out var expectedEdges);
+            var actualHasEdges = actual.Properties.TryGetValue(PurelySharpDiagnostics.ExceptionEdgesProperty, out var actualEdges);
+            Assert.That(actualHasEdges, Is.EqualTo(expectedHasEdges));
+            if (expectedHasEdges)
+            {
+                Assert.That(actualEdges, Is.EqualTo(expectedEdges));
+            }
         }
 
         private static string CreateMalformedEffectSummaryJson(string assemblyName, string assemblySha256, string moduleVersionId)

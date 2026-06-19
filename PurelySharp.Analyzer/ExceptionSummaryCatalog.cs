@@ -111,6 +111,7 @@ namespace PurelySharp.Analyzer
             out ImmutableArray<SummaryExceptionInfo> exceptionInfos)
         {
             var matchedExceptionSources = new Dictionary<string, ImmutableSortedSet<string>.Builder>(StringComparer.Ordinal);
+            var matchedExceptionEdges = new Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>>(StringComparer.Ordinal);
             var actualAssemblyIdentity = compilation is null
                 ? null
                 : TryResolveActualAssemblyIdentity(methodSymbol, compilation);
@@ -141,6 +142,20 @@ namespace PurelySharp.Analyzer
                         }
 
                         sources.UnionWith(exceptionInfo.Sources);
+
+                        if (!exceptionInfo.Edges.IsDefaultOrEmpty)
+                        {
+                            if (!matchedExceptionEdges.TryGetValue(exceptionInfo.ExceptionType, out var edgeMap))
+                            {
+                                edgeMap = new Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>(SummaryExceptionEdgeInfoComparer.Instance);
+                                matchedExceptionEdges.Add(exceptionInfo.ExceptionType, edgeMap);
+                            }
+
+                            foreach (var edge in exceptionInfo.Edges)
+                            {
+                                edgeMap[edge] = edge;
+                            }
+                        }
                     }
                 }
             }
@@ -153,7 +168,16 @@ namespace PurelySharp.Analyzer
 
             exceptionInfos = matchedExceptionSources
                 .OrderBy(item => item.Key, StringComparer.Ordinal)
-                .Select(item => new SummaryExceptionInfo(item.Key, item.Value.ToImmutableArray()))
+                .Select(item => new SummaryExceptionInfo(
+                    item.Key,
+                    item.Value.ToImmutableArray(),
+                    matchedExceptionEdges.TryGetValue(item.Key, out var edgeMap)
+                        ? edgeMap.Values
+                            .OrderBy(edge => edge.Depth)
+                            .ThenBy(edge => edge.CalleeExactSymbolKey, StringComparer.Ordinal)
+                            .ThenBy(edge => edge.SourcePath, StringComparer.Ordinal)
+                            .ToImmutableArray()
+                        : ImmutableArray<SummaryExceptionEdgeInfo>.Empty))
                 .ToImmutableArray();
             return true;
         }
@@ -193,12 +217,13 @@ namespace PurelySharp.Analyzer
 
                     var exceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
                     var exceptionSources = new Dictionary<string, ImmutableSortedSet<string>.Builder>(StringComparer.Ordinal);
+                    var exceptionEdges = new Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>>(StringComparer.Ordinal);
                     AddExceptionTypes(exceptionTypes, methodElement, "ThrownExceptionTypes");
                     AddExceptionTypes(exceptionTypes, methodElement, "TransitiveThrownExceptionTypes");
                     AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "ThrownExceptionSourcePaths");
                     AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "TransitiveThrownExceptionSourcePaths");
-                    AddExceptionEdges(exceptionTypes, exceptionSources, methodElement, "ThrownExceptionEdges");
-                    AddExceptionEdges(exceptionTypes, exceptionSources, methodElement, "TransitiveThrownExceptionEdges");
+                    AddExceptionEdges(exceptionTypes, exceptionSources, exceptionEdges, methodElement, "ThrownExceptionEdges");
+                    AddExceptionEdges(exceptionTypes, exceptionSources, exceptionEdges, methodElement, "TransitiveThrownExceptionEdges");
                     if (exceptionTypes.Count == 0)
                     {
                         continue;
@@ -209,7 +234,14 @@ namespace PurelySharp.Analyzer
                             exceptionType,
                             exceptionSources.TryGetValue(exceptionType, out var sources)
                                 ? sources.ToImmutableArray()
-                                : ImmutableArray<string>.Empty))
+                                : ImmutableArray<string>.Empty,
+                            exceptionEdges.TryGetValue(exceptionType, out var edges)
+                                ? edges.Values
+                                    .OrderBy(edge => edge.Depth)
+                                    .ThenBy(edge => edge.CalleeExactSymbolKey, StringComparer.Ordinal)
+                                    .ThenBy(edge => edge.SourcePath, StringComparer.Ordinal)
+                                    .ToImmutableArray()
+                                : ImmutableArray<SummaryExceptionEdgeInfo>.Empty))
                         .ToImmutableArray();
                     yield return new SummaryEntry(
                         symbol,
@@ -291,6 +323,7 @@ namespace PurelySharp.Analyzer
         private static void AddExceptionEdges(
             ImmutableSortedSet<string>.Builder exceptionTypes,
             Dictionary<string, ImmutableSortedSet<string>.Builder> exceptionSources,
+            Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>> exceptionEdges,
             JsonElement methodElement,
             string propertyName)
         {
@@ -333,7 +366,32 @@ namespace PurelySharp.Analyzer
                 }
 
                 sources.Add(sourcePath);
+
+                if (!exceptionEdges.TryGetValue(exceptionType, out var edgeMap))
+                {
+                    edgeMap = new Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>(SummaryExceptionEdgeInfoComparer.Instance);
+                    exceptionEdges.Add(exceptionType, edgeMap);
+                }
+
+                var edge = new SummaryExceptionEdgeInfo(
+                    sourcePath,
+                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CalleeExactSymbolKey") ??
+                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CalleeSymbol"),
+                    TryGetOptionalInt32(valueElement, "Depth"));
+                edgeMap[edge] = edge;
             }
+        }
+
+        private static int? TryGetOptionalInt32(JsonElement element, string propertyName)
+        {
+            if (!element.TryGetProperty(propertyName, out var valueElement))
+            {
+                return null;
+            }
+
+            return valueElement.ValueKind == JsonValueKind.Number && valueElement.TryGetInt32(out var number)
+                ? number
+                : null;
         }
 
         private static IEnumerable<string> GetSymbolKeys(IMethodSymbol methodSymbol)
@@ -990,14 +1048,78 @@ namespace PurelySharp.Analyzer
         internal sealed class SummaryExceptionInfo
         {
             public SummaryExceptionInfo(string exceptionType, ImmutableArray<string> sources)
+                : this(exceptionType, sources, ImmutableArray<SummaryExceptionEdgeInfo>.Empty)
+            {
+            }
+
+            public SummaryExceptionInfo(
+                string exceptionType,
+                ImmutableArray<string> sources,
+                ImmutableArray<SummaryExceptionEdgeInfo> edges)
             {
                 ExceptionType = exceptionType;
                 Sources = sources;
+                Edges = edges;
             }
 
             public string ExceptionType { get; }
 
             public ImmutableArray<string> Sources { get; }
+
+            public ImmutableArray<SummaryExceptionEdgeInfo> Edges { get; }
+        }
+
+        internal sealed class SummaryExceptionEdgeInfo
+        {
+            public SummaryExceptionEdgeInfo(
+                string? sourcePath,
+                string? calleeExactSymbolKey,
+                int? depth)
+            {
+                SourcePath = sourcePath;
+                CalleeExactSymbolKey = calleeExactSymbolKey;
+                Depth = depth;
+            }
+
+            public string? SourcePath { get; }
+
+            public string? CalleeExactSymbolKey { get; }
+
+            public int? Depth { get; }
+        }
+
+        private sealed class SummaryExceptionEdgeInfoComparer : IEqualityComparer<SummaryExceptionEdgeInfo>
+        {
+            public static readonly SummaryExceptionEdgeInfoComparer Instance = new SummaryExceptionEdgeInfoComparer();
+
+            public bool Equals(SummaryExceptionEdgeInfo? x, SummaryExceptionEdgeInfo? y)
+            {
+                if (ReferenceEquals(x, y))
+                {
+                    return true;
+                }
+
+                if (x is null || y is null)
+                {
+                    return false;
+                }
+
+                return string.Equals(x.SourcePath, y.SourcePath, StringComparison.Ordinal) &&
+                    string.Equals(x.CalleeExactSymbolKey, y.CalleeExactSymbolKey, StringComparison.Ordinal) &&
+                    x.Depth == y.Depth;
+            }
+
+            public int GetHashCode(SummaryExceptionEdgeInfo obj)
+            {
+                unchecked
+                {
+                    var hash = 17;
+                    hash = (hash * 31) + (obj.SourcePath != null ? StringComparer.Ordinal.GetHashCode(obj.SourcePath) : 0);
+                    hash = (hash * 31) + (obj.CalleeExactSymbolKey != null ? StringComparer.Ordinal.GetHashCode(obj.CalleeExactSymbolKey) : 0);
+                    hash = (hash * 31) + (obj.Depth ?? 0);
+                    return hash;
+                }
+            }
         }
 
         private sealed class SummaryAssemblyIdentity

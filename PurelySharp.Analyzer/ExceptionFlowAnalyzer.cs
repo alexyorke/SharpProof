@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -79,6 +80,11 @@ namespace PurelySharp.Analyzer
                 .Add(PurelySharpDiagnostics.ExceptionTypesProperty, string.Join(";", sortedTypes))
                 .Add(PurelySharpDiagnostics.ExceptionCategoriesProperty, exceptionEvidence.FormatCategories())
                 .Add(PurelySharpDiagnostics.ExceptionSourcesProperty, exceptionEvidence.FormatSources());
+            var formattedEdges = exceptionEvidence.FormatEdges();
+            if (!string.IsNullOrWhiteSpace(formattedEdges))
+            {
+                properties = properties.Add(PurelySharpDiagnostics.ExceptionEdgesProperty, formattedEdges);
+            }
 
             context.ReportDiagnostic(Diagnostic.Create(
                 PurelySharpDiagnostics.ExceptionSummaryRule,
@@ -113,7 +119,7 @@ namespace PurelySharp.Analyzer
                 string? exceptionSymbol = null;
                 foreach (var siteEntry in siteGroup)
                 {
-                    siteEvidence.Add(siteEntry.Exception.DisplayName, siteEntry.Exception.Category, siteEntry.Exception.Source);
+                    siteEvidence.Add(siteEntry.Exception);
                     exceptionSymbol ??= siteEntry.ExceptionSymbol;
                 }
 
@@ -135,6 +141,11 @@ namespace PurelySharp.Analyzer
                     .Add(PurelySharpDiagnostics.ExceptionTypesProperty, string.Join(";", sortedTypes))
                     .Add(PurelySharpDiagnostics.ExceptionCategoriesProperty, siteEvidence.FormatCategories())
                     .Add(PurelySharpDiagnostics.ExceptionSourcesProperty, siteEvidence.FormatSources());
+                var formattedEdges = siteEvidence.FormatEdges();
+                if (!string.IsNullOrWhiteSpace(formattedEdges))
+                {
+                    properties = properties.Add(PurelySharpDiagnostics.ExceptionEdgesProperty, formattedEdges);
+                }
                 if (!string.IsNullOrWhiteSpace(exceptionSymbol))
                 {
                     properties = properties.Add(PurelySharpDiagnostics.ExceptionSymbolProperty, exceptionSymbol);
@@ -167,7 +178,7 @@ namespace PurelySharp.Analyzer
                          exceptionSummaryCatalog,
                          visitedMethods))
             {
-                exceptionEvidence.Add(siteEntry.Exception.DisplayName, siteEntry.Exception.Category, siteEntry.Exception.Source);
+                exceptionEvidence.Add(siteEntry.Exception);
             }
 
             return exceptionEvidence;
@@ -1633,7 +1644,12 @@ namespace PurelySharp.Analyzer
                             TryResolveExceptionType(compilation, entry.ExceptionType),
                             entry.ExceptionType,
                             "source_callee",
-                            source));
+                            source,
+                            CreateDerivedDiagnosticEdges(
+                                entry.ExceptionType,
+                                "source_callee",
+                                source,
+                                CreatePrefixedCalleeChain(invokedMethodDisplay, source))));
                     })
                     .ToArray();
             }
@@ -1668,13 +1684,182 @@ namespace PurelySharp.Analyzer
                     : summaryException.Sources;
                 foreach (var source in sources)
                 {
+                    var matchingEdges = summaryException.Edges.IsDefaultOrEmpty
+                        ? ImmutableArray<ExceptionEdgeDiagnosticEntry>.Empty
+                        : summaryException.Edges
+                            .Where(edge => string.Equals(edge.SourcePath, source, StringComparison.Ordinal))
+                            .Select(edge => new ExceptionEdgeDiagnosticEntry(
+                                summaryException.ExceptionType,
+                                "effect_summary",
+                                edge.SourcePath ?? source,
+                                edge.CalleeExactSymbolKey,
+                                edge.Depth ?? 0))
+                            .ToImmutableArray();
+                    var derivedEdges = CreateDerivedDiagnosticEdges(
+                        summaryException.ExceptionType,
+                        "effect_summary",
+                        source,
+                        CreateSummaryCalleeChain(source, fallbackSource));
+                    matchingEdges = MergeDiagnosticEdges(matchingEdges, derivedEdges);
+
                     yield return new ExceptionCandidate(
                         TryResolveExceptionType(compilation, summaryException.ExceptionType),
                         summaryException.ExceptionType,
                         "effect_summary",
-                        source);
+                        source,
+                        matchingEdges);
                 }
             }
+        }
+
+        private static ImmutableArray<string> CreatePrefixedCalleeChain(string invokedMethodDisplay, string qualifiedSource)
+        {
+            var (_, source) = SplitQualifiedSource(qualifiedSource);
+            var nestedChain = ParseCalleeChainFromSource(source);
+            if (nestedChain.IsDefaultOrEmpty)
+            {
+                return ImmutableArray.Create(invokedMethodDisplay);
+            }
+
+            if (string.Equals(nestedChain[0], invokedMethodDisplay, StringComparison.Ordinal))
+            {
+                return nestedChain;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<string>(nestedChain.Length + 1);
+            builder.Add(invokedMethodDisplay);
+            builder.AddRange(nestedChain);
+            return builder.ToImmutable();
+        }
+
+        private static ImmutableArray<string> CreateSummaryCalleeChain(string source, string fallbackSource)
+        {
+            if (string.IsNullOrWhiteSpace(source) || string.Equals(source, fallbackSource, StringComparison.Ordinal))
+            {
+                return ImmutableArray<string>.Empty;
+            }
+
+            return ParseCalleeChainFromSource(source);
+        }
+
+        private static (string? Category, string Source) SplitQualifiedSource(string qualifiedSource)
+        {
+            if (string.IsNullOrWhiteSpace(qualifiedSource))
+            {
+                return (null, string.Empty);
+            }
+
+            var separatorIndex = qualifiedSource.IndexOf(':');
+            if (separatorIndex <= 0)
+            {
+                return (null, qualifiedSource);
+            }
+
+            var category = qualifiedSource.Substring(0, separatorIndex);
+            if (!IsKnownExceptionCategory(category))
+            {
+                return (null, qualifiedSource);
+            }
+
+            return (category, qualifiedSource.Substring(separatorIndex + 1));
+        }
+
+        private static ImmutableArray<string> ParseCalleeChainFromSource(string source)
+        {
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                return ImmutableArray<string>.Empty;
+            }
+
+            var segments = source
+                .Split(new[] { " -> " }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(segment => NormalizeCalleeSegment(segment))
+                .Where(segment => !string.IsNullOrWhiteSpace(segment) && LooksLikeSymbolSegment(segment))
+                .Distinct(StringComparer.Ordinal)
+                .ToImmutableArray();
+            return segments;
+        }
+
+        private static string NormalizeCalleeSegment(string segment)
+        {
+            var trimmed = segment.Trim();
+            var (_, source) = SplitQualifiedSource(trimmed);
+            return source.Trim();
+        }
+
+        private static bool LooksLikeSymbolSegment(string segment)
+        {
+            return segment.Contains(".", StringComparison.Ordinal) ||
+                segment.Contains("(", StringComparison.Ordinal);
+        }
+
+        private static ImmutableArray<ExceptionEdgeDiagnosticEntry> CreateDerivedDiagnosticEdges(
+            string exceptionType,
+            string category,
+            string sourcePath,
+            ImmutableArray<string> calleeChain)
+        {
+            if (calleeChain.IsDefaultOrEmpty || string.IsNullOrWhiteSpace(sourcePath))
+            {
+                return ImmutableArray<ExceptionEdgeDiagnosticEntry>.Empty;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<ExceptionEdgeDiagnosticEntry>();
+            for (var index = 1; index < calleeChain.Length; index++)
+            {
+                var callee = calleeChain[index];
+                if (string.IsNullOrWhiteSpace(callee))
+                {
+                    continue;
+                }
+
+                builder.Add(new ExceptionEdgeDiagnosticEntry(
+                    exceptionType,
+                    category,
+                    sourcePath,
+                    callee,
+                    index));
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private static ImmutableArray<ExceptionEdgeDiagnosticEntry> MergeDiagnosticEdges(
+            ImmutableArray<ExceptionEdgeDiagnosticEntry> first,
+            ImmutableArray<ExceptionEdgeDiagnosticEntry> second)
+        {
+            if (first.IsDefaultOrEmpty)
+            {
+                return second.IsDefault ? ImmutableArray<ExceptionEdgeDiagnosticEntry>.Empty : second;
+            }
+
+            if (second.IsDefaultOrEmpty)
+            {
+                return first;
+            }
+
+            var merged = new SortedDictionary<string, ExceptionEdgeDiagnosticEntry>(StringComparer.Ordinal);
+            foreach (var edge in first)
+            {
+                merged[edge.CreateKey()] = edge;
+            }
+
+            foreach (var edge in second)
+            {
+                merged[edge.CreateKey()] = edge;
+            }
+
+            return merged.Values.ToImmutableArray();
+        }
+
+        private static bool IsKnownExceptionCategory(string category)
+        {
+            return string.Equals(category, "direct_throw", StringComparison.Ordinal) ||
+                string.Equals(category, "rethrow", StringComparison.Ordinal) ||
+                string.Equals(category, "source_callee", StringComparison.Ordinal) ||
+                string.Equals(category, "effect_summary", StringComparison.Ordinal) ||
+                string.Equals(category, "definite_divide_by_zero", StringComparison.Ordinal) ||
+                string.Equals(category, "definite_null_dereference", StringComparison.Ordinal);
         }
 
         private static ITypeSymbol? TryResolveExceptionType(Compilation compilation, string displayName)
@@ -2227,12 +2412,18 @@ namespace PurelySharp.Analyzer
 
         private sealed class ExceptionCandidate
         {
-            public ExceptionCandidate(ITypeSymbol? type, string displayName, string category, string source)
+            public ExceptionCandidate(
+                ITypeSymbol? type,
+                string displayName,
+                string category,
+                string source,
+                ImmutableArray<ExceptionEdgeDiagnosticEntry> edges = default)
             {
                 Type = type;
                 DisplayName = displayName;
                 Category = category;
                 Source = source;
+                Edges = edges.IsDefault ? ImmutableArray<ExceptionEdgeDiagnosticEntry>.Empty : edges;
             }
 
             public ITypeSymbol? Type { get; }
@@ -2242,6 +2433,8 @@ namespace PurelySharp.Analyzer
             public string Category { get; }
 
             public string Source { get; }
+
+            public ImmutableArray<ExceptionEdgeDiagnosticEntry> Edges { get; }
         }
 
         private sealed class MethodCallCandidate
@@ -2282,11 +2475,16 @@ namespace PurelySharp.Analyzer
 
         private sealed class ExceptionEvidenceEntry
         {
-            public ExceptionEvidenceEntry(string exceptionType, string[] categories, string[] sources)
+            public ExceptionEvidenceEntry(
+                string exceptionType,
+                string[] categories,
+                string[] sources,
+                ExceptionEdgeDiagnosticEntry[] edges)
             {
                 ExceptionType = exceptionType;
                 Categories = categories;
                 Sources = sources;
+                Edges = edges;
             }
 
             public string ExceptionType { get; }
@@ -2294,6 +2492,8 @@ namespace PurelySharp.Analyzer
             public string[] Categories { get; }
 
             public string[] Sources { get; }
+
+            public ExceptionEdgeDiagnosticEntry[] Edges { get; }
         }
 
         private sealed class ExceptionEvidenceSet
@@ -2304,12 +2504,18 @@ namespace PurelySharp.Analyzer
             private readonly Dictionary<string, SortedSet<string>> _sourcesByType =
                 new Dictionary<string, SortedSet<string>>(StringComparer.Ordinal);
 
+            private readonly Dictionary<string, SortedDictionary<string, ExceptionEdgeDiagnosticEntry>> _edgesByType =
+                new Dictionary<string, SortedDictionary<string, ExceptionEdgeDiagnosticEntry>>(StringComparer.Ordinal);
+
             public int Count => _categoriesByType.Count;
 
             public string[] Types => _categoriesByType.Keys.OrderBy(type => type, StringComparer.Ordinal).ToArray();
 
-            public void Add(string exceptionType, string category, string source)
+            public void Add(ExceptionCandidate candidate)
             {
+                var exceptionType = candidate.DisplayName;
+                var category = candidate.Category;
+                var source = candidate.Source;
                 if (!_categoriesByType.TryGetValue(exceptionType, out var categories))
                 {
                     categories = new SortedSet<string>(StringComparer.Ordinal);
@@ -2325,6 +2531,20 @@ namespace PurelySharp.Analyzer
                 }
 
                 sources.Add(category + ":" + source);
+
+                if (!candidate.Edges.IsDefaultOrEmpty)
+                {
+                    if (!_edgesByType.TryGetValue(exceptionType, out var edges))
+                    {
+                        edges = new SortedDictionary<string, ExceptionEdgeDiagnosticEntry>(StringComparer.Ordinal);
+                        _edgesByType.Add(exceptionType, edges);
+                    }
+
+                    foreach (var edge in candidate.Edges)
+                    {
+                        edges[edge.CreateKey()] = edge;
+                    }
+                }
             }
 
             public ExceptionEvidenceEntry[] EnumerateEntries()
@@ -2338,7 +2558,10 @@ namespace PurelySharp.Analyzer
                             : Array.Empty<string>(),
                         _sourcesByType.TryGetValue(type, out var sources)
                             ? sources.ToArray()
-                            : Array.Empty<string>()))
+                            : Array.Empty<string>(),
+                        _edgesByType.TryGetValue(type, out var edges)
+                            ? edges.Values.ToArray()
+                            : Array.Empty<ExceptionEdgeDiagnosticEntry>()))
                     .ToArray();
             }
 
@@ -2359,6 +2582,56 @@ namespace PurelySharp.Analyzer
                     _sourcesByType
                         .OrderBy(item => item.Key, StringComparer.Ordinal)
                         .SelectMany(item => item.Value.Select(source => item.Key + "=" + source)));
+            }
+
+            public string? FormatEdges()
+            {
+                var edges = _edgesByType
+                    .OrderBy(item => item.Key, StringComparer.Ordinal)
+                    .SelectMany(item => item.Value.Values)
+                    .ToArray();
+                if (edges.Length == 0)
+                {
+                    return null;
+                }
+
+                return JsonSerializer.Serialize(edges);
+            }
+        }
+
+        private sealed class ExceptionEdgeDiagnosticEntry
+        {
+            public ExceptionEdgeDiagnosticEntry(
+                string exceptionType,
+                string category,
+                string sourcePath,
+                string? calleeExactSymbolKey,
+                int depth)
+            {
+                ExceptionType = exceptionType;
+                Category = category;
+                SourcePath = sourcePath;
+                CalleeExactSymbolKey = calleeExactSymbolKey;
+                Depth = depth;
+            }
+
+            public string ExceptionType { get; }
+
+            public string Category { get; }
+
+            public string SourcePath { get; }
+
+            public string? CalleeExactSymbolKey { get; }
+
+            public int Depth { get; }
+
+            public string CreateKey()
+            {
+                return ExceptionType + "|" +
+                    Category + "|" +
+                    SourcePath + "|" +
+                    (CalleeExactSymbolKey ?? string.Empty) + "|" +
+                    Depth.ToString(System.Globalization.CultureInfo.InvariantCulture);
             }
         }
 

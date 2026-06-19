@@ -8603,6 +8603,10 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentNullException"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.ArgumentNullException=effect_summary:System.ArgumentNullException.ThrowIfNull"));
+            AssertExceptionEdgesPropertyContainsIfPresent(
+                diagnostic,
+                "System.ArgumentNullException",
+                "System.ArgumentNullException.ThrowIfNull");
         }
 
         [Test]
@@ -8667,6 +8671,10 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.ArgumentNullException=effect_summary:System.ArgumentNullException.ThrowIfNull"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSymbolProperty], Does.Contain("System.ArgumentNullException.ThrowIfNull"));
+            AssertExceptionEdgesPropertyContainsIfPresent(
+                diagnostic,
+                "System.ArgumentNullException",
+                "System.ArgumentNullException.ThrowIfNull");
         }
 
         [Test]
@@ -9023,6 +9031,11 @@ public class TestClass
             Assert.That(sources, Does.Contain("Outer()"));
             Assert.That(sources, Does.Contain("Inner()"));
             Assert.That(sources, Does.Contain("direct_throw:throw"));
+            AssertExceptionEdgesPropertyContainsIfPresent(
+                diagnostic,
+                "System.InvalidOperationException",
+                "Outer",
+                "Inner");
         }
 
         [Test]
@@ -9451,6 +9464,20 @@ public class TestClass
         private static Diagnostic SingleDiagnostic(ImmutableArray<Diagnostic> diagnostics, string diagnosticId)
         {
             return diagnostics.Single(d => d.Id == diagnosticId);
+        }
+
+        private static void AssertExceptionEdgesPropertyContainsIfPresent(Diagnostic diagnostic, params string[] expectedFragments)
+        {
+            if (!diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ExceptionEdgesProperty, out var serializedEdges) ||
+                string.IsNullOrWhiteSpace(serializedEdges))
+            {
+                return;
+            }
+
+            foreach (var expectedFragment in expectedFragments)
+            {
+                Assert.That(serializedEdges, Does.Contain(expectedFragment));
+            }
         }
 
         private static string CreateEffectSummaryJson(

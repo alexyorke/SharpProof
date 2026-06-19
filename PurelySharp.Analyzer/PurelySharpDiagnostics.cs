@@ -63,6 +63,7 @@ namespace PurelySharp.Analyzer
         public const string ExceptionCategoriesProperty = "purelysharp.exceptions.categories";
         public const string ExceptionSourcesProperty = "purelysharp.exceptions.sources";
         public const string ExceptionSymbolProperty = "purelysharp.exceptions.symbol";
+        public const string ExceptionEdgesProperty = "purelysharp.exceptions.edges";
         private static readonly LocalizableString ExceptionSummaryTitle = "Method May Throw Exceptions";
         private static readonly LocalizableString ExceptionSummaryMessageFormat = "Method '{0}' can throw: {1}";
         private static readonly LocalizableString ExceptionSummaryDescription = "Reports exception types that can escape a method. Enable with purelysharp_report_exceptions = true.";
