@@ -3175,6 +3175,36 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStringBuilderConstructorSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                40,
+                "System.Text.StringBuilder..ctor()",
+                "System.Text.StringBuilder..ctor(string)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Text.StringBuilder..ctor()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Text.StringBuilder..ctor()", "internal_only");
+            AssertPurityClassification(summary, "System.Text.StringBuilder..ctor(string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Text.StringBuilder..ctor(string)", "internal_only");
+
+            var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+            Assert.That(symbols, Does.Contain("System.Text.StringBuilder..ctor()"));
+            Assert.That(symbols, Does.Contain("System.Text.StringBuilder..ctor(string)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeDateTimeToFileTimeAndMemberwiseCloneSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

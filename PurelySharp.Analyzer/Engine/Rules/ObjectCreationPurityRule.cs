@@ -174,13 +174,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     return PurityAnalysisResult.Pure;
                 }
 
-                if (trustedMetadataPurity.AllowsKnownPureFallback &&
-                    IsKnownPureStringBuilderConstructor(constructorSymbol))
-                {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a reviewed pure constructor.");
-                    return PurityAnalysisResult.Pure;
-                }
-
                 var constructorPurity = PurityAnalysisEngine.GetCalleePurity(constructorSymbol, context);
 
 
@@ -339,19 +332,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var constructorSymbol = objectCreationOperation.Constructor?.OriginalDefinition;
             return constructorSymbol?.ContainingType?.OriginalDefinition.ToDisplayString() == "System.Collections.ObjectModel.ReadOnlyCollection<T>" &&
                 constructorSymbol.Parameters.Length == 1;
-        }
-
-        private static bool IsKnownPureStringBuilderConstructor(IMethodSymbol? constructorSymbol)
-        {
-            if (constructorSymbol?.MethodKind != MethodKind.Constructor ||
-                constructorSymbol.ContainingType?.ToDisplayString() != "System.Text.StringBuilder")
-            {
-                return false;
-            }
-
-            return constructorSymbol.Parameters.Length == 0 ||
-                (constructorSymbol.Parameters.Length == 1 &&
-                 constructorSymbol.Parameters[0].Type.SpecialType == SpecialType.System_String);
         }
 
     }

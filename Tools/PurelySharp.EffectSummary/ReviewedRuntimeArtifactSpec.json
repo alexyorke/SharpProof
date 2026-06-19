@@ -963,6 +963,8 @@
       "OutputPath": "PurelySharp.Analyzer/StringBuilder.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/StringBuilder.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [
+        "System.Text.StringBuilder..ctor()",
+        "System.Text.StringBuilder..ctor(string)",
         "System.Text.StringBuilder.ToString",
         "System.Text.StringBuilder.get_Length"
       ]
