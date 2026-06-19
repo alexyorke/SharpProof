@@ -1179,6 +1179,65 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_EffectSummary_ConfigKnownImpureConstructor_OverridesGeneratedPureConstructorClassification()
+        {
+            const string boundarySource = """
+public sealed class ConfiguredConstructorBoundary
+{
+    public ConfiguredConstructorBoundary(int value)
+    {
+        Value = value;
+    }
+
+    public int Value { get; }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("ConfiguredConstructorBoundary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+            var methodIdentity = GetMethodIdentity(
+                fixture.AssemblyPath,
+                "ConfiguredConstructorBoundary..ctor(int)");
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public ConfiguredConstructorBoundary TestMethod(int value)
+    {
+        return new ConfiguredConstructorBoundary(value);
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "ConfiguredConstructorBoundary..ctor(int)",
+                            "pure",
+                            """[]""",
+                            methodIdentity.Symbol))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)),
+                ImmutableDictionary<string, string>.Empty.Add(
+                    "purelysharp_known_impure_methods",
+                    string.Join(
+                        ";",
+                        methodIdentity.Symbol,
+                        "ConfiguredConstructorBoundary..ctor",
+                        "ConfiguredConstructorBoundary.ConfiguredConstructorBoundary(int)")));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("config_known_impure"));
+        }
+
+        [Test]
         public async Task Ps0002_EffectSummary_WithTrustedGeneratedImpureConstructorClassification_ReportsImpurity()
         {
             const string boundarySource = """
@@ -1402,6 +1461,62 @@ public class TestClass
                 diagnostics.Any(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
                 Is.False,
                 "Trusted generated getter purity should override the built-in known-impure property fallback for metadata properties.");
+        }
+
+        [Test]
+        public async Task Ps0002_EffectSummary_ConfigKnownImpureInterpolationToString_OverridesGeneratedPureFormattingClassification()
+        {
+            const string boundarySource = """
+public sealed class ConfiguredFormattingBoundary
+{
+    public override string ToString()
+    {
+        return "ok";
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("ConfiguredFormattingBoundary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+            var methodIdentity = GetMethodIdentity(
+                fixture.AssemblyPath,
+                "ConfiguredFormattingBoundary.ToString()");
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(ConfiguredFormattingBoundary value)
+    {
+        return $"{value}";
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "ConfiguredFormattingBoundary.ToString()",
+                            "pure",
+                            """[]"""))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)),
+                ImmutableDictionary<string, string>.Empty.Add(
+                    "purelysharp_known_impure_methods",
+                    string.Join(
+                        ";",
+                        methodIdentity.Symbol,
+                        "ConfiguredFormattingBoundary.ToString",
+                        "ConfiguredFormattingBoundary.ToString()")));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("config_known_impure"));
         }
 
         [Test]
@@ -2195,6 +2310,19 @@ public class TestClass
             (string Path, string Text)[] effectSummaryFiles,
             ImmutableArray<MetadataReference> additionalReferences)
         {
+            return await GetAnalyzerDiagnosticsAsync(
+                source,
+                effectSummaryFiles,
+                additionalReferences,
+                null);
+        }
+
+        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
+            string source,
+            (string Path, string Text)[] effectSummaryFiles,
+            ImmutableArray<MetadataReference> additionalReferences,
+            ImmutableDictionary<string, string>? globalOptions)
+        {
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var compilation = CSharpCompilation.Create(
                 "ExceptionSummaryCatalogValidationTests",
@@ -2202,13 +2330,19 @@ public class TestClass
                 GetTrustedPlatformReferences().AddRange(additionalReferences),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
+            var analyzerGlobalOptions = globalOptions ?? ImmutableDictionary<string, string>.Empty;
+            if (!analyzerGlobalOptions.ContainsKey("purelysharp_report_exceptions"))
+            {
+                analyzerGlobalOptions = analyzerGlobalOptions.Add(
+                    "purelysharp_report_exceptions",
+                    "true");
+            }
+
             var analyzerOptions = new AnalyzerOptions(
                 effectSummaryFiles
                     .Select(file => (AdditionalText)new InMemoryAdditionalText(file.Path, file.Text))
                     .ToImmutableArray(),
-                new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty.Add(
-                    "purelysharp_report_exceptions",
-                    "true")));
+                new TestAnalyzerConfigOptionsProvider(analyzerGlobalOptions));
 
             var compilationWithAnalyzers = compilation.WithAnalyzers(
                 ImmutableArray.Create<DiagnosticAnalyzer>(new PurelySharpAnalyzer()),

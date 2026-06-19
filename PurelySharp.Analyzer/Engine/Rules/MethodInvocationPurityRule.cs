@@ -359,13 +359,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: "attribute"));
             }
 
-            GeneratedPurityCatalog.PurityEntry generatedPurity = default;
-            var hasTrustedGeneratedPurity = originalDefinitionSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
-                    originalDefinitionSymbol,
-                    context.SemanticModel.Compilation,
-                    out generatedPurity);
-            var allowsKnownPureFallback = !hasTrustedGeneratedPurity;
+            var trustedMetadataPurity = PurityAnalysisEngine.GetTrustedMethodPurityMetadata(
+                originalDefinitionSymbol,
+                context.SemanticModel.Compilation);
+            var hasTrustedGeneratedPurity = trustedMetadataPurity.HasTrustedGeneratedPurity;
+            var generatedPurity = trustedMetadataPurity.GeneratedPurity;
+            var allowsKnownPureFallback = trustedMetadataPurity.AllowsKnownPureFallback;
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Checking purity of {invocationOperation.Arguments.Length} arguments for {originalDefinitionSymbol.Name}.");
             foreach (var argument in invocationOperation.Arguments)
@@ -517,11 +516,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            var knownImpureMemberSource = PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinitionSymbol);
-            var hasConfiguredKnownImpureMember = string.Equals(
-                knownImpureMemberSource,
-                "config_known_impure",
-                StringComparison.Ordinal);
+            var knownImpureMemberSource = trustedMetadataPurity.KnownImpureMemberSource;
+            var hasConfiguredKnownImpureMember = trustedMetadataPurity.HasConfiguredKnownImpureMember;
 
             bool isExplicitlyPure = PurityAnalysisEngine.IsPureEnforced(
                 invokedMethodSymbol,

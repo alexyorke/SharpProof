@@ -180,12 +180,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            GeneratedPurityCatalog.PurityEntry generatedPurity = default;
-            var hasTrustedGeneratedPurity = originalDefinition.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
-                    originalDefinition,
-                    context.SemanticModel.Compilation,
-                    out generatedPurity);
+            var trustedMetadataPurity = PurityAnalysisEngine.GetTrustedMethodPurityMetadata(
+                originalDefinition,
+                context.SemanticModel.Compilation);
+            var hasTrustedGeneratedPurity = trustedMetadataPurity.HasTrustedGeneratedPurity;
+            var generatedPurity = trustedMetadataPurity.GeneratedPurity;
+
+            if (trustedMetadataPurity.HasConfiguredKnownImpureMember)
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    interpolation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        "catalog_hit",
+                        nameof(InterpolatedStringPurityRule),
+                        interpolation,
+                        syntaxNode: interpolation.Syntax,
+                        symbol: originalDefinition,
+                        catalogSource: trustedMetadataPurity.KnownImpureMemberSource));
+            }
 
             if (hasTrustedGeneratedPurity)
             {
@@ -221,7 +233,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinition) ?? "known_impure"));
             }
 
-            if (!hasTrustedGeneratedPurity && PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinition))
+            if (trustedMetadataPurity.AllowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinition))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }

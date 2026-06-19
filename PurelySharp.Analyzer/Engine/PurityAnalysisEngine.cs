@@ -952,16 +952,11 @@ namespace PurelySharp.Analyzer.Engine
                     return configuredImpureResult;
                 }
 
-                var knownImpureMemberSource = GetKnownImpureMemberSource(methodSymbol);
-                var hasConfiguredKnownImpureMember = string.Equals(
-                    knownImpureMemberSource,
-                    "config_known_impure",
-                    StringComparison.Ordinal);
-
-                GeneratedPurityCatalog.PurityEntry generatedPurity = default;
-                var hasTrustedGeneratedPurity = methodSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                    !hasConfiguredKnownImpureMember &&
-                    TryGetTrustedGeneratedPurity(methodSymbol, semanticModel.Compilation, out generatedPurity);
+                var trustedMetadataPurity = GetTrustedMethodPurityMetadata(methodSymbol, semanticModel.Compilation);
+                var knownImpureMemberSource = trustedMetadataPurity.KnownImpureMemberSource;
+                var hasConfiguredKnownImpureMember = trustedMetadataPurity.HasConfiguredKnownImpureMember;
+                var hasTrustedGeneratedPurity = trustedMetadataPurity.HasTrustedGeneratedPurity;
+                var generatedPurity = trustedMetadataPurity.GeneratedPurity;
 
                 if (hasConfiguredKnownImpureMember)
                 {
@@ -3061,6 +3056,53 @@ namespace PurelySharp.Analyzer.Engine
             out GeneratedPurityCatalog.PurityEntry purity)
         {
             return GeneratedPurityCatalog.Current.TryGetPurity(methodSymbol, compilation, out purity);
+        }
+
+        internal readonly struct TrustedMethodPurityMetadata
+        {
+            public TrustedMethodPurityMetadata(
+                string? knownImpureMemberSource,
+                bool hasTrustedGeneratedPurity,
+                GeneratedPurityCatalog.PurityEntry generatedPurity)
+            {
+                KnownImpureMemberSource = knownImpureMemberSource;
+                HasTrustedGeneratedPurity = hasTrustedGeneratedPurity;
+                GeneratedPurity = generatedPurity;
+            }
+
+            public string? KnownImpureMemberSource { get; }
+            public bool HasConfiguredKnownImpureMember =>
+                string.Equals(KnownImpureMemberSource, "config_known_impure", StringComparison.Ordinal);
+            public bool HasTrustedGeneratedPurity { get; }
+            public GeneratedPurityCatalog.PurityEntry GeneratedPurity { get; }
+            public bool AllowsKnownPureFallback => !HasTrustedGeneratedPurity;
+        }
+
+        internal static TrustedMethodPurityMetadata GetTrustedMethodPurityMetadata(
+            IMethodSymbol methodSymbol,
+            Compilation compilation)
+        {
+            if (methodSymbol == null)
+            {
+                return default;
+            }
+
+            var originalDefinition = methodSymbol.OriginalDefinition;
+            var knownImpureMemberSource = GetKnownImpureMemberSource(originalDefinition);
+            var hasConfiguredKnownImpureMember = string.Equals(
+                knownImpureMemberSource,
+                "config_known_impure",
+                StringComparison.Ordinal);
+
+            GeneratedPurityCatalog.PurityEntry generatedPurity = default;
+            var hasTrustedGeneratedPurity = originalDefinition.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                !hasConfiguredKnownImpureMember &&
+                TryGetTrustedGeneratedPurity(originalDefinition, compilation, out generatedPurity);
+
+            return new TrustedMethodPurityMetadata(
+                knownImpureMemberSource,
+                hasTrustedGeneratedPurity,
+                generatedPurity);
         }
 
         internal static bool TryGetTrustedGeneratedFieldPurity(
