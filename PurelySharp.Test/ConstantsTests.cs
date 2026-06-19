@@ -635,6 +635,129 @@ public static class InterfaceCollectionLookupCatalogSignatureSamples
         }
 
         [Test]
+        public void InterfaceEnumeratorContracts_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Collections.Generic;
+
+public static class InterfaceEnumeratorCatalogSignatureSamples
+{
+    public static IEnumerator<int> Enumerate(IEnumerable<int> values)
+    {
+        return values.GetEnumerator();
+    }
+
+    public static int Current(IEnumerator<int> enumerator)
+    {
+        return enumerator.Current;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "InterfaceEnumeratorCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var getEnumeratorSignature = GetInvocationSignature(compilation, syntaxTree, "values.GetEnumerator()");
+            var currentSignature = GetPropertySignature(compilation, syntaxTree, "enumerator.Current");
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var getEnumeratorMethod = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "values.GetEnumerator()"))
+                .Symbol!;
+            var currentGetter = ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<MemberAccessExpressionSyntax>()
+                    .Single(node => node.ToString() == "enumerator.Current"))
+                .Symbol!).GetMethod!;
+
+            AssertNotInManualCatalogs(getEnumeratorSignature);
+            AssertNotInManualCatalogs(currentSignature);
+
+            var (enumeratorMatched, enumeratorClassification) = GetGeneratedPurityClassification(getEnumeratorMethod, compilation);
+            Assert.That(enumeratorMatched, Is.True, getEnumeratorSignature);
+            Assert.That(enumeratorClassification, Is.EqualTo("conservative_unknown"), getEnumeratorSignature);
+
+            var (currentMatched, currentClassification) = GetGeneratedPurityClassification(currentGetter, compilation);
+            Assert.That(currentMatched, Is.True, currentSignature);
+            Assert.That(currentClassification, Is.EqualTo("conservative_unknown"), currentSignature);
+        }
+
+        [Test]
+        public void HashtableCompareInfoAndSortedListHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Collections;
+using System.Globalization;
+
+public static class HashtableCompareInfoAndSortedListCatalogSignatureSamples
+{
+    public static bool ContainsKey(Hashtable values, object key)
+    {
+        return values.ContainsKey(key);
+    }
+
+    public static int Compare(CompareInfo compareInfo, string left, string right)
+    {
+        return compareInfo.Compare(left, right);
+    }
+
+    public static object GetKey(SortedList values, int index)
+    {
+        return values.GetKey(index);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "HashtableCompareInfoAndSortedListCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = new (string Signature, IMethodSymbol Symbol, string ExpectedClassification)[]
+            {
+                (
+                    GetInvocationSignature(compilation, syntaxTree, "values.ContainsKey(key)"),
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "values.ContainsKey(key)"))
+                        .Symbol!,
+                    "impure"),
+                (
+                    GetInvocationSignature(compilation, syntaxTree, "compareInfo.Compare(left, right)"),
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "compareInfo.Compare(left, right)"))
+                        .Symbol!,
+                    "pure"),
+                (
+                    GetInvocationSignature(compilation, syntaxTree, "values.GetKey(index)"),
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "values.GetKey(index)"))
+                        .Symbol!,
+                    "impure"),
+            };
+
+            foreach (var trackedMethod in trackedMethods)
+            {
+                AssertNotInManualCatalogs(trackedMethod.Signature);
+                var (matched, classification) = GetGeneratedPurityClassification(trackedMethod.Symbol, compilation);
+                Assert.That(matched, Is.True, trackedMethod.Signature);
+                Assert.That(classification, Is.EqualTo(trackedMethod.ExpectedClassification), trackedMethod.Signature);
+            }
+        }
+
+        [Test]
         public void SortedDictionaryCount_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"

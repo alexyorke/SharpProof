@@ -4099,6 +4099,186 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_InterfaceEnumeratorContracts()
+        {
+            const string source = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(IEnumerable<int> values, IEnumerator<int> enumerator)
+    {
+        _ = values.GetEnumerator();
+        return enumerator.Current;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
+            {
+                (
+                    "System.Collections.Generic.IEnumerable<T>.GetEnumerator()",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "values.GetEnumerator()"))
+                        .Symbol!),
+                (
+                    "System.Collections.Generic.IEnumerator<T>.Current.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "enumerator.Current"))
+                        .Symbol!).GetMethod!),
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = trackedMembers.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.True,
+                "Unknown IEnumerable<T>/IEnumerator<T> contract dispatch should become conservative once the static pure fallback is removed.");
+            Assert.That(classifications["System.Collections.Generic.IEnumerable<T>.GetEnumerator()"].matched, Is.True,
+                "Generated purity catalog should resolve IEnumerable<T>.GetEnumerator.");
+            Assert.That(classifications["System.Collections.Generic.IEnumerable<T>.GetEnumerator()"].classification, Is.EqualTo("conservative_unknown"),
+                "Generated purity catalog should classify IEnumerable<T>.GetEnumerator as conservative_unknown.");
+            Assert.That(classifications["System.Collections.Generic.IEnumerator<T>.Current.get"].matched, Is.True,
+                "Generated purity catalog should resolve IEnumerator<T>.Current.get.");
+            Assert.That(classifications["System.Collections.Generic.IEnumerator<T>.Current.get"].classification, Is.EqualTo("conservative_unknown"),
+                "Generated purity catalog should classify IEnumerator<T>.Current.get as conservative_unknown.");
+        }
+
+        [Test]
+        public async Task GeneratedPurityCatalog_Resolves_HashtableCompareInfoAndSortedListHelpersAsMixedEvidence()
+        {
+            const string source = @"
+using System.Collections;
+using System.Globalization;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool ContainsKey(Hashtable values, object key)
+    {
+        return values.ContainsKey(key);
+    }
+
+    [EnforcePure]
+    public int Compare(CompareInfo compareInfo, string left, string right)
+    {
+        return compareInfo.Compare(left, right);
+    }
+
+    [EnforcePure]
+    public object GetKey(SortedList values, int index)
+    {
+        return values.GetKey(index);
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics
+                .Where(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = new (string Label, IMethodSymbol Symbol)[]
+            {
+                (
+                    "System.Collections.Hashtable.ContainsKey(object)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "values.ContainsKey(key)"))
+                        .Symbol!),
+                (
+                    "System.Globalization.CompareInfo.Compare(string, string)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "compareInfo.Compare(left, right)"))
+                        .Symbol!),
+                (
+                    "System.Collections.SortedList.GetKey(int)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "values.GetKey(index)"))
+                        .Symbol!),
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = trackedMethods.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(2));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "unknown_external_call" }),
+                "Open virtual dispatch on overridable Hashtable/SortedList members should remain conservative even though the base methods have reviewed generated summaries.");
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty]).OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray(),
+                Is.EqualTo(new[]
+                {
+                    "virtual System.Collections.Hashtable.ContainsKey(object)",
+                    "virtual System.Collections.SortedList.GetKey(int)",
+                }));
+            Assert.That(
+                purityDiagnostics.All(diagnostic => !diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.ImpurityCatalogSourceProperty)),
+                Is.True,
+                "These diagnostics should come from conservative open virtual dispatch, not from directly trusting the base-method runtime summary at the call site.");
+
+            Assert.That(classifications["System.Collections.Hashtable.ContainsKey(object)"].matched, Is.True);
+            Assert.That(classifications["System.Collections.Hashtable.ContainsKey(object)"].classification, Is.EqualTo("impure"));
+            Assert.That(classifications["System.Globalization.CompareInfo.Compare(string, string)"].matched, Is.True);
+            Assert.That(classifications["System.Globalization.CompareInfo.Compare(string, string)"].classification, Is.EqualTo("pure"));
+            Assert.That(classifications["System.Collections.SortedList.GetKey(int)"].matched, Is.True);
+            Assert.That(classifications["System.Collections.SortedList.GetKey(int)"].classification, Is.EqualTo("impure"));
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_KeyedCollectionContains()
         {
             const string source = @"

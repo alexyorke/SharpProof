@@ -430,6 +430,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Interface.EnumeratorContracts.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Interface.EnumeratorContracts.PurelySharp.EffectSummary.json",
+      "Limit": 12,
+      "SymbolPrefixes": [
+        "System.Collections.Generic.IEnumerable`1.GetEnumerator()",
+        "System.Collections.Generic.IEnumerator`1.get_Current()"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/KeyedCollection.Contains.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/KeyedCollection.Contains.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.ObjectModel.dll",
@@ -478,6 +487,24 @@
         "System.Char.IsWhiteSpace(char)",
         "System.Char.ToLowerInvariant(char)",
         "System.Char.ToUpperInvariant(char)"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Hashtable.CompareInfo.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Hashtable.CompareInfo.PurelySharp.EffectSummary.json",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Collections.Hashtable.ContainsKey(object)",
+        "System.Globalization.CompareInfo.Compare(string, string)"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/SortedList.GetKey.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/SortedList.GetKey.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Collections.NonGeneric.dll",
+      "Limit": 12,
+      "SymbolPrefixes": [
+        "System.Collections.SortedList.GetKey(int)"
       ]
     },
     {

@@ -1485,6 +1485,142 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeInterfaceEnumeratorContractSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                12,
+                "System.Collections.Generic.IEnumerable`1.GetEnumerator()",
+                "System.Collections.Generic.IEnumerator`1.get_Current()");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(
+                summary,
+                "System.Collections.Generic.IEnumerable`1.GetEnumerator()",
+                "conservative_unknown",
+                "abstract",
+                "metadata_only_or_external",
+                "no_il_body");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Collections.Generic.IEnumerable`1.GetEnumerator()",
+                "unknown");
+            AssertPurityClassification(
+                summary,
+                "System.Collections.Generic.IEnumerator`1.get_Current()",
+                "conservative_unknown",
+                "abstract",
+                "metadata_only_or_external",
+                "no_il_body");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Collections.Generic.IEnumerator`1.get_Current()",
+                "unknown");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.IEnumerable`1.GetEnumerator()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.IEnumerator`1.get_Current()"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeHashtableAndCompareInfoSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.Collections.Hashtable.ContainsKey(object)",
+                "System.Globalization.CompareInfo.Compare(string, string)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(
+                summary,
+                "System.Collections.Hashtable.ContainsKey(object)",
+                "impure",
+                "impure_callee");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Collections.Hashtable.ContainsKey(object)",
+                "caller_visible");
+            AssertPurityClassification(
+                summary,
+                "System.Globalization.CompareInfo.Compare(string, string)",
+                "pure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Globalization.CompareInfo.Compare(string, string)",
+                "none");
+            AssertPurityClassification(
+                summary,
+                "System.Globalization.CompareInfo.Compare(string, string, System.Globalization.CompareOptions)",
+                "pure");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Globalization.CompareInfo.Compare(string, string, System.Globalization.CompareOptions)",
+                "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Hashtable.ContainsKey(object)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Globalization.CompareInfo.Compare(string, string)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Globalization.CompareInfo.Compare(string, string, System.Globalization.CompareOptions)"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeSortedListGetKeySlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Collections.NonGeneric.dll",
+                12,
+                "System.Collections.SortedList.GetKey(int)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(
+                summary,
+                "System.Collections.SortedList.GetKey(int)",
+                "impure",
+                "throw");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Collections.SortedList.GetKey(int)",
+                "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.SortedList.GetKey(int)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeKeyedCollectionContainsSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
