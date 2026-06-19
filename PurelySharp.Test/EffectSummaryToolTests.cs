@@ -7262,6 +7262,44 @@ public static class CallvirtFixture
             AssertEffectVisibilityClassification(summary, "CallvirtFixture.Read(Counter)", "none");
         }
 
+        [Test]
+        public async Task EffectSummaryTool_TreatsSameAssemblyDerivedReadonlyStaticFieldReadAsPure()
+        {
+            using var summary = await CreateSameAssemblyDerivedStaticFieldSummaryAsync();
+            AssertPurityClassification(summary, "StableDerived.ReadStable()", "pure");
+            AssertEffectVisibilityClassification(summary, "StableDerived.ReadStable()", "internal_only");
+            AssertFreshnessClassification(summary, "StableDerived.ReadStable()", "none");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_TreatsSameAssemblyDerivedMutableStaticFieldReadAsImpure()
+        {
+            using var summary = await CreateSameAssemblyDerivedStaticFieldSummaryAsync();
+
+            AssertPurityClassification(summary, "MutableDerived.ReadMutable()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "MutableDerived.ReadMutable()", "caller_visible");
+            AssertFreshnessClassification(summary, "MutableDerived.ReadMutable()", "none");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_TreatsSameAssemblyReadonlyStaticCacheReadAsPure()
+        {
+            using var summary = await CreateSameAssemblyDerivedStaticFieldSummaryAsync();
+
+            AssertPurityClassification(summary, "StableCacheDerived.ReadStableToken()", "pure");
+            AssertEffectVisibilityClassification(summary, "StableCacheDerived.ReadStableToken()", "internal_only");
+            AssertFreshnessClassification(summary, "StableCacheDerived.ReadStableToken()", "none");
+
+            var roots = FindMethod(summary, "StableCacheDerived.ReadStableToken()")
+                .GetProperty("RootCandidates")
+                .EnumerateArray()
+                .Select(value => value.GetString())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
+
+            Assert.That(roots, Does.Contain("safe_static_cache_read"));
+        }
+
         private static void AssertThrownExceptions(JsonDocument summary, string methodSymbol, params string[] expectedExceptions)
         {
             var method = FindMethod(summary, methodSymbol);
@@ -7272,6 +7310,53 @@ public static class CallvirtFixture
                 .ToArray();
 
             Assert.That(thrownExceptions, Is.EqualTo(expectedExceptions));
+        }
+
+        private static async Task<JsonDocument> CreateSameAssemblyDerivedStaticFieldSummaryAsync()
+        {
+            var source = """
+public abstract class StaticFieldBase
+{
+    protected static readonly int Stable = 42;
+    protected static int Mutable = 7;
+    protected static readonly Token StableToken = new();
+}
+
+public sealed class Token
+{
+}
+
+public sealed class StableDerived : StaticFieldBase
+{
+    public static int ReadStable()
+    {
+        return Stable;
+    }
+}
+
+public sealed class MutableDerived : StaticFieldBase
+{
+    public static int ReadMutable()
+    {
+        return Mutable;
+    }
+}
+
+public sealed class StableCacheDerived : StaticFieldBase
+{
+    public static Token ReadStableToken()
+    {
+        return StableToken;
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryDerivedStaticFields", source);
+            return await RunEffectSummaryAsync(
+                fixture.AssemblyPath,
+                includeTransitiveRoots: true,
+                classifyPurity: true,
+                compareManualCatalogs: false);
         }
 
         private static void AssertTransitiveExceptions(JsonDocument summary, string methodSymbol, params string[] expectedExceptions)

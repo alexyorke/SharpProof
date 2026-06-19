@@ -1015,9 +1015,22 @@ internal static class AssemblyEffectSummarizer
         var moduleVersionId = reader.GetGuid(module.Mvid).ToString("D");
 
         var methodDefinitionHandlesByExactKey = new Dictionary<string, MethodDefinitionHandle>(StringComparer.Ordinal);
+        var fieldDefinitionHandlesBySymbol = new Dictionary<string, FieldDefinitionHandle>(StringComparer.Ordinal);
+        var fieldDefinitionHandlesByExactKey = new Dictionary<string, FieldDefinitionHandle>(StringComparer.Ordinal);
         var knownMethodReturnValues = new Dictionary<int, TrackedStackValue>();
         var knownMethodReturnValueVisiting = new HashSet<int>();
         var allSummaries = new List<MethodEffectSummary>();
+        foreach (var handle in reader.FieldDefinitions)
+        {
+            fieldDefinitionHandlesBySymbol[GetFieldDefinitionSymbol(reader, handle)] = handle;
+            fieldDefinitionHandlesByExactKey[GetFieldExactKey(reader, handle)] = handle;
+        }
+
+        var staticFieldFacts = BuildStaticFieldFacts(
+            peReader,
+            reader,
+            fieldDefinitionHandlesBySymbol,
+            fieldDefinitionHandlesByExactKey);
         foreach (var handle in reader.MethodDefinitions)
         {
             methodDefinitionHandlesByExactKey[GetMethodExactKey(reader, handle)] = handle;
@@ -1027,6 +1040,9 @@ internal static class AssemblyEffectSummarizer
                 handle,
                 moduleVersionId,
                 methodDefinitionHandlesByExactKey,
+                fieldDefinitionHandlesBySymbol,
+                fieldDefinitionHandlesByExactKey,
+                staticFieldFacts,
                 knownMethodReturnValues,
                 knownMethodReturnValueVisiting));
         }
@@ -1184,6 +1200,9 @@ internal static class AssemblyEffectSummarizer
         MethodDefinitionHandle handle,
         string moduleVersionId,
         IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
+        IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts,
         Dictionary<int, TrackedStackValue> knownMethodReturnValues,
         HashSet<int> knownMethodReturnValueVisiting)
     {
@@ -1192,6 +1211,7 @@ internal static class AssemblyEffectSummarizer
         var calls = new SortedSet<string>(StringComparer.Ordinal);
         var fields = new SortedSet<string>(StringComparer.Ordinal);
         var staticFields = new SortedSet<string>(StringComparer.Ordinal);
+        var sameAssemblyStaticReadFieldTokens = new SortedSet<int>();
         var thrownExceptionTypes = new SortedSet<string>(StringComparer.Ordinal);
         var callSites = new List<CallSiteSummary>();
         string? methodBodySha256 = null;
@@ -1233,8 +1253,11 @@ internal static class AssemblyEffectSummarizer
                     callSites,
                     fields,
                     staticFields,
+                    sameAssemblyStaticReadFieldTokens,
                     thrownExceptionTypes,
                     methodDefinitionHandlesByExactKey,
+                    fieldDefinitionHandlesBySymbol,
+                    fieldDefinitionHandlesByExactKey,
                     knownMethodReturnValues,
                     knownMethodReturnValueVisiting);
             }
@@ -1255,7 +1278,14 @@ internal static class AssemblyEffectSummarizer
             MethodBodySha256: methodBodySha256,
             CacheKey: cacheKey,
             Effects: effects.ToArray(),
-            RootCandidates: GetRootCandidates(effects, calls, staticFields, isConstructor).ToArray(),
+            RootCandidates: GetRootCandidates(
+                    effects,
+                    calls,
+                    staticFields,
+                    sameAssemblyStaticReadFieldTokens,
+                    staticFieldFacts,
+                    isConstructor)
+                .ToArray(),
             TransitiveRootCandidates: Array.Empty<string>(),
             ThrownExceptionTypes: thrownExceptionTypes.ToArray(),
             TransitiveThrownExceptionTypes: Array.Empty<string>(),
@@ -1459,13 +1489,15 @@ internal static class AssemblyEffectSummarizer
     private static IEnumerable<string> GetRootCandidates(
         IEnumerable<string> effects,
         IEnumerable<string> calls,
-        IEnumerable<string> staticFields,
+        IEnumerable<string> staticReadFields,
+        IReadOnlySet<int> sameAssemblyStaticReadFieldTokens,
+        IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts,
         bool isConstructor)
     {
         var roots = new SortedSet<string>(StringComparer.Ordinal);
         var effectSet = new HashSet<string>(effects, StringComparer.Ordinal);
         var callSet = new HashSet<string>(calls, StringComparer.Ordinal);
-        var staticFieldSet = new HashSet<string>(staticFields, StringComparer.Ordinal);
+        var staticReadFieldSet = new HashSet<string>(staticReadFields, StringComparer.Ordinal);
         foreach (var effect in effects)
         {
             switch (effect)
@@ -1480,13 +1512,13 @@ internal static class AssemblyEffectSummarizer
                     roots.Add("metadata_only_or_external");
                     break;
                 case "reads_static_field":
-                    if (IsSafeStaticCacheRead(staticFieldSet, callSet))
-                    {
-                        roots.Add("safe_static_cache_read");
-                    }
-                    else if (IsSafeStaticConstantRead(staticFieldSet))
+                    if (IsSafeStaticConstantRead(staticReadFieldSet, sameAssemblyStaticReadFieldTokens, staticFieldFacts))
                     {
                         roots.Add("safe_static_constant_read");
+                    }
+                    else if (IsSafeStaticCacheRead(staticReadFieldSet, callSet, sameAssemblyStaticReadFieldTokens, staticFieldFacts))
+                    {
+                        roots.Add("safe_static_cache_read");
                     }
                     else
                     {
@@ -1522,21 +1554,42 @@ internal static class AssemblyEffectSummarizer
         return roots;
     }
 
-    private static bool IsSafeStaticCacheRead(IReadOnlySet<string> fields, IReadOnlySet<string> calls)
+    private static bool IsSafeStaticCacheRead(
+        IReadOnlySet<string> fields,
+        IReadOnlySet<string> calls,
+        IReadOnlySet<int> sameAssemblyStaticReadFieldTokens,
+        IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts)
     {
         if (fields.Count == 0)
         {
             return false;
         }
 
-        if (fields.All(static field =>
+        if (!HasOnlySameAssemblyFieldFacts(
+                fields,
+                sameAssemblyStaticReadFieldTokens,
+                staticFieldFacts,
+                static kind => kind is StaticFieldFactKind.Constant or StaticFieldFactKind.StableIdentity,
+                IsKnownExternalSafeStaticCacheField))
+        {
+            return false;
+        }
+
+        return calls.Count == 0 ||
+            calls.Count == 1 && calls.Any(static call =>
+                call.StartsWith("System.ReadOnlySpan`1<byte>..ctor(void*, int)", StringComparison.Ordinal));
+    }
+
+    private static bool IsKnownExternalSafeStaticCacheField(string field)
+    {
+        if (
             field.StartsWith("System.Array+EmptyArray`1", StringComparison.Ordinal) &&
-            field.EndsWith(".Value", StringComparison.Ordinal)))
+            field.EndsWith(".Value", StringComparison.Ordinal))
         {
             return true;
         }
 
-        if (fields.All(static field =>
+        if (
             string.Equals(field, "System.StringComparer._ordinal", StringComparison.Ordinal) ||
             string.Equals(field, "System.StringComparer._ordinalIgnoreCase", StringComparison.Ordinal) ||
             string.Equals(field, "System.StringComparer._invariantCulture", StringComparison.Ordinal) ||
@@ -1556,28 +1609,75 @@ internal static class AssemblyEffectSummarizer
             string.Equals(field, "System.Net.IPAddress.Loopback", StringComparison.Ordinal) ||
             string.Equals(field, "System.Net.IPAddress.s_loopbackMappedToIPv6", StringComparison.Ordinal) ||
             field.StartsWith("System.Linq.EmptyPartition`1", StringComparison.Ordinal) &&
-            field.EndsWith(".Instance", StringComparison.Ordinal)))
+            field.EndsWith(".Instance", StringComparison.Ordinal))
         {
             return true;
         }
 
-        if (fields.All(static field =>
+        if (
             (field.StartsWith("System.Collections.Generic.Comparer`1", StringComparison.Ordinal) ||
              field.StartsWith("System.Collections.Generic.EqualityComparer`1", StringComparison.Ordinal)) &&
-            field.EndsWith(".<Default>k__BackingField", StringComparison.Ordinal)))
+            field.EndsWith(".<Default>k__BackingField", StringComparison.Ordinal))
         {
             return true;
         }
 
-        return calls.Count == 1 && calls.Any(static call =>
-            call.StartsWith("System.ReadOnlySpan`1<byte>..ctor(void*, int)", StringComparison.Ordinal));
+        return false;
     }
 
-    private static bool IsSafeStaticConstantRead(IReadOnlySet<string> fields)
+    private static bool IsSafeStaticConstantRead(
+        IReadOnlySet<string> fields,
+        IReadOnlySet<int> sameAssemblyStaticReadFieldTokens,
+        IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts)
     {
-        return fields.Count > 0 && fields.All(static field =>
-            string.Equals(field, "IsLittleEndian", StringComparison.Ordinal) ||
-            string.Equals(field, "System.BitConverter.IsLittleEndian", StringComparison.Ordinal));
+        return fields.Count > 0 &&
+            HasOnlySameAssemblyFieldFacts(
+                fields,
+                sameAssemblyStaticReadFieldTokens,
+                staticFieldFacts,
+                static kind => kind == StaticFieldFactKind.Constant,
+                static field =>
+                    string.Equals(field, "IsLittleEndian", StringComparison.Ordinal) ||
+                    string.Equals(field, "System.BitConverter.IsLittleEndian", StringComparison.Ordinal));
+    }
+
+    private static bool HasOnlySameAssemblyFieldFacts(
+        IReadOnlySet<string> fields,
+        IReadOnlySet<int> sameAssemblyStaticReadFieldTokens,
+        IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts,
+        Func<StaticFieldFactKind, bool> sameAssemblyFieldPredicate,
+        Func<string, bool> externalFieldPredicate)
+    {
+        if (fields.Count == 0)
+        {
+            return false;
+        }
+
+        var sameAssemblyFieldSymbols = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var fieldToken in sameAssemblyStaticReadFieldTokens)
+        {
+            if (!staticFieldFacts.TryGetValue(fieldToken, out var fact) || !sameAssemblyFieldPredicate(fact.Kind))
+            {
+                return false;
+            }
+
+            sameAssemblyFieldSymbols.Add(fact.Symbol);
+        }
+
+        foreach (var field in fields)
+        {
+            if (sameAssemblyFieldSymbols.Contains(field))
+            {
+                continue;
+            }
+
+            if (!externalFieldPredicate(field))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool IsFreshOwnedMemoryWrite(
@@ -1661,9 +1761,12 @@ internal static class AssemblyEffectSummarizer
         SortedSet<string> calls,
         List<CallSiteSummary> callSites,
         SortedSet<string> fields,
-        SortedSet<string> staticFields,
+        SortedSet<string> staticReadFields,
+        SortedSet<int> sameAssemblyStaticReadFieldTokens,
         SortedSet<string> thrownExceptionTypes,
         IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
         Dictionary<int, TrackedStackValue> knownMethodReturnValues,
         HashSet<int> knownMethodReturnValueVisiting)
     {
@@ -1776,7 +1879,13 @@ internal static class AssemblyEffectSummarizer
             {
                 effects.Add("reads_static_field");
                 AddField(reader, operandToken, fields);
-                AddField(reader, operandToken, staticFields);
+                AddField(reader, operandToken, staticReadFields);
+                AddSameAssemblyStaticFieldToken(
+                    reader,
+                    operandToken,
+                    fieldDefinitionHandlesBySymbol,
+                    fieldDefinitionHandlesByExactKey,
+                    sameAssemblyStaticReadFieldTokens);
             }
             else if (opCode == OpCodes.Stfld)
             {
@@ -1787,7 +1896,6 @@ internal static class AssemblyEffectSummarizer
             {
                 effects.Add("writes_static_field");
                 AddField(reader, operandToken, fields);
-                AddField(reader, operandToken, staticFields);
             }
             else if (opCode == OpCodes.Throw || opCode == OpCodes.Rethrow)
             {
@@ -2594,6 +2702,37 @@ internal static class AssemblyEffectSummarizer
         return true;
     }
 
+    private static bool IsKnownStableIdentityInitializerCall(string calledSymbol)
+    {
+        return calledSymbol.StartsWith("System.Array.Empty<", StringComparison.Ordinal);
+    }
+
+    private static StaticFieldInitializerValue[] PopStaticFieldInitializerValues(
+        List<StaticFieldInitializerValue> trackedStack,
+        int count)
+    {
+        var values = new StaticFieldInitializerValue[count];
+        for (var index = count - 1; index >= 0; index--)
+        {
+            values[index] = PopStaticFieldInitializerValue(trackedStack);
+        }
+
+        return values;
+    }
+
+    private static StaticFieldInitializerValue PopStaticFieldInitializerValue(List<StaticFieldInitializerValue> trackedStack)
+    {
+        if (trackedStack.Count == 0)
+        {
+            return StaticFieldInitializerValue.Unknown;
+        }
+
+        var lastIndex = trackedStack.Count - 1;
+        var value = trackedStack[lastIndex];
+        trackedStack.RemoveAt(lastIndex);
+        return value;
+    }
+
     private static bool TryGetBranchTargetOffset(
         OpCode opCode,
         byte[] il,
@@ -3092,11 +3231,441 @@ internal static class AssemblyEffectSummarizer
             opCode == OpCodes.Stelem_Ref;
     }
 
+    private static Dictionary<int, StaticFieldFact> BuildStaticFieldFacts(
+        PEReader peReader,
+        MetadataReader reader,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey)
+    {
+        var usageByFieldToken = ScanStaticFieldUsage(
+            peReader,
+            reader,
+            fieldDefinitionHandlesBySymbol,
+            fieldDefinitionHandlesByExactKey);
+        var initializerAssignmentsByFieldToken = AnalyzeStaticFieldInitializerAssignments(
+            peReader,
+            reader,
+            fieldDefinitionHandlesBySymbol,
+            fieldDefinitionHandlesByExactKey);
+        var facts = new Dictionary<int, StaticFieldFact>();
+        foreach (var handle in reader.FieldDefinitions)
+        {
+            var definition = reader.GetFieldDefinition(handle);
+            if ((definition.Attributes & FieldAttributes.Static) == 0)
+            {
+                continue;
+            }
+
+            var fieldToken = MetadataTokens.GetToken(handle);
+            var factKind = StaticFieldFactKind.Unknown;
+            if ((definition.Attributes & FieldAttributes.Literal) != 0 ||
+                (definition.Attributes & FieldAttributes.HasFieldRVA) != 0)
+            {
+                factKind = StaticFieldFactKind.Constant;
+            }
+            else if ((definition.Attributes & FieldAttributes.InitOnly) != 0 &&
+                usageByFieldToken.TryGetValue(fieldToken, out var usage) &&
+                !usage.HasAddressExposure &&
+                !usage.HasWritesOutsideTypeInitializer &&
+                usage.TotalWriteCount == 1 &&
+                usage.OwningTypeInitializerWriteCount == 1 &&
+                initializerAssignmentsByFieldToken.TryGetValue(fieldToken, out var assignment))
+            {
+                factKind = assignment.Kind switch
+                {
+                    StaticFieldInitializerValueKind.Constant => StaticFieldFactKind.Constant,
+                    StaticFieldInitializerValueKind.StableIdentity => StaticFieldFactKind.StableIdentity,
+                    _ => StaticFieldFactKind.Unknown
+                };
+            }
+
+            facts[fieldToken] = new StaticFieldFact(GetFieldDefinitionSymbol(reader, handle), factKind);
+        }
+
+        return facts;
+    }
+
+    private static Dictionary<int, StaticFieldUsage> ScanStaticFieldUsage(
+        PEReader peReader,
+        MetadataReader reader,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey)
+    {
+        var usageByFieldToken = new Dictionary<int, StaticFieldUsage>();
+        foreach (var methodHandle in reader.MethodDefinitions)
+        {
+            var methodDefinition = reader.GetMethodDefinition(methodHandle);
+            if (methodDefinition.RelativeVirtualAddress == 0)
+            {
+                continue;
+            }
+
+            var body = peReader.GetMethodBody(methodDefinition.RelativeVirtualAddress);
+            var il = body.GetILBytes();
+            if (il is null)
+            {
+                continue;
+            }
+
+            var declaringTypeHandle = methodDefinition.GetDeclaringType();
+            var isTypeInitializer = string.Equals(reader.GetString(methodDefinition.Name), ".cctor", StringComparison.Ordinal);
+            var offset = 0;
+            while (offset < il.Length)
+            {
+                var instructionOffset = offset;
+                var opCode = ReadOpCode(il, ref offset);
+                var operandOffset = offset;
+                var operandSize = GetOperandSize(opCode.OperandType, il, operandOffset);
+                var operandToken = operandSize == 4 && IsMetadataTokenOperand(opCode.OperandType)
+                    ? BitConverter.ToInt32(il, operandOffset)
+                    : (int?)null;
+                offset += operandSize;
+
+                if (operandToken is null)
+                {
+                    continue;
+                }
+
+                if (!TryResolveSameAssemblyFieldDefinitionHandle(
+                        reader,
+                        operandToken.Value,
+                        fieldDefinitionHandlesBySymbol,
+                        fieldDefinitionHandlesByExactKey,
+                        out var fieldHandle))
+                {
+                    continue;
+                }
+
+                var fieldDefinition = reader.GetFieldDefinition(fieldHandle);
+                if ((fieldDefinition.Attributes & FieldAttributes.Static) == 0)
+                {
+                    continue;
+                }
+
+                var fieldToken = MetadataTokens.GetToken(fieldHandle);
+                usageByFieldToken.TryGetValue(fieldToken, out var usage);
+                if (opCode == OpCodes.Ldsflda)
+                {
+                    usage.HasAddressExposure = true;
+                }
+                else if (opCode == OpCodes.Stsfld)
+                {
+                    usage.TotalWriteCount++;
+                    if (isTypeInitializer && fieldDefinition.GetDeclaringType().Equals(declaringTypeHandle))
+                    {
+                        usage.OwningTypeInitializerWriteCount++;
+                    }
+                    else
+                    {
+                        usage.HasWritesOutsideTypeInitializer = true;
+                    }
+                }
+
+                usageByFieldToken[fieldToken] = usage;
+            }
+        }
+
+        return usageByFieldToken;
+    }
+
+    private static Dictionary<int, StaticFieldInitializerValue> AnalyzeStaticFieldInitializerAssignments(
+        PEReader peReader,
+        MetadataReader reader,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey)
+    {
+        var assignmentsByFieldToken = new Dictionary<int, StaticFieldInitializerValue>();
+        foreach (var typeHandle in reader.TypeDefinitions)
+        {
+            if (!TryGetTypeInitializerHandle(reader, typeHandle, out var typeInitializerHandle))
+            {
+                continue;
+            }
+
+            foreach (var pair in AnalyzeTypeInitializerAssignments(
+                peReader,
+                reader,
+                typeHandle,
+                typeInitializerHandle,
+                fieldDefinitionHandlesBySymbol,
+                fieldDefinitionHandlesByExactKey))
+            {
+                assignmentsByFieldToken[pair.Key] = pair.Value;
+            }
+        }
+
+        return assignmentsByFieldToken;
+    }
+
+    private static Dictionary<int, StaticFieldInitializerValue> AnalyzeTypeInitializerAssignments(
+        PEReader peReader,
+        MetadataReader reader,
+        TypeDefinitionHandle declaringTypeHandle,
+        MethodDefinitionHandle typeInitializerHandle,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey)
+    {
+        var methodDefinition = reader.GetMethodDefinition(typeInitializerHandle);
+        if (methodDefinition.RelativeVirtualAddress == 0)
+        {
+            return new Dictionary<int, StaticFieldInitializerValue>();
+        }
+
+        var body = peReader.GetMethodBody(methodDefinition.RelativeVirtualAddress);
+        var il = body.GetILBytes();
+        if (il is null || body.ExceptionRegions.Length != 0)
+        {
+            return new Dictionary<int, StaticFieldInitializerValue>();
+        }
+
+        var trackedLocals = new Dictionary<int, StaticFieldInitializerValue>();
+        var trackedStack = new List<StaticFieldInitializerValue>();
+        var assignmentsByFieldToken = new Dictionary<int, StaticFieldInitializerValue>();
+        var offset = 0;
+        while (offset < il.Length)
+        {
+            var instructionOffset = offset;
+            var opCode = ReadOpCode(il, ref offset);
+            var operandOffset = offset;
+            var operandSize = GetOperandSize(opCode.OperandType, il, operandOffset);
+            var metadataToken = operandSize == 4 && IsMetadataTokenOperand(opCode.OperandType)
+                ? BitConverter.ToInt32(il, operandOffset)
+                : (int?)null;
+            offset += operandSize;
+
+            if (opCode == OpCodes.Constrained)
+            {
+                continue;
+            }
+
+            if (opCode.FlowControl is FlowControl.Branch or FlowControl.Cond_Branch ||
+                opCode == OpCodes.Throw ||
+                opCode == OpCodes.Rethrow)
+            {
+                return new Dictionary<int, StaticFieldInitializerValue>();
+            }
+
+            if (TryGetPushedInt32Constant(opCode, il, operandOffset, out _))
+            {
+                trackedStack.Add(StaticFieldInitializerValue.Constant);
+                continue;
+            }
+
+            if (opCode == OpCodes.Ldstr)
+            {
+                trackedStack.Add(StaticFieldInitializerValue.Constant);
+                continue;
+            }
+
+            if (opCode == OpCodes.Ldnull)
+            {
+                trackedStack.Add(StaticFieldInitializerValue.StableIdentity);
+                continue;
+            }
+
+            if (TryGetStoreLocalIndex(opCode, il, operandOffset, out var storeLocalIndex))
+            {
+                trackedLocals[storeLocalIndex] = PopStaticFieldInitializerValue(trackedStack);
+                continue;
+            }
+
+            if (TryGetLoadLocalIndex(opCode, il, operandOffset, out var loadLocalIndex))
+            {
+                trackedStack.Add(trackedLocals.TryGetValue(loadLocalIndex, out var localValue)
+                    ? localValue
+                    : StaticFieldInitializerValue.Unknown);
+                continue;
+            }
+
+            if (opCode == OpCodes.Dup)
+            {
+                trackedStack.Add(trackedStack.Count == 0 ? StaticFieldInitializerValue.Unknown : trackedStack[^1]);
+                continue;
+            }
+
+            if (opCode == OpCodes.Ldsfld)
+            {
+                trackedStack.Add(StaticFieldInitializerValue.Unknown);
+                continue;
+            }
+
+            if (opCode == OpCodes.Stsfld)
+            {
+                var assignedValue = PopStaticFieldInitializerValue(trackedStack);
+                if (metadataToken is not null &&
+                    TryResolveSameAssemblyFieldDefinitionHandle(
+                        reader,
+                        metadataToken.Value,
+                        fieldDefinitionHandlesBySymbol,
+                        fieldDefinitionHandlesByExactKey,
+                        out var fieldHandle))
+                {
+                    var fieldDefinition = reader.GetFieldDefinition(fieldHandle);
+                    if (fieldDefinition.GetDeclaringType().Equals(declaringTypeHandle))
+                    {
+                        var fieldToken = MetadataTokens.GetToken(fieldHandle);
+                        if (assignmentsByFieldToken.ContainsKey(fieldToken))
+                        {
+                            assignmentsByFieldToken[fieldToken] = StaticFieldInitializerValue.Unknown;
+                        }
+                        else
+                        {
+                            assignmentsByFieldToken[fieldToken] = assignedValue;
+                        }
+                    }
+                }
+
+                continue;
+            }
+
+            if (opCode == OpCodes.Newarr)
+            {
+                PopStaticFieldInitializerValue(trackedStack);
+                trackedStack.Add(StaticFieldInitializerValue.Unknown);
+                continue;
+            }
+
+            if (opCode == OpCodes.Newobj)
+            {
+                if (metadataToken is not null &&
+                    TryGetCallTargetSignature(reader, metadataToken.Value, isObjectConstruction: true, out var constructorSignature))
+                {
+                    PopStaticFieldInitializerValues(trackedStack, constructorSignature.ParameterTypes.Length);
+                    trackedStack.Add(StaticFieldInitializerValue.StableIdentity);
+                }
+                else
+                {
+                    trackedStack.Clear();
+                    trackedLocals.Clear();
+                    trackedStack.Add(StaticFieldInitializerValue.Unknown);
+                }
+
+                continue;
+            }
+
+            if (opCode == OpCodes.Call || opCode == OpCodes.Callvirt)
+            {
+                if (metadataToken is not null &&
+                    TryGetCallTargetSignature(reader, metadataToken.Value, isObjectConstruction: false, out var calledSignature))
+                {
+                    PopStaticFieldInitializerValues(trackedStack, calledSignature.ParameterTypes.Length);
+                    if (calledSignature.HasReceiver)
+                    {
+                        PopStaticFieldInitializerValue(trackedStack);
+                    }
+
+                    if (!string.Equals(calledSignature.ReturnType, "void", StringComparison.Ordinal))
+                    {
+                        trackedStack.Add(IsKnownStableIdentityInitializerCall(ResolveMethodExactKey(reader, metadataToken.Value))
+                            ? StaticFieldInitializerValue.StableIdentity
+                            : StaticFieldInitializerValue.Unknown);
+                    }
+                }
+                else
+                {
+                    trackedStack.Clear();
+                    trackedLocals.Clear();
+                }
+
+                continue;
+            }
+
+            if (opCode == OpCodes.Ret)
+            {
+                trackedStack.Clear();
+                trackedLocals.Clear();
+                continue;
+            }
+
+            if (!TryGetStackPopCount(opCode.StackBehaviourPop, out var popCount) ||
+                !TryGetStackPushCount(opCode.StackBehaviourPush, out var pushCount))
+            {
+                return new Dictionary<int, StaticFieldInitializerValue>();
+            }
+
+            PopStaticFieldInitializerValues(trackedStack, popCount);
+            for (var i = 0; i < pushCount; i++)
+            {
+                trackedStack.Add(StaticFieldInitializerValue.Unknown);
+            }
+
+            if (ShouldResetTrackedState(opCode))
+            {
+                trackedStack.Clear();
+                trackedLocals.Clear();
+            }
+        }
+
+        return assignmentsByFieldToken
+            .Where(static pair => pair.Value.Kind != StaticFieldInitializerValueKind.Unknown)
+            .ToDictionary(static pair => pair.Key, static pair => pair.Value);
+    }
+
+    private static bool TryGetTypeInitializerHandle(
+        MetadataReader reader,
+        TypeDefinitionHandle declaringTypeHandle,
+        out MethodDefinitionHandle methodHandle)
+    {
+        foreach (var candidateHandle in reader.GetTypeDefinition(declaringTypeHandle).GetMethods())
+        {
+            if (string.Equals(reader.GetString(reader.GetMethodDefinition(candidateHandle).Name), ".cctor", StringComparison.Ordinal))
+            {
+                methodHandle = candidateHandle;
+                return true;
+            }
+        }
+
+        methodHandle = default;
+        return false;
+    }
+
+    private static void AddSameAssemblyStaticFieldToken(
+        MetadataReader reader,
+        int? operandToken,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
+        SortedSet<int> sameAssemblyStaticReadFieldTokens)
+    {
+        if (operandToken is not null &&
+            TryResolveSameAssemblyFieldDefinitionHandle(
+                reader,
+                operandToken.Value,
+                fieldDefinitionHandlesBySymbol,
+                fieldDefinitionHandlesByExactKey,
+                out var fieldHandle))
+        {
+            sameAssemblyStaticReadFieldTokens.Add(MetadataTokens.GetToken(fieldHandle));
+        }
+    }
+
     private static void AddField(MetadataReader reader, int? operandToken, SortedSet<string> fields)
     {
         if (operandToken is not null)
         {
             fields.Add(ResolveFieldToken(reader, operandToken.Value));
+        }
+    }
+
+    private static bool TryResolveSameAssemblyFieldDefinitionHandle(
+        MetadataReader reader,
+        int metadataToken,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
+        IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
+        out FieldDefinitionHandle handle)
+    {
+        handle = default;
+        var resolvedHandle = MetadataTokens.Handle(metadataToken);
+        switch (resolvedHandle.Kind)
+        {
+            case HandleKind.FieldDefinition:
+                handle = (FieldDefinitionHandle)resolvedHandle;
+                return true;
+            case HandleKind.MemberReference:
+                var memberReferenceHandle = (MemberReferenceHandle)resolvedHandle;
+                return fieldDefinitionHandlesBySymbol.TryGetValue(GetMemberReferenceSymbol(reader, memberReferenceHandle), out handle) ||
+                    fieldDefinitionHandlesByExactKey.TryGetValue(GetMemberReferenceFieldExactKey(reader, memberReferenceHandle), out handle);
+            default:
+                return false;
         }
     }
 
@@ -3135,6 +3704,24 @@ internal static class AssemblyEffectSummarizer
         };
     }
 
+    private static string GetFieldExactKey(MetadataReader reader, FieldDefinitionHandle handle)
+    {
+        var definition = reader.GetFieldDefinition(handle);
+        var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
+        var fieldName = reader.GetString(definition.Name);
+        var fieldType = DecodeFieldDefinitionExactType(reader, definition);
+        return $"{typeName}.{fieldName}:{fieldType}";
+    }
+
+    private static string GetMemberReferenceFieldExactKey(MetadataReader reader, MemberReferenceHandle handle)
+    {
+        var memberReference = reader.GetMemberReference(handle);
+        var parentName = NormalizeExactTypeName(GetMemberReferenceParentName(reader, memberReference.Parent));
+        var fieldName = reader.GetString(memberReference.Name);
+        var fieldType = DecodeMemberReferenceFieldExactType(reader, memberReference);
+        return $"{parentName}.{fieldName}:{fieldType}";
+    }
+
     private static string GetMethodDisplaySymbol(MetadataReader reader, MethodDefinitionHandle handle)
     {
         var definition = reader.GetMethodDefinition(handle);
@@ -3158,6 +3745,38 @@ internal static class AssemblyEffectSummarizer
         var definition = reader.GetFieldDefinition(handle);
         var typeName = GetTypeName(reader, definition.GetDeclaringType());
         return $"{typeName}.{reader.GetString(definition.Name)}";
+    }
+
+    private static string DecodeFieldDefinitionExactType(MetadataReader reader, FieldDefinition definition)
+    {
+        try
+        {
+            return definition.DecodeSignature(new TypeNameProvider(reader), genericContext: null);
+        }
+        catch (BadImageFormatException)
+        {
+            return "?";
+        }
+        catch (InvalidOperationException)
+        {
+            return "?";
+        }
+    }
+
+    private static string DecodeMemberReferenceFieldExactType(MetadataReader reader, MemberReference memberReference)
+    {
+        try
+        {
+            return memberReference.DecodeFieldSignature(new TypeNameProvider(reader), genericContext: null);
+        }
+        catch (BadImageFormatException)
+        {
+            return "?";
+        }
+        catch (InvalidOperationException)
+        {
+            return "?";
+        }
     }
 
     private static bool ShouldTreatCallvirtAsDynamicDispatch(MetadataReader reader, int token)
@@ -3636,6 +4255,44 @@ internal readonly record struct CallTargetSignature(
 internal sealed record BranchTrackedState(
     List<TrackedStackValue> Stack,
     Dictionary<int, TrackedStackValue> Locals);
+
+internal enum StaticFieldFactKind
+{
+    Unknown,
+    Constant,
+    StableIdentity
+}
+
+internal readonly record struct StaticFieldFact(
+    string Symbol,
+    StaticFieldFactKind Kind);
+
+internal struct StaticFieldUsage
+{
+    public int TotalWriteCount;
+
+    public int OwningTypeInitializerWriteCount;
+
+    public bool HasWritesOutsideTypeInitializer;
+
+    public bool HasAddressExposure;
+}
+
+internal enum StaticFieldInitializerValueKind
+{
+    Unknown,
+    Constant,
+    StableIdentity
+}
+
+internal readonly record struct StaticFieldInitializerValue(StaticFieldInitializerValueKind Kind)
+{
+    public static StaticFieldInitializerValue Unknown => new(StaticFieldInitializerValueKind.Unknown);
+
+    public static StaticFieldInitializerValue Constant => new(StaticFieldInitializerValueKind.Constant);
+
+    public static StaticFieldInitializerValue StableIdentity => new(StaticFieldInitializerValueKind.StableIdentity);
+}
 
 internal readonly record struct TrackedStackValue(int? Int32Constant, string? KnownStringComparer, string? KnownExceptionType)
 {

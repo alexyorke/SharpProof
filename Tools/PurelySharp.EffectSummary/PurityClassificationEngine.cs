@@ -1531,17 +1531,6 @@ internal static class PurityClassificationEngine
             return false;
         }
 
-        foreach (var field in summary.Fields)
-        {
-            if (string.Equals(field, "System.String.Empty", StringComparison.Ordinal) ||
-                string.Equals(field, "System.String._firstChar", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            return false;
-        }
-
         return true;
     }
 
@@ -1661,18 +1650,8 @@ internal static class PurityClassificationEngine
             return true;
         }
 
-        return summary.Fields.All(static field =>
-            string.Equals(field, "System.String.Empty", StringComparison.Ordinal) ||
-            string.Equals(field, "System.String._firstChar", StringComparison.Ordinal) ||
-            string.Equals(field, "System.UriHelper.Unreserved", StringComparison.Ordinal) ||
-            string.Equals(field, "System.Globalization.TextInfo.Invariant", StringComparison.Ordinal) ||
-            string.Equals(field, "System.Globalization.CompareInfo.Invariant", StringComparison.Ordinal) ||
-            string.Equals(field, "System.BitConverter.IsLittleEndian", StringComparison.Ordinal) ||
-            string.Equals(field, "IsLittleEndian", StringComparison.Ordinal) ||
-            field.StartsWith("System.Linq.EmptyPartition`1", StringComparison.Ordinal) &&
-            field.EndsWith(".Instance", StringComparison.Ordinal) ||
-            field.StartsWith("System.Array+EmptyArray`1", StringComparison.Ordinal) &&
-            field.EndsWith(".Value", StringComparison.Ordinal));
+        return summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
+            summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal);
     }
 
     private static bool HasOnlyResolvedVirtualCallTargets(
