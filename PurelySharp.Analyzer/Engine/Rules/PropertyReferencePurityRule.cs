@@ -863,7 +863,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
         {
             if (implementation.DeclaringSyntaxReferences.Length == 0 &&
                 !PurityAnalysisEngine.HasTrustedGeneratedPurityCoverage(implementation, context.SemanticModel.Compilation) &&
-                !PurityAnalysisEngine.IsKnownPureBCLMember(implementation) &&
                 !PurityAnalysisEngine.HasPureExternalAttribute(implementation))
             {
                 return UnknownKeyDispatch(propertyReferenceOperation, implementation);
