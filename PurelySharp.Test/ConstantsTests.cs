@@ -365,6 +365,34 @@ public static class AggregateExceptionCatalogSignatureSamples
         }
 
         [Test]
+        public void LinqDeferredEnumerableHelpers_AreNotBackedByStaticPureCatalogs()
+        {
+            var source = @"
+using System.Collections.Generic;
+using System.Linq;
+
+public static class LinqDeferredCatalogSignatureSamples
+{
+    public static IEnumerable<int> Sample(IEnumerable<int> values)
+    {
+        _ = values.Distinct();
+        _ = values.Reverse();
+        return values.TakeWhile(static value => value > 0);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "LinqDeferredCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.Distinct()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.Reverse()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.TakeWhile(static value => value > 0)"));
+        }
+
+        [Test]
         public void DeadEnumerablePrefixPlaceholders_AreNotPresentInManualPureCatalogs()
         {
             var deadRows = new[]

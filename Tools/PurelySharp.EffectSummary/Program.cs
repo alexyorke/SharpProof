@@ -949,7 +949,9 @@ internal static class AssemblyEffectSummarizer
             string.Equals(field, "System.Globalization.CompareInfo.Invariant", StringComparison.Ordinal) ||
             string.Equals(field, "System.Net.IPAddress.IPv6Loopback", StringComparison.Ordinal) ||
             string.Equals(field, "System.Net.IPAddress.Loopback", StringComparison.Ordinal) ||
-            string.Equals(field, "System.Net.IPAddress.s_loopbackMappedToIPv6", StringComparison.Ordinal)))
+            string.Equals(field, "System.Net.IPAddress.s_loopbackMappedToIPv6", StringComparison.Ordinal) ||
+            field.StartsWith("System.Linq.EmptyPartition`1", StringComparison.Ordinal) &&
+            field.EndsWith(".Instance", StringComparison.Ordinal)))
         {
             return true;
         }

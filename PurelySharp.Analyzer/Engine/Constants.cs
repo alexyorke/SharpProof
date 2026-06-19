@@ -986,11 +986,9 @@ public static class Constants
         "System.Decimal.ToInt32(decimal)",
         "System.Delegate.Combine(System.Delegate, System.Delegate)",
         "System.Delegate.Remove(System.Delegate, System.Delegate)",
-        "System.Linq.Enumerable.Distinct<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
         "System.Linq.Enumerable.ElementAt<TSource>(System.Collections.Generic.IEnumerable<TSource>, int)",
         "System.Linq.Enumerable.First<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
         "System.Linq.Enumerable.Last<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
-        "System.Linq.Enumerable.Reverse<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
         "System.Linq.Enumerable.Single<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
         "System.Linq.Enumerable.Skip<TSource>(System.Collections.Generic.IEnumerable<TSource>, int)",
         "System.Linq.Enumerable.Take<TSource>(System.Collections.Generic.IEnumerable<TSource>, int)",
@@ -999,6 +997,5 @@ public static class Constants
         "System.FormattableString.Invariant(System.FormattableString)",
         "System.FormattableString.ToString(System.IFormatProvider)",
 
-        "System.Linq.Enumerable.TakeWhile<TSource>(System.Collections.Generic.IEnumerable<TSource>, System.Func<TSource, bool>)",
     };
 }

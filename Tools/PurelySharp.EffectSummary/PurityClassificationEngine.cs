@@ -281,16 +281,15 @@ internal static class PurityClassificationEngine
                       IsArgumentGuardThrowHelper(resolvedCallSummary.Symbol)) ||
                      (treatsDelegateDispatchAsSemantic &&
                       IsSemanticallyNeutralValidationThrowHelper(resolvedCallSummary.Symbol))) ||
+                    IsValidationThrowHelperCompatible(
+                        resolvedCallKey,
+                        bySymbol,
+                        memo,
+                        freshOwnedInitializationMemo,
+                        validationThrowHelperMemo,
+                        visiting) ||
                     (treatsObjectStateAsFreshOwned &&
                      IsFreshOwnedObjectInitializationCompatible(
-                         resolvedCallKey,
-                         bySymbol,
-                         memo,
-                         freshOwnedInitializationMemo,
-                         validationThrowHelperMemo,
-                         visiting)) ||
-                    (treatsObjectStateAsFreshOwned &&
-                     IsValidationThrowHelperCompatible(
                          resolvedCallKey,
                          bySymbol,
                          memo,
@@ -947,6 +946,8 @@ internal static class PurityClassificationEngine
             string.Equals(field, "System.Globalization.CompareInfo.Invariant", StringComparison.Ordinal) ||
             string.Equals(field, "System.BitConverter.IsLittleEndian", StringComparison.Ordinal) ||
             string.Equals(field, "IsLittleEndian", StringComparison.Ordinal) ||
+            field.StartsWith("System.Linq.EmptyPartition`1", StringComparison.Ordinal) &&
+            field.EndsWith(".Instance", StringComparison.Ordinal) ||
             field.StartsWith("System.Array+EmptyArray`1", StringComparison.Ordinal) &&
             field.EndsWith(".Value", StringComparison.Ordinal));
     }

@@ -1,0 +1,505 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-19T00:55:48.1222135+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.Linq",
+      "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.dll",
+      "AssemblySha256": "1b81642c1ee4f21ebbb57213c14e50df59aabcd7bf91de2eebdf4c0d9f32845b",
+      "ModuleVersionId": "3402224e-0e20-4120-a8fb-b217035f5f4f",
+      "MethodCount": 1188,
+      "EmittedMethodCount": 9,
+      "Methods": [
+        {
+          "Symbol": "System.Linq.Enumerable.Empty()",
+          "ExactSymbolKey": "System.Linq.Enumerable.Empty()-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+          "MetadataToken": "0x06000037",
+          "RelativeVirtualAddress": 259380,
+          "MethodBodySha256": "eefcd1b17252637ce2d138b2633ebc345fe1b0f7e04688fff654b7742cc5c4f8",
+          "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x06000037|il:eefcd1b17252637ce2d138b2633ebc345fe1b0f7e04688fff654b7742cc5c4f8",
+          "Effects": [
+            "reads_static_field"
+          ],
+          "RootCandidates": [
+            "safe_static_cache_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [],
+          "Fields": [
+            "System.Linq.EmptyPartition\u00601\u003C!!0\u003E.Instance"
+          ],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)",
+          "ExactSymbolKey": "System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+          "MetadataToken": "0x0600006C",
+          "RelativeVirtualAddress": 262760,
+          "MethodBodySha256": "8b8b2b77cd2bc16de6ff1d3c2366c2a419b5bd49d0bcf070e4ed8877a4be50a1",
+          "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x0600006C|il:8b8b2b77cd2bc16de6ff1d3c2366c2a419b5bd49d0bcf070e4ed8877a4be50a1",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E)",
+          "ExactSymbolKey": "System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+          "MetadataToken": "0x0600006D",
+          "RelativeVirtualAddress": 262772,
+          "MethodBodySha256": "81087f5993385a30d692217a0f37a810bc11595b169a200b7193bf846d672814",
+          "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x0600006D|il:81087f5993385a30d692217a0f37a810bc11595b169a200b7193bf846d672814",
+          "Effects": [
+            "allocates_object",
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.Linq.Enumerable\u002BDistinctIterator\u00601\u003C!!0\u003E..ctor(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003Evoid",
+            "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Linq.Enumerable.Reverse(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)",
+          "ExactSymbolKey": "System.Linq.Enumerable.Reverse(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+          "MetadataToken": "0x060000F8",
+          "RelativeVirtualAddress": 274576,
+          "MethodBodySha256": "2be68253a64261b7f466a9827623e62b8428be36a4f675a700fd06f5123f0147",
+          "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x060000F8|il:2be68253a64261b7f466a9827623e62b8428be36a4f675a700fd06f5123f0147",
+          "Effects": [
+            "allocates_object",
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.Linq.Enumerable\u002BReverseIterator\u00601\u003C!!0\u003E..ctor(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E)-\u003Evoid",
+            "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Linq.Enumerable.TakeWhile(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00602\u003C!!0, bool\u003E)",
+          "ExactSymbolKey": "System.Linq.Enumerable.TakeWhile(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00602\u003C!!0, bool\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+          "MetadataToken": "0x06000131",
+          "RelativeVirtualAddress": 277956,
+          "MethodBodySha256": "92b2d0c962937b166b58602e60bc44ae3b04a4927de0008d77df362ed472a9c2",
+          "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x06000131|il:92b2d0c962937b166b58602e60bc44ae3b04a4927de0008d77df362ed472a9c2",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.Linq.Enumerable.TakeWhileIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00602\u003C!!0, bool\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+            "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Linq.Enumerable.TakeWhileIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00602\u003C!!0, bool\u003E)",
+          "ExactSymbolKey": "System.Linq.Enumerable.TakeWhileIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00602\u003C!!0, bool\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+          "MetadataToken": "0x06000132",
+          "RelativeVirtualAddress": 277988,
+          "MethodBodySha256": "e5ef6d5c5425c26ce8f89d382ab7e4ef6e3cb4c615fc98443d69daada243af3b",
+          "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x06000132|il:e5ef6d5c5425c26ce8f89d382ab7e4ef6e3cb4c615fc98443d69daada243af3b",
+          "Effects": [
+            "allocates_object",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "fresh_owned_object_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__283\u00601\u003C!!0\u003E..ctor(int)-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__283\u00601\u003C!!0\u003E.\u003C\u003E3__predicate",
+            "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__283\u00601\u003C!!0\u003E.\u003C\u003E3__source"
+          ],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Linq.Enumerable.TakeWhile(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00603\u003C!!0, int, bool\u003E)",
+          "ExactSymbolKey": "System.Linq.Enumerable.TakeWhile(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00603\u003C!!0, int, bool\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+          "MetadataToken": "0x06000133",
+          "RelativeVirtualAddress": 278012,
+          "MethodBodySha256": "bf3c68164c0be5bd0b49c2f406cf5092370d7dab0e262ef893c550c0d0bcb8cc",
+          "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x06000133|il:bf3c68164c0be5bd0b49c2f406cf5092370d7dab0e262ef893c550c0d0bcb8cc",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.Linq.Enumerable.TakeWhileIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00603\u003C!!0, int, bool\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+            "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Linq.Enumerable.TakeWhileIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00603\u003C!!0, int, bool\u003E)",
+          "ExactSymbolKey": "System.Linq.Enumerable.TakeWhileIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00603\u003C!!0, int, bool\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+          "MetadataToken": "0x06000134",
+          "RelativeVirtualAddress": 278044,
+          "MethodBodySha256": "7f88fba044f0df7c61022e289ad00a23763ab0519a975b52cfb28e274cfc1217",
+          "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x06000134|il:7f88fba044f0df7c61022e289ad00a23763ab0519a975b52cfb28e274cfc1217",
+          "Effects": [
+            "allocates_object",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "fresh_owned_object_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__285\u00601\u003C!!0\u003E..ctor(int)-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__285\u00601\u003C!!0\u003E.\u003C\u003E3__predicate",
+            "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__285\u00601\u003C!!0\u003E.\u003C\u003E3__source"
+          ],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)",
+          "ExactSymbolKey": "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid",
+          "MetadataToken": "0x06000494",
+          "RelativeVirtualAddress": 319768,
+          "MethodBodySha256": "d6cb32d3a5e466d6485cd169ccaac205ef2f057b83edec06b9d227f475100315",
+          "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x06000494|il:d6cb32d3a5e466d6485cd169ccaac205ef2f057b83edec06b9d227f475100315",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws"
+          ],
+          "RootCandidates": [
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentNullException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "Calls": [
+            "System.ArgumentNullException..ctor(string)-\u003Evoid",
+            "System.Linq.ThrowHelper.GetArgumentString(System.Linq.ExceptionArgument)-\u003Estring"
+          ],
+          "Fields": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 9,
+    "PureCount": 8,
+    "ImpureCount": 1,
+    "ConservativeUnknownCount": 0,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)",
+        "ExactSymbolKey": "System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+        "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x0600006C|il:8b8b2b77cd2bc16de6ff1d3c2366c2a419b5bd49d0bcf070e4ed8877a4be50a1",
+        "AssemblyName": "System.Linq",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.dll",
+        "AssemblySha256": "1b81642c1ee4f21ebbb57213c14e50df59aabcd7bf91de2eebdf4c0d9f32845b",
+        "ModuleVersionId": "3402224e-0e20-4120-a8fb-b217035f5f4f",
+        "MetadataToken": "0x0600006C",
+        "MethodBodySha256": "8b8b2b77cd2bc16de6ff1d3c2366c2a419b5bd49d0bcf070e4ed8877a4be50a1",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E)",
+        "ExactSymbolKey": "System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+        "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x0600006D|il:81087f5993385a30d692217a0f37a810bc11595b169a200b7193bf846d672814",
+        "AssemblyName": "System.Linq",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.dll",
+        "AssemblySha256": "1b81642c1ee4f21ebbb57213c14e50df59aabcd7bf91de2eebdf4c0d9f32845b",
+        "ModuleVersionId": "3402224e-0e20-4120-a8fb-b217035f5f4f",
+        "MetadataToken": "0x0600006D",
+        "MethodBodySha256": "81087f5993385a30d692217a0f37a810bc11595b169a200b7193bf846d672814",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Linq.Enumerable.Empty()",
+        "ExactSymbolKey": "System.Linq.Enumerable.Empty()-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+        "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x06000037|il:eefcd1b17252637ce2d138b2633ebc345fe1b0f7e04688fff654b7742cc5c4f8",
+        "AssemblyName": "System.Linq",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.dll",
+        "AssemblySha256": "1b81642c1ee4f21ebbb57213c14e50df59aabcd7bf91de2eebdf4c0d9f32845b",
+        "ModuleVersionId": "3402224e-0e20-4120-a8fb-b217035f5f4f",
+        "MetadataToken": "0x06000037",
+        "MethodBodySha256": "eefcd1b17252637ce2d138b2633ebc345fe1b0f7e04688fff654b7742cc5c4f8",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Linq.Enumerable.Reverse(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)",
+        "ExactSymbolKey": "System.Linq.Enumerable.Reverse(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+        "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x060000F8|il:2be68253a64261b7f466a9827623e62b8428be36a4f675a700fd06f5123f0147",
+        "AssemblyName": "System.Linq",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.dll",
+        "AssemblySha256": "1b81642c1ee4f21ebbb57213c14e50df59aabcd7bf91de2eebdf4c0d9f32845b",
+        "ModuleVersionId": "3402224e-0e20-4120-a8fb-b217035f5f4f",
+        "MetadataToken": "0x060000F8",
+        "MethodBodySha256": "2be68253a64261b7f466a9827623e62b8428be36a4f675a700fd06f5123f0147",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Linq.Enumerable.TakeWhile(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00602\u003C!!0, bool\u003E)",
+        "ExactSymbolKey": "System.Linq.Enumerable.TakeWhile(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00602\u003C!!0, bool\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+        "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x06000131|il:92b2d0c962937b166b58602e60bc44ae3b04a4927de0008d77df362ed472a9c2",
+        "AssemblyName": "System.Linq",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.dll",
+        "AssemblySha256": "1b81642c1ee4f21ebbb57213c14e50df59aabcd7bf91de2eebdf4c0d9f32845b",
+        "ModuleVersionId": "3402224e-0e20-4120-a8fb-b217035f5f4f",
+        "MetadataToken": "0x06000131",
+        "MethodBodySha256": "92b2d0c962937b166b58602e60bc44ae3b04a4927de0008d77df362ed472a9c2",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Linq.Enumerable.TakeWhile(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00603\u003C!!0, int, bool\u003E)",
+        "ExactSymbolKey": "System.Linq.Enumerable.TakeWhile(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00603\u003C!!0, int, bool\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+        "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x06000133|il:bf3c68164c0be5bd0b49c2f406cf5092370d7dab0e262ef893c550c0d0bcb8cc",
+        "AssemblyName": "System.Linq",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.dll",
+        "AssemblySha256": "1b81642c1ee4f21ebbb57213c14e50df59aabcd7bf91de2eebdf4c0d9f32845b",
+        "ModuleVersionId": "3402224e-0e20-4120-a8fb-b217035f5f4f",
+        "MetadataToken": "0x06000133",
+        "MethodBodySha256": "bf3c68164c0be5bd0b49c2f406cf5092370d7dab0e262ef893c550c0d0bcb8cc",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Linq.Enumerable.TakeWhileIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00602\u003C!!0, bool\u003E)",
+        "ExactSymbolKey": "System.Linq.Enumerable.TakeWhileIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00602\u003C!!0, bool\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+        "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x06000132|il:e5ef6d5c5425c26ce8f89d382ab7e4ef6e3cb4c615fc98443d69daada243af3b",
+        "AssemblyName": "System.Linq",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.dll",
+        "AssemblySha256": "1b81642c1ee4f21ebbb57213c14e50df59aabcd7bf91de2eebdf4c0d9f32845b",
+        "ModuleVersionId": "3402224e-0e20-4120-a8fb-b217035f5f4f",
+        "MetadataToken": "0x06000132",
+        "MethodBodySha256": "e5ef6d5c5425c26ce8f89d382ab7e4ef6e3cb4c615fc98443d69daada243af3b",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Linq.Enumerable.TakeWhileIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00603\u003C!!0, int, bool\u003E)",
+        "ExactSymbolKey": "System.Linq.Enumerable.TakeWhileIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00603\u003C!!0, int, bool\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+        "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x06000134|il:7f88fba044f0df7c61022e289ad00a23763ab0519a975b52cfb28e274cfc1217",
+        "AssemblyName": "System.Linq",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.dll",
+        "AssemblySha256": "1b81642c1ee4f21ebbb57213c14e50df59aabcd7bf91de2eebdf4c0d9f32845b",
+        "ModuleVersionId": "3402224e-0e20-4120-a8fb-b217035f5f4f",
+        "MetadataToken": "0x06000134",
+        "MethodBodySha256": "7f88fba044f0df7c61022e289ad00a23763ab0519a975b52cfb28e274cfc1217",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)",
+        "ExactSymbolKey": "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid",
+        "CacheKey": "mvid:3402224e-0e20-4120-a8fb-b217035f5f4f|token:0x06000494|il:d6cb32d3a5e466d6485cd169ccaac205ef2f057b83edec06b9d227f475100315",
+        "AssemblyName": "System.Linq",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.dll",
+        "AssemblySha256": "1b81642c1ee4f21ebbb57213c14e50df59aabcd7bf91de2eebdf4c0d9f32845b",
+        "ModuleVersionId": "3402224e-0e20-4120-a8fb-b217035f5f4f",
+        "MetadataToken": "0x06000494",
+        "MethodBodySha256": "d6cb32d3a5e466d6485cd169ccaac205ef2f057b83edec06b9d227f475100315",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      }
+    ]
+  }
+}

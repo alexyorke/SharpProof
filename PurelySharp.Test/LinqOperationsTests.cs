@@ -458,6 +458,46 @@ public class TestClass
         }
 
         [Test]
+        public async Task LinqReverse_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections.Generic;
+using System.Linq;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public IEnumerable<int> TestMethod(IEnumerable<int> values)
+    {
+        return values.Reverse();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task LinqTakeWhileWithPurePredicate_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections.Generic;
+using System.Linq;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public IEnumerable<int> TestMethod(IEnumerable<int> values)
+    {
+        return values.TakeWhile(static value => value > 0);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task LinqContainsEqualityComparerDefaultDispatchToImpureEquatable_Diagnostic()
         {
             var test = @"

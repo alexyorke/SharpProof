@@ -4871,6 +4871,53 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeDeferredEnumerableSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Linq.dll",
+                160,
+                "System.Linq.Enumerable.Distinct(",
+                "System.Linq.Enumerable.Reverse(",
+                "System.Linq.Enumerable.TakeWhile(",
+                "System.Linq.Enumerable.Empty(");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Linq.Enumerable.Empty()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Linq.Enumerable.Empty()", "internal_only");
+            AssertPurityClassification(summary, "System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable`1<!!0>)", "pure");
+            AssertPurityClassification(summary, "System.Linq.Enumerable.Reverse(System.Collections.Generic.IEnumerable`1<!!0>)", "pure");
+            AssertPurityClassification(
+                summary,
+                "System.Linq.Enumerable.TakeWhile(System.Collections.Generic.IEnumerable`1<!!0>, System.Func`2<!!0, bool>)",
+                "pure");
+            AssertFreshnessClassification(
+                summary,
+                "System.Linq.Enumerable.TakeWhile(System.Collections.Generic.IEnumerable`1<!!0>, System.Func`2<!!0, bool>)",
+                "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Linq.Enumerable.TakeWhile(System.Collections.Generic.IEnumerable`1<!!0>, System.Func`2<!!0, bool>)",
+                "internal_only");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.Empty()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable`1<!!0>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.Reverse(System.Collections.Generic.IEnumerable`1<!!0>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.TakeWhile(System.Collections.Generic.IEnumerable`1<!!0>, System.Func`2<!!0, bool>)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimePureConstructorsSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(

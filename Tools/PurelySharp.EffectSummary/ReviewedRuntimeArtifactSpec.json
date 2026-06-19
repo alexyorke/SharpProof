@@ -635,6 +635,11 @@
       "SourceSummaryPath": "PurelySharp.Analyzer/List.PurelySharp.EffectSummary.json"
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Enumerable.Deferred.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Linq.dll",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Enumerable.Deferred.PurelySharp.EffectSummary.json"
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/MemoryExtensions.AsSpan.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/MemoryExtensions.AsSpan.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [
