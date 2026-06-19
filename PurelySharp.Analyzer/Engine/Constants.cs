@@ -206,7 +206,6 @@ public static class Constants
         "System.Reflection.Module.Name.get",
         "System.Reflection.Module.ScopeName.get",
         "System.Diagnostics.Trace.WriteLine(string)",
-        "System.Globalization.CultureInfo.GetCultureInfo(string)",
         "System.Enum.GetName(System.Type, object)",
         "System.Enum.IsDefined(System.Type, object)",
         "System.Enum.GetValues(System.Type)",

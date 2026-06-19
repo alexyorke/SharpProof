@@ -1259,6 +1259,12 @@ public static class ExceptionAccessorCatalogSignatureSamples
         }
 
         [Test]
+        public void CultureInfoGetCultureInfo_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Globalization.CultureInfo.GetCultureInfo(string)");
+        }
+
+        [Test]
         public void TupleArraySegmentAndReferenceEqualsHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("object.ReferenceEquals(object, object)"));

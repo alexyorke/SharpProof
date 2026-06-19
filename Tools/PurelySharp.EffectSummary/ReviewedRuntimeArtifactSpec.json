@@ -173,6 +173,15 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Culture.GetCultureInfo.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Culture.GetCultureInfo.PurelySharp.EffectSummary.json",
+      "IncludeCallees": false,
+      "Limit": 8,
+      "SymbolPrefixes": [
+        "System.Globalization.CultureInfo.GetCultureInfo(string)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Environment.HasShutdownStarted.PurelySharp.EffectSummary.json",
       "Limit": 4,
       "SymbolPrefixes": [
