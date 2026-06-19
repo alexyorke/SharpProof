@@ -41,6 +41,14 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Array.GetEnumerator.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Array.GetEnumerator.PurelySharp.EffectSummary.json",
+      "Limit": 8,
+      "SymbolPrefixes": [
+        "System.Array.GetEnumerator()"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/AggregateException.PurelySharp.EffectSummary.json",
       "Limit": 120,
       "SymbolPrefixes": [
@@ -552,6 +560,16 @@
       "SourceSummaryPath": "PurelySharp.Analyzer/Decimal.Negate.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [
         "System.Decimal.Negate"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/KeyValuePair.CtorGetters.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/KeyValuePair.CtorGetters.PurelySharp.EffectSummary.json",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Collections.Generic.KeyValuePair`2..ctor(!0, !1)",
+        "System.Collections.Generic.KeyValuePair`2.get_Key()",
+        "System.Collections.Generic.KeyValuePair`2.get_Value()"
       ]
     },
     {

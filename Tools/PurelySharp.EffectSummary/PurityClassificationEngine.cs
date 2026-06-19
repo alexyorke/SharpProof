@@ -5,6 +5,9 @@ using PurelySharp.Analyzer.Engine;
 
 internal static class PurityClassificationEngine
 {
+    private static readonly IReadOnlyDictionary<string, string> EmptyTypeParameterOrdinals =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
     private static readonly IReadOnlyDictionary<string, string> SpecialTypeAliases =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -794,6 +797,8 @@ internal static class PurityClassificationEngine
     private static string NormalizeCatalogSymbol(string symbol)
     {
         var normalized = symbol.Trim();
+        normalized = NormalizePropertyAccessorSymbol(normalized);
+        normalized = NormalizeMethodSymbol(normalized);
         foreach (var pair in SpecialTypeAliases)
         {
             normalized = normalized.Replace(pair.Key, pair.Value, StringComparison.Ordinal);
@@ -801,6 +806,232 @@ internal static class PurityClassificationEngine
 
         return normalized;
     }
+
+    private static string NormalizePropertyAccessorSymbol(string symbol)
+    {
+        var suffix = symbol.EndsWith(".get", StringComparison.Ordinal)
+            ? ".get"
+            : symbol.EndsWith(".set", StringComparison.Ordinal)
+                ? ".set"
+                : null;
+        if (suffix == null)
+        {
+            return symbol;
+        }
+
+        var memberSeparator = FindLastTopLevelDot(symbol, symbol.Length - suffix.Length);
+        if (memberSeparator < 0)
+        {
+            return symbol;
+        }
+
+        var containingType = symbol.Substring(0, memberSeparator);
+        var propertyName = symbol.Substring(
+            memberSeparator + 1,
+            symbol.Length - memberSeparator - suffix.Length - 1);
+        if (string.IsNullOrWhiteSpace(propertyName))
+        {
+            return symbol;
+        }
+
+        var normalizedContainingType = NormalizeContainingTypeDefinition(containingType, out _);
+        var accessorPrefix = string.Equals(suffix, ".get", StringComparison.Ordinal)
+            ? "get_"
+            : "set_";
+        return normalizedContainingType + "." + accessorPrefix + propertyName + "()";
+    }
+
+    private static string NormalizeMethodSymbol(string symbol)
+    {
+        var openParen = symbol.IndexOf('(');
+        if (openParen < 0 || !symbol.EndsWith(")", StringComparison.Ordinal))
+        {
+            return symbol;
+        }
+
+        var memberSeparator = FindLastTopLevelDot(symbol, openParen);
+        if (memberSeparator < 0)
+        {
+            return symbol;
+        }
+
+        var containingType = symbol.Substring(0, memberSeparator);
+        var memberName = symbol.Substring(memberSeparator + 1, openParen - memberSeparator - 1);
+        var parameterList = symbol.Substring(openParen + 1, symbol.Length - openParen - 2);
+        var normalizedContainingType = NormalizeContainingTypeDefinition(containingType, out var typeParameterOrdinals);
+        var simpleContainingTypeName = GetSimpleTypeName(containingType);
+        var normalizedMemberName = string.Equals(memberName, simpleContainingTypeName, StringComparison.Ordinal)
+            ? ".ctor"
+            : memberName;
+        var normalizedParameterList = ReplaceTypeParameterTokens(parameterList, typeParameterOrdinals);
+        return normalizedContainingType + "." + normalizedMemberName + "(" + normalizedParameterList + ")";
+    }
+
+    private static string NormalizeContainingTypeDefinition(
+        string containingType,
+        out IReadOnlyDictionary<string, string> typeParameterOrdinals)
+    {
+        typeParameterOrdinals = EmptyTypeParameterOrdinals;
+        var lastTypeSeparator = containingType.LastIndexOfAny(new[] { '.', '+' });
+        var prefix = lastTypeSeparator >= 0 ? containingType.Substring(0, lastTypeSeparator + 1) : string.Empty;
+        var simpleTypeName = lastTypeSeparator >= 0 ? containingType.Substring(lastTypeSeparator + 1) : containingType;
+        if (!TryParseGenericType(simpleTypeName, out var baseName, out var genericArguments))
+        {
+            return containingType;
+        }
+
+        var ordinals = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (var i = 0; i < genericArguments.Length; i++)
+        {
+            var genericArgument = genericArguments[i];
+            if (IsSimpleIdentifier(genericArgument))
+            {
+                ordinals[genericArgument] = "!" + i;
+            }
+        }
+
+        if (ordinals.Count > 0)
+        {
+            typeParameterOrdinals = ordinals;
+        }
+
+        return prefix + baseName + "`" + genericArguments.Length;
+    }
+
+    private static bool TryParseGenericType(string typeName, out string baseName, out string[] genericArguments)
+    {
+        baseName = typeName;
+        genericArguments = Array.Empty<string>();
+        var genericStart = typeName.IndexOf('<');
+        if (genericStart < 0 || !typeName.EndsWith(">", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        baseName = typeName.Substring(0, genericStart).Trim();
+        if (string.IsNullOrWhiteSpace(baseName))
+        {
+            baseName = typeName;
+            return false;
+        }
+
+        genericArguments = SplitTopLevelArguments(typeName.Substring(genericStart + 1, typeName.Length - genericStart - 2));
+        return genericArguments.Length > 0;
+    }
+
+    private static string[] SplitTopLevelArguments(string text)
+    {
+        var arguments = new List<string>();
+        var start = 0;
+        var depth = 0;
+        for (var i = 0; i < text.Length; i++)
+        {
+            switch (text[i])
+            {
+                case '<':
+                    depth++;
+                    break;
+                case '>':
+                    depth = Math.Max(0, depth - 1);
+                    break;
+                case ',' when depth == 0:
+                    arguments.Add(text.Substring(start, i - start).Trim());
+                    start = i + 1;
+                    break;
+            }
+        }
+
+        arguments.Add(text.Substring(start).Trim());
+        return arguments
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .ToArray();
+    }
+
+    private static string ReplaceTypeParameterTokens(
+        string text,
+        IReadOnlyDictionary<string, string> typeParameterOrdinals)
+    {
+        if (string.IsNullOrEmpty(text) || typeParameterOrdinals.Count == 0)
+        {
+            return text;
+        }
+
+        var builder = new StringBuilder(text.Length);
+        for (var i = 0; i < text.Length;)
+        {
+            if (!IsIdentifierStart(text[i]))
+            {
+                builder.Append(text[i]);
+                i++;
+                continue;
+            }
+
+            var start = i;
+            i++;
+            while (i < text.Length && IsIdentifierPart(text[i]))
+            {
+                i++;
+            }
+
+            var token = text.Substring(start, i - start);
+            builder.Append(typeParameterOrdinals.TryGetValue(token, out var replacement) ? replacement : token);
+        }
+
+        return builder.ToString();
+    }
+
+    private static int FindLastTopLevelDot(string text, int exclusiveUpperBound)
+    {
+        var depth = 0;
+        var lastDot = -1;
+        for (var i = 0; i < exclusiveUpperBound; i++)
+        {
+            switch (text[i])
+            {
+                case '<':
+                    depth++;
+                    break;
+                case '>':
+                    depth = Math.Max(0, depth - 1);
+                    break;
+                case '.' when depth == 0:
+                    lastDot = i;
+                    break;
+            }
+        }
+
+        return lastDot;
+    }
+
+    private static string GetSimpleTypeName(string containingType)
+    {
+        var lastTypeSeparator = containingType.LastIndexOfAny(new[] { '.', '+' });
+        var simpleTypeName = lastTypeSeparator >= 0 ? containingType.Substring(lastTypeSeparator + 1) : containingType;
+        var genericStart = simpleTypeName.IndexOf('<');
+        return genericStart >= 0 ? simpleTypeName.Substring(0, genericStart) : simpleTypeName;
+    }
+
+    private static bool IsSimpleIdentifier(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !IsIdentifierStart(value[0]))
+        {
+            return false;
+        }
+
+        for (var i = 1; i < value.Length; i++)
+        {
+            if (!IsIdentifierPart(value[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsIdentifierStart(char value) => char.IsLetter(value) || value == '_';
+
+    private static bool IsIdentifierPart(char value) => char.IsLetterOrDigit(value) || value == '_';
 
     private static string? GetFreshArrayNote(MethodPurityClassification? classification)
     {

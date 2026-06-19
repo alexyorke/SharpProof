@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -884,6 +885,37 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeArrayGetEnumeratorSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                8,
+                "System.Array.GetEnumerator()");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Array.GetEnumerator()", "pure");
+            AssertFreshnessClassification(summary, "System.Array.GetEnumerator()", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Array.GetEnumerator()", "internal_only");
+            AssertPurityClassification(summary, "System.ArrayEnumerator..ctor(System.Array)", "pure");
+            AssertFreshnessClassification(summary, "System.ArrayEnumerator..ctor(System.Array)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.ArrayEnumerator..ctor(System.Array)", "internal_only");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Array.GetEnumerator()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeContractSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(
@@ -1045,6 +1077,80 @@ public static class StringComparisonFixture
 
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.LinkedListNode`1.get_Value()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.SortedList`2.IndexOfKey(!0)"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeKeyValuePairCtorAndAccessorsSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.Collections.Generic.KeyValuePair`2..ctor(!0, !1)",
+                "System.Collections.Generic.KeyValuePair`2.get_Key()",
+                "System.Collections.Generic.KeyValuePair`2.get_Value()");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Collections.Generic.KeyValuePair`2..ctor(!0, !1)", "pure");
+            AssertFreshnessClassification(summary, "System.Collections.Generic.KeyValuePair`2..ctor(!0, !1)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.KeyValuePair`2..ctor(!0, !1)", "internal_only");
+            AssertPurityClassification(summary, "System.Collections.Generic.KeyValuePair`2.get_Key()", "pure");
+            AssertFreshnessClassification(summary, "System.Collections.Generic.KeyValuePair`2.get_Key()", "none");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.KeyValuePair`2.get_Key()", "none");
+            AssertPurityClassification(summary, "System.Collections.Generic.KeyValuePair`2.get_Value()", "pure");
+            AssertFreshnessClassification(summary, "System.Collections.Generic.KeyValuePair`2.get_Value()", "none");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.KeyValuePair`2.get_Value()", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EquivalentTo(new[]
+            {
+                "System.Collections.Generic.KeyValuePair`2..ctor(!0, !1)",
+                "System.Collections.Generic.KeyValuePair`2.get_Key()",
+                "System.Collections.Generic.KeyValuePair`2.get_Value()",
+            }));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_KeyValuePairCatalogNormalization_UsesMetadataPositionalForms()
+        {
+            await RunEffectSummaryToolAsync("--help");
+
+            var assemblyPath = Path.Combine(
+                GetRepositoryRoot(),
+                "Tools",
+                "PurelySharp.EffectSummary",
+                "bin",
+                "Debug",
+                "net8.0",
+                "PurelySharp.EffectSummary.dll");
+            Assert.That(File.Exists(assemblyPath), Is.True, assemblyPath);
+
+            var assembly = Assembly.LoadFrom(assemblyPath);
+            var engineType = assembly.GetType("PurityClassificationEngine", throwOnError: true)!;
+            var normalizeMethod = engineType.GetMethod("NormalizeCatalogSymbol", BindingFlags.NonPublic | BindingFlags.Static)!;
+
+            Assert.That(
+                (string)normalizeMethod.Invoke(null, new object[] { "System.Collections.Generic.KeyValuePair<TKey, TValue>.KeyValuePair(TKey, TValue)" })!,
+                Is.EqualTo("System.Collections.Generic.KeyValuePair`2..ctor(!0, !1)"));
+            Assert.That(
+                (string)normalizeMethod.Invoke(null, new object[] { "System.Collections.Generic.KeyValuePair<TKey, TValue>.Key.get" })!,
+                Is.EqualTo("System.Collections.Generic.KeyValuePair`2.get_Key()"));
+            Assert.That(
+                (string)normalizeMethod.Invoke(null, new object[] { "System.Collections.Generic.KeyValuePair<TKey, TValue>.Value.get" })!,
+                Is.EqualTo("System.Collections.Generic.KeyValuePair`2.get_Value()"));
+            Assert.That(
+                (string)normalizeMethod.Invoke(null, new object[] { "System.Collections.Generic.IEnumerable<T>.GetEnumerator()" })!,
+                Is.EqualTo("System.Collections.Generic.IEnumerable`1.GetEnumerator()"));
         }
 
         [Test]

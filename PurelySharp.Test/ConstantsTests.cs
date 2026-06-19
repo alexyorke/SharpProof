@@ -314,6 +314,42 @@ public static class ArrayIndexOfLengthCatalogSignatureSamples
         }
 
         [Test]
+        public void ArrayGetEnumerator_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+using System.Collections;
+
+public static class ArrayGetEnumeratorCatalogSignatureSamples
+{
+    public static IEnumerator Sample(Array values)
+    {
+        return values.GetEnumerator();
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ArrayGetEnumeratorCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var signature = GetInvocationSignature(compilation, syntaxTree, "values.GetEnumerator()");
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var invocation = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Single(node => node.ToString() == "values.GetEnumerator()");
+            var methodSymbol = (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!;
+            var (matched, classification) = GetGeneratedPurityClassification(methodSymbol, compilation);
+
+            Assert.That(signature, Is.EqualTo("System.Array.GetEnumerator()"));
+            AssertNotInManualCatalogs(signature);
+            Assert.That(matched, Is.True,
+                "Generated purity catalog should resolve System.Array.GetEnumerator() from runtime metadata evidence.");
+            Assert.That(classification, Is.EqualTo("pure"));
+        }
+
+        [Test]
         public void GenericArrayIndexLookupHelpers_AreNotBackedByStaticPureCatalogs()
         {
             var source = @"
@@ -1426,6 +1462,69 @@ public static class DecimalComparisonAndConversionCatalogSignatureSamples
             Assert.That(resolutions["decimal.ToDouble(value)"].classification, Is.EqualTo("pure"));
             Assert.That(resolutions["decimal.ToInt32(value)"].matched, Is.True);
             Assert.That(resolutions["decimal.ToInt32(value)"].classification, Is.EqualTo("impure"));
+        }
+
+        [Test]
+        public void KeyValuePairCtorAndAccessors_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Collections.Generic;
+
+public static class KeyValuePairCatalogSignatureSamples<TKey, TValue>
+{
+    public static TValue Sample(KeyValuePair<TKey, TValue> pair, TKey key, TValue value)
+    {
+        var created = new KeyValuePair<TKey, TValue>(key, value);
+        _ = pair.Key;
+        return created.Value;
+    }
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "KeyValuePairCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var ctorSignature = GetObjectCreationSignature(compilation, syntaxTree, "new KeyValuePair<TKey, TValue>(key, value)");
+            var keySignature = GetPropertySignature(compilation, syntaxTree, "pair.Key");
+            var valueSignature = GetPropertySignature(compilation, syntaxTree, "created.Value");
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMembers = new (string Signature, IMethodSymbol Symbol)[]
+            {
+                (
+                    ctorSignature,
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<ObjectCreationExpressionSyntax>()
+                            .Single(node => node.ToString() == "new KeyValuePair<TKey, TValue>(key, value)"))
+                        .Symbol!),
+                (
+                    keySignature,
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "pair.Key"))
+                        .Symbol!).GetMethod!),
+                (
+                    valueSignature,
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "created.Value"))
+                        .Symbol!).GetMethod!),
+            };
+
+            foreach (var trackedMember in trackedMembers)
+            {
+                var (matched, classification) = GetGeneratedPurityClassification(trackedMember.Symbol, compilation);
+                AssertNotInManualCatalogs(trackedMember.Signature);
+                Assert.That(matched, Is.True, trackedMember.Signature);
+                Assert.That(classification, Is.EqualTo("pure"), trackedMember.Signature);
+            }
         }
 
         [Test]
