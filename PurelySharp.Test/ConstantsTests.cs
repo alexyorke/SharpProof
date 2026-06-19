@@ -620,6 +620,29 @@ public static class StaticCacheGetterCatalogSignatureSamples
         }
 
         [Test]
+        public void CancellationTokenNone_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Threading;
+
+public static class CancellationTokenCatalogSignatureSamples
+{
+    public static CancellationToken Sample()
+    {
+        return CancellationToken.None;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "CancellationTokenCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "CancellationToken.None"));
+        }
+
+        [Test]
         public void NullableComparisonHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"

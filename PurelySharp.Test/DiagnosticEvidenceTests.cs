@@ -613,6 +613,55 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_CancellationTokenNoneAsPureEvidence()
+        {
+            const string source = @"
+using System.Threading;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod()
+    {
+        _ = CancellationToken.None;
+        return true;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var memberAccess = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Single(node => node.ToString() == "CancellationToken.None");
+            var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(memberAccess).Symbol!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var args = new object?[] { propertySymbol.GetMethod!.OriginalDefinition, compilation, null };
+            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+            var purityEntry = args[2]!;
+            var classification = matched
+                ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                : string.Empty;
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow CancellationToken.None even under the System.Threading namespace fallback.");
+            Assert.That(matched, Is.True);
+            Assert.That(classification, Is.EqualTo("pure"));
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_IPAddressIsLoopbackAsPureEvidence()
         {
             const string source = @"

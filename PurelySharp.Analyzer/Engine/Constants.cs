@@ -1005,9 +1005,6 @@ public static class Constants
         "System.Linq.Enumerable.ThenBy",
         "System.Linq.Enumerable.Zip",
         "System.Runtime.InteropServices.Marshal.SizeOf<T>()",
-        "System.Threading.CancellationToken.None.get",
-
-
         "System.AggregateException.AggregateException(System.Collections.Generic.IEnumerable<System.Exception>)",
         "System.AggregateException.Flatten()",
         "System.Array.IndexOf<T>(T[], T)",

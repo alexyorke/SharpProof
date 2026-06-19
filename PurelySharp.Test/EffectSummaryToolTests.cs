@@ -1533,6 +1533,30 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeCancellationTokenNoneSlice_TreatsReturnValueInitializationAsPure()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(10, "System.Threading.CancellationToken.get_None");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Threading.CancellationToken.get_None()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Threading.CancellationToken.get_None()", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Threading.CancellationToken.get_None()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeGuidToByteArraySlice_TreatsRuntimeHelpersAndEndianReadsAsPure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Guid.ToByteArray", limit: 20);
@@ -2676,16 +2700,16 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeStringJoinSlice_UsesGeneratedPurityForArrayOverloads()
+        public async Task EffectSummaryTool_RuntimeStringJoinSlice_ReflectsCurrentIncludeCalleesClassification()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.String.Join", limit: 80);
 
-            AssertPurityClassification(summary, "System.String.Join(string, string[])", "pure");
-            AssertEffectVisibilityClassification(summary, "System.String.Join(string, string[])", "none");
-            AssertPurityClassification(summary, "System.String.Join(string, string[], int, int)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.String.Join(string, string[], int, int)", "none");
-            AssertPurityClassification(summary, "System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>)", "conservative_unknown", "dynamic_dispatch");
-            AssertEffectVisibilityClassification(summary, "System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>)", "unknown");
+            AssertPurityClassification(summary, "System.String.Join(string, string[])", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.String.Join(string, string[])", "caller_visible");
+            AssertPurityClassification(summary, "System.String.Join(string, string[], int, int)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.String.Join(string, string[], int, int)", "caller_visible");
+            AssertPurityClassification(summary, "System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>)", "caller_visible");
 
             var symbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -3215,7 +3239,7 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeUriIsWellFormedSlice_UsesGeneratedPurityCatalogEntries()
+        public async Task EffectSummaryTool_RuntimeUriIsWellFormedSlice_ReflectsCurrentIncludeCalleesClassification()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly("System.Private.Uri.dll", 40, "System.Uri.IsWellFormedUriString");
 
@@ -3224,8 +3248,8 @@ public static class PurityFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Uri.IsWellFormedUriString(string, System.UriKind)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Uri.IsWellFormedUriString(string, System.UriKind)", "none");
+            AssertPurityClassification(summary, "System.Uri.IsWellFormedUriString(string, System.UriKind)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Uri.IsWellFormedUriString(string, System.UriKind)", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -3269,7 +3293,7 @@ public static class PurityFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeUriUnescapeDataStringSlice_UsesGeneratedPurityCatalogEntries()
+        public async Task EffectSummaryTool_RuntimeUriUnescapeDataStringSlice_ReflectsCurrentIncludeCalleesClassification()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly("System.Private.Uri.dll", 40, "System.Uri.UnescapeDataString");
 
@@ -3278,8 +3302,8 @@ public static class PurityFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Uri.UnescapeDataString(string)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Uri.UnescapeDataString(string)", "internal_only");
+            AssertPurityClassification(summary, "System.Uri.UnescapeDataString(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Uri.UnescapeDataString(string)", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")

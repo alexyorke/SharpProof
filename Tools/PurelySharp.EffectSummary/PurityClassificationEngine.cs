@@ -163,6 +163,7 @@ internal static class PurityClassificationEngine
             if (string.Equals(root, "caller_visible_memory_write", StringComparison.Ordinal) &&
                 (HasFreshOwnedArrayWritePattern(summary) ||
                  HasFreshOwnedStringWritePattern(summary) ||
+                 HasReturnValueInitializationPattern(summary) ||
                  HasLocalScratchMemoryWritePattern(summary) ||
                  HasByRefLikeViewConstructionPattern(summary)))
             {
@@ -201,6 +202,7 @@ internal static class PurityClassificationEngine
                 (summary.RootCandidates.Contains("fresh_owned_memory_write", StringComparer.Ordinal) ||
                  HasFreshOwnedArrayWritePattern(summary) ||
                  HasFreshOwnedStringWritePattern(summary) ||
+                 HasReturnValueInitializationPattern(summary) ||
                  HasLocalScratchMemoryWritePattern(summary) ||
                  HasByRefLikeViewConstructionPattern(summary)))
             {
@@ -844,6 +846,30 @@ internal static class PurityClassificationEngine
         return summary.Calls.Any(static call =>
             call.StartsWith("System.Collections.Generic.ValueListBuilder`1<", StringComparison.Ordinal) ||
             call.StartsWith("System.Text.ValueStringBuilder.", StringComparison.Ordinal));
+    }
+
+    private static bool HasReturnValueInitializationPattern(MethodEffectSummary? summary)
+    {
+        if (summary == null ||
+            !summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        foreach (var effect in summary.Effects)
+        {
+            if (!string.Equals(effect, "writes_indirect_memory", StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        if (summary.Calls.Length != 0 || summary.Fields.Length != 0)
+        {
+            return false;
+        }
+
+        return HasParameterlessNonVoidReturn(summary.ExactSymbolKey);
     }
 
     private static bool HasByRefLikeViewConstructionPattern(MethodEffectSummary? summary)
@@ -1492,6 +1518,32 @@ internal static class PurityClassificationEngine
     {
         return callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) && callSymbol.Contains("..ctor(ref ", StringComparison.Ordinal);
+    }
+
+    private static bool HasParameterlessNonVoidReturn(string exactSymbolKey)
+    {
+        if (string.IsNullOrWhiteSpace(exactSymbolKey))
+        {
+            return false;
+        }
+
+        var openParenIndex = exactSymbolKey.IndexOf('(');
+        var returnSeparatorIndex = exactSymbolKey.LastIndexOf(")->", StringComparison.Ordinal);
+        if (openParenIndex < 0 || returnSeparatorIndex <= openParenIndex)
+        {
+            return false;
+        }
+
+        var parameters = exactSymbolKey.Substring(openParenIndex + 1, returnSeparatorIndex - openParenIndex - 1);
+        if (!string.IsNullOrEmpty(parameters))
+        {
+            return false;
+        }
+
+        var returnType = exactSymbolKey[(returnSeparatorIndex + 3)..];
+        return !string.IsNullOrWhiteSpace(returnType) &&
+            !string.Equals(returnType, "void", StringComparison.Ordinal) &&
+            !returnType.StartsWith("ref ", StringComparison.Ordinal);
     }
 
     private static bool IsPureArgumentGuardWrapper(string symbol)

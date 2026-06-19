@@ -340,6 +340,14 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/CancellationToken.None.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/CancellationToken.None.PurelySharp.EffectSummary.json",
+      "Limit": 10,
+      "SymbolPrefixes": [
+        "System.Threading.CancellationToken.get_None"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/IPAddress.IsLoopback.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/IPAddress.IsLoopback.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Net.Primitives.dll",

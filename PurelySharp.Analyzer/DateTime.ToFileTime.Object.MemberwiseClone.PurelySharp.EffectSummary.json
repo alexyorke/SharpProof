@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T23:09:37.4392056+00:00",
+  "GeneratedAtUtc": "2026-06-19T00:06:09.1903759+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -400,38 +400,7 @@
     "ImpureCount": 4,
     "ConservativeUnknownCount": 1,
     "CatalogComparison": {
-      "KnownPureMembers": [
-        {
-          "Symbol": "System.DateTime.ToFileTime()",
-          "Catalog": "known_pure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.DateTime.ToFileTimeUtc()"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.DateTime.ToFileTime()-\u003Elong"
-          ]
-        },
-        {
-          "Symbol": "object.MemberwiseClone()",
-          "Catalog": "known_pure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Buffer.Memmove(ref byte, ref byte, nuint)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "object.MemberwiseClone()-\u003Eobject"
-          ]
-        }
-      ],
+      "KnownPureMembers": [],
       "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
