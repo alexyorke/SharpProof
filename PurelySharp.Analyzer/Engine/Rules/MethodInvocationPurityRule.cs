@@ -535,21 +535,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 invokedMethodSymbol,
                 context.EnforcePureAttributeSymbol,
                 context.PureAttributeSymbol);
-            if (PurityAnalysisEngine.IsInConfiguredImpureNamespaceOrType(originalDefinitionSymbol) &&
-                !isExplicitlyPure &&
-                !PurityAnalysisEngine.IsConfiguredKnownPureMember(originalDefinitionSymbol))
-            {
-                PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (In configured impure NS/Type and not explicitly Pure)");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        GetCatalogHitCategory(originalDefinitionSymbol),
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: originalDefinitionSymbol,
-                        catalogSource: "known_impure_namespace_or_type"));
-            }
-
             if (hasTrustedGeneratedPurity)
             {
                 if (generatedPurity.IsPure)
@@ -570,6 +555,21 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: originalDefinitionSymbol,
                         catalogSource: "generated_purity_summary"));
                 }
+            }
+
+            if (PurityAnalysisEngine.IsInConfiguredImpureNamespaceOrType(originalDefinitionSymbol) &&
+                !isExplicitlyPure &&
+                !PurityAnalysisEngine.IsConfiguredKnownPureMember(originalDefinitionSymbol))
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (In configured impure NS/Type and not explicitly Pure)");
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    invocationOperation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        GetCatalogHitCategory(originalDefinitionSymbol),
+                        nameof(MethodInvocationPurityRule),
+                        invocationOperation,
+                        symbol: originalDefinitionSymbol,
+                        catalogSource: "known_impure_namespace_or_type"));
             }
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Checking IsKnownPureBCLMember with signature: '{originalDefinitionSymbol.ToDisplayString()}'");
