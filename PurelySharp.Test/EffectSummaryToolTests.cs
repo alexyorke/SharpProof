@@ -15,6 +15,9 @@ namespace PurelySharp.Test
     [TestFixture]
     public class EffectSummaryToolTests
     {
+        private static readonly object EffectSummaryToolBuildLock = new object();
+        private static string? s_effectSummaryToolDllPath;
+
         [Test]
         public async Task EffectSummaryTool_CollectsCommonDirectExceptionTypes()
         {
@@ -6899,10 +6902,7 @@ public static class CallvirtFixture
                 WorkingDirectory = GetRepositoryRoot(),
                 UseShellExecute = false,
             };
-            startInfo.ArgumentList.Add("run");
-            startInfo.ArgumentList.Add("--project");
-            startInfo.ArgumentList.Add("Tools\\PurelySharp.EffectSummary\\PurelySharp.EffectSummary.csproj");
-            startInfo.ArgumentList.Add("--");
+            startInfo.ArgumentList.Add(GetEffectSummaryToolDllPath());
             startInfo.ArgumentList.Add("--assembly");
             startInfo.ArgumentList.Add(assemblyPath);
             startInfo.ArgumentList.Add("--output");
@@ -6956,10 +6956,7 @@ public static class CallvirtFixture
                 WorkingDirectory = GetRepositoryRoot(),
                 UseShellExecute = false,
             };
-            startInfo.ArgumentList.Add("run");
-            startInfo.ArgumentList.Add("--project");
-            startInfo.ArgumentList.Add("Tools\\PurelySharp.EffectSummary\\PurelySharp.EffectSummary.csproj");
-            startInfo.ArgumentList.Add("--");
+            startInfo.ArgumentList.Add(GetEffectSummaryToolDllPath());
             startInfo.ArgumentList.Add("--assembly");
             startInfo.ArgumentList.Add(assemblyPath);
             foreach (var symbolPrefix in symbolPrefixes)
@@ -7009,10 +7006,7 @@ public static class CallvirtFixture
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };
-            startInfo.ArgumentList.Add("run");
-            startInfo.ArgumentList.Add("--project");
-            startInfo.ArgumentList.Add("Tools\\PurelySharp.EffectSummary\\PurelySharp.EffectSummary.csproj");
-            startInfo.ArgumentList.Add("--");
+            startInfo.ArgumentList.Add(GetEffectSummaryToolDllPath());
             foreach (var argument in arguments)
             {
                 startInfo.ArgumentList.Add(argument);
@@ -7091,10 +7085,7 @@ public static class CallvirtFixture
                 WorkingDirectory = GetRepositoryRoot(),
                 UseShellExecute = false,
             };
-            startInfo.ArgumentList.Add("run");
-            startInfo.ArgumentList.Add("--project");
-            startInfo.ArgumentList.Add("Tools\\PurelySharp.EffectSummary\\PurelySharp.EffectSummary.csproj");
-            startInfo.ArgumentList.Add("--");
+            startInfo.ArgumentList.Add(GetEffectSummaryToolDllPath());
             startInfo.ArgumentList.Add("--framework");
             startInfo.ArgumentList.Add("net8.0");
             if (!string.IsNullOrWhiteSpace(runtimeAssemblyName))
@@ -7136,6 +7127,48 @@ public static class CallvirtFixture
             }
 
             return JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+        }
+
+        private static string GetEffectSummaryToolDllPath()
+        {
+            lock (EffectSummaryToolBuildLock)
+            {
+                if (!string.IsNullOrWhiteSpace(s_effectSummaryToolDllPath) && File.Exists(s_effectSummaryToolDllPath))
+                {
+                    return s_effectSummaryToolDllPath;
+                }
+
+                var repositoryRoot = GetRepositoryRoot();
+                var projectPath = Path.Combine(repositoryRoot, "Tools", "PurelySharp.EffectSummary", "PurelySharp.EffectSummary.csproj");
+                var dllPath = Path.Combine(repositoryRoot, "Tools", "PurelySharp.EffectSummary", "bin", "Debug", "net8.0", "PurelySharp.EffectSummary.dll");
+                var startInfo = new ProcessStartInfo
+                {
+                    FileName = "dotnet",
+                    WorkingDirectory = repositoryRoot,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                };
+                startInfo.ArgumentList.Add("build");
+                startInfo.ArgumentList.Add(projectPath);
+                startInfo.ArgumentList.Add("-m:20");
+                startInfo.ArgumentList.Add("--no-restore");
+
+                using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to build effect summary tool.");
+                var standardOutput = process.StandardOutput.ReadToEnd();
+                var standardError = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                if (process.ExitCode != 0 || !File.Exists(dllPath))
+                {
+                    throw new AssertionException(
+                        "Effect summary tool build failed." + Environment.NewLine +
+                        standardOutput + Environment.NewLine +
+                        standardError);
+                }
+
+                s_effectSummaryToolDllPath = dllPath;
+                return s_effectSummaryToolDllPath;
+            }
         }
 
         private static async Task<FixtureAssembly> CreateFixtureAssemblyAsync(string assemblyName, string source)
