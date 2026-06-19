@@ -180,19 +180,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            if (PurityAnalysisEngine.IsKnownImpure(originalDefinition))
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    interpolation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "catalog_hit",
-                        nameof(InterpolatedStringPurityRule),
-                        interpolation,
-                        syntaxNode: interpolation.Syntax,
-                        symbol: originalDefinition,
-                        catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinition) ?? "known_impure"));
-            }
-
             GeneratedPurityCatalog.PurityEntry generatedPurity = default;
             var hasTrustedGeneratedPurity = originalDefinition.Locations.FirstOrDefault()?.IsInMetadata == true &&
                 PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
@@ -217,8 +204,21 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             interpolation,
                             syntaxNode: interpolation.Syntax,
                             symbol: originalDefinition,
-                            catalogSource: "generated_purity_summary"));
+                        catalogSource: "generated_purity_summary"));
                 }
+            }
+
+            if (PurityAnalysisEngine.IsKnownImpure(originalDefinition))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    interpolation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        "catalog_hit",
+                        nameof(InterpolatedStringPurityRule),
+                        interpolation,
+                        syntaxNode: interpolation.Syntax,
+                        symbol: originalDefinition,
+                        catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinition) ?? "known_impure"));
             }
 
             if (!hasTrustedGeneratedPurity && PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinition))

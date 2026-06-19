@@ -7780,6 +7780,73 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPuritySummary_PrefersStrongerExactMatch_RegardlessOfAdditionalFileOrder()
+        {
+            const string metadataSymbol = "System.Type.ToString()";
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(System.Type type)
+    {
+        return type.ToString();
+    }
+}",
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new InMemoryAdditionalText(
+                        "Synthetic.TypeToString.Unknown.PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            typeof(Type).Assembly.Location,
+                            metadataSymbol,
+                            "conservative_unknown",
+                            "[\"metadata_only_or_external\"]")),
+                    new InMemoryAdditionalText(
+                        "Synthetic.TypeToString.Pure.PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            typeof(Type).Assembly.Location,
+                            metadataSymbol,
+                            "pure",
+                            "[]"))));
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted exact-match purity selection should prefer the stronger pure summary regardless of additional-file order.");
+        }
+
+        [Test]
+        public async Task GeneratedPuritySummary_Allows_TypeToString_InsideInterpolatedString_WhenMetadataEvidenceIsPure()
+        {
+            const string metadataSymbol = "System.Type.ToString()";
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(System.Type type)
+    {
+        return $""{type}"";
+    }
+}",
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new InMemoryAdditionalText(
+                        "Synthetic.TypeToString.Interpolation.PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            typeof(Type).Assembly.Location,
+                            metadataSymbol,
+                            "pure",
+                            "[]"))));
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated pure summaries should override the manual ToString catalog inside interpolated strings.");
+        }
+
+        [Test]
         public async Task GeneratedPuritySummary_Allows_TypeGetTypeFromHandle_WhenMetadataEvidenceIsPure()
         {
             const string metadataSymbol = "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)";

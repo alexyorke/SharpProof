@@ -320,6 +320,44 @@ public class TestClass
         }
 
         [Test]
+        public async Task PathGetRandomFileName_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}()
+    {
+        return Path.GetRandomFileName();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task PathGetTempFileName_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}()
+    {
+        return Path.GetTempFileName();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task DynamicDispatchImpurity_Diagnostic()
         {
 
