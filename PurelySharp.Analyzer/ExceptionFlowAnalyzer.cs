@@ -311,9 +311,10 @@ namespace PurelySharp.Analyzer
 
             foreach (var invocation in GetInvocationNodes(methodNode))
             {
+                var knownExactLocals = GetKnownExactLocalTypesBefore(invocation, semanticModel, cancellationToken);
                 if (semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation invocationOperation)
                 {
-                    foreach (var invokedMethod in ResolveInvocationTargets(invocationOperation))
+                    foreach (var invokedMethod in ResolveInvocationTargets(invocationOperation, knownExactLocals))
                     {
                         if (invokedMethod.MethodKind == MethodKind.DelegateInvoke)
                         {
@@ -345,9 +346,13 @@ namespace PurelySharp.Analyzer
 
             foreach (var propertyAccess in GetPropertyAccessNodes(methodNode, semanticModel, cancellationToken))
             {
+                var knownExactLocals = GetKnownExactLocalTypesBefore(propertyAccess, semanticModel, cancellationToken);
                 if (semanticModel.GetOperation(propertyAccess, cancellationToken) is IPropertyReferenceOperation propertyReferenceOperation)
                 {
-                    foreach (var getterMethod in ResolvePropertyAccessorTargets(propertyReferenceOperation, preferSetter: false))
+                    foreach (var getterMethod in ResolvePropertyAccessorTargets(
+                                 propertyReferenceOperation,
+                                 preferSetter: false,
+                                 knownExactLocals))
                     {
                         if (seen.Add(CreateMethodCallSiteKey(propertyAccess, getterMethod)))
                         {
@@ -365,9 +370,13 @@ namespace PurelySharp.Analyzer
 
             foreach (var propertyWrite in GetPropertyWriteNodes(methodNode, semanticModel, cancellationToken))
             {
+                var knownExactLocals = GetKnownExactLocalTypesBefore(propertyWrite, semanticModel, cancellationToken);
                 if (semanticModel.GetOperation(propertyWrite, cancellationToken) is IPropertyReferenceOperation propertyReferenceOperation)
                 {
-                    foreach (var setterMethod in ResolvePropertyAccessorTargets(propertyReferenceOperation, preferSetter: true))
+                    foreach (var setterMethod in ResolvePropertyAccessorTargets(
+                                 propertyReferenceOperation,
+                                 preferSetter: true,
+                                 knownExactLocals))
                     {
                         if (seen.Add(CreateMethodCallSiteKey(propertyWrite, setterMethod)))
                         {
@@ -433,7 +442,9 @@ namespace PurelySharp.Analyzer
                 method.OriginalDefinition.ToDisplayString();
         }
 
-        private static IEnumerable<IMethodSymbol> ResolveInvocationTargets(IInvocationOperation invocationOperation)
+        private static IEnumerable<IMethodSymbol> ResolveInvocationTargets(
+            IInvocationOperation invocationOperation,
+            IReadOnlyDictionary<ISymbol, INamedTypeSymbol>? knownExactLocals = null)
         {
             var invokedMethod = invocationOperation.TargetMethod;
             if (invokedMethod == null)
@@ -447,7 +458,7 @@ namespace PurelySharp.Analyzer
                 yield break;
             }
 
-            if (TryResolveExactConcreteType(invocationOperation.Instance, out var exactReceiverType))
+            if (TryResolveExactConcreteType(invocationOperation.Instance, knownExactLocals, out var exactReceiverType))
             {
                 var exactTarget = ResolveMethodTargetForConcreteReceiver(invokedMethod, exactReceiverType);
                 if (exactTarget != null)
@@ -462,7 +473,8 @@ namespace PurelySharp.Analyzer
 
         private static IEnumerable<IMethodSymbol> ResolvePropertyAccessorTargets(
             IPropertyReferenceOperation propertyReferenceOperation,
-            bool preferSetter)
+            bool preferSetter,
+            IReadOnlyDictionary<ISymbol, INamedTypeSymbol>? knownExactLocals = null)
         {
             var accessor = preferSetter
                 ? propertyReferenceOperation.Property?.SetMethod
@@ -478,7 +490,7 @@ namespace PurelySharp.Analyzer
                 yield break;
             }
 
-            if (TryResolveExactConcreteType(propertyReferenceOperation.Instance, out var exactReceiverType))
+            if (TryResolveExactConcreteType(propertyReferenceOperation.Instance, knownExactLocals, out var exactReceiverType))
             {
                 var exactAccessor = ResolvePropertyAccessorTargetForConcreteReceiver(
                     propertyReferenceOperation.Property,
@@ -638,7 +650,10 @@ namespace PurelySharp.Analyzer
                 ReferenceEquals(assignment.Left, node);
         }
 
-        private static bool TryResolveExactConcreteType(IOperation? operation, out INamedTypeSymbol exactReceiverType)
+        private static bool TryResolveExactConcreteType(
+            IOperation? operation,
+            IReadOnlyDictionary<ISymbol, INamedTypeSymbol>? knownExactLocals,
+            out INamedTypeSymbol exactReceiverType)
         {
             exactReceiverType = null!;
             var current = operation;
@@ -658,13 +673,34 @@ namespace PurelySharp.Analyzer
                     return true;
                 }
 
+                if (current is ILocalReferenceOperation localReferenceOperation &&
+                    knownExactLocals != null &&
+                    knownExactLocals.TryGetValue(localReferenceOperation.Local.OriginalDefinition, out var localExactType))
+                {
+                    exactReceiverType = localExactType;
+                    return true;
+                }
+
                 if (current is IConditionalOperation conditionalOperation)
                 {
-                    if (TryResolveExactConcreteType(conditionalOperation.WhenTrue, out var whenTrueType) &&
-                        TryResolveExactConcreteType(conditionalOperation.WhenFalse, out var whenFalseType) &&
+                    if (TryResolveExactConcreteType(conditionalOperation.WhenTrue, knownExactLocals, out var whenTrueType) &&
+                        TryResolveExactConcreteType(conditionalOperation.WhenFalse, knownExactLocals, out var whenFalseType) &&
                         SymbolEqualityComparer.Default.Equals(whenTrueType, whenFalseType))
                     {
                         exactReceiverType = whenTrueType;
+                        return true;
+                    }
+
+                    return false;
+                }
+
+                if (current is ICoalesceOperation coalesceOperation)
+                {
+                    if (TryResolveExactConcreteType(coalesceOperation.Value, knownExactLocals, out var leftType) &&
+                        TryResolveExactConcreteType(coalesceOperation.WhenNull, knownExactLocals, out var rightType) &&
+                        SymbolEqualityComparer.Default.Equals(leftType, rightType))
+                    {
+                        exactReceiverType = leftType;
                         return true;
                     }
 
@@ -685,6 +721,124 @@ namespace PurelySharp.Analyzer
 
                 return false;
             }
+        }
+
+        private static IReadOnlyDictionary<ISymbol, INamedTypeSymbol>? GetKnownExactLocalTypesBefore(
+            SyntaxNode callSite,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            if (!TryGetContainingStatement(callSite, out var containingStatement) ||
+                !TryGetContainingStatementList(containingStatement!, out var statements))
+            {
+                return null;
+            }
+
+            Dictionary<ISymbol, INamedTypeSymbol>? knownExactLocals = null;
+            foreach (var statement in statements)
+            {
+                if (ReferenceEquals(statement, containingStatement))
+                {
+                    break;
+                }
+
+                UpdateKnownExactLocalTypes(statement, semanticModel, cancellationToken, ref knownExactLocals);
+            }
+
+            return knownExactLocals;
+        }
+
+        private static void UpdateKnownExactLocalTypes(
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ref Dictionary<ISymbol, INamedTypeSymbol>? knownExactLocals)
+        {
+            if (statement is LocalDeclarationStatementSyntax localDeclaration)
+            {
+                foreach (var variable in localDeclaration.Declaration.Variables)
+                {
+                    if (semanticModel.GetDeclaredSymbol(variable, cancellationToken) is not ILocalSymbol localSymbol)
+                    {
+                        continue;
+                    }
+
+                    if (variable.Initializer?.Value != null &&
+                        semanticModel.GetOperation(variable.Initializer.Value, cancellationToken) is { } initializerOperation &&
+                        TryResolveExactConcreteType(initializerOperation, knownExactLocals, out var exactType))
+                    {
+                        (knownExactLocals ??= new Dictionary<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default))[localSymbol.OriginalDefinition] = exactType;
+                    }
+                    else
+                    {
+                        knownExactLocals?.Remove(localSymbol.OriginalDefinition);
+                    }
+                }
+
+                return;
+            }
+
+            if (statement is ExpressionStatementSyntax
+                {
+                    Expression: AssignmentExpressionSyntax
+                    {
+                        RawKind: (int)SyntaxKind.SimpleAssignmentExpression
+                    } assignment
+                } &&
+                TryGetAssignedLocalSymbol(assignment.Left, semanticModel, cancellationToken, out var assignedLocalSymbol))
+            {
+                if (semanticModel.GetOperation(assignment.Right, cancellationToken) is { } rightOperation &&
+                    TryResolveExactConcreteType(rightOperation, knownExactLocals, out var exactType))
+                {
+                    (knownExactLocals ??= new Dictionary<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default))[assignedLocalSymbol!] = exactType;
+                }
+                else
+                {
+                    knownExactLocals?.Remove(assignedLocalSymbol!);
+                }
+            }
+        }
+
+        private static bool TryGetContainingStatement(SyntaxNode node, out StatementSyntax? statement)
+        {
+            statement = node.FirstAncestorOrSelf<StatementSyntax>();
+            return statement != null;
+        }
+
+        private static bool TryGetContainingStatementList(
+            StatementSyntax statement,
+            out SyntaxList<StatementSyntax> statements)
+        {
+            if (statement.Parent is BlockSyntax block)
+            {
+                statements = block.Statements;
+                return true;
+            }
+
+            if (statement.Parent is SwitchSectionSyntax switchSection)
+            {
+                statements = switchSection.Statements;
+                return true;
+            }
+
+            statements = default;
+            return false;
+        }
+
+        private static bool TryGetAssignedLocalSymbol(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out ISymbol? localSymbol)
+        {
+            localSymbol = null;
+            if (semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is not ILocalSymbol symbol)
+            {
+                return false;
+            }
+
+            localSymbol = symbol.OriginalDefinition;
+            return true;
         }
 
         private static IOperation? SkipImplicitConversions(IOperation? operation)

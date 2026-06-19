@@ -306,6 +306,74 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_InterfaceMethodDispatch_AliasLocalExactConcreteReceiver_Propagates()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public interface IService
+{
+    void Work();
+}
+
+public sealed class ThrowingService : IService
+{
+    public void Work()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        IService service = new ThrowingService();
+        IService alias = service;
+        alias.Work();
+    }
+}", "TestMethod");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
+        public async Task Ps0011_InterfaceMethodDispatch_AliasLocalExactConcreteReceiver_ReportsCallSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public interface IService
+{
+    void Work();
+}
+
+public sealed class ThrowingService : IService
+{
+    public void Work()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        IService service = new ThrowingService();
+        IService alias = service;
+        alias.Work();
+    }
+}");
+
+            var diagnostic = diagnostics.Single(d =>
+                d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId &&
+                d.GetMessage().Contains("alias.Work()", StringComparison.Ordinal));
+            Assert.That(diagnostic.GetMessage(), Does.Contain("alias.Work()"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
         public async Task Ps0010_VirtualMethodDispatch_DirectExactConcreteReceiver_Propagates()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"
@@ -329,6 +397,38 @@ public class TestClass
     public void TestMethod()
     {
         ((Worker)new ThrowingWorker()).Work();
+    }
+}", "TestMethod");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
+        public async Task Ps0010_VirtualMethodDispatch_CastLocalExactConcreteReceiver_Propagates()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public abstract class Worker
+{
+    public abstract void Work();
+}
+
+public sealed class ThrowingWorker : Worker
+{
+    public override void Work()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        var concrete = new ThrowingWorker();
+        Worker worker = (Worker)concrete;
+        worker.Work();
     }
 }", "TestMethod");
 
@@ -362,6 +462,42 @@ public class TestClass
     public int TestMethod()
     {
         return ((IValueSource)new ThrowingValueSource()).Value;
+    }
+}", "TestMethod");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
+        public async Task Ps0010_InterfacePropertyGetter_SameConcreteConditionalLocal_Propagates()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public interface IValueSource
+{
+    int Value { get; }
+}
+
+public sealed class ThrowingValueSource : IValueSource
+{
+    public int Value
+    {
+        get
+        {
+            throw new InvalidOperationException();
+        }
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(bool chooseLeft)
+    {
+        IValueSource source = chooseLeft
+            ? new ThrowingValueSource()
+            : new ThrowingValueSource();
+        return source.Value;
     }
 }", "TestMethod");
 

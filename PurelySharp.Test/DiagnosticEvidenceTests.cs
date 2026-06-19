@@ -8415,6 +8415,50 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0011_InterfaceMethodDispatch_AliasLocalExactConcreteReceiver_ReportsSourceCalleeEvidence()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public interface IService
+{
+    void Work();
+}
+
+public sealed class ThrowingService : IService
+{
+    public void Work()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        var concrete = new ThrowingService();
+        IService alias = concrete;
+        alias.Work();
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            var diagnostic = SingleDiagnostic(
+                diagnostics
+                    .Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId)
+                    .Where(d => d.GetMessage().Contains("alias.Work()", StringComparison.Ordinal))
+                    .ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("alias.Work()"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("source_callee"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.InvalidOperationException=source_callee:"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSymbolProperty], Does.Contain("ThrowingService.Work"));
+        }
+
+        [Test]
         public async Task Ps0011_DirectThrow_UncaughtAtSite_ReportsWarning()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
