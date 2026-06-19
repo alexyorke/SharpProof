@@ -2032,6 +2032,274 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_ConsoleObservableGettersAsImpureEvidence()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ConsoleColor BackgroundColor()
+    {
+        return Console.BackgroundColor;
+    }
+
+    [EnforcePure]
+    public int BufferHeight()
+    {
+        return Console.BufferHeight;
+    }
+
+    [EnforcePure]
+    public int BufferWidth()
+    {
+        return Console.BufferWidth;
+    }
+
+    [EnforcePure]
+    public bool CapsLock()
+    {
+        return Console.CapsLock;
+    }
+
+    [EnforcePure]
+    public int CursorLeft()
+    {
+        return Console.CursorLeft;
+    }
+
+    [EnforcePure]
+    public int CursorSize()
+    {
+        return Console.CursorSize;
+    }
+
+    [EnforcePure]
+    public int CursorTop()
+    {
+        return Console.CursorTop;
+    }
+
+    [EnforcePure]
+    public bool CursorVisible()
+    {
+        return Console.CursorVisible;
+    }
+
+    [EnforcePure]
+    public ConsoleColor ForegroundColor()
+    {
+        return Console.ForegroundColor;
+    }
+
+    [EnforcePure]
+    public int LargestWindowHeight()
+    {
+        return Console.LargestWindowHeight;
+    }
+
+    [EnforcePure]
+    public int LargestWindowWidth()
+    {
+        return Console.LargestWindowWidth;
+    }
+
+    [EnforcePure]
+    public bool NumberLock()
+    {
+        return Console.NumberLock;
+    }
+
+    [EnforcePure]
+    public string Title()
+    {
+        return Console.Title;
+    }
+
+    [EnforcePure]
+    public bool TreatControlCAsInput()
+    {
+        return Console.TreatControlCAsInput;
+    }
+
+    [EnforcePure]
+    public int WindowHeight()
+    {
+        return Console.WindowHeight;
+    }
+
+    [EnforcePure]
+    public int WindowLeft()
+    {
+        return Console.WindowLeft;
+    }
+
+    [EnforcePure]
+    public int WindowTop()
+    {
+        return Console.WindowTop;
+    }
+
+    [EnforcePure]
+    public int WindowWidth()
+    {
+        return Console.WindowWidth;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics
+                .Where(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
+                .ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
+            {
+                (
+                    "System.Console.BackgroundColor.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.BackgroundColor"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.BufferHeight.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.BufferHeight"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.BufferWidth.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.BufferWidth"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.CapsLock.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.CapsLock"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.CursorLeft.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.CursorLeft"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.CursorSize.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.CursorSize"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.CursorTop.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.CursorTop"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.CursorVisible.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.CursorVisible"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.ForegroundColor.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.ForegroundColor"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.LargestWindowHeight.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.LargestWindowHeight"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.LargestWindowWidth.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.LargestWindowWidth"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.NumberLock.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.NumberLock"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.Title.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.Title"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.TreatControlCAsInput.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.TreatControlCAsInput"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.WindowHeight.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.WindowHeight"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.WindowLeft.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.WindowLeft"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.WindowTop.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.WindowTop"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Console.WindowWidth.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot().DescendantNodes().OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "Console.WindowWidth"))
+                        .Symbol!).GetMethod!),
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = trackedMembers.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(18));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "generated_purity_summary" }));
+            foreach (var label in classifications.Keys)
+            {
+                Assert.That(classifications[label].matched, Is.True,
+                    "Generated purity catalog should resolve " + label + ".");
+                Assert.That(classifications[label].classification, Is.EqualTo("impure"),
+                    "Generated purity catalog should classify " + label + " as impure.");
+            }
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_EnvironmentCommandLineAsImpureEvidence()
         {
             const string source = @"

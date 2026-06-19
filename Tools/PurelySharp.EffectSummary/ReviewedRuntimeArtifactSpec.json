@@ -318,6 +318,33 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Console.Observable.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Console.Observable.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Console.dll",
+      "Limit": 180,
+      "MaxDepth": 2,
+      "SymbolPrefixes": [
+        "System.Console.get_BackgroundColor",
+        "System.Console.get_BufferHeight",
+        "System.Console.get_BufferWidth",
+        "System.Console.get_CapsLock",
+        "System.Console.get_CursorLeft",
+        "System.Console.get_CursorSize",
+        "System.Console.get_CursorTop",
+        "System.Console.get_CursorVisible",
+        "System.Console.get_ForegroundColor",
+        "System.Console.get_LargestWindowHeight",
+        "System.Console.get_LargestWindowWidth",
+        "System.Console.get_NumberLock",
+        "System.Console.get_Title",
+        "System.Console.get_TreatControlCAsInput",
+        "System.Console.get_WindowHeight",
+        "System.Console.get_WindowLeft",
+        "System.Console.get_WindowTop",
+        "System.Console.get_WindowWidth"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/DateTimeOffset.Additional.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/DateTimeOffset.Additional.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [

@@ -242,6 +242,37 @@ public static class EnvironmentCatalogSignatureSamples
         }
 
         [Test]
+        public void ConsoleObservableGetterHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Console.BackgroundColor.get",
+                "System.Console.BufferHeight.get",
+                "System.Console.BufferWidth.get",
+                "System.Console.CapsLock.get",
+                "System.Console.CursorLeft.get",
+                "System.Console.CursorSize.get",
+                "System.Console.CursorTop.get",
+                "System.Console.CursorVisible.get",
+                "System.Console.ForegroundColor.get",
+                "System.Console.LargestWindowHeight.get",
+                "System.Console.LargestWindowWidth.get",
+                "System.Console.NumberLock.get",
+                "System.Console.Title.get",
+                "System.Console.TreatControlCAsInput.get",
+                "System.Console.WindowHeight.get",
+                "System.Console.WindowLeft.get",
+                "System.Console.WindowTop.get",
+                "System.Console.WindowWidth.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void AbstractDispatchFallbacks_AreNotBackedByManualImpureCatalogEntries()
         {
             AssertNotInManualCatalogs("object.ToString()");

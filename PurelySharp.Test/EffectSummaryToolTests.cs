@@ -4950,6 +4950,123 @@ public static class StringComparisonFixture
             }));
         }
 
+        [Test]
+        public async Task EffectSummaryTool_RuntimeConsoleObservableSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Console.dll",
+                180,
+                2,
+                "System.Console.get_BackgroundColor",
+                "System.Console.get_BufferHeight",
+                "System.Console.get_BufferWidth",
+                "System.Console.get_CapsLock",
+                "System.Console.get_CursorLeft",
+                "System.Console.get_CursorSize",
+                "System.Console.get_CursorTop",
+                "System.Console.get_CursorVisible",
+                "System.Console.get_ForegroundColor",
+                "System.Console.get_LargestWindowHeight",
+                "System.Console.get_LargestWindowWidth",
+                "System.Console.get_NumberLock",
+                "System.Console.get_Title",
+                "System.Console.get_TreatControlCAsInput",
+                "System.Console.get_WindowHeight",
+                "System.Console.get_WindowLeft",
+                "System.Console.get_WindowTop",
+                "System.Console.get_WindowWidth");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Console.get_BackgroundColor()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_BackgroundColor()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_BufferHeight()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_BufferHeight()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_BufferWidth()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_BufferWidth()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_CapsLock()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_CapsLock()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_CursorLeft()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_CursorLeft()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_CursorSize()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_CursorSize()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_CursorTop()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_CursorTop()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_CursorVisible()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_CursorVisible()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_ForegroundColor()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_ForegroundColor()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_LargestWindowHeight()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_LargestWindowHeight()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_LargestWindowWidth()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_LargestWindowWidth()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_NumberLock()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_NumberLock()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_Title()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_Title()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_TreatControlCAsInput()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_TreatControlCAsInput()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_WindowHeight()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_WindowHeight()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_WindowLeft()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_WindowLeft()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_WindowTop()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_WindowTop()", "caller_visible");
+            AssertPurityClassification(summary, "System.Console.get_WindowWidth()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Console.get_WindowWidth()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Console.get_BackgroundColor()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_BufferHeight()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_BufferWidth()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_CapsLock()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_CursorLeft()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_CursorSize()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_CursorTop()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_CursorVisible()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_ForegroundColor()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_LargestWindowHeight()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_LargestWindowWidth()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_NumberLock()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_Title()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_TreatControlCAsInput()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_WindowHeight()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_WindowLeft()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_WindowTop()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Console.get_WindowWidth()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Console.get_BackgroundColor()",
+                "System.Console.get_BufferHeight()",
+                "System.Console.get_BufferWidth()",
+                "System.Console.get_CapsLock()",
+                "System.Console.get_CursorLeft()",
+                "System.Console.get_CursorSize()",
+                "System.Console.get_CursorTop()",
+                "System.Console.get_CursorVisible()",
+                "System.Console.get_ForegroundColor()",
+                "System.Console.get_LargestWindowHeight()",
+                "System.Console.get_LargestWindowWidth()",
+                "System.Console.get_NumberLock()",
+                "System.Console.get_Title()",
+                "System.Console.get_TreatControlCAsInput()",
+                "System.Console.get_WindowHeight()",
+                "System.Console.get_WindowLeft()",
+                "System.Console.get_WindowTop()",
+                "System.Console.get_WindowWidth()",
+            }));
+        }
 
         [Test]
         public async Task EffectSummaryTool_RuntimeObjectTypeMetadataSlice_UsesGeneratedPurityEvidence()
