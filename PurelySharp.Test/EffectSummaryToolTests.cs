@@ -7300,6 +7300,96 @@ public static class CallvirtFixture
             Assert.That(roots, Does.Contain("safe_static_cache_read"));
         }
 
+        [Test]
+        public async Task EffectSummaryTool_TreatsGenericSameAssemblyReadonlyStaticCacheReadAsPure()
+        {
+            const string source = """
+public sealed class Token
+{
+}
+
+public static class GenericCache<T>
+{
+    public static readonly Token Value = new();
+}
+
+public static class GenericCacheConsumer
+{
+    public static Token Read()
+    {
+        return GenericCache<int>.Value;
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryGenericStaticCache", source);
+            using var summary = await RunEffectSummaryAsync(
+                fixture.AssemblyPath,
+                includeTransitiveRoots: true,
+                classifyPurity: true,
+                compareManualCatalogs: true);
+
+            AssertPurityClassification(summary, "GenericCacheConsumer.Read()", "pure");
+            AssertEffectVisibilityClassification(summary, "GenericCacheConsumer.Read()", "internal_only");
+            AssertFreshnessClassification(summary, "GenericCacheConsumer.Read()", "none");
+
+            var roots = FindMethod(summary, "GenericCacheConsumer.Read()")
+                .GetProperty("RootCandidates")
+                .EnumerateArray()
+                .Select(value => value.GetString())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
+
+            Assert.That(roots, Does.Contain("safe_static_cache_read"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_CapturesGenericSameAssemblyStringComparerReceiverEvidence()
+        {
+            const string source = """
+using System;
+
+public static class GenericComparerCache<T>
+{
+    public static readonly StringComparer Value = StringComparer.Ordinal;
+}
+
+public static class GenericComparerConsumer
+{
+    public static bool Compare(string left, string right)
+    {
+        return GenericComparerCache<int>.Value.Equals(left, right);
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryGenericStringComparerCache", source);
+            using var summary = await RunEffectSummaryAsync(
+                fixture.AssemblyPath,
+                includeTransitiveRoots: true,
+                classifyPurity: true,
+                compareManualCatalogs: true);
+
+            AssertPurityClassification(summary, "GenericComparerConsumer.Compare(string, string)", "pure");
+
+            var callSite = FindMethod(summary, "GenericComparerConsumer.Compare(string, string)")
+                .GetProperty("CallSites")
+                .EnumerateArray()
+                .Single(candidate => candidate.GetProperty("ArgumentEvidence")
+                    .EnumerateArray()
+                    .Any(evidence =>
+                        string.Equals(evidence.GetProperty("Target").GetString(), "receiver", StringComparison.Ordinal) &&
+                        string.Equals(evidence.GetProperty("Type").GetString(), "System.StringComparer", StringComparison.Ordinal)));
+
+            var receiverEvidence = callSite.GetProperty("ArgumentEvidence")
+                .EnumerateArray()
+                .Single(evidence =>
+                    string.Equals(evidence.GetProperty("Target").GetString(), "receiver", StringComparison.Ordinal) &&
+                    string.Equals(evidence.GetProperty("Type").GetString(), "System.StringComparer", StringComparison.Ordinal));
+
+            Assert.That(receiverEvidence.GetProperty("Value").GetString(), Is.EqualTo("System.StringComparer.Ordinal"));
+        }
+
         private static void AssertThrownExceptions(JsonDocument summary, string methodSymbol, params string[] expectedExceptions)
         {
             var method = FindMethod(summary, methodSymbol);
