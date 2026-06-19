@@ -825,10 +825,6 @@ public static class Constants
         "System.Security.Cryptography.MD5.ComputeHash(byte[])",
         "System.Security.Cryptography.SHA256.ComputeHash(byte[])",
 
-        "string.String(System.ReadOnlySpan<char>)",
-
-
-
         "System.StringComparer.InvariantCultureIgnoreCase.Compare(string, string)",
         "System.StringComparer.Ordinal.Equals(string, string)",
 

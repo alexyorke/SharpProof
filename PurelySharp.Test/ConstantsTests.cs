@@ -2869,9 +2869,9 @@ public static class CatalogSignatureSamples
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetObjectCreationSignature(compilation, syntaxTree, "new FileNotFoundException(\"missing.txt\")")));
 
             Assert.That(GetObjectCreationSignature(compilation, syntaxTree, "new string(chars)"), Is.EqualTo("string.String(System.ReadOnlySpan<char>)"));
-            Assert.That(Constants.KnownPureBCLMembers, Does.Contain(GetObjectCreationSignature(compilation, syntaxTree, "new string(chars)")));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new string(chars)"));
 
-            Assert.That(GetInvocationSignature(compilation, syntaxTree, "System.Runtime.InteropServices.Marshal.PtrToStructure<int>(ptr)"), Is.EqualTo("System.Runtime.InteropServices.Marshal.PtrToStructure<T>(System.IntPtr)"));
+            Assert.That(GetInvocationSignature(compilation, syntaxTree, "System.Runtime.InteropServices.Marshal.PtrToStructure<int>(ptr)"), Is.EqualTo("System.Runtime.InteropServices.Marshal.PtrToStructure<T>(nint)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "System.Runtime.InteropServices.Marshal.PtrToStructure<int>(ptr)"));
             AssertNotInManualCatalogs("System.Security.Claims.ClaimsPrincipal.IsInRole(string)");
             AssertNotInManualCatalogs("System.Reflection.FieldInfo.GetValue(object)");
@@ -3093,7 +3093,7 @@ public static class RecentCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "guid.Equals(Guid.Empty)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "guid.CompareTo(Guid.Empty)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "guid.ToString(\"N\")"));
-            AssertCatalogMembership(GetObjectCreationSignature(compilation, syntaxTree, "new string(charSpan)"), expectedPure: true, expectedImpure: false);
+            AssertCatalogMembership(GetObjectCreationSignature(compilation, syntaxTree, "new string(charSpan)"), expectedPure: false, expectedImpure: false);
             var bitConverterGetBytesExpressions = new[]
             {
                 "BitConverter.GetBytes(true)",

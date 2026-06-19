@@ -175,8 +175,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 }
 
                 if (trustedMetadataPurity.AllowsKnownPureFallback &&
-                    (IsKnownPureStringBuilderConstructor(constructorSymbol) ||
-                     IsKnownPureStringReadOnlySpanConstructor(constructorSymbol)))
+                    IsKnownPureStringBuilderConstructor(constructorSymbol))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a reviewed pure constructor.");
                     return PurityAnalysisResult.Pure;
@@ -355,22 +354,5 @@ namespace PurelySharp.Analyzer.Engine.Rules
                  constructorSymbol.Parameters[0].Type.SpecialType == SpecialType.System_String);
         }
 
-        private static bool IsKnownPureStringReadOnlySpanConstructor(IMethodSymbol? constructorSymbol)
-        {
-            if (constructorSymbol?.MethodKind != MethodKind.Constructor ||
-                constructorSymbol.ContainingType?.SpecialType != SpecialType.System_String ||
-                constructorSymbol.Parameters.Length != 1)
-            {
-                return false;
-            }
-
-            if (constructorSymbol.Parameters[0].Type is not INamedTypeSymbol parameterType)
-            {
-                return false;
-            }
-
-            return parameterType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
-                parameterType.TypeArguments[0].SpecialType == SpecialType.System_Char;
-        }
     }
 }

@@ -492,7 +492,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task StringCtorFromReadOnlySpan_NoDiagnostic()
+        public async Task StringCtorFromReadOnlySpan_Diagnostic()
         {
             var test = @"
 using System;
@@ -501,7 +501,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod(string input)
+    public string {|PS0002:TestMethod|}(string input)
     {
         ReadOnlySpan<char> chars = input.AsSpan();
         return new string(chars);
@@ -512,7 +512,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task StringCtorFromReadOnlySpan_LocalNonEscapingUse_NoDiagnostic()
+        public async Task StringCtorFromReadOnlySpan_LocalNonEscapingUse_Diagnostic()
         {
             var test = @"
 using System;
@@ -521,7 +521,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public int TestMethod(string input)
+    public int {|PS0002:TestMethod|}(string input)
     {
         ReadOnlySpan<char> chars = input.AsSpan();
         var copy = new string(chars);
@@ -533,7 +533,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task StringCtorFromReadOnlySpan_LocalReturned_NoDiagnostic()
+        public async Task StringCtorFromReadOnlySpan_LocalReturned_Diagnostic()
         {
             var test = @"
 using System;
@@ -542,7 +542,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod(string input)
+    public string {|PS0002:TestMethod|}(string input)
     {
         ReadOnlySpan<char> chars = input.AsSpan();
         var copy = new string(chars);

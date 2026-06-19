@@ -80,7 +80,7 @@ namespace TestNamespace
         }
 
         [Test]
-        public async Task SpanPatternMatchingWithOtherPatterns_NoDiagnostic()
+        public async Task SpanPatternMatchingWithOtherPatterns_Diagnostic()
         {
             var test = @"
 // Requires LangVersion 11+
@@ -93,7 +93,7 @@ namespace TestNamespace
     public class TypeParser
     {
         [EnforcePure]
-        public string ParseValue(object value)
+        public string {|PS0002:ParseValue|}(object value)
         {
             // C# 11 feature: Pattern match with various types including Span<char>
             if (value is int n)
