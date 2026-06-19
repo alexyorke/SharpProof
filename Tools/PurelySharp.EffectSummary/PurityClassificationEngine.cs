@@ -660,7 +660,7 @@ internal static class PurityClassificationEngine
     private static CatalogComparisonReport BuildCatalogComparison(IReadOnlyList<MethodEffectSummary> methods)
     {
         var bySymbol = methods
-            .GroupBy(method => NormalizeCatalogSymbol(method.Symbol), StringComparer.Ordinal)
+            .GroupBy(method => NormalizeCatalogComparisonKey(method.Symbol), StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
         return new CatalogComparisonReport(
             KnownPureMembers: BuildRows(Constants.KnownPureBCLMembers, bySymbol, "known_pure"),
@@ -674,11 +674,11 @@ internal static class PurityClassificationEngine
         string catalogName)
     {
         return symbols
-            .Where(symbol => bySymbol.ContainsKey(NormalizeCatalogSymbol(symbol)))
+            .Where(symbol => bySymbol.ContainsKey(NormalizeCatalogComparisonKey(symbol)))
             .OrderBy(static symbol => symbol, StringComparer.Ordinal)
             .Select(symbol =>
             {
-                var matchedMethods = bySymbol[NormalizeCatalogSymbol(symbol)];
+                var matchedMethods = bySymbol[NormalizeCatalogComparisonKey(symbol)];
                 var classifications = matchedMethods
                     .Select(static method => method.PurityClassification)
                     .Where(static classification => classification != null)
@@ -807,6 +807,32 @@ internal static class PurityClassificationEngine
         return normalized;
     }
 
+    private static string NormalizeCatalogComparisonKey(string symbol)
+    {
+        if (TryNormalizeAccessorComparisonKey(symbol, out var comparisonKey))
+        {
+            return comparisonKey;
+        }
+
+        return NormalizeCatalogSymbol(symbol);
+    }
+
+    private static bool TryNormalizeAccessorComparisonKey(string symbol, out string comparisonKey)
+    {
+        if (TryNormalizeCatalogAccessorComparisonKey(symbol, out comparisonKey))
+        {
+            return true;
+        }
+
+        if (TryNormalizeRuntimeAccessorComparisonKey(symbol, out comparisonKey))
+        {
+            return true;
+        }
+
+        comparisonKey = string.Empty;
+        return false;
+    }
+
     private static string NormalizePropertyAccessorSymbol(string symbol)
     {
         var suffix = symbol.EndsWith(".get", StringComparison.Ordinal)
@@ -841,6 +867,124 @@ internal static class PurityClassificationEngine
         return normalizedContainingType + "." + accessorPrefix + propertyName + "()";
     }
 
+    private static bool TryNormalizeCatalogAccessorComparisonKey(string symbol, out string comparisonKey)
+    {
+        var suffix = symbol.EndsWith(".get", StringComparison.Ordinal)
+            ? ".get"
+            : symbol.EndsWith(".set", StringComparison.Ordinal)
+                ? ".set"
+                : null;
+        if (suffix == null)
+        {
+            comparisonKey = string.Empty;
+            return false;
+        }
+
+        var memberSeparator = FindLastTopLevelDot(symbol, symbol.Length - suffix.Length);
+        if (memberSeparator < 0)
+        {
+            comparisonKey = string.Empty;
+            return false;
+        }
+
+        var containingType = symbol.Substring(0, memberSeparator);
+        var propertyName = symbol.Substring(
+            memberSeparator + 1,
+            symbol.Length - memberSeparator - suffix.Length - 1);
+        if (string.IsNullOrWhiteSpace(propertyName))
+        {
+            comparisonKey = string.Empty;
+            return false;
+        }
+
+        var normalizedContainingType = NormalizeContainingTypeDefinition(containingType, out var typeParameterOrdinals);
+        var normalizedPropertyName = propertyName;
+        var normalizedIndexParameterList = string.Empty;
+        if (TryParseCatalogIndexer(propertyName, out var indexParameterList))
+        {
+            normalizedPropertyName = "Item";
+            normalizedIndexParameterList = NormalizeParameterList(
+                indexParameterList,
+                typeParameterOrdinals,
+                EmptyTypeParameterOrdinals);
+        }
+
+        comparisonKey = BuildAccessorComparisonKey(
+            normalizedContainingType,
+            string.Equals(suffix, ".get", StringComparison.Ordinal) ? "get" : "set",
+            normalizedPropertyName,
+            normalizedIndexParameterList);
+        return true;
+    }
+
+    private static bool TryNormalizeRuntimeAccessorComparisonKey(string symbol, out string comparisonKey)
+    {
+        var openParen = symbol.IndexOf('(');
+        if (openParen < 0 || !symbol.EndsWith(")", StringComparison.Ordinal))
+        {
+            comparisonKey = string.Empty;
+            return false;
+        }
+
+        var memberSeparator = FindLastTopLevelDot(symbol, openParen);
+        if (memberSeparator < 0)
+        {
+            comparisonKey = string.Empty;
+            return false;
+        }
+
+        var containingType = symbol.Substring(0, memberSeparator);
+        var memberName = symbol.Substring(memberSeparator + 1, openParen - memberSeparator - 1);
+        var accessorKind = memberName.StartsWith("get_", StringComparison.Ordinal)
+            ? "get"
+            : memberName.StartsWith("set_", StringComparison.Ordinal)
+                ? "set"
+                : null;
+        if (accessorKind == null)
+        {
+            comparisonKey = string.Empty;
+            return false;
+        }
+
+        var normalizedContainingType = NormalizeContainingTypeDefinition(containingType, out var typeParameterOrdinals);
+        var parameterList = symbol.Substring(openParen + 1, symbol.Length - openParen - 2);
+        var normalizedParameterList = NormalizeParameterList(
+            parameterList,
+            typeParameterOrdinals,
+            EmptyTypeParameterOrdinals);
+        comparisonKey = BuildAccessorComparisonKey(
+            normalizedContainingType,
+            accessorKind,
+            memberName.Substring(4),
+            string.Equals(accessorKind, "set", StringComparison.Ordinal)
+                ? TrimTrailingParameter(normalizedParameterList)
+                : normalizedParameterList);
+        return true;
+    }
+
+    private static bool TryParseCatalogIndexer(string propertyName, out string indexParameterList)
+    {
+        if (propertyName.StartsWith("this[", StringComparison.Ordinal) &&
+            propertyName.EndsWith("]", StringComparison.Ordinal) &&
+            propertyName.Length > "this[]".Length)
+        {
+            indexParameterList = propertyName.Substring(5, propertyName.Length - 6);
+            return true;
+        }
+
+        indexParameterList = string.Empty;
+        return false;
+    }
+
+    private static string BuildAccessorComparisonKey(
+        string containingType,
+        string accessorKind,
+        string propertyName,
+        string parameterList)
+    {
+        return containingType + "|" + accessorKind + "|" + propertyName + "|" + parameterList;
+    }
+
     private static string NormalizeMethodSymbol(string symbol)
     {
         var openParen = symbol.IndexOf('(');
@@ -859,12 +1003,44 @@ internal static class PurityClassificationEngine
         var memberName = symbol.Substring(memberSeparator + 1, openParen - memberSeparator - 1);
         var parameterList = symbol.Substring(openParen + 1, symbol.Length - openParen - 2);
         var normalizedContainingType = NormalizeContainingTypeDefinition(containingType, out var typeParameterOrdinals);
+        var normalizedMethodName = NormalizeMethodDefinition(memberName, out var methodParameterOrdinals);
         var simpleContainingTypeName = GetSimpleTypeName(containingType);
-        var normalizedMemberName = string.Equals(memberName, simpleContainingTypeName, StringComparison.Ordinal)
+        var normalizedMemberName = string.Equals(normalizedMethodName, simpleContainingTypeName, StringComparison.Ordinal)
             ? ".ctor"
-            : memberName;
-        var normalizedParameterList = ReplaceTypeParameterTokens(parameterList, typeParameterOrdinals);
+            : normalizedMethodName;
+        var normalizedParameterList = NormalizeParameterList(
+            parameterList,
+            typeParameterOrdinals,
+            methodParameterOrdinals);
         return normalizedContainingType + "." + normalizedMemberName + "(" + normalizedParameterList + ")";
+    }
+
+    private static string NormalizeMethodDefinition(
+        string memberName,
+        out IReadOnlyDictionary<string, string> methodParameterOrdinals)
+    {
+        methodParameterOrdinals = EmptyTypeParameterOrdinals;
+        if (!TryParseGenericType(memberName, out var baseName, out var genericArguments))
+        {
+            return memberName;
+        }
+
+        var ordinals = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (var i = 0; i < genericArguments.Length; i++)
+        {
+            var genericArgument = genericArguments[i];
+            if (IsSimpleIdentifier(genericArgument))
+            {
+                ordinals[genericArgument] = "!!" + i;
+            }
+        }
+
+        if (ordinals.Count > 0)
+        {
+            methodParameterOrdinals = ordinals;
+        }
+
+        return baseName;
     }
 
     private static string NormalizeContainingTypeDefinition(
@@ -895,7 +1071,22 @@ internal static class PurityClassificationEngine
             typeParameterOrdinals = ordinals;
         }
 
-        return prefix + baseName + "`" + genericArguments.Length;
+        return prefix + NormalizeGenericTypeBaseName(baseName, genericArguments.Length);
+    }
+
+    private static string NormalizeGenericTypeBaseName(string baseName, int arity)
+    {
+        var existingAritySeparator = baseName.LastIndexOf('`');
+        if (existingAritySeparator >= 0 &&
+            existingAritySeparator + 1 < baseName.Length &&
+            int.TryParse(baseName.Substring(existingAritySeparator + 1), out var existingArity))
+        {
+            return existingArity == arity
+                ? baseName
+                : baseName.Substring(0, existingAritySeparator) + "`" + arity;
+        }
+
+        return baseName + "`" + arity;
     }
 
     private static bool TryParseGenericType(string typeName, out string baseName, out string[] genericArguments)
@@ -947,11 +1138,112 @@ internal static class PurityClassificationEngine
             .ToArray();
     }
 
+    private static string NormalizeParameterList(
+        string text,
+        IReadOnlyDictionary<string, string> typeParameterOrdinals,
+        IReadOnlyDictionary<string, string> methodParameterOrdinals)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        var parameters = SplitTopLevelArguments(text);
+        if (parameters.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            ", ",
+            parameters.Select(parameter => NormalizeTypeExpression(
+                parameter,
+                typeParameterOrdinals,
+                methodParameterOrdinals)));
+    }
+
+    private static string NormalizeTypeExpression(
+        string text,
+        IReadOnlyDictionary<string, string> typeParameterOrdinals,
+        IReadOnlyDictionary<string, string> methodParameterOrdinals)
+    {
+        var trimmed = text.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return trimmed;
+        }
+
+        foreach (var modifier in new[]
+                 {
+                     "scoped ref ",
+                     "ref readonly ",
+                     "scoped in ",
+                     "params ",
+                     "scoped ",
+                     "ref ",
+                     "out ",
+                     "in ",
+                 })
+        {
+            if (trimmed.StartsWith(modifier, StringComparison.Ordinal))
+            {
+                return modifier + NormalizeTypeExpression(
+                    trimmed.Substring(modifier.Length),
+                    typeParameterOrdinals,
+                    methodParameterOrdinals);
+            }
+        }
+
+        var suffix = string.Empty;
+        while (true)
+        {
+            if (trimmed.EndsWith("[]", StringComparison.Ordinal))
+            {
+                suffix = "[]" + suffix;
+                trimmed = trimmed.Substring(0, trimmed.Length - 2).TrimEnd();
+                continue;
+            }
+
+            if (trimmed.EndsWith("?", StringComparison.Ordinal) ||
+                trimmed.EndsWith("*", StringComparison.Ordinal))
+            {
+                suffix = trimmed[^1] + suffix;
+                trimmed = trimmed.Substring(0, trimmed.Length - 1).TrimEnd();
+                continue;
+            }
+
+            break;
+        }
+
+        if (TryParseGenericType(trimmed, out _, out var genericArguments))
+        {
+            var normalizedBase = NormalizeContainingTypeDefinition(trimmed, out _);
+            var normalizedArguments = genericArguments
+                .Select(argument => NormalizeTypeExpression(
+                    argument,
+                    typeParameterOrdinals,
+                    methodParameterOrdinals));
+            return normalizedBase + "<" + string.Join(", ", normalizedArguments) + ">" + suffix;
+        }
+
+        return ReplaceTypeParameterTokens(trimmed, typeParameterOrdinals, methodParameterOrdinals) + suffix;
+    }
+
+    private static string TrimTrailingParameter(string parameterList)
+    {
+        var parameters = SplitTopLevelArguments(parameterList);
+        return parameters.Length <= 1
+            ? string.Empty
+            : string.Join(", ", parameters.Take(parameters.Length - 1));
+    }
+
     private static string ReplaceTypeParameterTokens(
         string text,
-        IReadOnlyDictionary<string, string> typeParameterOrdinals)
+        IReadOnlyDictionary<string, string> typeParameterOrdinals,
+        IReadOnlyDictionary<string, string> methodParameterOrdinals)
     {
-        if (string.IsNullOrEmpty(text) || typeParameterOrdinals.Count == 0)
+        if (string.IsNullOrEmpty(text) ||
+            (typeParameterOrdinals.Count == 0 && methodParameterOrdinals.Count == 0))
         {
             return text;
         }
@@ -974,7 +1266,19 @@ internal static class PurityClassificationEngine
             }
 
             var token = text.Substring(start, i - start);
-            builder.Append(typeParameterOrdinals.TryGetValue(token, out var replacement) ? replacement : token);
+            var hasTypeReplacement = typeParameterOrdinals.TryGetValue(token, out var typeReplacement);
+            var hasMethodReplacement = methodParameterOrdinals.TryGetValue(token, out var methodReplacement);
+            if (hasTypeReplacement && hasMethodReplacement && !string.Equals(typeReplacement, methodReplacement, StringComparison.Ordinal))
+            {
+                builder.Append(token);
+                continue;
+            }
+
+            builder.Append(hasMethodReplacement
+                ? methodReplacement
+                : hasTypeReplacement
+                    ? typeReplacement
+                    : token);
         }
 
         return builder.ToString();

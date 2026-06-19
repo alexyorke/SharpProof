@@ -1138,6 +1138,7 @@ public static class StringComparisonFixture
             var assembly = Assembly.LoadFrom(assemblyPath);
             var engineType = assembly.GetType("PurityClassificationEngine", throwOnError: true)!;
             var normalizeMethod = engineType.GetMethod("NormalizeCatalogSymbol", BindingFlags.NonPublic | BindingFlags.Static)!;
+            var comparisonKeyMethod = engineType.GetMethod("NormalizeCatalogComparisonKey", BindingFlags.NonPublic | BindingFlags.Static)!;
 
             Assert.That(
                 (string)normalizeMethod.Invoke(null, new object[] { "System.Collections.Generic.KeyValuePair<TKey, TValue>.KeyValuePair(TKey, TValue)" })!,
@@ -1151,6 +1152,25 @@ public static class StringComparisonFixture
             Assert.That(
                 (string)normalizeMethod.Invoke(null, new object[] { "System.Collections.Generic.IEnumerable<T>.GetEnumerator()" })!,
                 Is.EqualTo("System.Collections.Generic.IEnumerable`1.GetEnumerator()"));
+            Assert.That(
+                (string)normalizeMethod.Invoke(null, new object[] { "System.Linq.Enumerable.Any<TSource>(System.Collections.Generic.IEnumerable<TSource>)" })!,
+                Is.EqualTo("System.Linq.Enumerable.Any(System.Collections.Generic.IEnumerable`1<!!0>)"));
+            Assert.That(
+                (string)normalizeMethod.Invoke(null, new object[] { "System.Linq.Enumerable.Any(System.Collections.Generic.IEnumerable`1<!!0>)" })!,
+                Is.EqualTo("System.Linq.Enumerable.Any(System.Collections.Generic.IEnumerable`1<!!0>)"));
+            Assert.That(
+                (string)normalizeMethod.Invoke(null, new object[] { "System.Threading.Tasks.Task.FromResult<TResult>(TResult)" })!,
+                Is.EqualTo("System.Threading.Tasks.Task.FromResult(!!0)"));
+
+            Assert.That(
+                (string)comparisonKeyMethod.Invoke(null, new object[] { "System.Environment.OSVersion.get" })!,
+                Is.EqualTo((string)comparisonKeyMethod.Invoke(null, new object[] { "System.Environment.get_OSVersion()" })!));
+            Assert.That(
+                (string)comparisonKeyMethod.Invoke(null, new object[] { "System.Collections.Generic.List<T>.Capacity.set" })!,
+                Is.EqualTo((string)comparisonKeyMethod.Invoke(null, new object[] { "System.Collections.Generic.List`1.set_Capacity(int)" })!));
+            Assert.That(
+                (string)comparisonKeyMethod.Invoke(null, new object[] { "System.Collections.Immutable.ImmutableList<T>.this[int].get" })!,
+                Is.EqualTo((string)comparisonKeyMethod.Invoke(null, new object[] { "System.Collections.Immutable.ImmutableList`1.get_Item(int)" })!));
         }
 
         [Test]
@@ -5064,6 +5084,22 @@ public static class StringComparisonFixture
             var catalogComparison = report.GetProperty("CatalogComparison");
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+            var capacitySetterRow = knownImpureRows.Single(row => string.Equals(
+                row.GetProperty("Symbol").GetString(),
+                "System.Collections.Generic.List<T>.Capacity.set",
+                StringComparison.Ordinal));
+            var capacitySetterMatchedKeys = capacitySetterRow
+                .GetProperty("MatchedExactSymbolKeys")
+                .EnumerateArray()
+                .Select(static value => value.GetString())
+                .OfType<string>()
+                .ToArray();
+
+            Assert.That(capacitySetterRow.GetProperty("Classification").GetString(), Is.EqualTo("impure"));
+            Assert.That(
+                capacitySetterMatchedKeys.Any(static key => key.StartsWith("System.Collections.Generic.List`1.set_Capacity(int)", StringComparison.Ordinal)),
+                Is.True);
 
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Capacity()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.get_Capacity()", "none");
@@ -5302,6 +5338,61 @@ public static class StringComparisonFixture
             Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.Repeat(!!0, int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.Reverse(System.Collections.Generic.IEnumerable`1<!!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Linq.Enumerable.TakeWhile(System.Collections.Generic.IEnumerable`1<!!0>, System.Func`2<!!0, bool>)"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_CatalogComparison_NormalizesGenericMethodParameters()
+        {
+            using var enumerableSummary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Linq.dll",
+                40,
+                "System.Linq.Enumerable.Any(");
+            using var taskSummary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.Threading.Tasks.Task.FromResult(");
+
+            var enumerableKnownPureRow = enumerableSummary.RootElement
+                .GetProperty("PurityReport")
+                .GetProperty("CatalogComparison")
+                .GetProperty("KnownPureMembers")
+                .EnumerateArray()
+                .Single(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Linq.Enumerable.Any<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
+                    StringComparison.Ordinal));
+            var enumerableMatchedKeys = enumerableKnownPureRow
+                .GetProperty("MatchedExactSymbolKeys")
+                .EnumerateArray()
+                .Select(static value => value.GetString())
+                .OfType<string>()
+                .ToArray();
+
+            Assert.That(
+                enumerableMatchedKeys.Any(static key => key.Contains("!!0", StringComparison.Ordinal)),
+                Is.True,
+                "Enumerable.Any<TSource> should match a runtime exact key that uses method generic ordinals.");
+
+            var taskKnownPureRow = taskSummary.RootElement
+                .GetProperty("PurityReport")
+                .GetProperty("CatalogComparison")
+                .GetProperty("KnownPureMembers")
+                .EnumerateArray()
+                .Single(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Threading.Tasks.Task.FromResult<TResult>(TResult)",
+                    StringComparison.Ordinal));
+            var taskMatchedKeys = taskKnownPureRow
+                .GetProperty("MatchedExactSymbolKeys")
+                .EnumerateArray()
+                .Select(static value => value.GetString())
+                .OfType<string>()
+                .ToArray();
+
+            Assert.That(
+                taskMatchedKeys.Any(static key => key.Contains("!!0", StringComparison.Ordinal)),
+                Is.True,
+                "Task.FromResult<TResult> should match a runtime exact key that uses method generic ordinals.");
         }
 
         [Test]
