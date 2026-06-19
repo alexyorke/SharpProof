@@ -1405,6 +1405,108 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_EffectSummary_WithTrustedGeneratedPureListPatternMembers_SuppressesUnknownExternalCall()
+        {
+            const string boundarySource = """
+public sealed class GeneratedListPatternBoundary
+{
+    public int Length => 2;
+
+    public int this[int index] => index;
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("GeneratedPureListPatternBoundary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(GeneratedListPatternBoundary value)
+    {
+        return value is [0, 1];
+    }
+}
+""",
+                new[]
+                {
+                    ("length.PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "GeneratedListPatternBoundary.get_Length()",
+                            "pure",
+                            """[]""")),
+                    ("indexer.PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "GeneratedListPatternBoundary.get_Item(int)",
+                            "pure",
+                            """[]"""))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_EffectSummary_WithTrustedGeneratedImpureListPatternLength_ReportsImpurity()
+        {
+            const string boundarySource = """
+public sealed class GeneratedListPatternBoundary
+{
+    public int Length => 2;
+
+    public int this[int index] => index;
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("GeneratedImpureListPatternBoundary", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(GeneratedListPatternBoundary value)
+    {
+        return value is [0, 1];
+    }
+}
+""",
+                new[]
+                {
+                    ("length.PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "GeneratedListPatternBoundary.get_Length()",
+                            "impure",
+                            """[ "global_state_write" ]""")),
+                    ("indexer.PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "GeneratedListPatternBoundary.get_Item(int)",
+                            "pure",
+                            """[]"""))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+        }
+
+        [Test]
         public async Task Ps0002_EffectSummary_WithTrustedGeneratedPureBinaryOperatorClassification_SuppressesUnknownExternalCall()
         {
             const string boundarySource = """

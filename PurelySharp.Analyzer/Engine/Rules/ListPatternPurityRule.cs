@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
@@ -109,7 +110,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (member is IPropertySymbol property)
             {
-                if (PurityAnalysisEngine.IsKnownImpure(property))
+                var knownImpureMemberSource = PurityAnalysisEngine.GetKnownImpureMemberSource(property);
+                if (string.Equals(
+                    knownImpureMemberSource,
+                    "config_known_impure",
+                    StringComparison.Ordinal))
                 {
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         operation.Syntax,
@@ -119,7 +124,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             operation,
                             syntaxNode: operation.Syntax,
                             symbol: property,
-                            catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(property) ?? "known_impure"));
+                            catalogSource: knownImpureMemberSource));
                 }
 
                 return CheckPropertyGetterPurity(
