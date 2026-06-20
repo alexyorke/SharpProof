@@ -5849,6 +5849,56 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Narrows_ArrayIEnumerableGetEnumeratorDispatch()
+        {
+            const string source = @"
+using System.Collections;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(int[] values)
+    {
+        _ = ((IEnumerable)values).GetEnumerator();
+        return 0;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Array receivers cast to IEnumerable should narrow back to the trusted Array.GetEnumerator runtime helper.");
+        }
+
+        [Test]
+        public async Task GeneratedPurityCatalog_Narrows_ArrayGenericIEnumerableGetEnumeratorDispatch()
+        {
+            const string source = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(int[] values)
+    {
+        _ = ((IEnumerable<int>)values).GetEnumerator();
+        return 0;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Array receivers cast to IEnumerable<T> should narrow back to the trusted Array.GetEnumerator runtime helper.");
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_ContractHelpers()
         {
             const string source = @"

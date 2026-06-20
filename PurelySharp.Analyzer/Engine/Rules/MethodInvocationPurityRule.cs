@@ -985,6 +985,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(invocationOperation.Syntax);
             }
 
+            if (TryCheckArrayInterfaceGetEnumeratorPurity(invocationOperation, context, out var arrayEnumeratorResult))
+            {
+                return arrayEnumeratorResult;
+            }
+
             var candidateMethods = ResolvePotentialDispatchTargets(
                 invokedMethodSymbol,
                 context.SemanticModel,
@@ -1047,6 +1052,114 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        }
+
+        private static bool TryCheckArrayInterfaceGetEnumeratorPurity(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            var methodSymbol = invocationOperation.TargetMethod;
+            if (methodSymbol.Name != "GetEnumerator" ||
+                methodSymbol.Parameters.Length != 0 ||
+                !IsEnumerableGetEnumeratorDispatchTarget(methodSymbol) ||
+                !TryGetKnownArrayReceiverType(invocationOperation.Instance, out _))
+            {
+                return false;
+            }
+
+            var arrayGetEnumerator = context.SemanticModel.Compilation
+                .GetSpecialType(SpecialType.System_Array)
+                .GetMembers("GetEnumerator")
+                .OfType<IMethodSymbol>()
+                .FirstOrDefault(candidate => candidate.Parameters.Length == 0);
+            if (arrayGetEnumerator == null)
+            {
+                return false;
+            }
+
+            var purity = PurityAnalysisEngine.GetCalleePurity(arrayGetEnumerator.OriginalDefinition, context);
+            result = purity.IsPure
+                ? PurityAnalysisEngine.PurityAnalysisResult.Pure
+                : purity.WithCallee(arrayGetEnumerator.OriginalDefinition, invocationOperation.Syntax);
+            return true;
+        }
+
+        private static bool IsEnumerableGetEnumeratorDispatchTarget(IMethodSymbol methodSymbol)
+        {
+            var containingType = methodSymbol.ContainingType;
+            if (containingType == null)
+            {
+                return false;
+            }
+
+            if (containingType.SpecialType == SpecialType.System_Collections_IEnumerable)
+            {
+                return true;
+            }
+
+            return containingType is INamedTypeSymbol namedContainingType &&
+                namedContainingType.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T;
+        }
+
+        private static bool TryGetKnownArrayReceiverType(
+            IOperation? invocationInstance,
+            out IArrayTypeSymbol arrayType)
+        {
+            var current = invocationInstance;
+
+            while (true)
+            {
+                current = NormalizeReceiverOperation(current);
+                if (current == null)
+                {
+                    arrayType = null!;
+                    return false;
+                }
+
+                if (current is IConditionalAccessOperation conditionalAccess)
+                {
+                    current = conditionalAccess.Operation;
+                    continue;
+                }
+
+                if (current is IConditionalOperation conditional)
+                {
+                    if (TryGetKnownArrayReceiverType(conditional.WhenTrue, out var whenTrueType) &&
+                        TryGetKnownArrayReceiverType(conditional.WhenFalse, out var whenFalseType) &&
+                        SymbolEqualityComparer.Default.Equals(whenTrueType, whenFalseType))
+                    {
+                        arrayType = whenTrueType;
+                        return true;
+                    }
+
+                    arrayType = null!;
+                    return false;
+                }
+
+                if (current is IConversionOperation conversion)
+                {
+                    current = conversion.Operand;
+                    continue;
+                }
+
+                if (current is IParenthesizedOperation parenthesized)
+                {
+                    current = parenthesized.Operand;
+                    continue;
+                }
+
+                if (current.Type is IArrayTypeSymbol resolvedArrayType)
+                {
+                    arrayType = resolvedArrayType;
+                    return true;
+                }
+
+                arrayType = null!;
+                return false;
+            }
         }
 
         private static bool TryCheckEqualityComparerDispatchPurity(
