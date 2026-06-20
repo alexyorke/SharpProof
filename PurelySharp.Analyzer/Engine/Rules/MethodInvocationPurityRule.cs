@@ -3493,6 +3493,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            if (IsTrustedGeneratedPureDefaultComparerSingleton(value, context))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             if (IsTrustedGeneratedPureStringComparerSingleton(value, context))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -3539,6 +3544,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            if (IsTrustedGeneratedPureDefaultComparerSingleton(value, context))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             if (IsTrustedGeneratedPureStringComparerSingleton(value, context))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -3573,7 +3583,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static bool IsNullOrDefaultComparerArgument(IArgumentOperation argument)
         {
             var value = PurityAnalysisEngine.SkipImplicitConversions(argument.Value) ?? argument.Value;
-            return IsNullOrDefaultComparerValue(value);
+            return IsNullOrDefaultComparerValue(value) || IsDefaultComparerSingleton(value);
         }
 
         private static bool IsNullOrDefaultComparerValue(IOperation value)
@@ -3581,11 +3591,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
 
             if (value.ConstantValue.HasValue && value.ConstantValue.Value == null)
-            {
-                return true;
-            }
-
-            if (IsDefaultComparerSingleton(value))
             {
                 return true;
             }
@@ -3601,6 +3606,44 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 containingType.OriginalDefinition.ToDisplayString() is
                     "System.Collections.Generic.EqualityComparer<T>" or
                     "System.Collections.Generic.Comparer<T>";
+        }
+
+        private static bool IsTrustedGeneratedPureDefaultComparerSingleton(
+            IOperation value,
+            PurityAnalysisContext context)
+        {
+            value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
+            if (value is not IPropertyReferenceOperation
+                {
+                    Property:
+                    {
+                        IsStatic: true,
+                        Name: "Default",
+                        ContainingType: { } containingType,
+                        GetMethod: { } getterSymbol
+                    }
+                })
+            {
+                return false;
+            }
+
+            var containingTypeDisplay = containingType.OriginalDefinition.ToDisplayString();
+            if (containingTypeDisplay is not "System.Collections.Generic.EqualityComparer<T>" and
+                not "System.Collections.Generic.Comparer<T>")
+            {
+                return false;
+            }
+
+            if (getterSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
+            {
+                return false;
+            }
+
+            return PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
+                getterSymbol.OriginalDefinition,
+                context.SemanticModel.Compilation,
+                out var generatedPurity) &&
+                generatedPurity.IsPure;
         }
 
         private static bool IsTrustedGeneratedPureStringComparerSingleton(
