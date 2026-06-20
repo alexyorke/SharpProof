@@ -2318,6 +2318,59 @@ public static class StopwatchCatalogSignatureSamples
         }
 
         [Test]
+        public void TypePureMetadataGetters_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System;
+using System.Reflection;
+
+public static class TypeMetadataCatalogSignatureSamples
+{
+    public static MethodBase? DeclaringMethod(Type type) => type.DeclaringMethod;
+    public static Type? DeclaringType(Type type) => type.DeclaringType;
+    public static bool IsGenericType(Type type) => type.IsGenericType;
+    public static bool IsGenericTypeDefinition(Type type) => type.IsGenericTypeDefinition;
+    public static bool IsGenericParameter(Type type) => type.IsGenericParameter;
+    public static MemberTypes MemberType(Type type) => type.MemberType;
+    public static Type? ReflectedType(Type type) => type.ReflectedType;
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "TypeMetadataCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMembers = new[]
+            {
+                ("type.DeclaringMethod", "System.Type.DeclaringMethod.get"),
+                ("type.DeclaringType", "System.Type.DeclaringType.get"),
+                ("type.IsGenericType", "System.Type.IsGenericType.get"),
+                ("type.IsGenericTypeDefinition", "System.Type.IsGenericTypeDefinition.get"),
+                ("type.IsGenericParameter", "System.Type.IsGenericParameter.get"),
+                ("type.MemberType", "System.Type.MemberType.get"),
+                ("type.ReflectedType", "System.Type.ReflectedType.get"),
+            };
+
+            foreach (var trackedMember in trackedMembers)
+            {
+                var memberAccess = syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<MemberAccessExpressionSyntax>()
+                    .Single(node => node.ToString() == trackedMember.Item1);
+                var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(memberAccess).Symbol!;
+                var signature = GetPropertySignature(compilation, syntaxTree, trackedMember.Item1);
+                var (matched, classification) = GetGeneratedPurityClassification(propertySymbol.GetMethod!, compilation);
+
+                Assert.That(signature, Is.EqualTo(trackedMember.Item2));
+                AssertNotInManualCatalogs(signature);
+                Assert.That(matched, Is.True, trackedMember.Item2);
+                Assert.That(classification, Is.EqualTo("pure"), trackedMember.Item2);
+            }
+        }
+
+        [Test]
         public void MemberInfoName_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             const string source = @"

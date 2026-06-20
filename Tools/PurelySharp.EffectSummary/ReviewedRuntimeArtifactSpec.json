@@ -500,7 +500,15 @@
       "SourceSummaryPath": "PurelySharp.Analyzer/Object.TypeMetadata.PurelySharp.EffectSummary.json",
       "Limit": 20,
       "SymbolPrefixes": [
-        "System.Object.GetType"
+        "System.Object.GetType",
+        "System.Type.ToString",
+        "System.Type.get_DeclaringMethod",
+        "System.Type.get_DeclaringType",
+        "System.Type.get_IsGenericType",
+        "System.Type.get_IsGenericTypeDefinition",
+        "System.Type.get_IsGenericParameter",
+        "System.Type.get_MemberType",
+        "System.Type.get_ReflectedType"
       ]
     },
     {

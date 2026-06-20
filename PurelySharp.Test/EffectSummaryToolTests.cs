@@ -6271,7 +6271,14 @@ public static class DuplicateReviewedSeedFixture
                 "System.Private.CoreLib.dll",
                 20,
                 "System.Object.GetType",
-                "System.Type.ToString");
+                "System.Type.ToString",
+                "System.Type.get_DeclaringMethod",
+                "System.Type.get_DeclaringType",
+                "System.Type.get_IsGenericType",
+                "System.Type.get_IsGenericTypeDefinition",
+                "System.Type.get_IsGenericParameter",
+                "System.Type.get_MemberType",
+                "System.Type.get_ReflectedType");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -6285,6 +6292,20 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Reflection.MemberInfo.get_Name()", "none");
             AssertPurityClassification(summary, "System.Type.ToString()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Type.ToString()", "none");
+            AssertPurityClassification(summary, "System.Type.get_DeclaringMethod()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.get_DeclaringMethod()", "none");
+            AssertPurityClassification(summary, "System.Type.get_DeclaringType()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.get_DeclaringType()", "none");
+            AssertPurityClassification(summary, "System.Type.get_IsGenericType()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.get_IsGenericType()", "none");
+            AssertPurityClassification(summary, "System.Type.get_IsGenericTypeDefinition()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.get_IsGenericTypeDefinition()", "none");
+            AssertPurityClassification(summary, "System.Type.get_IsGenericParameter()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.get_IsGenericParameter()", "none");
+            AssertPurityClassification(summary, "System.Type.get_MemberType()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.get_MemberType()", "none");
+            AssertPurityClassification(summary, "System.Type.get_ReflectedType()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.get_ReflectedType()", "none");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -6293,7 +6314,14 @@ public static class DuplicateReviewedSeedFixture
                 .Where(symbol =>
                     string.Equals(symbol, "System.Object.GetType()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Reflection.MemberInfo.get_Name()", StringComparison.Ordinal) ||
-                    string.Equals(symbol, "System.Type.ToString()", StringComparison.Ordinal))
+                    string.Equals(symbol, "System.Type.ToString()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.get_DeclaringMethod()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.get_DeclaringType()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.get_IsGenericType()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.get_IsGenericTypeDefinition()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.get_IsGenericParameter()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.get_MemberType()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.get_ReflectedType()", StringComparison.Ordinal))
                 .OrderBy(symbol => symbol, StringComparer.Ordinal)
                 .ToArray();
 
@@ -6302,6 +6330,13 @@ public static class DuplicateReviewedSeedFixture
                 "System.Object.GetType()",
                 "System.Reflection.MemberInfo.get_Name()",
                 "System.Type.ToString()",
+                "System.Type.get_DeclaringMethod()",
+                "System.Type.get_DeclaringType()",
+                "System.Type.get_IsGenericParameter()",
+                "System.Type.get_IsGenericType()",
+                "System.Type.get_IsGenericTypeDefinition()",
+                "System.Type.get_MemberType()",
+                "System.Type.get_ReflectedType()",
             }));
         }
 
