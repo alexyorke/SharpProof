@@ -4158,6 +4158,12 @@ public class TestClass
     }
 
     [EnforcePure]
+    public object LocalTime(DateTime value)
+    {
+        return value.ToLocalTime();
+    }
+
+    [EnforcePure]
     public object OffsetNow()
     {
         return DateTimeOffset.Now;
@@ -4208,6 +4214,14 @@ public class TestClass
                             .Single(node => node.ToString() == "DateTime.UtcNow"))
                         .Symbol!).GetMethod!),
                 (
+                    "System.DateTime.ToLocalTime()",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "value.ToLocalTime()"))
+                        .Symbol!),
+                (
                     "System.DateTimeOffset.Now.get",
                     ((IPropertySymbol)semanticModel.GetSymbolInfo(
                         syntaxTree.GetRoot()
@@ -4239,7 +4253,7 @@ public class TestClass
                     return (matched, classification);
                 });
 
-            Assert.That(purityDiagnostics, Has.Length.EqualTo(5));
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(6));
             Assert.That(
                 purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
                 Is.EqualTo(new[] { "generated_purity_summary" }));

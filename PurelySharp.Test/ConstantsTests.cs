@@ -264,6 +264,7 @@ public static class EnvironmentCatalogSignatureSamples
             {
                 "System.DateTime.Now.get",
                 "System.DateTime.Today.get",
+                "System.DateTime.ToLocalTime()",
                 "System.DateTime.UtcNow.get",
                 "System.DateTimeOffset.Now.get",
                 "System.DateTimeOffset.UtcNow.get",

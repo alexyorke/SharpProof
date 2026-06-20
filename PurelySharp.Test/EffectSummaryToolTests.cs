@@ -2566,6 +2566,7 @@ public static class StringComparisonFixture
                 2,
                 "System.DateTime.get_Now",
                 "System.DateTime.get_Today",
+                "System.DateTime.ToLocalTime()",
                 "System.DateTime.get_UtcNow",
                 "System.DateTimeOffset.get_Now",
                 "System.DateTimeOffset.get_UtcNow");
@@ -2580,6 +2581,8 @@ public static class StringComparisonFixture
             AssertEffectVisibilityClassification(summary, "System.DateTime.get_Now()", "caller_visible");
             AssertPurityClassification(summary, "System.DateTime.get_Today()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.DateTime.get_Today()", "caller_visible");
+            AssertPurityClassification(summary, "System.DateTime.ToLocalTime()", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.DateTime.ToLocalTime()", "caller_visible");
             AssertPurityClassification(summary, "System.DateTime.get_UtcNow()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.DateTime.get_UtcNow()", "caller_visible");
             AssertPurityClassification(summary, "System.DateTimeOffset.get_Now()", "impure", "impure_callee");
@@ -2594,6 +2597,7 @@ public static class StringComparisonFixture
                 .Where(symbol =>
                     string.Equals(symbol, "System.DateTime.get_Now()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.DateTime.get_Today()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.DateTime.ToLocalTime()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.DateTime.get_UtcNow()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.DateTimeOffset.get_Now()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.DateTimeOffset.get_UtcNow()", StringComparison.Ordinal))
@@ -2602,6 +2606,7 @@ public static class StringComparisonFixture
 
             Assert.That(generatedSymbols, Is.EqualTo(new[]
             {
+                "System.DateTime.ToLocalTime()",
                 "System.DateTime.get_Now()",
                 "System.DateTime.get_Today()",
                 "System.DateTime.get_UtcNow()",

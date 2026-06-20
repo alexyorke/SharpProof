@@ -591,7 +591,6 @@ public static class Constants
         "System.Collections.ObjectModel.Collection<T>.InsertItem(int, T)",
         "System.Collections.ObjectModel.Collection<T>.SetItem(int, T)",
         "System.ComponentModel.INotifyCollectionChanged.CollectionChanged",
-        "System.DateTime.ToLocalTime()",
         "System.Delegate.DynamicInvoke(object[])",
 
         "System.GC.SuppressFinalize(object)",

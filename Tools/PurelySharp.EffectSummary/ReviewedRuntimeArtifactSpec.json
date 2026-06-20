@@ -362,6 +362,7 @@
       "SymbolPrefixes": [
         "System.DateTime.get_Now",
         "System.DateTime.get_Today",
+        "System.DateTime.ToLocalTime()",
         "System.DateTime.get_UtcNow",
         "System.DateTimeOffset.get_Now",
         "System.DateTimeOffset.get_UtcNow"

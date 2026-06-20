@@ -248,6 +248,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task DateTimeToLocalTime_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DateTime {|PS0002:TestMethod|}(DateTime value)
+    {
+        return value.ToLocalTime();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task DateTimeBinaryRoundTripHelpers_Diagnostic()
         {
             var test = @"
