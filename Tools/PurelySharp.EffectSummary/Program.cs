@@ -752,7 +752,17 @@ internal static class ArtifactSpecSymbolSource
             return false;
         }
 
-        var byExactSymbolKey = methodEntries.ToDictionary(entry => entry.ExactSymbolKey, entry => entry, StringComparer.Ordinal);
+        var byExactSymbolKey = methodEntries
+            .GroupBy(entry => entry.ExactSymbolKey, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => new SourceSummaryMethodEntry(
+                    group.First().Symbol,
+                    group.Key,
+                    group.SelectMany(entry => entry.Calls)
+                        .Distinct(StringComparer.Ordinal)
+                        .ToArray()),
+                StringComparer.Ordinal);
         var queue = new Queue<SourceSummaryMethodEntry>();
         var visited = new HashSet<string>(StringComparer.Ordinal);
 

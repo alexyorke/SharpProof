@@ -530,8 +530,10 @@
         "System.Collections.Immutable.ImmutableHashSet`1.get_Count",
         "System.Collections.Immutable.ImmutableHashSet`1.get_IsEmpty",
         "System.Collections.Immutable.ImmutableHashSet`1.get_KeyComparer",
+        "System.Collections.Immutable.ImmutableQueue`1.Dequeue",
         "System.Collections.Immutable.ImmutableQueue`1.Clear",
         "System.Collections.Immutable.ImmutableStack`1.Clear",
+        "System.Collections.Immutable.ImmutableStack`1.Pop",
         "System.Collections.Immutable.ImmutableStack`1.Push",
         "System.Collections.Immutable.ImmutableStack`1.get_IsEmpty"
       ]

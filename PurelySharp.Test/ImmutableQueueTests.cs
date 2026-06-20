@@ -46,5 +46,28 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task ImmutableQueueDequeue_Diagnostic()
+        {
+            var test = @"
+using System.Collections.Immutable;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ImmutableQueue<int> DequeueValue(ImmutableQueue<int> queue)
+    {
+        return queue.Dequeue();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(
+                test,
+                VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedId)
+                    .WithSpan(8, 32, 8, 44)
+                    .WithArguments("DequeueValue"));
+        }
     }
 }

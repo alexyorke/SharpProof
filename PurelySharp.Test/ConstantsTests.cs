@@ -1032,8 +1032,10 @@ public static class KeyedCollectionCatalogSignatureSamples
                 "System.Collections.Immutable.ImmutableHashSet<T>.Count.get",
                 "System.Collections.Immutable.ImmutableHashSet<T>.IsEmpty.get",
                 "System.Collections.Immutable.ImmutableHashSet<T>.KeyComparer.get",
+                "System.Collections.Immutable.ImmutableQueue<T>.Dequeue()",
                 "System.Collections.Immutable.ImmutableQueue<T>.Clear()",
                 "System.Collections.Immutable.ImmutableStack<T>.Clear()",
+                "System.Collections.Immutable.ImmutableStack<T>.Pop()",
                 "System.Collections.Immutable.ImmutableStack<T>.Push(T)",
                 "System.Collections.Immutable.ImmutableStack<T>.IsEmpty.get",
             };

@@ -65,5 +65,28 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task ImmutableStackPop_Diagnostic()
+        {
+            var test = @"
+using System.Collections.Immutable;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ImmutableStack<int> PopValue(ImmutableStack<int> stack)
+    {
+        return stack.Pop();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(
+                test,
+                VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedId)
+                    .WithSpan(8, 32, 8, 40)
+                    .WithArguments("PopValue"));
+        }
     }
 }

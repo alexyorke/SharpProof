@@ -4472,6 +4472,120 @@ public readonly struct ConversionFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_DeduplicatesDuplicateExactKeys()
+        {
+            var source = """
+public static class DuplicateReviewedSeedFixture
+{
+    public static int Root()
+    {
+        return Callee();
+    }
+
+    public static int Callee()
+    {
+        return 1;
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryArtifactSpecDuplicateExactKey", source);
+
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-artifact-source-duplicate-exact-key-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var seedOutputPath = Path.Combine(workingDirectory, "seed.PurelySharp.EffectSummary.json");
+            var regeneratedOutputPath = Path.Combine(workingDirectory, "regenerated.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            var duplicateSeedJson = JsonSerializer.Serialize(
+                new
+                {
+                    Assemblies = new object[]
+                    {
+                        new
+                        {
+                            Methods = new object[]
+                            {
+                                new
+                                {
+                                    Symbol = "DuplicateReviewedSeedFixture.Root()",
+                                    ExactSymbolKey = "DuplicateReviewedSeedFixture.Root()->int",
+                                    Calls = new[]
+                                    {
+                                        "DuplicateReviewedSeedFixture.Callee()->int",
+                                    },
+                                },
+                                new
+                                {
+                                    Symbol = "DuplicateReviewedSeedFixture.Root()",
+                                    ExactSymbolKey = "DuplicateReviewedSeedFixture.Root()->int",
+                                    Calls = Array.Empty<string>(),
+                                },
+                                new
+                                {
+                                    Symbol = "DuplicateReviewedSeedFixture.Callee()",
+                                    ExactSymbolKey = "DuplicateReviewedSeedFixture.Callee()->int",
+                                    Calls = Array.Empty<string>(),
+                                },
+                            },
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(seedOutputPath, duplicateSeedJson);
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = regeneratedOutputPath,
+                            SourceSummaryPath = seedOutputPath,
+                            AssemblyPaths = new[]
+                            {
+                                fixture.AssemblyPath,
+                            },
+                            SymbolPrefixes = new[]
+                            {
+                                "DuplicateReviewedSeedFixture.Root",
+                            },
+                            IncludeCallees = true,
+                            IncludePurityClassification = true,
+                            Limit = 10,
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
+
+            using var regeneratedSummary = JsonDocument.Parse(await File.ReadAllTextAsync(regeneratedOutputPath));
+            var generatedSymbols = regeneratedSummary.RootElement
+                .GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("DuplicateReviewedSeedFixture.Root()"));
+            Assert.That(generatedSymbols, Does.Contain("DuplicateReviewedSeedFixture.Callee()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_ExcludesReflectionSensitiveReviewedMembers()
         {
             var workingDirectory = Path.Combine(
