@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T21:57:19.9966609+00:00",
+  "GeneratedAtUtc": "2026-06-20T03:23:58.7996822+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -8,7 +8,7 @@
       "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
       "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
       "MethodCount": 34519,
-      "EmittedMethodCount": 28,
+      "EmittedMethodCount": 29,
       "Methods": [
         {
           "Symbol": "System.Attribute..ctor()",
@@ -24,10 +24,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "object..ctor()-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "object..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -55,10 +65,14 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
             "System.Exception._HResult"
           ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -89,6 +103,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Exception.set_HResult(int)-\u003Evoid",
             "System.SystemException..ctor(string)-\u003Evoid"
@@ -96,6 +112,19 @@
           "Fields": [
             "System.ArgumentException._paramName"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Exception.set_HResult(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SystemException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -121,11 +150,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Exception.set_HResult(int)-\u003Evoid",
             "System.SystemException..ctor(string)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Exception.set_HResult(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SystemException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -151,12 +195,32 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArithmeticException..ctor(string)-\u003Evoid",
             "System.Exception.set_HResult(int)-\u003Evoid",
             "System.SR.get_Arg_DivideByZero()-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArithmeticException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Exception.set_HResult(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_Arg_DivideByZero()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -182,10 +246,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Attribute..ctor()-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Attribute..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -211,11 +285,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Exception.set_HResult(int)-\u003Evoid",
             "System.SystemException..ctor(string)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Exception.set_HResult(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SystemException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -244,12 +333,22 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Index.ThrowValueArgumentOutOfRange_NeedNonNegNumException()-\u003Evoid"
           ],
           "Fields": [
             "System.Index._value"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Index.ThrowValueArgumentOutOfRange_NeedNonNegNumException()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -281,11 +380,31 @@
             "System.ArgumentOutOfRangeException"
           ],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.ArgumentOutOfRangeException",
+              "SourcePath": "System.Index.ThrowValueArgumentOutOfRange_NeedNonNegNumException()"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentOutOfRangeException..ctor(string, string)-\u003Evoid",
             "System.SR.get_ArgumentOutOfRange_NeedNonNegNum()-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentOutOfRangeException..ctor(string, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_ArgumentOutOfRange_NeedNonNegNum()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -313,11 +432,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Exception.set_HResult(int)-\u003Evoid",
             "System.SystemException..ctor(string)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Exception.set_HResult(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SystemException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -343,12 +477,32 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Exception.set_HResult(int)-\u003Evoid",
             "System.SR.get_Arg_NotImplementedException()-\u003Estring",
             "System.SystemException..ctor(string)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Exception.set_HResult(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_Arg_NotImplementedException()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SystemException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -374,11 +528,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Exception.set_HResult(int)-\u003Evoid",
             "System.SystemException..ctor(string)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Exception.set_HResult(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SystemException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -407,12 +576,22 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Attribute..ctor()-\u003Evoid"
           ],
           "Fields": [
             "System.ObsoleteAttribute.\u003CMessage\u003Ek__BackingField"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Attribute..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -438,12 +617,32 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArithmeticException..ctor(string)-\u003Evoid",
             "System.Exception.set_HResult(int)-\u003Evoid",
             "System.SR.get_Arg_OverflowException()-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArithmeticException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Exception.set_HResult(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_Arg_OverflowException()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -469,12 +668,32 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Exception.set_HResult(int)-\u003Evoid",
             "System.NotSupportedException..ctor(string)-\u003Evoid",
             "System.SR.get_Arg_PlatformNotSupported()-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Exception.set_HResult(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.NotSupportedException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_Arg_PlatformNotSupported()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -502,11 +721,15 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
             "System.Range.\u003CEnd\u003Ek__BackingField",
             "System.Range.\u003CStart\u003Ek__BackingField"
           ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -532,10 +755,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Attribute..ctor()-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Attribute..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -561,10 +794,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.SR.GetResourceString(string)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.SR.GetResourceString(string)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -590,10 +833,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.SR.GetResourceString(string)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.SR.GetResourceString(string)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -619,10 +872,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.SR.GetResourceString(string)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.SR.GetResourceString(string)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -648,10 +911,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.SR.GetResourceString(string)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.SR.GetResourceString(string)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -677,10 +950,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.SR.GetResourceString(string)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.SR.GetResourceString(string)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -706,11 +989,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Exception..ctor(string)-\u003Evoid",
             "System.Exception.set_HResult(int)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Exception..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Exception.set_HResult(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -738,10 +1036,52 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
             "System.UIntPtr._value"
           ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.ValueTask\u00601..ctor(!0)",
+          "ExactSymbolKey": "System.Threading.Tasks.ValueTask\u00601..ctor(!0)-\u003Evoid",
+          "MetadataToken": "0x06003EE3",
+          "RelativeVirtualAddress": 7643256,
+          "MethodBodySha256": "cdbf976c12827382f8cbc0e67ca58c09f54cdca99cec4999f4b6f16a810ad574",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003EE3|il:cdbf976c12827382f8cbc0e67ca58c09f54cdca99cec4999f4b6f16a810ad574",
+          "Effects": [
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "fresh_owned_object_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Threading.Tasks.ValueTask\u00601._continueOnCapturedContext",
+            "System.Threading.Tasks.ValueTask\u00601._obj",
+            "System.Threading.Tasks.ValueTask\u00601._result",
+            "System.Threading.Tasks.ValueTask\u00601._token"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -770,12 +1110,22 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Attribute..ctor()-\u003Evoid"
           ],
           "Fields": [
             "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute.\u003CParameterName\u003Ek__BackingField"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Attribute..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -804,12 +1154,22 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Attribute..ctor()-\u003Evoid"
           ],
           "Fields": [
             "System.Runtime.CompilerServices.MethodImplAttribute.\u003CValue\u003Ek__BackingField"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Attribute..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -835,12 +1195,32 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Exception.set_HResult(int)-\u003Evoid",
             "System.IO.IOException..ctor(string)-\u003Evoid",
             "System.SR.get_Arg_EndOfStreamException()-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Exception.set_HResult(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.IO.IOException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_Arg_EndOfStreamException()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -866,11 +1246,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Exception.set_HResult(int)-\u003Evoid",
             "System.SystemException..ctor(string)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Exception.set_HResult(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SystemException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -887,8 +1282,8 @@
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 28,
-    "PureCount": 26,
+    "MethodCount": 29,
+    "PureCount": 27,
     "ImpureCount": 2,
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
@@ -1434,6 +1829,26 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x06002218",
         "MethodBodySha256": "637845a8841db771ce85f9d5314f786705c4963a7635ef96a887a506caf4725e",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.ValueTask\u00601..ctor(!0)",
+        "ExactSymbolKey": "System.Threading.Tasks.ValueTask\u00601..ctor(!0)-\u003Evoid",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003EE3|il:cdbf976c12827382f8cbc0e67ca58c09f54cdca99cec4999f4b6f16a810ad574",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003EE3",
+        "MethodBodySha256": "cdbf976c12827382f8cbc0e67ca58c09f54cdca99cec4999f4b6f16a810ad574",
         "Classification": "pure",
         "PrimaryCategory": "generated_purity_summary",
         "Categories": [],

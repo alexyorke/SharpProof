@@ -1274,6 +1274,39 @@ public static class TaskWrapperCatalogSignatureSamples
         }
 
         [Test]
+        public void ValueTaskResultConstructor_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Threading.Tasks;
+
+public static class ValueTaskConstructorCatalogSignatureSamples
+{
+    public static ValueTask<int> FromResult()
+    {
+        return new ValueTask<int>(42);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ValueTaskConstructorCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var objectCreation = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<ObjectCreationExpressionSyntax>()
+                .Single(node => node.ToString() == "new ValueTask<int>(42)");
+            var methodSymbol = (IMethodSymbol)semanticModel.GetSymbolInfo(objectCreation).Symbol!;
+            var (matched, classification) = GetGeneratedPurityClassification(methodSymbol, compilation);
+
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new ValueTask<int>(42)"));
+            Assert.That(matched, Is.True,
+                "Generated purity catalog should resolve the ValueTask<TResult>(TResult) constructor from runtime metadata evidence.");
+            Assert.That(classification, Is.EqualTo("pure"));
+        }
+
+        [Test]
         public void CancellationTokenNone_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"

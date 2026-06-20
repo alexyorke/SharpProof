@@ -7414,6 +7414,7 @@ public static class DuplicateReviewedSeedFixture
                 "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute..ctor(string)",
                 "System.Runtime.CompilerServices.MethodImplAttribute..ctor(System.Runtime.CompilerServices.MethodImplOptions)",
                 "System.SerializableAttribute..ctor()",
+                "System.Threading.Tasks.ValueTask`1..ctor(!0)",
                 "System.UIntPtr..ctor(uint)");
 
             var report = summary.RootElement.GetProperty("PurityReport");
@@ -7429,6 +7430,7 @@ public static class DuplicateReviewedSeedFixture
                 "System.Runtime.CompilerServices.MethodImplAttribute..ctor(System.Runtime.CompilerServices.MethodImplOptions)",
                 "System.Index..ctor(int, bool)",
                 "System.Range..ctor(System.Index, System.Index)",
+                "System.Threading.Tasks.ValueTask`1..ctor(!0)",
                 "System.UIntPtr..ctor(uint)",
             };
 

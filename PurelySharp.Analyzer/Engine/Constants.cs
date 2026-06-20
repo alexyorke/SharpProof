@@ -823,7 +823,6 @@ public static class Constants
         "System.Diagnostics.CounterSample.Calculate(System.Diagnostics.CounterSample, System.Diagnostics.CounterSample)",
         "System.Numerics.Plane.Normalize(System.Numerics.Plane)",
         "System.Reflection.Emit.Label.Equals(object)",
-        "System.Threading.Tasks.ValueTask<TResult>.ValueTask(TResult)",
         "System.IO.Hashing.Crc32.Hash(System.ReadOnlySpan<byte>)",
         "System.Runtime.InteropServices.MemoryMarshal.Read<T>(System.ReadOnlySpan<byte>)",
         "System.HashCode.Combine<T1, T2>(T1, T2)",
