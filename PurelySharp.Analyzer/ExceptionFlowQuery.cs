@@ -26,16 +26,35 @@ namespace PurelySharp.Analyzer
             IMethodSymbol methodSymbol,
             ExceptionSummaryCatalog exceptionSummaryCatalog)
         {
+            var visitedMethods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
+            {
+                methodSymbol.OriginalDefinition
+            };
+
+            return AnalyzeMethod(
+                methodNode,
+                semanticModel,
+                cancellationToken,
+                methodSymbol,
+                exceptionSummaryCatalog,
+                visitedMethods);
+        }
+
+        private static MethodExceptionQueryResult AnalyzeMethod(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            IMethodSymbol methodSymbol,
+            ExceptionSummaryCatalog exceptionSummaryCatalog,
+            HashSet<IMethodSymbol> visitedMethods)
+        {
             var siteEntries = CollectUncaughtExceptionSiteEntries(
                     methodNode,
                     semanticModel,
                     cancellationToken,
                     methodSymbol,
                     exceptionSummaryCatalog,
-                    new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
-                    {
-                        methodSymbol.OriginalDefinition
-                    })
+                    visitedMethods)
                 .ToImmutableArray();
 
             var exceptionEvidence = new ExceptionEvidenceSet();
@@ -198,7 +217,8 @@ namespace PurelySharp.Analyzer
                     semanticModel,
                     cancellationToken,
                     invokedMethod,
-                    exceptionSummaryCatalog);
+                    exceptionSummaryCatalog,
+                    visitedMethods);
 
                 var invokedMethodDisplay = GetExceptionSourceMethodDisplay(invokedMethod.OriginalDefinition);
                 return result.ExceptionEvidence.EnumerateEntries()
