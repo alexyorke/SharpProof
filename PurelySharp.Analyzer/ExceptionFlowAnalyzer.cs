@@ -200,6 +200,15 @@ namespace PurelySharp.Analyzer
                 }
             }
 
+            foreach (var initializer in GetConstructorInitializerNodes(methodNode))
+            {
+                if (TryGetConstructorInitializerTarget(initializer, semanticModel, cancellationToken, out var constructorSymbol) &&
+                    seen.Add(CreateMethodCallSiteKey(initializer, constructorSymbol)))
+                {
+                    yield return new MethodCallCandidate(initializer, constructorSymbol);
+                }
+            }
+
             foreach (var propertyAccess in GetPropertyAccessNodes(methodNode, semanticModel, cancellationToken))
             {
                 var knownExactLocals = GetKnownExactLocalTypesBefore(propertyAccess, semanticModel, cancellationToken);
@@ -381,6 +390,38 @@ namespace PurelySharp.Analyzer
             return methodNode.DescendantNodes(
                     descendIntoChildren: node => ReferenceEquals(node, methodNode) || !IsNestedCallableBoundary(node))
                 .Where(node => node is ObjectCreationExpressionSyntax || node is ImplicitObjectCreationExpressionSyntax);
+        }
+
+        private static IEnumerable<ConstructorInitializerSyntax> GetConstructorInitializerNodes(SyntaxNode methodNode)
+        {
+            if (methodNode is ConstructorDeclarationSyntax constructorDeclaration &&
+                constructorDeclaration.Initializer != null)
+            {
+                yield return constructorDeclaration.Initializer;
+            }
+        }
+
+        private static bool TryGetConstructorInitializerTarget(
+            ConstructorInitializerSyntax initializer,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out IMethodSymbol constructorSymbol)
+        {
+            if (semanticModel.GetOperation(initializer, cancellationToken) is IInvocationOperation invocationOperation &&
+                invocationOperation.TargetMethod != null)
+            {
+                constructorSymbol = invocationOperation.TargetMethod;
+                return true;
+            }
+
+            if (semanticModel.GetSymbolInfo(initializer, cancellationToken).Symbol is IMethodSymbol symbol)
+            {
+                constructorSymbol = symbol;
+                return true;
+            }
+
+            constructorSymbol = null!;
+            return false;
         }
 
         internal static IEnumerable<BinaryExpressionSyntax> GetDefiniteDivideByZeroNodes(

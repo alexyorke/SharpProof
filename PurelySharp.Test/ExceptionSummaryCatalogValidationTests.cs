@@ -877,6 +877,50 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_ToolOutput_DoesNotReportMetadataThrowCaughtByTrueFilter()
+        {
+            const string boundarySource = """
+using System;
+
+public static class SummaryBoundary
+{
+    public static int ThrowFormat()
+    {
+        throw new FormatException();
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryCaughtByTrueFilter", boundarySource);
+            var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        try
+        {
+            return SummaryBoundary.ThrowFormat();
+        }
+        catch (FormatException) when (true)
+        {
+            return 1;
+        }
+    }
+}
+""",
+                summaryJson,
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_EffectSummary_ToolOutput_PropagatesMetadataRethrow()
         {
             const string boundarySource = """

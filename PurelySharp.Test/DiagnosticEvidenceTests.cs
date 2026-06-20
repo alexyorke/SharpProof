@@ -9472,6 +9472,50 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010AndPs0011_EffectSummaryConstructorInitializer_PropagateToDerivedConstructor()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class DerivedException : Exception
+{
+    public DerivedException(string value)
+        : base(value)
+    {
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
+                    "PurelySharp.EffectSummary.json",
+                    CreateEffectSummaryJson(
+                        typeof(Exception).Assembly.Location,
+                        "System.Exception..ctor(string)",
+                        new[] { "System.InvalidOperationException" }))));
+
+            var summaryDiagnostic = SingleDiagnostic(
+                diagnostics
+                    .Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId)
+                    .Where(d => d.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty] == "effect_summary")
+                    .Where(d => (d.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty] ?? string.Empty).Contains("System.Exception", StringComparison.Ordinal))
+                    .ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.Exception"));
+
+            var siteDiagnostic = SingleDiagnostic(
+                diagnostics
+                    .Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId)
+                    .Where(d => d.GetMessage().Contains("base(value)", StringComparison.Ordinal))
+                    .ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSymbolProperty], Does.Contain("System.Exception"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.Exception"));
+        }
+
+        [Test]
         public async Task Ps0011_SourceCallee_UncaughtAtCallSite_ReportsWarning()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
@@ -9605,6 +9649,54 @@ public class TestClass
 
             Assert.That(siteDiagnostics.Any(d => d.GetMessage().Contains("Callee()", StringComparison.Ordinal)), Is.False);
             Assert.That(siteDiagnostics.Any(d => d.GetMessage().Contains("throw new InvalidOperationException()", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public async Task Ps0010AndPs0011_SourceConstructorInitializer_PropagateToDerivedConstructor()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class BaseClass
+{
+    protected BaseClass(string value)
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class DerivedClass : BaseClass
+{
+    public DerivedClass(string value)
+        : base(value)
+    {
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            var summaryDiagnostic = SingleDiagnostic(
+                diagnostics
+                    .Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId)
+                    .Where(d => d.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty] == "source_callee")
+                    .Where(d => (d.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty] ?? string.Empty).Contains("BaseClass", StringComparison.Ordinal))
+                    .ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("source_callee"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("BaseClass"));
+            Assert.That(summaryDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("direct_throw:throw"));
+
+            var siteDiagnostic = SingleDiagnostic(
+                diagnostics
+                    .Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId)
+                    .Where(d => d.GetMessage().Contains("base(value)", StringComparison.Ordinal))
+                    .ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("source_callee"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSymbolProperty], Does.Contain("BaseClass"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("BaseClass"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("direct_throw:throw"));
         }
 
         [Test]
