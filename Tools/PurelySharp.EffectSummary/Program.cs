@@ -33,10 +33,12 @@ internal static class EffectSummaryCli
 
     private static int RunArtifactSpec(string artifactSpecPath)
     {
+        var artifactSpecDirectory = Path.GetDirectoryName(Path.GetFullPath(artifactSpecPath))
+            ?? throw new InvalidOperationException($"Unable to resolve artifact spec directory for '{artifactSpecPath}'.");
         var document = ArtifactSpecDocument.Load(artifactSpecPath);
         foreach (var artifact in document.Artifacts)
         {
-            var options = CliOptions.FromArtifactSpec(document.Defaults, artifact);
+            var options = CliOptions.FromArtifactSpec(document.Defaults, artifact, artifactSpecDirectory);
             if (string.IsNullOrWhiteSpace(options.OutputPath))
             {
                 throw new ArgumentException("Artifact spec entries require OutputPath.");
@@ -245,13 +247,16 @@ internal sealed class CliOptions
         return options;
     }
 
-    public static CliOptions FromArtifactSpec(ArtifactSpecDefaults? defaults, ArtifactSpecEntry artifact)
+    public static CliOptions FromArtifactSpec(
+        ArtifactSpecDefaults? defaults,
+        ArtifactSpecEntry artifact,
+        string? artifactSpecDirectory = null)
     {
         var options = new CliOptions
         {
             Framework = artifact.Framework ?? defaults?.Framework ?? "net8.0",
             RuntimeAssemblyName = artifact.RuntimeAssemblyName ?? defaults?.RuntimeAssemblyName ?? "System.Private.CoreLib.dll",
-            OutputPath = artifact.OutputPath,
+            OutputPath = ResolveArtifactSpecOutputPath(artifact.OutputPath, artifactSpecDirectory),
             Limit = artifact.Limit ?? defaults?.Limit,
             IncludeCallees = artifact.IncludeCallees ?? defaults?.IncludeCallees ?? false,
             MaxDepth = artifact.MaxDepth ?? defaults?.MaxDepth ?? 1,
@@ -271,7 +276,7 @@ internal sealed class CliOptions
 
         if (artifact.AssemblyPaths != null)
         {
-            options.AssemblyPaths.AddRange(artifact.AssemblyPaths);
+            options.AssemblyPaths.AddRange(ResolveArtifactSpecAssemblyPaths(artifact.AssemblyPaths, artifactSpecDirectory));
         }
 
         if (hasPackageAssembly)
@@ -310,7 +315,7 @@ internal sealed class CliOptions
         if (!string.IsNullOrWhiteSpace(artifact.SourceSummaryPath))
         {
             var sourceSymbols = ArtifactSpecSymbolSource.LoadSymbols(
-                artifact.SourceSummaryPath!,
+                ResolveArtifactSpecInputPath(artifact.SourceSummaryPath!, artifactSpecDirectory),
                 options.ExcludedSymbolPrefixes,
                 options.SymbolPrefixes);
             options.ExactSymbols.AddRange(sourceSymbols.Symbols);
@@ -330,6 +335,62 @@ internal sealed class CliOptions
         return !string.IsNullOrWhiteSpace(artifact.PackageId) ||
             !string.IsNullOrWhiteSpace(artifact.PackageVersion) ||
             !string.IsNullOrWhiteSpace(artifact.PackageAssemblyRelativePath);
+    }
+
+    private static IEnumerable<string> ResolveArtifactSpecAssemblyPaths(
+        IEnumerable<string>? assemblyPaths,
+        string? artifactSpecDirectory)
+    {
+        if (assemblyPaths == null)
+        {
+            return Array.Empty<string>();
+        }
+
+        return assemblyPaths.Select(path => ResolveArtifactSpecInputPath(path, artifactSpecDirectory));
+    }
+
+    private static string? ResolveArtifactSpecOutputPath(string? path, string? artifactSpecDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(path) || Path.IsPathRooted(path) || string.IsNullOrWhiteSpace(artifactSpecDirectory))
+        {
+            return path;
+        }
+
+        var specRelativeCandidate = Path.GetFullPath(Path.Combine(artifactSpecDirectory, path));
+        var currentRelativeCandidate = Path.GetFullPath(path);
+        var specRelativeDirectory = Path.GetDirectoryName(specRelativeCandidate);
+        var currentRelativeDirectory = Path.GetDirectoryName(currentRelativeCandidate);
+        var specDirectoryExists = !string.IsNullOrWhiteSpace(specRelativeDirectory) && Directory.Exists(specRelativeDirectory);
+        var currentDirectoryExists = !string.IsNullOrWhiteSpace(currentRelativeDirectory) && Directory.Exists(currentRelativeDirectory);
+
+        if (specDirectoryExists || !currentDirectoryExists)
+        {
+            return specRelativeCandidate;
+        }
+
+        return currentRelativeCandidate;
+    }
+
+    private static string ResolveArtifactSpecInputPath(string path, string? artifactSpecDirectory)
+    {
+        if (Path.IsPathRooted(path) || string.IsNullOrWhiteSpace(artifactSpecDirectory))
+        {
+            return path;
+        }
+
+        var specRelativeCandidate = Path.GetFullPath(Path.Combine(artifactSpecDirectory, path));
+        if (File.Exists(specRelativeCandidate) || Directory.Exists(specRelativeCandidate))
+        {
+            return specRelativeCandidate;
+        }
+
+        var currentRelativeCandidate = Path.GetFullPath(path);
+        if (File.Exists(currentRelativeCandidate) || Directory.Exists(currentRelativeCandidate))
+        {
+            return currentRelativeCandidate;
+        }
+
+        return specRelativeCandidate;
     }
 
     private static string ResolveNuGetPackageAssemblyPath(ArtifactSpecEntry artifact)

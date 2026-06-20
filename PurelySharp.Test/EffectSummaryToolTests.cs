@@ -4884,6 +4884,77 @@ public static class DuplicateReviewedSeedFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_ResolvesRelativePathsAgainstSpecDirectory()
+        {
+            var workingRoot = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-artifact-spec-relative-" + Guid.NewGuid().ToString("N"));
+            var specDirectory = Path.Combine(workingRoot, "spec");
+            var invocationDirectory = Path.Combine(workingRoot, "invoke");
+            var outputDirectory = Path.Combine(specDirectory, "out");
+            Directory.CreateDirectory(specDirectory);
+            Directory.CreateDirectory(invocationDirectory);
+            Directory.CreateDirectory(outputDirectory);
+
+            var repositoryRoot = GetRepositoryRoot();
+            var runtimeAssemblyPath = typeof(string).Assembly.Location;
+            var copiedSeedPath = Path.Combine(specDirectory, "Environment.PurelySharp.EffectSummary.json");
+            File.Copy(
+                Path.Combine(repositoryRoot, "PurelySharp.Analyzer", "Environment.PurelySharp.EffectSummary.json"),
+                copiedSeedPath);
+
+            var outputPath = Path.Combine(outputDirectory, "Directory.CurrentDirectory.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(specDirectory, "artifact-spec.json");
+            var relativeOutputPath = Path.GetRelativePath(specDirectory, outputPath);
+            var relativeSeedPath = Path.GetRelativePath(specDirectory, copiedSeedPath);
+            var relativeAssemblyPath = Path.GetRelativePath(specDirectory, runtimeAssemblyPath);
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Defaults = new
+                    {
+                        Framework = "net8.0",
+                        IncludeCallees = true,
+                        IncludePurityClassification = true,
+                        CompareManualCatalogs = true,
+                    },
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = relativeOutputPath,
+                            SourceSummaryPath = relativeSeedPath,
+                            AssemblyPaths = new[] { relativeAssemblyPath },
+                            SymbolPrefixes = new[]
+                            {
+                                "System.IO.Directory.GetCurrentDirectory",
+                                "System.IO.Directory.SetCurrentDirectory",
+                            },
+                            Limit = 80,
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsyncWithWorkingDirectory(invocationDirectory, "--artifact-spec", artifactSpecPath);
+
+            Assert.That(File.Exists(outputPath), Is.True);
+            Assert.That(File.Exists(Path.Combine(invocationDirectory, relativeOutputPath)), Is.False);
+
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+            AssertPurityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "caller_visible");
+            AssertPurityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "caller_visible");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_Classifies_EnvironmentCommandLineAndVersion_AsImpure()
         {
             var workingDirectory = Path.Combine(
@@ -8135,10 +8206,15 @@ public sealed class StableCacheDerived : StaticFieldBase
 
         private static async Task RunEffectSummaryToolAsync(params string[] arguments)
         {
+            await RunEffectSummaryToolAsyncWithWorkingDirectory(GetRepositoryRoot(), arguments);
+        }
+
+        private static async Task RunEffectSummaryToolAsyncWithWorkingDirectory(string workingDirectory, params string[] arguments)
+        {
             var startInfo = new ProcessStartInfo
             {
                 FileName = "dotnet",
-                WorkingDirectory = GetRepositoryRoot(),
+                WorkingDirectory = workingDirectory,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
