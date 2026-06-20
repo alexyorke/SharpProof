@@ -1415,6 +1415,144 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public void ReviewedSummaryCatalogLoader_DropsAmbiguousSameImplementationDuplicates()
+        {
+            var assembly = Assembly.LoadFrom(GetEffectSummaryToolDllPath());
+            var loaderType = assembly.GetType("ReviewedSummaryCatalogLoader", throwOnError: true)!;
+            var loadMethod = loaderType.GetMethod("Load", BindingFlags.Public | BindingFlags.Static)!;
+            const string conflictingExactSymbolKey = "TestType.Conflicting()->void";
+            const string stableExactSymbolKey = "TestType.Stable()->void";
+            var rootDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "reviewed-loader-ambiguous-" + Guid.NewGuid().ToString("N"));
+            var analyzerDirectory = Path.Combine(rootDirectory, "PurelySharp.Analyzer");
+            Directory.CreateDirectory(analyzerDirectory);
+
+            try
+            {
+                File.WriteAllText(
+                    Path.Combine(analyzerDirectory, "A.PurelySharp.EffectSummary.json"),
+                    CreateReviewedSummaryDocument(
+                        CreateReviewedEntry(
+                            symbol: "TestType.Conflicting()",
+                            exactSymbolKey: conflictingExactSymbolKey,
+                            metadataToken: "0x06000001",
+                            methodBodySha256: "conflict-body",
+                            primaryCategory: "global_state_read",
+                            categories: new[] { "global_state_read" }),
+                        CreateReviewedEntry(
+                            symbol: "TestType.Stable()",
+                            exactSymbolKey: stableExactSymbolKey,
+                            metadataToken: "0x06000002",
+                            methodBodySha256: "stable-body",
+                            classification: "pure",
+                            primaryCategory: "generated_purity_summary",
+                            categories: Array.Empty<string>(),
+                            effectVisibilityClassification: "none")));
+                File.WriteAllText(
+                    Path.Combine(analyzerDirectory, "B.PurelySharp.EffectSummary.json"),
+                    CreateReviewedSummaryDocument(
+                        CreateReviewedEntry(
+                            symbol: "TestType.Conflicting()",
+                            exactSymbolKey: conflictingExactSymbolKey,
+                            metadataToken: "0x06000001",
+                            methodBodySha256: "conflict-body",
+                            primaryCategory: "global_state_write",
+                            categories: new[] { "global_state_write" })));
+
+                lock (EffectSummaryToolBuildLock)
+                {
+                    var originalDirectory = Directory.GetCurrentDirectory();
+                    try
+                    {
+                        Directory.SetCurrentDirectory(rootDirectory);
+                        var entries = (System.Collections.IDictionary)loadMethod.Invoke(null, Array.Empty<object>())!;
+                        Assert.That(entries.Contains(conflictingExactSymbolKey), Is.False);
+                        Assert.That(entries.Contains(stableExactSymbolKey), Is.True);
+                    }
+                    finally
+                    {
+                        Directory.SetCurrentDirectory(originalDirectory);
+                    }
+                }
+            }
+            finally
+            {
+                if (Directory.Exists(rootDirectory))
+                {
+                    Directory.Delete(rootDirectory, recursive: true);
+                }
+            }
+        }
+
+        [Test]
+        public void ReviewedSummaryCatalogLoader_PrefersDominatingSameImplementationDuplicate()
+        {
+            var assembly = Assembly.LoadFrom(GetEffectSummaryToolDllPath());
+            var loaderType = assembly.GetType("ReviewedSummaryCatalogLoader", throwOnError: true)!;
+            var loadMethod = loaderType.GetMethod("Load", BindingFlags.Public | BindingFlags.Static)!;
+            const string exactSymbolKey = "TestType.Dominating()->void";
+            var rootDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "reviewed-loader-dominating-" + Guid.NewGuid().ToString("N"));
+            var analyzerDirectory = Path.Combine(rootDirectory, "PurelySharp.Analyzer");
+            Directory.CreateDirectory(analyzerDirectory);
+
+            try
+            {
+                File.WriteAllText(
+                    Path.Combine(analyzerDirectory, "A.PurelySharp.EffectSummary.json"),
+                    CreateReviewedSummaryDocument(
+                        CreateReviewedEntry(
+                            symbol: "TestType.Dominating()",
+                            exactSymbolKey: exactSymbolKey,
+                            metadataToken: "0x06000003",
+                            methodBodySha256: "dominating-body",
+                            primaryCategory: "global_state_read",
+                            categories: new[] { "global_state_read" })));
+                File.WriteAllText(
+                    Path.Combine(analyzerDirectory, "B.PurelySharp.EffectSummary.json"),
+                    CreateReviewedSummaryDocument(
+                        CreateReviewedEntry(
+                            symbol: "TestType.Dominating()",
+                            exactSymbolKey: exactSymbolKey,
+                            metadataToken: "0x06000003",
+                            methodBodySha256: "dominating-body",
+                            primaryCategory: "global_state_read",
+                            categories: new[] { "global_state_read", "impure_callee" },
+                            firstBlockingCallChain: new[] { "TestType.Helper()" })));
+
+                lock (EffectSummaryToolBuildLock)
+                {
+                    var originalDirectory = Directory.GetCurrentDirectory();
+                    try
+                    {
+                        Directory.SetCurrentDirectory(rootDirectory);
+                        var entries = (System.Collections.IDictionary)loadMethod.Invoke(null, Array.Empty<object>())!;
+                        Assert.That(entries.Contains(exactSymbolKey), Is.True);
+
+                        var entry = entries[exactSymbolKey]!;
+                        var categories = ((string[])entry.GetType().GetProperty("Categories")!.GetValue(entry)!)
+                            .OrderBy(value => value, StringComparer.Ordinal)
+                            .ToArray();
+                        Assert.That(categories, Is.EqualTo(new[] { "global_state_read", "impure_callee" }));
+                    }
+                    finally
+                    {
+                        Directory.SetCurrentDirectory(originalDirectory);
+                    }
+                }
+            }
+            finally
+            {
+                if (Directory.Exists(rootDirectory))
+                {
+                    Directory.Delete(rootDirectory, recursive: true);
+                }
+            }
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeSortedDictionaryLookupSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
@@ -8482,6 +8620,55 @@ public sealed class StableCacheDerived : StaticFieldBase
         private static string GetRepositoryRoot()
         {
             return Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory, "..", "..", "..", ".."));
+        }
+
+        private static string CreateReviewedSummaryDocument(params object[] entries)
+        {
+            return JsonSerializer.Serialize(new
+            {
+                GeneratedPurityCatalog = new
+                {
+                    Entries = entries
+                }
+            });
+        }
+
+        private static object CreateReviewedEntry(
+            string symbol,
+            string exactSymbolKey,
+            string metadataToken,
+            string methodBodySha256,
+            string classification = "impure",
+            string primaryCategory = "generated_purity_summary",
+            string[]? categories = null,
+            string[]? firstBlockingCallChain = null,
+            bool hasFreshArrayAllocationEvidence = false,
+            bool hasFreshObjectAllocationEvidence = false,
+            bool hasUnsupportedEffects = false,
+            string freshnessClassification = "none",
+            string effectVisibilityClassification = "caller_visible")
+        {
+            return new
+            {
+                Symbol = symbol,
+                ExactSymbolKey = exactSymbolKey,
+                CacheKey = "mvid:test-mvid|token:" + metadataToken + "|il:" + methodBodySha256,
+                AssemblyName = "TestAssembly",
+                AssemblyPath = "TestAssembly.dll",
+                AssemblySha256 = "test-assembly-sha256",
+                ModuleVersionId = "test-module-version-id",
+                MetadataToken = metadataToken,
+                MethodBodySha256 = methodBodySha256,
+                Classification = classification,
+                PrimaryCategory = primaryCategory,
+                Categories = categories ?? Array.Empty<string>(),
+                FirstBlockingCallChain = firstBlockingCallChain ?? Array.Empty<string>(),
+                HasFreshArrayAllocationEvidence = hasFreshArrayAllocationEvidence,
+                HasFreshObjectAllocationEvidence = hasFreshObjectAllocationEvidence,
+                HasUnsupportedEffects = hasUnsupportedEffects,
+                FreshnessClassification = freshnessClassification,
+                EffectVisibilityClassification = effectVisibilityClassification
+            };
         }
 
         private static void TryKillProcess(Process process)

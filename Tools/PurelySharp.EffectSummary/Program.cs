@@ -946,7 +946,8 @@ internal static class ReviewedSummaryCatalogLoader
             return new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
         }
 
-        var entriesByKey = new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
+        var candidatesByKey = new Dictionary<string, List<ReviewedCatalogCandidate>>(StringComparer.Ordinal);
+        var order = 0;
         foreach (var path in Directory.EnumerateFiles(summaryDirectory, "*.PurelySharp.EffectSummary.json", SearchOption.TopDirectoryOnly)
                      .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
         {
@@ -967,15 +968,176 @@ internal static class ReviewedSummaryCatalogLoader
                     continue;
                 }
 
-                if (!entriesByKey.TryGetValue(entry.ExactSymbolKey, out var existing) ||
-                    GetClassificationStrength(entry.Classification) > GetClassificationStrength(existing.Classification))
+                if (!candidatesByKey.TryGetValue(entry.ExactSymbolKey, out var candidates))
                 {
-                    entriesByKey[entry.ExactSymbolKey] = entry;
+                    candidates = new List<ReviewedCatalogCandidate>();
+                    candidatesByKey.Add(entry.ExactSymbolKey, candidates);
                 }
+
+                candidates.Add(new ReviewedCatalogCandidate(entry, order++));
+            }
+        }
+
+        var entriesByKey = new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
+        foreach (var pair in candidatesByKey)
+        {
+            var resolvedEntry = ResolveReviewedEntryCandidates(pair.Value);
+            if (resolvedEntry != null)
+            {
+                entriesByKey[pair.Key] = resolvedEntry;
             }
         }
 
         return entriesByKey;
+    }
+
+    private static GeneratedPurityCatalogEntry? ResolveReviewedEntryCandidates(
+        IReadOnlyList<ReviewedCatalogCandidate> candidates)
+    {
+        ReviewedCatalogCandidate? bestCandidate = null;
+        foreach (var implementationGroup in candidates
+                     .GroupBy(candidate => CreateReviewedImplementationKey(candidate.Entry), StringComparer.Ordinal))
+        {
+            var resolvedCandidate = ResolveSameImplementationCandidates(
+                implementationGroup
+                    .OrderBy(candidate => candidate.Order)
+                    .ToArray());
+            if (resolvedCandidate == null)
+            {
+                continue;
+            }
+
+            if (bestCandidate == null ||
+                CompareReviewedCatalogCandidates(resolvedCandidate.Value, bestCandidate.Value) > 0)
+            {
+                bestCandidate = resolvedCandidate;
+            }
+        }
+
+        return bestCandidate?.Entry;
+    }
+
+    private static ReviewedCatalogCandidate? ResolveSameImplementationCandidates(
+        IReadOnlyList<ReviewedCatalogCandidate> candidates)
+    {
+        if (candidates.Count == 0)
+        {
+            return null;
+        }
+
+        var bestCandidate = candidates[0];
+        for (var i = 1; i < candidates.Count; i++)
+        {
+            var candidate = candidates[i];
+            if (AreEquivalentReviewedEntries(bestCandidate.Entry, candidate.Entry))
+            {
+                continue;
+            }
+
+            var bestDominatesCandidate = DoesReviewedEntryDominate(bestCandidate.Entry, candidate.Entry);
+            var candidateDominatesBest = DoesReviewedEntryDominate(candidate.Entry, bestCandidate.Entry);
+            if (bestDominatesCandidate == candidateDominatesBest)
+            {
+                return null;
+            }
+
+            if (candidateDominatesBest)
+            {
+                bestCandidate = candidate;
+            }
+        }
+
+        return bestCandidate;
+    }
+
+    private static int CompareReviewedCatalogCandidates(
+        ReviewedCatalogCandidate left,
+        ReviewedCatalogCandidate right)
+    {
+        var classificationComparison =
+            GetClassificationStrength(left.Entry.Classification).CompareTo(GetClassificationStrength(right.Entry.Classification));
+        if (classificationComparison != 0)
+        {
+            return classificationComparison;
+        }
+
+        return right.Order.CompareTo(left.Order);
+    }
+
+    private static bool AreEquivalentReviewedEntries(
+        GeneratedPurityCatalogEntry left,
+        GeneratedPurityCatalogEntry right)
+    {
+        return string.Equals(left.Classification, right.Classification, StringComparison.Ordinal) &&
+            string.Equals(left.PrimaryCategory, right.PrimaryCategory, StringComparison.Ordinal) &&
+            string.Equals(left.FreshnessClassification, right.FreshnessClassification, StringComparison.Ordinal) &&
+            string.Equals(left.EffectVisibilityClassification, right.EffectVisibilityClassification, StringComparison.Ordinal) &&
+            left.HasFreshArrayAllocationEvidence == right.HasFreshArrayAllocationEvidence &&
+            left.HasFreshObjectAllocationEvidence == right.HasFreshObjectAllocationEvidence &&
+            left.HasUnsupportedEffects == right.HasUnsupportedEffects &&
+            HaveSameSet(left.Categories, right.Categories) &&
+            left.FirstBlockingCallChain.SequenceEqual(right.FirstBlockingCallChain, StringComparer.Ordinal);
+    }
+
+    private static bool DoesReviewedEntryDominate(
+        GeneratedPurityCatalogEntry stronger,
+        GeneratedPurityCatalogEntry weaker)
+    {
+        return string.Equals(stronger.Classification, weaker.Classification, StringComparison.Ordinal) &&
+            string.Equals(stronger.PrimaryCategory, weaker.PrimaryCategory, StringComparison.Ordinal) &&
+            string.Equals(stronger.FreshnessClassification, weaker.FreshnessClassification, StringComparison.Ordinal) &&
+            string.Equals(stronger.EffectVisibilityClassification, weaker.EffectVisibilityClassification, StringComparison.Ordinal) &&
+            (!weaker.HasFreshArrayAllocationEvidence || stronger.HasFreshArrayAllocationEvidence) &&
+            (!weaker.HasFreshObjectAllocationEvidence || stronger.HasFreshObjectAllocationEvidence) &&
+            (!weaker.HasUnsupportedEffects || stronger.HasUnsupportedEffects) &&
+            IsSetSuperset(stronger.Categories, weaker.Categories) &&
+            IsPrefix(weaker.FirstBlockingCallChain, stronger.FirstBlockingCallChain);
+    }
+
+    private static bool HaveSameSet(string[] left, string[] right)
+    {
+        return left.Length == right.Length &&
+            IsSetSuperset(left, right);
+    }
+
+    private static bool IsSetSuperset(string[] left, string[] right)
+    {
+        if (right.Length == 0)
+        {
+            return true;
+        }
+
+        var set = new HashSet<string>(left, StringComparer.Ordinal);
+        return right.All(set.Contains);
+    }
+
+    private static bool IsPrefix(string[] prefix, string[] sequence)
+    {
+        if (prefix.Length > sequence.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < prefix.Length; i++)
+        {
+            if (!string.Equals(prefix[i], sequence[i], StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string CreateReviewedImplementationKey(GeneratedPurityCatalogEntry entry)
+    {
+        return string.Join(
+            "|",
+            entry.AssemblyName,
+            entry.AssemblySha256,
+            entry.ModuleVersionId,
+            entry.MetadataToken,
+            entry.MethodBodySha256 ?? string.Empty);
     }
 
     private static string? TryFindAnalyzerSummaryDirectory()
@@ -1088,6 +1250,10 @@ internal static class ReviewedSummaryCatalogLoader
             _ => 0,
         };
     }
+
+    private readonly record struct ReviewedCatalogCandidate(
+        GeneratedPurityCatalogEntry Entry,
+        int Order);
 }
 
 internal static class RuntimeAssemblyResolver
