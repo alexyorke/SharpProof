@@ -1435,6 +1435,7 @@ internal static class AssemblyEffectSummarizer
         var sameAssemblyStaticReadFieldTokens = new SortedSet<int>();
         var thrownExceptionTypes = new SortedSet<string>(StringComparer.Ordinal);
         var callSites = new List<CallSiteSummary>();
+        var exceptionPropagationSites = new List<ExceptionPropagationSite>();
         string? methodBodySha256 = null;
 
         if ((definition.Attributes & MethodAttributes.Abstract) != 0)
@@ -1476,6 +1477,7 @@ internal static class AssemblyEffectSummarizer
                     staticFields,
                     sameAssemblyStaticReadFieldTokens,
                     thrownExceptionTypes,
+                    exceptionPropagationSites,
                     methodDefinitionHandlesByExactKey,
                     fieldDefinitionHandlesBySymbol,
                     fieldDefinitionHandlesByExactKey,
@@ -1521,6 +1523,12 @@ internal static class AssemblyEffectSummarizer
                 .Select(group => group.First())
                 .OrderBy(site => site.ExactSymbolKey, StringComparer.Ordinal)
                 .ThenBy(GetCallSiteDeduplicationKey, StringComparer.Ordinal)
+                .ToArray()
+            ,
+            ExceptionPropagationSites = exceptionPropagationSites
+                .Distinct()
+                .OrderBy(site => site.ExactSymbolKey, StringComparer.Ordinal)
+                .ThenBy(site => site.InstructionOffset)
                 .ToArray()
         };
     }
@@ -1644,17 +1652,22 @@ internal static class AssemblyEffectSummarizer
             return OrderThrownExceptionEdges(thrownSources.Values);
         }
 
-        foreach (var call in summary.Calls)
+        foreach (var propagationSite in summary.ExceptionPropagationSites)
         {
-            if (bySymbol.ContainsKey(call))
+            if (bySymbol.ContainsKey(propagationSite.ExactSymbolKey))
             {
-                foreach (var nestedSource in VisitThrownExceptionEdges(call, bySymbol, memo, visiting))
+                foreach (var nestedSource in VisitThrownExceptionEdges(propagationSite.ExactSymbolKey, bySymbol, memo, visiting))
                 {
+                    if (!ExceptionEscapesPropagationSite(propagationSite, nestedSource.ExceptionType))
+                    {
+                        continue;
+                    }
+
                     var chainedSourcePath = summary.Symbol + " -> " + nestedSource.SourcePath;
                     var immediateCalleeEdge = new ThrownExceptionEdgeSummary(
                         nestedSource.ExceptionType,
                         chainedSourcePath,
-                        CalleeExactSymbolKey: call,
+                        CalleeExactSymbolKey: propagationSite.ExactSymbolKey,
                         Depth: 1);
                     thrownSources[CreateThrownExceptionEdgeKey(immediateCalleeEdge)] = immediateCalleeEdge;
 
@@ -1972,6 +1985,7 @@ internal static class AssemblyEffectSummarizer
         SortedSet<string> staticReadFields,
         SortedSet<int> sameAssemblyStaticReadFieldTokens,
         SortedSet<string> thrownExceptionTypes,
+        List<ExceptionPropagationSite> exceptionPropagationSites,
         IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
         IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesBySymbol,
         IReadOnlyDictionary<string, FieldDefinitionHandle> fieldDefinitionHandlesByExactKey,
@@ -2027,6 +2041,12 @@ internal static class AssemblyEffectSummarizer
                 {
                     calledSymbol = ResolveMethodExactKey(reader, operandToken.Value);
                     calls.Add(calledSymbol);
+                    exceptionPropagationSites.Add(CreateExceptionPropagationSite(
+                        il,
+                        reader,
+                        exceptionRegions,
+                        instructionOffset,
+                        calledSymbol));
                     if (TryGetCallTargetSignature(reader, operandToken.Value, opCode == OpCodes.Newobj, out var signature))
                     {
                         var argumentValues = PopTrackedStackValues(trackedStack, signature.ParameterTypes.Length);
@@ -2121,7 +2141,7 @@ internal static class AssemblyEffectSummarizer
                 }
 
                 if (thrownExceptionType != null &&
-                    IsEscapingThrow(reader, exceptionRegions, instructionOffset, thrownExceptionType))
+                    IsEscapingThrow(il, reader, exceptionRegions, instructionOffset, thrownExceptionType))
                 {
                     thrownExceptionTypes.Add(thrownExceptionType);
                 }
@@ -3300,12 +3320,59 @@ internal static class AssemblyEffectSummarizer
         return GetEnclosingCatchExceptionType(reader, exceptionRegions, instructionOffset);
     }
 
+    private static ExceptionPropagationSite CreateExceptionPropagationSite(
+        byte[] il,
+        MetadataReader reader,
+        ImmutableArray<ExceptionRegion> exceptionRegions,
+        int instructionOffset,
+        string exactSymbolKey)
+    {
+        return new ExceptionPropagationSite(
+            exactSymbolKey,
+            instructionOffset,
+            GetHandlingCatchExceptionTypes(reader, exceptionRegions, instructionOffset),
+            IsShadowedByDefinitelyThrowingFinally(il, exceptionRegions, instructionOffset));
+    }
+
+    private static bool ExceptionEscapesPropagationSite(
+        ExceptionPropagationSite propagationSite,
+        string thrownExceptionType)
+    {
+        if (propagationSite.IsShadowedByDefinitelyThrowingFinally)
+        {
+            return false;
+        }
+
+        foreach (var catchExceptionType in propagationSite.HandlingCatchExceptionTypes)
+        {
+            if (string.IsNullOrWhiteSpace(catchExceptionType))
+            {
+                continue;
+            }
+
+            if (string.Equals(catchExceptionType, "System.Exception", StringComparison.Ordinal) ||
+                string.Equals(catchExceptionType, "System.Object", StringComparison.Ordinal) ||
+                string.Equals(catchExceptionType, thrownExceptionType, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static bool IsEscapingThrow(
+        byte[] il,
         MetadataReader reader,
         ImmutableArray<ExceptionRegion> exceptionRegions,
         int instructionOffset,
         string thrownExceptionType)
     {
+        if (IsShadowedByDefinitelyThrowingFinally(il, exceptionRegions, instructionOffset))
+        {
+            return false;
+        }
+
         foreach (var exceptionRegion in exceptionRegions)
         {
             if (exceptionRegion.Kind != ExceptionRegionKind.Catch ||
@@ -3322,6 +3389,77 @@ internal static class AssemblyEffectSummarizer
         }
 
         return true;
+    }
+
+    private static string[] GetHandlingCatchExceptionTypes(
+        MetadataReader reader,
+        ImmutableArray<ExceptionRegion> exceptionRegions,
+        int instructionOffset)
+    {
+        return exceptionRegions
+            .Where(exceptionRegion =>
+                exceptionRegion.Kind == ExceptionRegionKind.Catch &&
+                ContainsOffset(exceptionRegion.TryOffset, exceptionRegion.TryLength, instructionOffset))
+            .Select(exceptionRegion => GetCatchExceptionType(reader, exceptionRegion))
+            .Where(exceptionType => !string.IsNullOrWhiteSpace(exceptionType))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray()!;
+    }
+
+    private static bool IsShadowedByDefinitelyThrowingFinally(
+        byte[] il,
+        ImmutableArray<ExceptionRegion> exceptionRegions,
+        int instructionOffset)
+    {
+        foreach (var exceptionRegion in exceptionRegions)
+        {
+            if (exceptionRegion.Kind != ExceptionRegionKind.Finally ||
+                !ContainsOffset(exceptionRegion.TryOffset, exceptionRegion.TryLength, instructionOffset) ||
+                ContainsOffset(exceptionRegion.HandlerOffset, exceptionRegion.HandlerLength, instructionOffset))
+            {
+                continue;
+            }
+
+            if (FinallyHandlerDefinitelyThrows(il, exceptionRegion.HandlerOffset, exceptionRegion.HandlerLength))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool FinallyHandlerDefinitelyThrows(byte[] il, int handlerOffset, int handlerLength)
+    {
+        var endOffset = handlerOffset + handlerLength;
+        var offset = handlerOffset;
+        OpCode lastMeaningfulOpCode = default;
+        var foundMeaningfulInstruction = false;
+        while (offset < endOffset)
+        {
+            var opCode = ReadOpCode(il, ref offset);
+            var operandOffset = offset;
+            var operandSize = GetOperandSize(opCode.OperandType, il, operandOffset);
+            offset += operandSize;
+
+            if (opCode.FlowControl is FlowControl.Branch or FlowControl.Cond_Branch or FlowControl.Return ||
+                opCode == OpCodes.Endfinally ||
+                opCode == OpCodes.Endfilter ||
+                opCode == OpCodes.Leave ||
+                opCode == OpCodes.Leave_S)
+            {
+                return false;
+            }
+
+            if (opCode != OpCodes.Nop)
+            {
+                lastMeaningfulOpCode = opCode;
+                foundMeaningfulInstruction = true;
+            }
+        }
+
+        return foundMeaningfulInstruction &&
+            (lastMeaningfulOpCode == OpCodes.Throw || lastMeaningfulOpCode == OpCodes.Rethrow);
     }
 
     private static bool TryGetEnclosingCatchRegion(
@@ -4713,11 +4851,20 @@ internal sealed record MethodEffectSummary(
     public ThrownExceptionEdgeSummary[] TransitiveThrownExceptionEdges { get; init; } = Array.Empty<ThrownExceptionEdgeSummary>();
 
     public MethodPurityClassification? PurityClassification { get; init; }
+
+    [JsonIgnore]
+    public ExceptionPropagationSite[] ExceptionPropagationSites { get; init; } = Array.Empty<ExceptionPropagationSite>();
 }
 
 internal sealed record ExceptionSourcePath(
     string ExceptionType,
     string SourcePath);
+
+internal sealed record ExceptionPropagationSite(
+    string ExactSymbolKey,
+    int InstructionOffset,
+    string[] HandlingCatchExceptionTypes,
+    bool IsShadowedByDefinitelyThrowingFinally);
 
 internal sealed record ThrownExceptionEdgeSummary(
     string ExceptionType,

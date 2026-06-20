@@ -1011,6 +1011,93 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_ToolOutput_FinallyThrow_ShadowsEarlierDirectMetadataThrow()
+        {
+            const string boundarySource = """
+using System;
+
+public static class SummaryBoundary
+{
+    public static void DirectThrowShadowedByFinally()
+    {
+        try
+        {
+            throw new InvalidOperationException();
+        }
+        finally
+        {
+            throw new FormatException();
+        }
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryFinallyShadowedDirect", boundarySource);
+            var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+public class TestClass
+{
+    public void TestMethod()
+    {
+        SummaryBoundary.DirectThrowShadowedByFinally();
+    }
+}
+""",
+                summaryJson,
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            AssertEffectSummaryException(diagnostics, "TestMethod", "System.FormatException");
+        }
+
+        [Test]
+        public async Task Ps0010_EffectSummary_ToolOutput_FinallyThrow_ShadowsEarlierTransitiveMetadataThrow()
+        {
+            const string boundarySource = """
+using System;
+
+public static class SummaryBoundary
+{
+    private static void ThrowDirect()
+    {
+        throw new InvalidOperationException();
+    }
+
+    public static void TransitiveCallShadowedByFinally()
+    {
+        try
+        {
+            ThrowDirect();
+        }
+        finally
+        {
+            throw new FormatException();
+        }
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryFinallyShadowedTransitive", boundarySource);
+            var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+public class TestClass
+{
+    public void TestMethod()
+    {
+        SummaryBoundary.TransitiveCallShadowedByFinally();
+    }
+}
+""",
+                summaryJson,
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            AssertEffectSummaryException(diagnostics, "TestMethod", "System.FormatException");
+        }
+
+        [Test]
         public async Task Ps0002_EffectSummary_WithTrustedGeneratedPureClassification_SuppressesUnknownExternalCall()
         {
             const string boundarySource = """

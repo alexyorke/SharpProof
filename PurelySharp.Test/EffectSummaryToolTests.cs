@@ -203,6 +203,54 @@ public static class ExceptionFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_FinallyThrow_ShadowsEarlierEscapingDirectAndTransitiveExceptions()
+        {
+            var source = """
+using System;
+
+public static class ExceptionFixture
+{
+    private static void ThrowDirect()
+    {
+        throw new InvalidOperationException("boom");
+    }
+
+    public static void DirectThrowShadowedByFinally()
+    {
+        try
+        {
+            throw new InvalidOperationException("boom");
+        }
+        finally
+        {
+            throw new FormatException();
+        }
+    }
+
+    public static void TransitiveCallShadowedByFinally()
+    {
+        try
+        {
+            ThrowDirect();
+        }
+        finally
+        {
+            throw new FormatException();
+        }
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryFinallyShadowing", source);
+            using var summary = await RunEffectSummaryAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
+
+            AssertThrownExceptions(summary, "ExceptionFixture.DirectThrowShadowedByFinally()", "System.FormatException");
+            AssertThrownExceptions(summary, "ExceptionFixture.TransitiveCallShadowedByFinally()", "System.FormatException");
+            AssertTransitiveExceptions(summary, "ExceptionFixture.TransitiveCallShadowedByFinally()", "System.FormatException");
+            AssertTransitiveExceptionEdges(summary, "ExceptionFixture.TransitiveCallShadowedByFinally()");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_FilteredSummary_UnboundedDepth_PreservesDeepTransitiveExceptions()
         {
             var source = """
@@ -7872,11 +7920,15 @@ public sealed class StableCacheDerived : StaticFieldBase
             var method = FindMethod(summary, methodSymbol);
             var actualEntries = method.GetProperty("TransitiveThrownExceptionEdges")
                 .EnumerateArray()
-                .Select(entry => (
-                    ExceptionType: entry.GetProperty("ExceptionType").GetString(),
-                    CalleeExactSymbolKey: entry.GetProperty("CalleeExactSymbolKey").GetString(),
-                    SourcePath: entry.GetProperty("SourcePath").GetString(),
-                    Depth: entry.GetProperty("Depth").GetInt32()))
+                .Select(entry =>
+                {
+                    var hasCalleeExactSymbolKey = entry.TryGetProperty("CalleeExactSymbolKey", out var calleeExactSymbolKeyElement);
+                    return (
+                        ExceptionType: entry.GetProperty("ExceptionType").GetString(),
+                        CalleeExactSymbolKey: hasCalleeExactSymbolKey ? calleeExactSymbolKeyElement.GetString() : null,
+                        SourcePath: entry.GetProperty("SourcePath").GetString(),
+                        Depth: entry.GetProperty("Depth").GetInt32());
+                })
                 .Where(entry =>
                     !string.IsNullOrWhiteSpace(entry.ExceptionType) &&
                     !string.IsNullOrWhiteSpace(entry.CalleeExactSymbolKey) &&
