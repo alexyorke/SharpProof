@@ -136,11 +136,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         symbol: PurityAnalysisEngine.TryResolveSymbol(expression)));
             }
 
-            if (IsFrameworkType(expressionType))
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
             if (expressionType is not INamedTypeSymbol namedType)
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -233,9 +228,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinition) ?? "known_impure"));
             }
 
-            if (trustedMetadataPurity.AllowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinition))
+            if (IsFrameworkType(expressionType))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            if (namedType.TypeKind == TypeKind.Class &&
+                !namedType.IsSealed &&
+                toStringMethod.IsVirtual &&
+                !toStringMethod.IsSealed)
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    interpolation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        "dynamic_dispatch",
+                        nameof(InterpolatedStringPurityRule),
+                        interpolation,
+                        syntaxNode: interpolation.Syntax,
+                        symbol: toStringMethod));
             }
 
             if (originalDefinition.DeclaringSyntaxReferences.Length == 0)
