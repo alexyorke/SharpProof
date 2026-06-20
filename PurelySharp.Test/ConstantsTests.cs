@@ -233,6 +233,12 @@ public static class EnvironmentCatalogSignatureSamples
         }
 
         [Test]
+        public void DebugWriteLine_IsNotBackedByAnExactImpureMethodCatalogRow()
+        {
+            Assert.That(Constants.KnownImpureMethods, Does.Not.Contain("System.Diagnostics.Debug.WriteLine(string)"));
+        }
+
+        [Test]
         public void CultureAndRegionAmbientStateHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             var members = new[]

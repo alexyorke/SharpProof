@@ -219,6 +219,46 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_ImplicitConversionOperator_ReportsOperatorSummary()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public readonly struct Token
+{
+    public static implicit operator int(Token value)
+    {
+        throw new InvalidOperationException();
+    }
+}");
+
+            var diagnostic = diagnostics.Single(d =>
+                d.Id == PurelySharpDiagnostics.ExceptionSummaryId &&
+                ContainsMethodName(d, "op_Implicit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
+        public async Task Ps0011_ImplicitConversionOperator_ReportsThrowSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public readonly struct Token
+{
+    public static implicit operator int(Token value)
+    {
+        throw new InvalidOperationException();
+    }
+}");
+
+            var diagnostic = diagnostics.Single(d =>
+                d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId &&
+                d.GetMessage().Contains("throw new InvalidOperationException()", StringComparison.Ordinal));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
         public async Task Ps0010_LocalDelegateTarget_Propagates()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"

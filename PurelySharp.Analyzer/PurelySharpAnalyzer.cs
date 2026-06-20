@@ -57,6 +57,7 @@ namespace PurelySharp.Analyzer
                     SyntaxKind.GetAccessorDeclaration,
                     SyntaxKind.SetAccessorDeclaration,
                     SyntaxKind.ConstructorDeclaration,
+                    SyntaxKind.ConversionOperatorDeclaration,
                     SyntaxKind.OperatorDeclaration,
                     SyntaxKind.LocalFunctionStatement);
             });

@@ -71,7 +71,6 @@ public static class Constants
         "object.GetHashCode()",
         "System.Diagnostics.ActivitySource.StartActivity(string)",
         "System.Diagnostics.Debug.Assert(bool)",
-        "System.Diagnostics.Debug.WriteLine(string)",
         "System.Diagnostics.Debugger.Break()",
         "System.Diagnostics.DiagnosticListener.DiagnosticListener(string)",
         "System.Diagnostics.FileVersionInfo.FileVersion.get",
