@@ -569,6 +569,18 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/ConfigurationManager.AppSettings.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/ConfigurationManager.AppSettings.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Configuration.ConfigurationManager.dll",
+      "PackageId": "System.Configuration.ConfigurationManager",
+      "PackageVersion": "10.0.8",
+      "PackageAssemblyRelativePath": "lib/net8.0/System.Configuration.ConfigurationManager.dll",
+      "Limit": 40,
+      "SymbolPrefixes": [
+        "System.Configuration.ConfigurationManager.get_AppSettings"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/StaticCache.Getters.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/StaticCache.Getters.PurelySharp.EffectSummary.json",
       "Limit": 40,

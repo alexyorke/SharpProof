@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Configuration;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -7472,6 +7473,33 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ConfigurationManagerAppSettings_UsesGeneratedPurityCatalogSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+using System.Configuration;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string? TestMethod()
+    {
+        return ConfigurationManager.AppSettings[""MyKey""];
+    }
+}",
+                additionalMetadataReferences: ImmutableArray.Create<MetadataReference>(
+                    MetadataReference.CreateFromFile(typeof(ConfigurationManager).Assembly.Location)));
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Configuration.ConfigurationManager.AppSettings"));
+        }
+
+        [Test]
         public async Task Ps0002_MonitorExit_UsesNamespaceFallbackAfterMemberCatalogRemoval()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
@@ -10949,11 +10977,16 @@ public class TestClass
             string source,
             ImmutableDictionary<string, string>? globalOptions = null,
             bool allowUnsafe = false,
-            ImmutableArray<AdditionalText>? additionalFiles = null)
+            ImmutableArray<AdditionalText>? additionalFiles = null,
+            ImmutableArray<MetadataReference>? additionalMetadataReferences = null)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var references = GetTrustedPlatformReferences()
                 .Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
+            if (additionalMetadataReferences.HasValue)
+            {
+                references = references.AddRange(additionalMetadataReferences.Value);
+            }
 
             var compilation = CSharpCompilation.Create(
                 "DiagnosticEvidenceTests",

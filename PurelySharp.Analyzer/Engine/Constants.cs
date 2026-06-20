@@ -529,7 +529,6 @@ public static class Constants
         "System.Runtime.InteropServices.MemoryMarshal.Write<T>(System.Span<byte>, ref T)",
         "System.ComponentModel.Component.Dispose()",
         "System.ComponentModel.LicenseManager.Validate(System.Type, object)",
-        "System.Configuration.ConfigurationManager.AppSettings.get",
         "System.Configuration.ConfigurationManager.ConnectionStrings.get",
         "System.Data.DataSet.Clear()",
         "System.Diagnostics.Debugger.IsAttached.get",

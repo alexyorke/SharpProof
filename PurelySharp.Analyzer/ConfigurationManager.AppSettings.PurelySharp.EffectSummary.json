@@ -1,0 +1,335 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-20T22:48:12.7362832+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.Configuration.ConfigurationManager",
+      "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.configuration.configurationmanager\\10.0.8\\lib\\net8.0\\System.Configuration.ConfigurationManager.dll",
+      "AssemblySha256": "659fdc73a654e34ea2c97783e902f548f681fbcd6629b77113343f557d36233c",
+      "ModuleVersionId": "710c74a3-db1f-4a23-8197-0c65e9ded91d",
+      "MethodCount": 2720,
+      "EmittedMethodCount": 4,
+      "Methods": [
+        {
+          "Symbol": "System.SR.get_Config_appsettings_declaration_invalid()",
+          "ExactSymbolKey": "System.SR.get_Config_appsettings_declaration_invalid()-\u003Estring",
+          "MetadataToken": "0x06000021",
+          "RelativeVirtualAddress": 9037,
+          "MethodBodySha256": "e65d0d10a80fe6dbc83356ec5a38fd231f959aa8397217e534471eb8b4382725",
+          "CacheKey": "mvid:710c74a3-db1f-4a23-8197-0c65e9ded91d|token:0x06000021|il:e65d0d10a80fe6dbc83356ec5a38fd231f959aa8397217e534471eb8b4382725",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.SR.GetResourceString(string)-\u003Estring"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.SR.GetResourceString(string)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "unknown_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.SR.GetResourceString(string)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
+          "Symbol": "System.Configuration.ConfigurationErrorsException..ctor(string)",
+          "ExactSymbolKey": "System.Configuration.ConfigurationErrorsException..ctor(string)-\u003Evoid",
+          "MetadataToken": "0x06000369",
+          "RelativeVirtualAddress": 72866,
+          "MethodBodySha256": "8517d4337efbebdee5896318e48086e526c78acbe9c747daab82222a55fce07e",
+          "CacheKey": "mvid:710c74a3-db1f-4a23-8197-0c65e9ded91d|token:0x06000369|il:8517d4337efbebdee5896318e48086e526c78acbe9c747daab82222a55fce07e",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Configuration.ConfigurationErrorsException..ctor(string, System.Exception, string, int)-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Configuration.ConfigurationErrorsException..ctor(string, System.Exception, string, int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Configuration.ConfigurationManager.get_AppSettings()",
+          "ExactSymbolKey": "System.Configuration.ConfigurationManager.get_AppSettings()-\u003ESystem.Collections.Specialized.NameValueCollection",
+          "MetadataToken": "0x060003C0",
+          "RelativeVirtualAddress": 77325,
+          "MethodBodySha256": "785366718d0f44bd588453c9db598874f96bc0880e7535a28c33a64c1bfe09ae",
+          "CacheKey": "mvid:710c74a3-db1f-4a23-8197-0c65e9ded91d|token:0x060003C0|il:785366718d0f44bd588453c9db598874f96bc0880e7535a28c33a64c1bfe09ae",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws"
+          ],
+          "RootCandidates": [
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.Configuration.ConfigurationErrorsException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.Configuration.ConfigurationErrorsException",
+              "SourcePath": "System.Configuration.ConfigurationManager.get_AppSettings()"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Configuration.ConfigurationErrorsException..ctor(string)-\u003Evoid",
+            "System.Configuration.ConfigurationManager.GetSection(string)-\u003Eobject",
+            "System.SR.get_Config_appsettings_declaration_invalid()-\u003Estring"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Configuration.ConfigurationErrorsException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Configuration.ConfigurationManager.GetSection(string)-\u003Eobject",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_Config_appsettings_declaration_invalid()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "impure_callee",
+              "throw"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Configuration.ConfigurationManager.GetSection(string)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Configuration.ConfigurationManager.GetSection(string)",
+          "ExactSymbolKey": "System.Configuration.ConfigurationManager.GetSection(string)-\u003Eobject",
+          "MetadataToken": "0x060003C7",
+          "RelativeVirtualAddress": 77814,
+          "MethodBodySha256": "52a588c6c4e4610c7292fbb90ee6ab07b4d321dcbd1ded898b6bff9be71f2c9e",
+          "CacheKey": "mvid:710c74a3-db1f-4a23-8197-0c65e9ded91d|token:0x060003C7|il:52a588c6c4e4610c7292fbb90ee6ab07b4d321dcbd1ded898b6bff9be71f2c9e",
+          "Effects": [
+            "calls_method",
+            "reads_static_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "global_state_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Configuration.ConfigurationManager.PrepareConfigSystem()-\u003Evoid",
+            "System.Configuration.Internal.IInternalConfigSystem.GetSection(string)-\u003Eobject",
+            "string.IsNullOrEmpty(string)-\u003Ebool"
+          ],
+          "Fields": [
+            "System.Configuration.ConfigurationManager.s_configSystem"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Configuration.ConfigurationManager.PrepareConfigSystem()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Configuration.Internal.IInternalConfigSystem.GetSection(string)-\u003Eobject",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.IsNullOrEmpty(string)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 4,
+    "PureCount": 1,
+    "ImpureCount": 2,
+    "ConservativeUnknownCount": 1,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.Configuration.ConfigurationErrorsException..ctor(string)",
+        "ExactSymbolKey": "System.Configuration.ConfigurationErrorsException..ctor(string)-\u003Evoid",
+        "CacheKey": "mvid:710c74a3-db1f-4a23-8197-0c65e9ded91d|token:0x06000369|il:8517d4337efbebdee5896318e48086e526c78acbe9c747daab82222a55fce07e",
+        "AssemblyName": "System.Configuration.ConfigurationManager",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.configuration.configurationmanager\\10.0.8\\lib\\net8.0\\System.Configuration.ConfigurationManager.dll",
+        "AssemblySha256": "659fdc73a654e34ea2c97783e902f548f681fbcd6629b77113343f557d36233c",
+        "ModuleVersionId": "710c74a3-db1f-4a23-8197-0c65e9ded91d",
+        "MetadataToken": "0x06000369",
+        "MethodBodySha256": "8517d4337efbebdee5896318e48086e526c78acbe9c747daab82222a55fce07e",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Configuration.ConfigurationManager.GetSection(string)",
+        "ExactSymbolKey": "System.Configuration.ConfigurationManager.GetSection(string)-\u003Eobject",
+        "CacheKey": "mvid:710c74a3-db1f-4a23-8197-0c65e9ded91d|token:0x060003C7|il:52a588c6c4e4610c7292fbb90ee6ab07b4d321dcbd1ded898b6bff9be71f2c9e",
+        "AssemblyName": "System.Configuration.ConfigurationManager",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.configuration.configurationmanager\\10.0.8\\lib\\net8.0\\System.Configuration.ConfigurationManager.dll",
+        "AssemblySha256": "659fdc73a654e34ea2c97783e902f548f681fbcd6629b77113343f557d36233c",
+        "ModuleVersionId": "710c74a3-db1f-4a23-8197-0c65e9ded91d",
+        "MetadataToken": "0x060003C7",
+        "MethodBodySha256": "52a588c6c4e4610c7292fbb90ee6ab07b4d321dcbd1ded898b6bff9be71f2c9e",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
+        "Categories": [
+          "global_state_read"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Configuration.ConfigurationManager.get_AppSettings()",
+        "ExactSymbolKey": "System.Configuration.ConfigurationManager.get_AppSettings()-\u003ESystem.Collections.Specialized.NameValueCollection",
+        "CacheKey": "mvid:710c74a3-db1f-4a23-8197-0c65e9ded91d|token:0x060003C0|il:785366718d0f44bd588453c9db598874f96bc0880e7535a28c33a64c1bfe09ae",
+        "AssemblyName": "System.Configuration.ConfigurationManager",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.configuration.configurationmanager\\10.0.8\\lib\\net8.0\\System.Configuration.ConfigurationManager.dll",
+        "AssemblySha256": "659fdc73a654e34ea2c97783e902f548f681fbcd6629b77113343f557d36233c",
+        "ModuleVersionId": "710c74a3-db1f-4a23-8197-0c65e9ded91d",
+        "MetadataToken": "0x060003C0",
+        "MethodBodySha256": "785366718d0f44bd588453c9db598874f96bc0880e7535a28c33a64c1bfe09ae",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
+        "Categories": [
+          "global_state_read",
+          "impure_callee",
+          "throw"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Configuration.ConfigurationManager.GetSection(string)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.SR.get_Config_appsettings_declaration_invalid()",
+        "ExactSymbolKey": "System.SR.get_Config_appsettings_declaration_invalid()-\u003Estring",
+        "CacheKey": "mvid:710c74a3-db1f-4a23-8197-0c65e9ded91d|token:0x06000021|il:e65d0d10a80fe6dbc83356ec5a38fd231f959aa8397217e534471eb8b4382725",
+        "AssemblyName": "System.Configuration.ConfigurationManager",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.configuration.configurationmanager\\10.0.8\\lib\\net8.0\\System.Configuration.ConfigurationManager.dll",
+        "AssemblySha256": "659fdc73a654e34ea2c97783e902f548f681fbcd6629b77113343f557d36233c",
+        "ModuleVersionId": "710c74a3-db1f-4a23-8197-0c65e9ded91d",
+        "MetadataToken": "0x06000021",
+        "MethodBodySha256": "e65d0d10a80fe6dbc83356ec5a38fd231f959aa8397217e534471eb8b4382725",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "unknown_callee",
+        "Categories": [
+          "unknown_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.SR.GetResourceString(string)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      }
+    ]
+  }
+}

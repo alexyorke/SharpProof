@@ -4510,6 +4510,73 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_Resolves_ConfigurationManagerPackageAssembly()
+        {
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-artifact-configurationmanager-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var outputPath = Path.Combine(workingDirectory, "ConfigurationManager.AppSettings.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Defaults = new
+                    {
+                        Framework = "net8.0",
+                        IncludeCallees = true,
+                        IncludePurityClassification = true,
+                        CompareManualCatalogs = true,
+                    },
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = outputPath,
+                            RuntimeAssemblyName = "System.Configuration.ConfigurationManager.dll",
+                            PackageId = "System.Configuration.ConfigurationManager",
+                            PackageVersion = "10.0.8",
+                            PackageAssemblyRelativePath = "lib/net8.0/System.Configuration.ConfigurationManager.dll",
+                            Limit = 40,
+                            SymbolPrefixes = new[]
+                            {
+                                "System.Configuration.ConfigurationManager.get_AppSettings",
+                            },
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
+
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+            var methods = summary.RootElement.GetProperty("Assemblies")[0].GetProperty("Methods").EnumerateArray().ToArray();
+
+            Assert.That(
+                Path.GetFileName(summary.RootElement.GetProperty("Assemblies")[0].GetProperty("AssemblyPath").GetString()),
+                Is.EqualTo("System.Configuration.ConfigurationManager.dll"));
+            Assert.That(
+                methods.Any(method =>
+                    string.Equals(method.GetProperty("Symbol").GetString(), "System.Configuration.ConfigurationManager.get_AppSettings()", StringComparison.Ordinal) &&
+                    string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(), "impure", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                methods.Any(method =>
+                    string.Equals(method.GetProperty("Symbol").GetString(), "System.Configuration.ConfigurationManager.get_AppSettings()", StringComparison.Ordinal) &&
+                    method.GetProperty("PurityClassification").GetProperty("Categories")
+                        .EnumerateArray()
+                        .Any(category => string.Equals(category.GetString(), "global_state_read", StringComparison.Ordinal))),
+                Is.True);
+        }
+
+        [Test]
         public void EffectSummaryTool_ArtifactSpec_Rejects_Rooted_NuGetPackageAssemblyPath()
         {
             var workingDirectory = Path.Combine(

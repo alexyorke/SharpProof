@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Configuration;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -3898,6 +3899,43 @@ public static class EmailAddressCatalogSignatureSamples
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new EmailAddressAttribute()"));
+        }
+
+        [Test]
+        public void ConfigurationManagerAppSettings_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System.Configuration;
+
+public static class ConfigurationManagerCatalogSignatureSamples
+{
+    public static string? Sample()
+    {
+        return ConfigurationManager.AppSettings[""MyKey""];
+    }
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ConfigurationManagerGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences()
+                    .Add(MetadataReference.CreateFromFile(typeof(ConfigurationManager).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var signature = GetPropertySignature(compilation, syntaxTree, "ConfigurationManager.AppSettings");
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var memberAccess = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Single(node => node.ToString() == "ConfigurationManager.AppSettings");
+            var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(memberAccess).Symbol!;
+            var (matched, classification) = GetGeneratedPurityClassification(propertySymbol.GetMethod!, compilation);
+
+            Assert.That(signature, Is.EqualTo("System.Configuration.ConfigurationManager.AppSettings.get"));
+            AssertNotInManualCatalogs(signature);
+            Assert.That(matched, Is.True,
+                "Generated purity catalog should resolve System.Configuration.ConfigurationManager.AppSettings.get from the package implementation assembly.");
+            Assert.That(classification, Is.EqualTo("impure"));
         }
 
         [Test]
