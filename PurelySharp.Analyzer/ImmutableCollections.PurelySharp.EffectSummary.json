@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-20T00:43:56.3177744+00:00",
+  "GeneratedAtUtc": "2026-06-20T00:59:19.2619243+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Collections.Immutable",
@@ -8,7 +8,7 @@
       "AssemblySha256": "f134239f34d90e805fd44c26d2b350f31915734b1dc1b008e5ccec89a39a90aa",
       "ModuleVersionId": "1cf34767-9f12-4875-9879-d6722518f4c4",
       "MethodCount": 2114,
-      "EmittedMethodCount": 5,
+      "EmittedMethodCount": 10,
       "Methods": [
         {
           "Symbol": "System.Collections.Immutable.ImmutableHashSet\u00601.get_Count()",
@@ -116,6 +116,41 @@
           }
         },
         {
+          "Symbol": "System.Collections.Immutable.ImmutableDictionary.Create()",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary.Create()-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E",
+          "MetadataToken": "0x0600023E",
+          "RelativeVirtualAddress": 439740,
+          "MethodBodySha256": "c3a7594bdd8811bff7acf1ae860051e1525c0e96286e4d38a24566dee609384f",
+          "CacheKey": "mvid:1cf34767-9f12-4875-9879-d6722518f4c4|token:0x0600023E|il:c3a7594bdd8811bff7acf1ae860051e1525c0e96286e4d38a24566dee609384f",
+          "Effects": [
+            "reads_static_field"
+          ],
+          "RootCandidates": [
+            "safe_static_cache_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Collections.Immutable.ImmutableDictionary\u00602.Empty"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
           "Symbol": "System.Collections.Immutable.ImmutableHashSet.Create()",
           "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet.Create()-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E",
           "MetadataToken": "0x0600034D",
@@ -184,6 +219,156 @@
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "internal_only"
           }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableQueue\u00601.Clear()",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableQueue\u00601.Clear()-\u003ESystem.Collections.Immutable.ImmutableQueue\u00601\u003C!0\u003E",
+          "MetadataToken": "0x06000496",
+          "RelativeVirtualAddress": 464116,
+          "MethodBodySha256": "e08fa9990881d4a86ee155866e827cd24e98a589643b73a672157ab51c4734fd",
+          "CacheKey": "mvid:1cf34767-9f12-4875-9879-d6722518f4c4|token:0x06000496|il:e08fa9990881d4a86ee155866e827cd24e98a589643b73a672157ab51c4734fd",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Immutable.ImmutableQueue\u00601\u003C!0\u003E.get_Empty()-\u003ESystem.Collections.Immutable.ImmutableQueue\u00601\u003C!0\u003E"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableQueue\u00601\u003C!0\u003E.get_Empty()-\u003ESystem.Collections.Immutable.ImmutableQueue\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableStack\u00601.Clear()",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601.Clear()-\u003ESystem.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E",
+          "MetadataToken": "0x06000637",
+          "RelativeVirtualAddress": 480976,
+          "MethodBodySha256": "b23c5437d91c770c6c295e4a9a62b0da45102f63b84505f31df0741b697688f7",
+          "CacheKey": "mvid:1cf34767-9f12-4875-9879-d6722518f4c4|token:0x06000637|il:b23c5437d91c770c6c295e4a9a62b0da45102f63b84505f31df0741b697688f7",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E.get_Empty()-\u003ESystem.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E.get_Empty()-\u003ESystem.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableStack\u00601.get_IsEmpty()",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601.get_IsEmpty()-\u003Ebool",
+          "MetadataToken": "0x06000639",
+          "RelativeVirtualAddress": 480992,
+          "MethodBodySha256": "0f7e62e8f3c2abc509ad2c1d25492cfbecf74d6ebefe38165b84c775f3789b2b",
+          "CacheKey": "mvid:1cf34767-9f12-4875-9879-d6722518f4c4|token:0x06000639|il:0f7e62e8f3c2abc509ad2c1d25492cfbecf74d6ebefe38165b84c775f3789b2b",
+          "Effects": [
+            "reads_instance_field"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Collections.Immutable.ImmutableStack\u00601._tail"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableStack\u00601.Push(!0)",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601.Push(!0)-\u003ESystem.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E",
+          "MetadataToken": "0x0600063C",
+          "RelativeVirtualAddress": 481060,
+          "MethodBodySha256": "4e50ec9a535d90c0dca8efe8ddba4fa03a151344fd9a63a58aaf20e43e75cc37",
+          "CacheKey": "mvid:1cf34767-9f12-4875-9879-d6722518f4c4|token:0x0600063C|il:4e50ec9a535d90c0dca8efe8ddba4fa03a151344fd9a63a58aaf20e43e75cc37",
+          "Effects": [
+            "allocates_object"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E..ctor(!0, System.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E)-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E..ctor(!0, System.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
         }
       ]
     },
@@ -193,7 +378,7 @@
       "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
       "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
       "MethodCount": 2208,
-      "EmittedMethodCount": 5,
+      "EmittedMethodCount": 10,
       "Methods": [
         {
           "Symbol": "System.Collections.Immutable.ImmutableHashSet\u00601.get_Count()",
@@ -301,6 +486,41 @@
           }
         },
         {
+          "Symbol": "System.Collections.Immutable.ImmutableDictionary.Create()",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary.Create()-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E",
+          "MetadataToken": "0x06000244",
+          "RelativeVirtualAddress": 30396,
+          "MethodBodySha256": "78b126e0723586e010d05f11387ecde8d6908f2b0209e171a9237a50c8f2348e",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000244|il:78b126e0723586e010d05f11387ecde8d6908f2b0209e171a9237a50c8f2348e",
+          "Effects": [
+            "reads_static_field"
+          ],
+          "RootCandidates": [
+            "safe_static_cache_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Collections.Immutable.ImmutableDictionary\u00602.Empty"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
           "Symbol": "System.Collections.Immutable.ImmutableHashSet.Create()",
           "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet.Create()-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E",
           "MetadataToken": "0x06000355",
@@ -369,14 +589,164 @@
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "internal_only"
           }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableQueue\u00601.Clear()",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableQueue\u00601.Clear()-\u003ESystem.Collections.Immutable.ImmutableQueue\u00601\u003C!0\u003E",
+          "MetadataToken": "0x0600049E",
+          "RelativeVirtualAddress": 53618,
+          "MethodBodySha256": "365553908c29afebc8b0bd2bd35392b249cb8c0b3c8fcc523348e02995c196cf",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x0600049E|il:365553908c29afebc8b0bd2bd35392b249cb8c0b3c8fcc523348e02995c196cf",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Immutable.ImmutableQueue\u00601\u003C!0\u003E.get_Empty()-\u003ESystem.Collections.Immutable.ImmutableQueue\u00601\u003C!0\u003E"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableQueue\u00601\u003C!0\u003E.get_Empty()-\u003ESystem.Collections.Immutable.ImmutableQueue\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableStack\u00601.Clear()",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601.Clear()-\u003ESystem.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E",
+          "MetadataToken": "0x0600063D",
+          "RelativeVirtualAddress": 69410,
+          "MethodBodySha256": "a2b892541209417ebfc137a6843aa4451373ae383352d090e0a9d95afe381d3f",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x0600063D|il:a2b892541209417ebfc137a6843aa4451373ae383352d090e0a9d95afe381d3f",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E.get_Empty()-\u003ESystem.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E.get_Empty()-\u003ESystem.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableStack\u00601.get_IsEmpty()",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601.get_IsEmpty()-\u003Ebool",
+          "MetadataToken": "0x0600063F",
+          "RelativeVirtualAddress": 69425,
+          "MethodBodySha256": "6c966cbb8af7933aa46814378d0bbfd77ca2b3a1a9d7a3bb7b54d3c51d3f9a62",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x0600063F|il:6c966cbb8af7933aa46814378d0bbfd77ca2b3a1a9d7a3bb7b54d3c51d3f9a62",
+          "Effects": [
+            "reads_instance_field"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Collections.Immutable.ImmutableStack\u00601._tail"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableStack\u00601.Push(!0)",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601.Push(!0)-\u003ESystem.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E",
+          "MetadataToken": "0x06000642",
+          "RelativeVirtualAddress": 69490,
+          "MethodBodySha256": "78c65dd88cb31d8db7f74f846e6e5c0df3ff135bd18704de4fce2a97b58a2bd9",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000642|il:78c65dd88cb31d8db7f74f846e6e5c0df3ff135bd18704de4fce2a97b58a2bd9",
+          "Effects": [
+            "allocates_object"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E..ctor(!0, System.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E)-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E..ctor(!0, System.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
         }
       ]
     }
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 10,
-    "PureCount": 10,
+    "MethodCount": 20,
+    "PureCount": 20,
     "ImpureCount": 0,
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
@@ -388,6 +758,46 @@
   "GeneratedPurityCatalog": {
     "SchemaVersion": 2,
     "Entries": [
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableDictionary.Create()",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary.Create()-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E",
+        "CacheKey": "mvid:1cf34767-9f12-4875-9879-d6722518f4c4|token:0x0600023E|il:c3a7594bdd8811bff7acf1ae860051e1525c0e96286e4d38a24566dee609384f",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Immutable.dll",
+        "AssemblySha256": "f134239f34d90e805fd44c26d2b350f31915734b1dc1b008e5ccec89a39a90aa",
+        "ModuleVersionId": "1cf34767-9f12-4875-9879-d6722518f4c4",
+        "MetadataToken": "0x0600023E",
+        "MethodBodySha256": "c3a7594bdd8811bff7acf1ae860051e1525c0e96286e4d38a24566dee609384f",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableDictionary.Create()",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary.Create()-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000244|il:78b126e0723586e010d05f11387ecde8d6908f2b0209e171a9237a50c8f2348e",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x06000244",
+        "MethodBodySha256": "78b126e0723586e010d05f11387ecde8d6908f2b0209e171a9237a50c8f2348e",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "internal_only"
+      },
       {
         "Symbol": "System.Collections.Immutable.ImmutableHashSet.Create()",
         "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet.Create()-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E",
@@ -587,6 +997,166 @@
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableQueue\u00601.Clear()",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableQueue\u00601.Clear()-\u003ESystem.Collections.Immutable.ImmutableQueue\u00601\u003C!0\u003E",
+        "CacheKey": "mvid:1cf34767-9f12-4875-9879-d6722518f4c4|token:0x06000496|il:e08fa9990881d4a86ee155866e827cd24e98a589643b73a672157ab51c4734fd",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Immutable.dll",
+        "AssemblySha256": "f134239f34d90e805fd44c26d2b350f31915734b1dc1b008e5ccec89a39a90aa",
+        "ModuleVersionId": "1cf34767-9f12-4875-9879-d6722518f4c4",
+        "MetadataToken": "0x06000496",
+        "MethodBodySha256": "e08fa9990881d4a86ee155866e827cd24e98a589643b73a672157ab51c4734fd",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableQueue\u00601.Clear()",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableQueue\u00601.Clear()-\u003ESystem.Collections.Immutable.ImmutableQueue\u00601\u003C!0\u003E",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x0600049E|il:365553908c29afebc8b0bd2bd35392b249cb8c0b3c8fcc523348e02995c196cf",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x0600049E",
+        "MethodBodySha256": "365553908c29afebc8b0bd2bd35392b249cb8c0b3c8fcc523348e02995c196cf",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableStack\u00601.Clear()",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601.Clear()-\u003ESystem.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E",
+        "CacheKey": "mvid:1cf34767-9f12-4875-9879-d6722518f4c4|token:0x06000637|il:b23c5437d91c770c6c295e4a9a62b0da45102f63b84505f31df0741b697688f7",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Immutable.dll",
+        "AssemblySha256": "f134239f34d90e805fd44c26d2b350f31915734b1dc1b008e5ccec89a39a90aa",
+        "ModuleVersionId": "1cf34767-9f12-4875-9879-d6722518f4c4",
+        "MetadataToken": "0x06000637",
+        "MethodBodySha256": "b23c5437d91c770c6c295e4a9a62b0da45102f63b84505f31df0741b697688f7",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableStack\u00601.Clear()",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601.Clear()-\u003ESystem.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x0600063D|il:a2b892541209417ebfc137a6843aa4451373ae383352d090e0a9d95afe381d3f",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x0600063D",
+        "MethodBodySha256": "a2b892541209417ebfc137a6843aa4451373ae383352d090e0a9d95afe381d3f",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableStack\u00601.Push(!0)",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601.Push(!0)-\u003ESystem.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E",
+        "CacheKey": "mvid:1cf34767-9f12-4875-9879-d6722518f4c4|token:0x0600063C|il:4e50ec9a535d90c0dca8efe8ddba4fa03a151344fd9a63a58aaf20e43e75cc37",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Immutable.dll",
+        "AssemblySha256": "f134239f34d90e805fd44c26d2b350f31915734b1dc1b008e5ccec89a39a90aa",
+        "ModuleVersionId": "1cf34767-9f12-4875-9879-d6722518f4c4",
+        "MetadataToken": "0x0600063C",
+        "MethodBodySha256": "4e50ec9a535d90c0dca8efe8ddba4fa03a151344fd9a63a58aaf20e43e75cc37",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableStack\u00601.Push(!0)",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601.Push(!0)-\u003ESystem.Collections.Immutable.ImmutableStack\u00601\u003C!0\u003E",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000642|il:78c65dd88cb31d8db7f74f846e6e5c0df3ff135bd18704de4fce2a97b58a2bd9",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x06000642",
+        "MethodBodySha256": "78c65dd88cb31d8db7f74f846e6e5c0df3ff135bd18704de4fce2a97b58a2bd9",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableStack\u00601.get_IsEmpty()",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601.get_IsEmpty()-\u003Ebool",
+        "CacheKey": "mvid:1cf34767-9f12-4875-9879-d6722518f4c4|token:0x06000639|il:0f7e62e8f3c2abc509ad2c1d25492cfbecf74d6ebefe38165b84c775f3789b2b",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Immutable.dll",
+        "AssemblySha256": "f134239f34d90e805fd44c26d2b350f31915734b1dc1b008e5ccec89a39a90aa",
+        "ModuleVersionId": "1cf34767-9f12-4875-9879-d6722518f4c4",
+        "MetadataToken": "0x06000639",
+        "MethodBodySha256": "0f7e62e8f3c2abc509ad2c1d25492cfbecf74d6ebefe38165b84c775f3789b2b",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableStack\u00601.get_IsEmpty()",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableStack\u00601.get_IsEmpty()-\u003Ebool",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x0600063F|il:6c966cbb8af7933aa46814378d0bbfd77ca2b3a1a9d7a3bb7b54d3c51d3f9a62",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x0600063F",
+        "MethodBodySha256": "6c966cbb8af7933aa46814378d0bbfd77ca2b3a1a9d7a3bb7b54d3c51d3f9a62",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
       }
     ]
   }

@@ -27,5 +27,43 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task ImmutableStackClear_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections.Immutable;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ImmutableStack<int> ClearStack(ImmutableStack<int> stack)
+    {
+        return stack.Clear();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ImmutableStackIsEmpty_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections.Immutable;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool IsEmpty(ImmutableStack<int> stack)
+    {
+        return stack.IsEmpty;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

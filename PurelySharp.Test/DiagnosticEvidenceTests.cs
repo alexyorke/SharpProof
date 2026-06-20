@@ -4934,6 +4934,36 @@ public class TestClass
     {
         return set.KeyComparer;
     }
+
+    [EnforcePure]
+    public ImmutableDictionary<int, string> CreateDictionary()
+    {
+        return ImmutableDictionary.Create<int, string>();
+    }
+
+    [EnforcePure]
+    public ImmutableQueue<int> ClearQueue(ImmutableQueue<int> queue)
+    {
+        return queue.Clear();
+    }
+
+    [EnforcePure]
+    public ImmutableStack<int> ClearStack(ImmutableStack<int> stack)
+    {
+        return stack.Clear();
+    }
+
+    [EnforcePure]
+    public bool StackIsEmpty(ImmutableStack<int> stack)
+    {
+        return stack.IsEmpty;
+    }
+
+    [EnforcePure]
+    public ImmutableStack<int> PushStack(ImmutableStack<int> stack, int value)
+    {
+        return stack.Push(value);
+    }
 }";
 
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
@@ -4965,6 +4995,46 @@ public class TestClass
                             .DescendantNodes()
                             .OfType<InvocationExpressionSyntax>()
                             .Single(node => node.ToString() == "ImmutableHashSet.Create<int>()"))
+                        .Symbol!),
+                (
+                    "ImmutableDictionary.Create<int, string>()",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "ImmutableDictionary.Create<int, string>()"))
+                        .Symbol!),
+                (
+                    "queue.Clear()",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "queue.Clear()"))
+                        .Symbol!),
+                (
+                    "stack.Clear()",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "stack.Clear()"))
+                        .Symbol!),
+                (
+                    "stack.IsEmpty",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "stack.IsEmpty"))
+                        .Symbol!).GetMethod!),
+                (
+                    "stack.Push(value)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "stack.Push(value)"))
                         .Symbol!),
                 (
                     "set.Count",
@@ -5008,6 +5078,11 @@ public class TestClass
 
             Assert.That(resolutions["ImmutableList.Create<int>()"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["ImmutableHashSet.Create<int>()"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["ImmutableDictionary.Create<int, string>()"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["queue.Clear()"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["stack.Clear()"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["stack.IsEmpty"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["stack.Push(value)"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["set.Count"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["set.IsEmpty"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["set.KeyComparer"], Is.EqualTo((true, "pure")));

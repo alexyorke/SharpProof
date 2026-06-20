@@ -27,5 +27,24 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task ImmutableQueueClear_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections.Immutable;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ImmutableQueue<int> ClearQueue(ImmutableQueue<int> queue)
+    {
+        return queue.Clear();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

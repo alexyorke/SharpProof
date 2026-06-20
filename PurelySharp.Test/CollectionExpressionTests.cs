@@ -55,6 +55,82 @@ public class CollectionExpressionExample
         }
 
         [Test]
+        public async Task PureMethod_CreateImmutableArrayRangeProjection_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Immutable;
+
+public class CollectionExpressionExample
+{
+    [EnforcePure]
+    public ImmutableArray<int> ProjectNumbers(ImmutableArray<int> values)
+    {
+        return ImmutableArray.CreateRange(values, static value => value + 1);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task PureMethod_CreateImmutableArrayRangeProjectionWithArg_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Immutable;
+
+public class CollectionExpressionExample
+{
+    [EnforcePure]
+    public ImmutableArray<int> AddOffset(ImmutableArray<int> values, int offset)
+    {
+        return ImmutableArray.CreateRange(values, static (value, delta) => value + delta, offset);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task PureMethod_CreateImmutableArraySliceProjection_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Immutable;
+
+public class CollectionExpressionExample
+{
+    [EnforcePure]
+    public ImmutableArray<int> ProjectSlice(ImmutableArray<int> values)
+    {
+        return ImmutableArray.CreateRange(values, 0, 0, static value => value + 1);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task PureMethod_CreateImmutableArraySliceProjectionWithArg_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Immutable;
+
+public class CollectionExpressionExample
+{
+    [EnforcePure]
+    public ImmutableArray<int> ProjectSliceWithOffset(ImmutableArray<int> values, int offset)
+    {
+        return ImmutableArray.CreateRange(values, 0, 0, static (value, delta) => value + delta, offset);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task PureMethod_CreateImmutableList_NoDiagnostic()
         {
             var test = @"

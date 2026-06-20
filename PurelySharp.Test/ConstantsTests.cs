@@ -1026,11 +1026,16 @@ public static class KeyedCollectionCatalogSignatureSamples
         {
             var members = new[]
             {
+                "System.Collections.Immutable.ImmutableDictionary.Create<TKey, TValue>()",
                 "System.Collections.Immutable.ImmutableList.Create<T>()",
                 "System.Collections.Immutable.ImmutableHashSet.Create<T>()",
                 "System.Collections.Immutable.ImmutableHashSet<T>.Count.get",
                 "System.Collections.Immutable.ImmutableHashSet<T>.IsEmpty.get",
                 "System.Collections.Immutable.ImmutableHashSet<T>.KeyComparer.get",
+                "System.Collections.Immutable.ImmutableQueue<T>.Clear()",
+                "System.Collections.Immutable.ImmutableStack<T>.Clear()",
+                "System.Collections.Immutable.ImmutableStack<T>.Push(T)",
+                "System.Collections.Immutable.ImmutableStack<T>.IsEmpty.get",
             };
 
             foreach (var member in members)
