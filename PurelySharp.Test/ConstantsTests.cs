@@ -1045,6 +1045,21 @@ public static class KeyedCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void ImmutableListEqualityHelpers_AreSourcedFromSemanticAnalysis_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Collections.Immutable.ImmutableList<T>.Contains(T)",
+                "System.Collections.Immutable.ImmutableList<T>.Remove(T)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void MutableCollectionReadHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"

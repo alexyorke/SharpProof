@@ -752,9 +752,7 @@ public static class Constants
 
 
         "System.Collections.Immutable.ImmutableList<T>.Add(T)",
-        "System.Collections.Immutable.ImmutableList<T>.Contains(T)",
         "System.Collections.Immutable.ImmutableList<T>.Count.get",
-        "System.Collections.Immutable.ImmutableList<T>.Remove(T)",
         "System.Collections.Immutable.ImmutableList<T>.SetItem(int, T)",
         "System.Collections.Immutable.ImmutableList<T>.this[int].get",
         "System.Collections.Immutable.ImmutableList.Create<T>(params T[])",
