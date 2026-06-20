@@ -3939,6 +3939,43 @@ public static class ConfigurationManagerCatalogSignatureSamples
         }
 
         [Test]
+        public void ConfigurationManagerConnectionStrings_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System.Configuration;
+
+public static class ConfigurationManagerConnectionStringsCatalogSignatureSamples
+{
+    public static ConnectionStringSettingsCollection Sample()
+    {
+        return ConfigurationManager.ConnectionStrings;
+    }
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ConfigurationManagerConnectionStringsGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences()
+                    .Add(MetadataReference.CreateFromFile(typeof(ConfigurationManager).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var signature = GetPropertySignature(compilation, syntaxTree, "ConfigurationManager.ConnectionStrings");
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var memberAccess = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Single(node => node.ToString() == "ConfigurationManager.ConnectionStrings");
+            var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(memberAccess).Symbol!;
+            var (matched, classification) = GetGeneratedPurityClassification(propertySymbol.GetMethod!, compilation);
+
+            Assert.That(signature, Is.EqualTo("System.Configuration.ConfigurationManager.ConnectionStrings.get"));
+            AssertNotInManualCatalogs(signature);
+            Assert.That(matched, Is.True,
+                "Generated purity catalog should resolve System.Configuration.ConfigurationManager.ConnectionStrings.get from the package implementation assembly.");
+            Assert.That(classification, Is.EqualTo("impure"));
+        }
+
+        [Test]
         public void CoreComponentModelAttributeConstructorsGeneratedPurityEntriesResolveAgainstNet80References()
         {
             var source = @"

@@ -7500,6 +7500,33 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ConfigurationManagerConnectionStrings_UsesGeneratedPurityCatalogSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+using System.Configuration;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ConnectionStringSettingsCollection TestMethod()
+    {
+        return ConfigurationManager.ConnectionStrings;
+    }
+}",
+                additionalMetadataReferences: ImmutableArray.Create<MetadataReference>(
+                    MetadataReference.CreateFromFile(typeof(ConfigurationManager).Assembly.Location)));
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Configuration.ConfigurationManager.ConnectionStrings"));
+        }
+
+        [Test]
         public async Task Ps0002_MonitorExit_UsesNamespaceFallbackAfterMemberCatalogRemoval()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
