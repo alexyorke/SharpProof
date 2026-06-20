@@ -1510,6 +1510,7 @@ namespace PurelySharp.Analyzer
             public string FreshnessClassification { get; }
             public bool IsPure => string.Equals(Classification, "pure", StringComparison.Ordinal);
             public bool IsImpure => string.Equals(Classification, "impure", StringComparison.Ordinal);
+            public bool IsNonPure => !string.IsNullOrWhiteSpace(Classification) && !IsPure;
             public bool IsFreshArrayCandidate =>
                 HasFreshArrayAllocationEvidence &&
                 (string.Equals(FreshnessClassification, "fresh_array_candidate_via_local_helpers", StringComparison.Ordinal) ||

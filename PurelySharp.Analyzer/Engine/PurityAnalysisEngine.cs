@@ -1099,6 +1099,22 @@ namespace PurelySharp.Analyzer.Engine
                         return PurityAnalysisResult.Pure;
                     }
 
+                    if (hasTrustedGeneratedPurity && generatedPurity.IsNonPure)
+                    {
+                        LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} has no body but does have trusted non-pure generated summary evidence.");
+                        var generatedSyntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
+                        var generatedNoBodyResult = ImpureResult(
+                            generatedSyntax,
+                            PurityEvidence.Create(
+                                generatedPurity.PrimaryCategory,
+                                syntaxNode: generatedSyntax,
+                                symbol: methodSymbol,
+                                catalogSource: "generated_purity_summary"));
+                        purityCache[methodSymbol] = generatedNoBodyResult;
+                        LogDebug($"{indent}<< Exit DeterminePurity (Abstract/NoBody Generated Summary): {methodSymbol.ToDisplayString()}");
+                        return generatedNoBodyResult;
+                    }
+
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is abstract or has no body AND lacks trusted purity evidence. Assuming impure.");
                     var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
                     var noBodyResult = ImpureResult(

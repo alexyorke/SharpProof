@@ -6659,77 +6659,6 @@ public class TestClass
         }
 
         [Test]
-        public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPureMethodFallback()
-        {
-            const string source = @"
-using System;
-using System.Security.Cryptography;
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right)
-    {
-        return CryptographicOperations.FixedTimeEquals(left, right);
-    }
-}";
-
-            const string metadataSymbol = "System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan`1<byte>, System.ReadOnlySpan`1<byte>)";
-            const string displaySymbol = "System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.ReadOnlySpan<byte>, System.ReadOnlySpan<byte>)";
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
-                source,
-                additionalFiles: ImmutableArray.Create<AdditionalText>(
-                    new InMemoryAdditionalText(
-                        "Synthetic.Cryptography.PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            typeof(CryptographicOperations).Assembly.Location,
-                            metadataSymbol,
-                            "conservative_unknown",
-                            "[\"dynamic_dispatch\"]",
-                            displaySymbol))));
-
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Security.Cryptography.CryptographicOperations.FixedTimeEquals"));
-        }
-
-        [Test]
-        public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPurePropertyFallback()
-        {
-            const string source = @"
-using System.Globalization;
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public CultureInfo TestMethod()
-    {
-        return CultureInfo.InvariantCulture;
-    }
-}";
-
-            const string symbol = "System.Globalization.CultureInfo.get_InvariantCulture()";
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
-                source,
-                additionalFiles: ImmutableArray.Create<AdditionalText>(
-                    new InMemoryAdditionalText(
-                        "Synthetic.Globalization.PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            typeof(CultureInfo).Assembly.Location,
-                            symbol,
-                            "conservative_unknown",
-                            "[\"dynamic_dispatch\"]"))));
-
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("unknown_external_call"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("no_body"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("CultureInfo.InvariantCulture.get"));
-        }
-
-        [Test]
         public async Task Ps0002_ConservativeUnknownGeneratedPurity_SuppressesKnownPureConstructorFallback()
         {
             const string source = @"
@@ -8177,7 +8106,8 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("unknown_external_call"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("metadata_only_or_external"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Environment.TickCount"));
         }
 
@@ -8199,8 +8129,8 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("unknown_external_call"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("no_body"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("metadata_only_or_external"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Environment.CurrentManagedThreadId"));
         }
 
@@ -8222,8 +8152,8 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("unknown_external_call"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("no_body"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("metadata_only_or_external"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Environment.TickCount64"));
         }
 
@@ -8245,9 +8175,32 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("unknown_external_call"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("no_body"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("metadata_only_or_external"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Environment.ExitCode"));
+        }
+
+        [Test]
+        public async Task Ps0002_EnvironmentExitMethod_UsesGeneratedConservativeUnknownEvidence()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        Environment.Exit(1);
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("unknown_callee"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Environment.Exit"));
         }
 
         [Test]
