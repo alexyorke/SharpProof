@@ -307,7 +307,7 @@ internal static class PurityClassificationEngine
                             continue;
                         }
 
-                        impureCategories.Add("impure_callee");
+                        AddImpureCalleeCategories(impureCategories, externalClassification);
                         if (blockingCallChain.Length == 0)
                         {
                             blockingCallChain = JoinCallChain(externalEntry.Symbol, externalClassification.FirstBlockingCallChain);
@@ -370,7 +370,8 @@ internal static class PurityClassificationEngine
                     resolvedCallKey,
                     resolvedCallSummary,
                     externalGeneratedPurityEntries,
-                    out var reviewedCalleeClassification))
+                    out var reviewedCalleeClassification) &&
+                ShouldPreferReviewedUpgrade(calleeClassification, reviewedCalleeClassification))
             {
                 effectiveCalleeClassification = reviewedCalleeClassification;
             }
@@ -410,7 +411,7 @@ internal static class PurityClassificationEngine
                     continue;
                 }
 
-                impureCategories.Add("impure_callee");
+                AddImpureCalleeCategories(impureCategories, effectiveCalleeClassification);
                 if (blockingCallChain.Length == 0)
                 {
                     blockingCallChain = JoinCallChain(resolvedCallSummary.Symbol, effectiveCalleeClassification.FirstBlockingCallChain);
@@ -552,6 +553,22 @@ internal static class PurityClassificationEngine
         return !string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
             HasDeterministicStringComparisonEvidence(callSite) &&
             IsContextSensitiveStringComparisonMethod(resolvedCallSummary.ExactSymbolKey);
+    }
+
+    private static void AddImpureCalleeCategories(
+        SortedSet<string> impureCategories,
+        MethodPurityClassification calleeClassification)
+    {
+        foreach (var category in calleeClassification.Categories)
+        {
+            if (string.Equals(category, "global_state_read", StringComparison.Ordinal) ||
+                string.Equals(category, "global_state_write", StringComparison.Ordinal))
+            {
+                impureCategories.Add(category);
+            }
+        }
+
+        impureCategories.Add("impure_callee");
     }
 
     private static bool TryClassifyRuntimeIntrinsicStub(
@@ -1811,6 +1828,28 @@ internal static class PurityClassificationEngine
             externalGeneratedPurityEntries,
             out classification) &&
             !string.Equals(classification.Classification, "conservative_unknown", StringComparison.Ordinal);
+    }
+
+    private static bool ShouldPreferReviewedUpgrade(
+        MethodPurityClassification currentClassification,
+        MethodPurityClassification reviewedClassification)
+    {
+        if (!string.Equals(currentClassification.Classification, "impure", StringComparison.Ordinal) ||
+            !string.Equals(reviewedClassification.Classification, "impure", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var currentHasAmbientState = currentClassification.Categories.Contains("global_state_read", StringComparer.Ordinal) ||
+            currentClassification.Categories.Contains("global_state_write", StringComparer.Ordinal);
+        if (!currentHasAmbientState)
+        {
+            return true;
+        }
+
+        var reviewedHasAmbientState = reviewedClassification.Categories.Contains("global_state_read", StringComparer.Ordinal) ||
+            reviewedClassification.Categories.Contains("global_state_write", StringComparer.Ordinal);
+        return reviewedHasAmbientState;
     }
 
     private static bool TryGetExternalEntry(

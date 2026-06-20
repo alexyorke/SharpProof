@@ -1203,6 +1203,7 @@ public class TestClass
             var purityEntry = args[2]!;
             var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
 
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.CurrentDirectory.get.");
             Assert.That(classification, Is.EqualTo("impure"),
@@ -1247,6 +1248,7 @@ public class TestClass
             var purityEntry = args[2]!;
             var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
 
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.Directory.GetCurrentDirectory"));
@@ -1844,6 +1846,7 @@ public class TestClass
             var purityEntry = args[2]!;
             var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
 
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.ExpandEnvironmentVariables(string).");
             Assert.That(classification, Is.EqualTo("impure"),
@@ -6837,7 +6840,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task Ps0002_AppDomainCurrentDomain_UsesGeneratedPurityCatalogSource()
+        public async Task Ps0002_AppDomainCurrentDomain_IsNowPureInGeneratedPurityCatalog()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
@@ -6852,12 +6855,10 @@ public class TestClass
     }
 }");
 
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.AppDomain.CurrentDomain.get"));
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "AppDomain.CurrentDomain now resolves as pure from runtime-generated summaries and should not raise PS0002.");
         }
 
         [Test]
@@ -6878,7 +6879,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.AppDomain.BaseDirectory.get"));
@@ -6902,7 +6903,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.AppDomain.FriendlyName.get"));
@@ -7117,7 +7118,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task Ps0002_TimeProviderSystem_UsesGeneratedPurityCatalogSource()
+        public async Task Ps0002_TimeProviderSystem_IsNowPureInGeneratedPurityCatalog()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
@@ -7132,12 +7133,10 @@ public class TestClass
     }
 }");
 
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.TimeProvider.System.get"));
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "TimeProvider.System now resolves as pure from runtime-generated summaries and should not raise PS0002.");
         }
 
         [Test]
@@ -7278,7 +7277,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.Path.GetTempPath"));

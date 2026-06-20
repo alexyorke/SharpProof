@@ -1040,6 +1040,10 @@
       "OutputPath": "PurelySharp.Analyzer/TimeProvider.TimeZoneInfo.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/TimeProvider.TimeZoneInfo.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [
+        "System.TimeProvider.get_System",
+        "System.TimeProvider.get_LocalTimeZone",
+        "System.TimeProvider.get_TimestampFrequency",
+        "System.TimeZoneInfo.get_Local",
         "System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)"
       ]
     },

@@ -2222,7 +2222,7 @@ public static class StringComparisonFixture
             AssertEffectVisibilityClassification(summary, "System.IO.Path.GetRandomFileName()", "caller_visible");
             AssertPurityClassification(summary, "System.IO.Path.GetTempFileName()", "impure", "caller_visible_memory_write", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.IO.Path.GetTempFileName()", "caller_visible");
-            AssertPurityClassification(summary, "System.IO.Path.GetTempPath()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.IO.Path.GetTempPath()", "impure", "global_state_read", "global_state_write", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.IO.Path.GetTempPath()", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -4848,7 +4848,7 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "caller_visible");
             AssertPurityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "caller_visible");
@@ -4948,7 +4948,7 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(File.Exists(Path.Combine(invocationDirectory, relativeOutputPath)), Is.False);
 
             using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
-            AssertPurityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "caller_visible");
             AssertPurityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "caller_visible");
@@ -5176,9 +5176,9 @@ public static class DuplicateReviewedSeedFixture
 
             AssertPurityClassification(summary, "System.AppDomain.get_Id()", "pure");
             AssertEffectVisibilityClassification(summary, "System.AppDomain.get_Id()", "none");
-            AssertPurityClassification(summary, "System.AppDomain.get_CurrentDomain()", "impure", "global_state_read");
-            AssertEffectVisibilityClassification(summary, "System.AppDomain.get_CurrentDomain()", "caller_visible");
-            AssertPurityClassification(summary, "System.AppDomain.get_BaseDirectory()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.AppDomain.get_CurrentDomain()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.AppDomain.get_CurrentDomain()", "internal_only");
+            AssertPurityClassification(summary, "System.AppDomain.get_BaseDirectory()", "impure", "global_state_read", "global_state_write", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.AppDomain.get_BaseDirectory()", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -5214,7 +5214,7 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.AppDomain.get_FriendlyName()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.AppDomain.get_FriendlyName()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.AppDomain.get_FriendlyName()", "caller_visible");
             AssertPurityClassification(summary, "System.Reflection.Assembly.GetEntryAssembly()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Reflection.Assembly.GetEntryAssembly()", "caller_visible");
@@ -5517,7 +5517,7 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Environment.get_CurrentDirectory()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Environment.get_CurrentDirectory()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_CurrentDirectory()", "caller_visible");
             AssertPurityClassification(summary, "System.Environment.set_CurrentDirectory(string)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.set_CurrentDirectory(string)", "caller_visible");
@@ -5734,15 +5734,15 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariable(string)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariable(string)", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.GetEnvironmentVariable(string)", "caller_visible");
-            AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.GetEnvironmentVariable(string, System.EnvironmentVariableTarget)", "caller_visible");
             AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariables()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.GetEnvironmentVariables()", "caller_visible");
             AssertPurityClassification(summary, "System.Environment.GetEnvironmentVariables(System.EnvironmentVariableTarget)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.GetEnvironmentVariables(System.EnvironmentVariableTarget)", "caller_visible");
-            AssertPurityClassification(summary, "System.Environment.ExpandEnvironmentVariables(string)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Environment.ExpandEnvironmentVariables(string)", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.ExpandEnvironmentVariables(string)", "caller_visible");
             AssertPurityClassification(summary, "System.Environment.get_UserInteractive()", "impure", "caller_visible_memory_write", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_UserInteractive()", "caller_visible");
@@ -6646,9 +6646,9 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.TimeProvider.get_System()", "impure", "global_state_read");
-            AssertEffectVisibilityClassification(summary, "System.TimeProvider.get_System()", "caller_visible");
-            AssertPurityClassification(summary, "System.TimeProvider.get_LocalTimeZone()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.TimeProvider.get_System()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.TimeProvider.get_System()", "internal_only");
+            AssertPurityClassification(summary, "System.TimeProvider.get_LocalTimeZone()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.TimeProvider.get_LocalTimeZone()", "caller_visible");
             AssertPurityClassification(summary, "System.TimeProvider.get_TimestampFrequency()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.TimeProvider.get_TimestampFrequency()", "caller_visible");

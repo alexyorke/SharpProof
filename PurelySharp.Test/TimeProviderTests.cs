@@ -29,7 +29,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TimeProviderSystem_Diagnostic()
+        public async Task TimeProviderSystem_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -38,7 +38,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public TimeProvider {|PS0002:TestMethod|}()
+    public TimeProvider TestMethod()
     {
         return TimeProvider.System;
     }

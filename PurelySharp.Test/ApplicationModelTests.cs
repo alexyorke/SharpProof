@@ -129,7 +129,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task AppDomainCurrentDomain_Diagnostic()
+        public async Task AppDomainCurrentDomain_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -138,7 +138,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public AppDomain {|PS0002:TestMethod|}()
+    public AppDomain TestMethod()
     {
         return AppDomain.CurrentDomain;
     }
