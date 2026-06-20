@@ -122,7 +122,7 @@ public class TestClass
                 .Where(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId)
                 .Single(d => d.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("config_known_impure"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("TestClass.CustomApi"));
@@ -1203,7 +1203,7 @@ public class TestClass
             var purityEntry = args[2]!;
             var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.CurrentDirectory.get.");
             Assert.That(classification, Is.EqualTo("impure"),
@@ -7423,7 +7423,7 @@ public class TestClass
 
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.Path.GetTempPath"));
@@ -7451,6 +7451,44 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("known_impure_namespace_or_type"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Threading.Monitor.Exit"));
+        }
+
+        [Test]
+        public async Task Ps0002_SafeHandleDispose_UsesNamespaceFallbackAfterMemberCatalogRemoval()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using System.Runtime.InteropServices;
+using PurelySharp.Attributes;
+
+sealed class TestHandle : SafeHandle
+{
+    public TestHandle() : base(IntPtr.Zero, true)
+    {
+    }
+
+    public override bool IsInvalid => false;
+
+    protected override bool ReleaseHandle()
+    {
+        return true;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(TestHandle handle)
+    {
+        handle.Dispose();
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("known_impure_namespace_or_type"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Runtime.InteropServices.SafeHandle.Dispose"));
         }
 
         [Test]

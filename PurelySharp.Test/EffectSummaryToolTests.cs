@@ -2346,12 +2346,7 @@ public static class StringComparisonFixture
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
-            Assert.That(
-                catalogComparison.GetProperty("KnownImpureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "System.Runtime.InteropServices.SafeHandle.Dispose()" }));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.IO.Path.GetFullPath(string)", "impure", "throw");

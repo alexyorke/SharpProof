@@ -536,7 +536,6 @@ public static class Constants
         "Microsoft.Win32.RegistryKey.SetValue(string, object)",
         "System.Net.Http.Headers.HttpContentHeaders.ContentLength.get",
         "System.Net.Http.Headers.HttpContentHeaders.ContentLength.set",
-        "System.Runtime.InteropServices.SafeHandle.Dispose()",
         "System.Runtime.InteropServices.SafeHandle.IsInvalid.get",
         "System.Text.Unicode.Utf8.ToUtf16(System.ReadOnlySpan<byte>, System.Span<char>, out int, out int)",
         "System.Threading.Semaphore.Semaphore(int, int)",

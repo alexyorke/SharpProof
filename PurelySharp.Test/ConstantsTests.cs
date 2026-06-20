@@ -2178,6 +2178,12 @@ public static class UriCatalogSignatureSamples
         }
 
         [Test]
+        public void SafeHandleDispose_IsSourcedFromNamespaceOrGeneratedEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Runtime.InteropServices.SafeHandle.Dispose()");
+        }
+
+        [Test]
         public void AppDomainFriendlyName_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.AppDomain.FriendlyName.get");
