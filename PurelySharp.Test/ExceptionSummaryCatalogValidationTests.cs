@@ -2127,6 +2127,94 @@ public class TestClass
             }
         }
 
+        [Test]
+        public void ExceptionSummaryCatalog_TryGetExceptionFacts_PreservesDirectAndTransitiveOrigins()
+        {
+            var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
+            var compilation = CreateLibraryCallCompilation();
+            var methodSymbol = compilation.GetTypeByMetadataName(typeof(ArgumentNullException).FullName!)!
+                .GetMembers("ThrowIfNull")
+                .OfType<IMethodSymbol>()
+                .Single(method =>
+                    method.Parameters.Length == 2 &&
+                    method.Parameters[0].Type.SpecialType == SpecialType.System_Object &&
+                    method.Parameters[1].Type.SpecialType == SpecialType.System_String);
+
+            var analyzerOptions = new AnalyzerOptions(
+                ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
+                    "PurelySharp.EffectSummary.json",
+                    CreateEffectSummaryJson(
+                        coreLib,
+                        "System.ArgumentNullException.ThrowIfNull(object, string)",
+                        thrownExceptionTypesJson: """[ "System.ArgumentException" ]""",
+                        transitiveThrownExceptionTypesJson: """[ "System.ArgumentException", "System.InvalidOperationException" ]""",
+                        thrownExceptionSourcePathsJson: """
+[
+  {
+    "ExceptionType": "System.ArgumentException",
+    "SourcePath": "throw new System.ArgumentException()"
+  }
+]
+""",
+                        transitiveThrownExceptionSourcePathsJson: """
+[
+  {
+    "ExceptionType": "System.ArgumentException",
+    "SourcePath": "throw new System.ArgumentException()"
+  },
+  {
+    "ExceptionType": "System.InvalidOperationException",
+    "SourcePath": "TestMethod() -> Helper()"
+  }
+]
+""",
+                        transitiveThrownExceptionEdgesJson: """
+[
+  {
+    "ExceptionType": "System.ArgumentException",
+    "SourcePath": "throw new System.ArgumentException()",
+    "Depth": 0
+  },
+  {
+    "ExceptionType": "System.InvalidOperationException",
+    "SourcePath": "TestMethod() -> Helper()",
+    "CalleeExactSymbolKey": "TestClass.Helper()->void",
+    "Depth": 1
+  }
+]
+"""))),
+                new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
+
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.ExceptionSummaryCatalog", throwOnError: true)!;
+            var fromOptionsMethod = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetExceptionFactsMethod = catalogType.GetMethods(BindingFlags.Instance | BindingFlags.Public)
+                .Single(method => method.Name == "TryGetExceptionFacts" &&
+                    method.GetParameters().Length == 3 &&
+                    method.GetParameters()[1].ParameterType == typeof(Compilation));
+            var catalog = fromOptionsMethod.Invoke(null, new object?[] { analyzerOptions, default(System.Threading.CancellationToken) })!;
+
+            var args = new object?[] { methodSymbol, compilation, null };
+            Assert.That((bool)tryGetExceptionFactsMethod.Invoke(catalog, args)!, Is.True);
+
+            var facts = ((System.Collections.IEnumerable)args[2]!)
+                .Cast<object>()
+                .Select(fact => (
+                    ExceptionType: (string)fact.GetType().GetProperty("ExceptionType")!.GetValue(fact)!,
+                    OriginKind: fact.GetType().GetProperty("OriginKind")!.GetValue(fact)!.ToString(),
+                    SourcePath: (string?)fact.GetType().GetProperty("SourcePath")!.GetValue(fact),
+                    CalleeExactSymbolKey: (string?)fact.GetType().GetProperty("CalleeExactSymbolKey")!.GetValue(fact),
+                    Depth: (int?)fact.GetType().GetProperty("Depth")!.GetValue(fact)))
+                .ToArray();
+
+            Assert.That(facts, Is.EqualTo(new[]
+            {
+                ("System.ArgumentException", "Direct", "throw new System.ArgumentException()", null, (int?)null),
+                ("System.ArgumentException", "Direct", "throw new System.ArgumentException()", null, (int?)0),
+                ("System.InvalidOperationException", "Transitive", "TestMethod() -> Helper()", null, (int?)null),
+                ("System.InvalidOperationException", "Transitive", "TestMethod() -> Helper()", "TestClass.Helper()->void", (int?)1),
+            }));
+        }
+
         private static string CreateLibraryCallSource()
         {
             return """

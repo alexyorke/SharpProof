@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-20T20:11:03.011934+00:00",
+  "GeneratedAtUtc": "2026-06-20T20:38:23.4202093+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -1407,10 +1407,13 @@
             "Classification": "impure",
             "Categories": [
               "caller_visible_memory_write",
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.IO.Path.GetFullPath(string)"
+              "System.IO.Path.GetFullPath(string)",
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1580,14 +1583,21 @@
           ],
           "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "pure",
-            "Categories": [],
-            "FirstBlockingCallChain": [],
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.IO.Path.JoinInternal(System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E)",
+              "System.String.Concat(System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E)",
+              "System.String.FastAllocateString(int)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
+            "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "none"
+            "EffectVisibilityClassification": "caller_visible"
           }
         },
         {
@@ -1649,14 +1659,20 @@
           ],
           "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "pure",
-            "Categories": [],
-            "FirstBlockingCallChain": [],
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.String.Concat(System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E)",
+              "System.String.FastAllocateString(int)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": false,
             "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "none"
+            "EffectVisibilityClassification": "caller_visible"
           }
         },
         {
@@ -1957,9 +1973,14 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "impure_callee",
               "throw"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
@@ -2171,7 +2192,8 @@
               "throw"
             ],
             "FirstBlockingCallChain": [
-              "System.IO.Path.JoinInternal(System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E)"
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -3819,8 +3841,8 @@
   "PurityReport": {
     "SchemaVersion": 3,
     "MethodCount": 62,
-    "PureCount": 33,
-    "ImpureCount": 27,
+    "PureCount": 31,
+    "ImpureCount": 29,
     "ConservativeUnknownCount": 2,
     "CatalogComparison": {
       "KnownPureMembers": [],
@@ -3974,10 +3996,13 @@
         "PrimaryCategory": "caller_visible_memory_write",
         "Categories": [
           "caller_visible_memory_write",
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.IO.Path.GetFullPath(string)"
+          "System.IO.Path.GetFullPath(string)",
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -4042,7 +4067,7 @@
         "MetadataToken": "0x060076D2",
         "MethodBodySha256": "86bca284093b4a0d623a85ea44dd0ce78dfa80c7dd495522504dae361d4980b0",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "global_state_read",
           "global_state_write",
@@ -4089,11 +4114,16 @@
         "MetadataToken": "0x060076C4",
         "MethodBodySha256": "7617df7f9003b52e6452d286dcab93a94aeeae16466cc82488fb27624ae7bcdc",
         "Classification": "impure",
-        "PrimaryCategory": "throw",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
+          "impure_callee",
           "throw"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,
@@ -4111,7 +4141,7 @@
         "MetadataToken": "0x060076C5",
         "MethodBodySha256": "fb84fdb4305ee94da73e7da179d8f016ee71df939616c3b6fbd7ddce8f4fc118",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "global_state_read",
           "global_state_write",
@@ -4119,7 +4149,8 @@
           "throw"
         ],
         "FirstBlockingCallChain": [
-          "System.IO.Path.JoinInternal(System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E)"
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
@@ -4209,7 +4240,7 @@
         "MetadataToken": "0x060076A1",
         "MethodBodySha256": "243c055662c809c52c6d8a30c87d2b2ce856908599e928f60e0f7b98d8e9eaf9",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "global_state_read",
           "global_state_write",
@@ -4236,7 +4267,7 @@
         "MetadataToken": "0x060076CA",
         "MethodBodySha256": "5695a17e381306a4734ef0fe72a9a0d4867e95ab61949a194361f33abdf47f11",
         "Classification": "impure",
-        "PrimaryCategory": "caller_visible_memory_write",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "caller_visible_memory_write",
           "global_state_read",
@@ -4264,7 +4295,7 @@
         "MetadataToken": "0x060076C7",
         "MethodBodySha256": "2ac1bd5e1f8cb96d9b5fe6ce6919757945f897a99e772c2b30016070dd55972c",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "global_state_read",
           "global_state_write",
@@ -4293,7 +4324,7 @@
         "MetadataToken": "0x060076C9",
         "MethodBodySha256": "21c0937be58861c988bd674bcbe4674c6315e67cd0034f5fd932e1504aa6c714",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "global_state_read",
           "global_state_write",
@@ -4401,15 +4432,22 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x060076AA",
         "MethodBodySha256": "148694897919fc633fd22b611bf0bcdfe814714f289a65897d9222508c0bf9ef",
-        "Classification": "pure",
-        "PrimaryCategory": "generated_purity_summary",
-        "Categories": [],
-        "FirstBlockingCallChain": [],
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
+        "Categories": [
+          "global_state_read",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.IO.Path.JoinInternal(System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E)",
+          "System.String.Concat(System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E)",
+          "System.String.FastAllocateString(int)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
+        "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "none"
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.IO.Path.JoinInternal(System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E)",
@@ -4421,15 +4459,21 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x060076B6",
         "MethodBodySha256": "4610feda453a34ad7354d6cdc45b75e2bf7bbb775e5d18d1605b2502d554a717",
-        "Classification": "pure",
-        "PrimaryCategory": "generated_purity_summary",
-        "Categories": [],
-        "FirstBlockingCallChain": [],
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
+        "Categories": [
+          "global_state_read",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.String.Concat(System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E)",
+          "System.String.FastAllocateString(int)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "none"
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.IO.Path.JoinInternal(System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E)",
@@ -4462,7 +4506,7 @@
         "MetadataToken": "0x060076B8",
         "MethodBodySha256": "98f32ce244a45a5f8fd058848e421580f68e38d2b2d98b321c010e25bc3e4d3d",
         "Classification": "impure",
-        "PrimaryCategory": "caller_visible_memory_write",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "caller_visible_memory_write",
           "global_state_read",

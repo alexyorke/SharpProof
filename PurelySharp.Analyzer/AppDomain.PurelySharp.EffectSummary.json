@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-20T20:10:56.9631144+00:00",
+  "GeneratedAtUtc": "2026-06-20T20:38:18.6865361+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -540,7 +540,7 @@
         "MetadataToken": "0x06000AEE",
         "MethodBodySha256": "3ff2c11c1905d5b57572dba522015c03254820b8193f1a35316f4c82e976cdbe",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "global_state_read",
           "global_state_write",
@@ -567,7 +567,7 @@
         "MetadataToken": "0x06000B07",
         "MethodBodySha256": "32457d127380f7f4823f6fe23069937eea0dcb5f3f043dda805623a9217bc0a0",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "global_state_read",
           "global_state_write",

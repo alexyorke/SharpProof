@@ -302,7 +302,8 @@ internal static class PurityClassificationEngine
                                 memo,
                                 freshOwnedInitializationMemo,
                                 validationThrowHelperMemo,
-                                visiting))
+                                visiting) ||
+                            ShouldTreatCallAsSemanticallyPure(summary, callSite, externalEntry.Symbol, externalClassification))
                         {
                             continue;
                         }
@@ -550,9 +551,23 @@ internal static class PurityClassificationEngine
         MethodEffectSummary resolvedCallSummary,
         MethodPurityClassification calleeClassification)
     {
-        return !string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+        return ShouldTreatCallAsSemanticallyPure(
+            callerSummary,
+            callSite,
+            resolvedCallSummary.Symbol,
+            calleeClassification);
+    }
+
+    private static bool ShouldTreatCallAsSemanticallyPure(
+        MethodEffectSummary callerSummary,
+        CallSiteSummary callSite,
+        string calleeSymbol,
+        MethodPurityClassification calleeClassification)
+    {
+        return IsInteropLastErrorBookkeepingCall(callerSummary, calleeSymbol) ||
+            (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
             HasDeterministicStringComparisonEvidence(callSite) &&
-            IsContextSensitiveStringComparisonMethod(resolvedCallSummary.ExactSymbolKey);
+            IsContextSensitiveStringComparisonMethod(calleeSymbol));
     }
 
     private static void AddImpureCalleeCategories(
@@ -849,7 +864,7 @@ internal static class PurityClassificationEngine
             MetadataToken: method.MetadataToken,
             MethodBodySha256: method.MethodBodySha256,
             Classification: classification.Classification,
-            PrimaryCategory: classification.Categories.FirstOrDefault() ?? "generated_purity_summary",
+            PrimaryCategory: GetPrimaryCategory(classification.Categories),
             Categories: classification.Categories,
             FirstBlockingCallChain: classification.FirstBlockingCallChain,
             HasFreshArrayAllocationEvidence: classification.HasFreshArrayAllocationEvidence,
@@ -857,6 +872,16 @@ internal static class PurityClassificationEngine
             HasUnsupportedEffects: classification.HasUnsupportedEffects,
             FreshnessClassification: classification.FreshnessClassification,
             EffectVisibilityClassification: classification.EffectVisibilityClassification);
+    }
+
+    private static string GetPrimaryCategory(IReadOnlyList<string> categories)
+    {
+        if (categories.Contains("global_state_write", StringComparer.Ordinal))
+        {
+            return "global_state_write";
+        }
+
+        return categories.FirstOrDefault() ?? "generated_purity_summary";
     }
 
     private static MethodPurityClassification? AggregateCatalogClassification(IReadOnlyList<MethodPurityClassification> classifications)
@@ -1840,16 +1865,23 @@ internal static class PurityClassificationEngine
             return true;
         }
 
-        var currentHasAmbientState = currentClassification.Categories.Contains("global_state_read", StringComparer.Ordinal) ||
-            currentClassification.Categories.Contains("global_state_write", StringComparer.Ordinal);
-        if (!currentHasAmbientState)
+        foreach (var category in currentClassification.Categories)
         {
-            return true;
+            if (!reviewedClassification.Categories.Contains(category, StringComparer.Ordinal))
+            {
+                return false;
+            }
         }
 
-        var reviewedHasAmbientState = reviewedClassification.Categories.Contains("global_state_read", StringComparer.Ordinal) ||
-            reviewedClassification.Categories.Contains("global_state_write", StringComparer.Ordinal);
-        return reviewedHasAmbientState;
+        foreach (var category in reviewedClassification.Categories)
+        {
+            if (!currentClassification.Categories.Contains(category, StringComparer.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool TryGetExternalEntry(
@@ -1923,15 +1955,49 @@ internal static class PurityClassificationEngine
         if (callSymbol.StartsWith("Interop+", StringComparison.Ordinal) ||
             callSymbol.StartsWith("Internal.Win32.", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.InteropServices.NativeLibrary.", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.SetLastPInvokeError(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.SetLastSystemError(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastPInvokeError(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastSystemError(", StringComparison.Ordinal))
         {
-            category = "global_state_read";
+            category = IsSetterLikeUnresolvedInteropBoundaryCall(callSymbol)
+                ? "global_state_write"
+                : "global_state_read";
             return true;
         }
 
         category = string.Empty;
         return false;
+    }
+
+    private static bool IsInteropLastErrorBookkeepingCall(
+        MethodEffectSummary callerSummary,
+        string calleeSymbol)
+    {
+        return (IsInteropBoundaryWrapper(callerSummary.Symbol) || UsesWin32ErrorTranslation(callerSummary)) &&
+            (calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastPInvokeError(", StringComparison.Ordinal) ||
+             calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.GetLastSystemError(", StringComparison.Ordinal) ||
+             calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.SetLastPInvokeError(", StringComparison.Ordinal) ||
+             calleeSymbol.StartsWith("System.Runtime.InteropServices.Marshal.SetLastSystemError(", StringComparison.Ordinal));
+    }
+
+    private static bool IsInteropBoundaryWrapper(string symbol)
+    {
+        return symbol.StartsWith("Interop+", StringComparison.Ordinal) ||
+            symbol.StartsWith("Internal.Win32.", StringComparison.Ordinal);
+    }
+
+    private static bool UsesWin32ErrorTranslation(MethodEffectSummary summary)
+    {
+        return summary.Calls.Any(call =>
+            call.StartsWith("System.IO.Win32Marshal.GetExceptionForWin32Error(", StringComparison.Ordinal));
+    }
+
+    private static bool IsSetterLikeUnresolvedInteropBoundaryCall(string callSymbol)
+    {
+        return callSymbol.Contains(".set_", StringComparison.Ordinal) ||
+            callSymbol.Contains(".Set", StringComparison.Ordinal) ||
+            callSymbol.Contains("<Set", StringComparison.Ordinal);
     }
 
     private static string NormalizeConstructedReceiverType(string exactSymbolKey)

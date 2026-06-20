@@ -4850,7 +4850,8 @@ public static class DuplicateReviewedSeedFixture
 
             AssertPurityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "caller_visible");
-            AssertPurityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "impure", "global_state_write", "impure_callee");
+            AssertPrimaryCategory(summary, "System.IO.Directory.SetCurrentDirectory(string)", "global_state_write");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -4950,7 +4951,8 @@ public static class DuplicateReviewedSeedFixture
             using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
             AssertPurityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.GetCurrentDirectory()", "caller_visible");
-            AssertPurityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "impure", "global_state_write", "impure_callee");
+            AssertPrimaryCategory(summary, "System.IO.Directory.SetCurrentDirectory(string)", "global_state_write");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "caller_visible");
         }
 
@@ -5519,7 +5521,9 @@ public static class DuplicateReviewedSeedFixture
 
             AssertPurityClassification(summary, "System.Environment.get_CurrentDirectory()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_CurrentDirectory()", "caller_visible");
-            AssertPurityClassification(summary, "System.Environment.set_CurrentDirectory(string)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.Environment.set_CurrentDirectory(string)", "impure", "global_state_write", "impure_callee");
+            AssertPrimaryCategory(summary, "System.Environment.set_CurrentDirectory(string)", "global_state_write");
+            AssertCategoriesDoNotContain(summary, "System.Environment.set_CurrentDirectory(string)", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Environment.set_CurrentDirectory(string)", "caller_visible");
             AssertPurityClassification(summary, "System.Environment.GetFolderPath(System.Environment+SpecialFolder)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.GetFolderPath(System.Environment+SpecialFolder)", "caller_visible");
@@ -8040,6 +8044,38 @@ public sealed class StableCacheDerived : StaticFieldBase
             {
                 Assert.That(categories, Does.Contain(expectedCategory));
             }
+        }
+
+        private static void AssertPrimaryCategory(
+            JsonDocument summary,
+            string methodSymbol,
+            string expectedPrimaryCategory)
+        {
+            var entry = summary.RootElement
+                .GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Single(item => string.Equals(
+                    item.GetProperty("Symbol").GetString(),
+                    methodSymbol,
+                    StringComparison.Ordinal));
+            Assert.That(entry.GetProperty("PrimaryCategory").GetString(), Is.EqualTo(expectedPrimaryCategory));
+        }
+
+        private static void AssertCategoriesDoNotContain(
+            JsonDocument summary,
+            string methodSymbol,
+            string unexpectedCategory)
+        {
+            var method = FindMethod(summary, methodSymbol);
+            var classification = method.GetProperty("PurityClassification");
+            var categories = classification.GetProperty("Categories")
+                .EnumerateArray()
+                .Select(value => value.GetString())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
+
+            Assert.That(categories, Does.Not.Contain(unexpectedCategory));
         }
 
         private static void AssertFreshnessClassification(

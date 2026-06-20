@@ -1258,6 +1258,100 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_EnvironmentCurrentDirectorySetterAsImpureWriteEvidence()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string path)
+    {
+        Environment.CurrentDirectory = path;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var assignment = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<AssignmentExpressionSyntax>()
+                .Single(node => node.ToString() == "Environment.CurrentDirectory = path");
+            var propertySymbol = (IPropertySymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(assignment.Left).Symbol!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var args = new object?[] { propertySymbol.SetMethod!.OriginalDefinition, compilation, null };
+            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+            var purityEntry = args[2]!;
+            var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+            var primaryCategory = (string)purityEntry.GetType().GetProperty("PrimaryCategory")!.GetValue(purityEntry)!;
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Environment.CurrentDirectory.set"));
+            Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.CurrentDirectory.set.");
+            Assert.That(classification, Is.EqualTo("impure"));
+            Assert.That(primaryCategory, Is.EqualTo("global_state_write"));
+        }
+
+        [Test]
+        public async Task GeneratedPurityCatalog_Resolves_DirectorySetCurrentDirectoryAsImpureWriteEvidence()
+        {
+            const string source = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string path)
+    {
+        Directory.SetCurrentDirectory(path);
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var invocation = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Single(node => node.ToString() == "Directory.SetCurrentDirectory(path)");
+            var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
+            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+            var purityEntry = args[2]!;
+            var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+            var primaryCategory = (string)purityEntry.GetType().GetProperty("PrimaryCategory")!.GetValue(purityEntry)!;
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.Directory.SetCurrentDirectory"));
+            Assert.That(matched, Is.True, "Generated purity catalog should resolve Directory.SetCurrentDirectory(string).");
+            Assert.That(classification, Is.EqualTo("impure"));
+            Assert.That(primaryCategory, Is.EqualTo("global_state_write"));
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_DirectoryExistsAsImpureEvidence()
         {
             const string source = @"

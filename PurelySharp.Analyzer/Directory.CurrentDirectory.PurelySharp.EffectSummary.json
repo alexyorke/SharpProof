@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-20T20:11:01.583567+00:00",
+  "GeneratedAtUtc": "2026-06-20T20:38:22.2952314+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -93,7 +93,7 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -243,7 +243,7 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -343,9 +343,14 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "impure_callee",
               "throw"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
@@ -402,8 +407,7 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
-              "impure_callee"
+              "global_state_read"
             ],
             "FirstBlockingCallChain": [
               "Interop\u002BKernel32.\u003CGetCurrentDirectory\u003Eg____PInvoke|131_0(uint, char*)-\u003Euint"
@@ -470,8 +474,7 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
-              "impure_callee"
+              "global_state_write"
             ],
             "FirstBlockingCallChain": [
               "Interop\u002BKernel32.\u003CSetCurrentDirectory\u003Eg____PInvoke|220_0(ushort*)-\u003Eint"
@@ -651,7 +654,7 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
+              "global_state_write",
               "impure_callee",
               "throw"
             ],
@@ -1531,7 +1534,7 @@
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": true,
+            "HasUnsupportedEffects": false,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "caller_visible"
           }
@@ -1744,8 +1747,7 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_read",
         "Categories": [
-          "global_state_read",
-          "impure_callee"
+          "global_state_read"
         ],
         "FirstBlockingCallChain": [
           "Interop\u002BKernel32.\u003CGetCurrentDirectory\u003Eg____PInvoke|131_0(uint, char*)-\u003Euint"
@@ -1767,10 +1769,9 @@
         "MetadataToken": "0x060000BF",
         "MethodBodySha256": "531e080db930330fa9deae018c83dfb8b9f1c1902b227cbd7b6e5d8331adc894",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
-          "global_state_read",
-          "impure_callee"
+          "global_state_write"
         ],
         "FirstBlockingCallChain": [
           "Interop\u002BKernel32.\u003CSetCurrentDirectory\u003Eg____PInvoke|220_0(ushort*)-\u003Eint"
@@ -1866,9 +1867,9 @@
         "MetadataToken": "0x060004D9",
         "MethodBodySha256": "de3169650cde705edffdc52d09a8ec8f99ea48e4c5ee2a52aa1e459ca62d01c3",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
-          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -1893,9 +1894,9 @@
         "MetadataToken": "0x060004F2",
         "MethodBodySha256": "f38909ff26f23750e87258999f82a201f64626e158e6d1343627478086994906",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
-          "global_state_read",
+          "global_state_write",
           "impure_callee",
           "throw"
         ],
@@ -1948,9 +1949,9 @@
         "MetadataToken": "0x060074AC",
         "MethodBodySha256": "e9ec2377de5efb43fb7385c26f2e65cf1d7ab9eb1b533a5fc9c90e85230eacce",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
-          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -1976,11 +1977,16 @@
         "MetadataToken": "0x060076C4",
         "MethodBodySha256": "7617df7f9003b52e6452d286dcab93a94aeeae16466cc82488fb27624ae7bcdc",
         "Classification": "impure",
-        "PrimaryCategory": "throw",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
+          "impure_callee",
           "throw"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,
@@ -2034,7 +2040,7 @@
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": true,
+        "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "caller_visible"
       },

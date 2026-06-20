@@ -405,13 +405,16 @@ namespace PurelySharp.Analyzer
                     }
 
                     var categories = ReadStringArray(purityElement, "Categories");
+                    var primaryCategory = CompatibilityHelpers.GetTrimmedStringProperty(purityElement, "PrimaryCategory");
                     var freshnessClassification = CompatibilityHelpers.GetTrimmedStringProperty(purityElement, "FreshnessClassification") ?? "none";
                     yield return new SummaryEntry(
                         symbol,
                         new PurityEntry(
                             classification.Trim(),
                             categories,
-                            categories.FirstOrDefault() ?? "generated_purity_summary",
+                            string.IsNullOrWhiteSpace(primaryCategory)
+                                ? categories.FirstOrDefault() ?? "generated_purity_summary"
+                                : primaryCategory.Trim(),
                             ReadBooleanProperty(purityElement, "HasFreshArrayAllocationEvidence"),
                             freshnessClassification),
                         assemblyIdentity,
