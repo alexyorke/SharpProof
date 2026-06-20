@@ -2382,17 +2382,37 @@ public static class StringComparisonFixture
         [Test]
         public async Task EffectSummaryTool_RuntimeDateTimeOffsetSlice_TreatsAddMethodsFactoriesAndDerivedHelpersDifferently()
         {
-            using var summary = await RunRuntimeEffectSummaryAsync("System.DateTimeOffset", limit: 80);
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                200,
+                "System.DateTimeOffset.Add(System.TimeSpan)",
+                "System.DateTimeOffset.AddDays(double)",
+                "System.DateTimeOffset.AddHours(double)",
+                "System.DateTimeOffset.AddMilliseconds(double)",
+                "System.DateTimeOffset.AddMinutes(double)",
+                "System.DateTimeOffset.AddMonths(int)",
+                "System.DateTimeOffset.AddSeconds(double)",
+                "System.DateTimeOffset.AddTicks(long)",
+                "System.DateTimeOffset.AddYears(int)",
+                "System.DateTimeOffset.Compare(System.DateTimeOffset, System.DateTimeOffset)",
+                "System.DateTimeOffset.CompareTo(System.DateTimeOffset)",
+                "System.DateTimeOffset.Equals(System.DateTimeOffset)",
+                "System.DateTimeOffset.Equals(System.DateTimeOffset, System.DateTimeOffset)",
+                "System.DateTimeOffset.Subtract(System.DateTimeOffset)",
+                "System.DateTimeOffset.ToUnixTimeMilliseconds()",
+                "System.DateTimeOffset.ToUnixTimeSeconds()",
+                "System.DateTimeOffset.get_Offset()",
+                "System.DateTimeOffset.FromUnixTimeMilliseconds(long)",
+                "System.DateTimeOffset.FromUnixTimeSeconds(long)");
 
-            AssertPurityClassification(summary, "System.DateTimeOffset.Add(System.TimeSpan)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTimeOffset.AddDays(double)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTimeOffset.AddHours(double)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTimeOffset.AddMilliseconds(double)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTimeOffset.AddMinutes(double)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTimeOffset.AddMonths(int)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTimeOffset.AddSeconds(double)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTimeOffset.AddTicks(long)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTimeOffset.AddYears(int)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTimeOffset.Add(System.TimeSpan)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddDays(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddHours(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddMilliseconds(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddMinutes(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddMonths(int)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddSeconds(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddTicks(long)", "pure");
+            AssertPurityClassification(summary, "System.DateTimeOffset.AddYears(int)", "pure");
             AssertPurityClassification(summary, "System.DateTimeOffset.Compare(System.DateTimeOffset, System.DateTimeOffset)", "pure");
             AssertPurityClassification(summary, "System.DateTimeOffset.CompareTo(System.DateTimeOffset)", "pure");
             AssertPurityClassification(summary, "System.DateTimeOffset.Equals(System.DateTimeOffset)", "pure");
@@ -2401,27 +2421,46 @@ public static class StringComparisonFixture
             AssertPurityClassification(summary, "System.DateTimeOffset.ToUnixTimeMilliseconds()", "pure");
             AssertPurityClassification(summary, "System.DateTimeOffset.ToUnixTimeSeconds()", "pure");
             AssertPurityClassification(summary, "System.DateTimeOffset.get_Offset()", "pure");
-            AssertPurityClassification(summary, "System.DateTimeOffset.FromUnixTimeMilliseconds(long)", "impure", "global_state_read", "throw");
-            AssertPurityClassification(summary, "System.DateTimeOffset.FromUnixTimeSeconds(long)", "impure", "global_state_read", "throw");
+            AssertPurityClassification(summary, "System.DateTimeOffset.FromUnixTimeMilliseconds(long)", "impure", "throw");
+            AssertPurityClassification(summary, "System.DateTimeOffset.FromUnixTimeSeconds(long)", "impure", "throw");
         }
 
         [Test]
         public async Task EffectSummaryTool_RuntimeDateTimeSlice_TreatsAddAndRoundTripHelpersDifferently()
         {
-            using var summary = await RunRuntimeEffectSummaryAsync("System.DateTime", limit: 120);
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                200,
+                "System.DateTime.Add(System.TimeSpan)",
+                "System.DateTime.AddDays(double)",
+                "System.DateTime.AddHours(double)",
+                "System.DateTime.AddMilliseconds(double)",
+                "System.DateTime.AddMinutes(double)",
+                "System.DateTime.AddMonths(int)",
+                "System.DateTime.AddSeconds(double)",
+                "System.DateTime.AddTicks(long)",
+                "System.DateTime.AddYears(int)",
+                "System.DateTime.FromBinary(long)",
+                "System.DateTime.FromOADate(double)",
+                "System.DateTime.ToOADate()",
+                "System.DateTime.ToBinary()",
+                "System.DateTime.Compare(System.DateTime, System.DateTime)",
+                "System.DateTime.CompareTo(System.DateTime)",
+                "System.DateTime.Equals(System.DateTime)",
+                "System.DateTime.Subtract(System.DateTime)",
+                "System.DateTime.DaysInMonth(int, int)");
 
-            AssertPurityClassification(summary, "System.DateTime.Add(System.TimeSpan)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTime.AddDays(double)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTime.AddHours(double)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTime.AddMilliseconds(double)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTime.AddMinutes(double)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTime.AddMonths(int)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTime.AddSeconds(double)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTime.AddTicks(long)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTime.AddYears(int)", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTime.Add(System.TimeSpan)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.AddDays(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.AddHours(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.AddMilliseconds(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.AddMinutes(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.AddMonths(int)", "impure", "throw");
+            AssertPurityClassification(summary, "System.DateTime.AddSeconds(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.AddTicks(long)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.AddYears(int)", "impure", "throw");
             AssertPurityClassification(summary, "System.DateTime.FromBinary(long)", "impure", "global_state_read", "throw");
-            AssertPurityClassification(summary, "System.DateTime.FromOADate(double)", "impure", "impure_callee");
-            AssertPurityClassification(summary, "System.DateTime.ToOADate()", "impure", "impure_callee");
+            AssertPurityClassification(summary, "System.DateTime.FromOADate(double)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.ToOADate()", "pure");
             AssertPurityClassification(summary, "System.DateTime.ToBinary()", "pure");
             AssertPurityClassification(summary, "System.DateTime.Compare(System.DateTime, System.DateTime)", "pure");
             AssertPurityClassification(summary, "System.DateTime.CompareTo(System.DateTime)", "pure");

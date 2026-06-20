@@ -20,7 +20,6 @@ public static class Constants
     public static readonly ImmutableHashSet<string> KnownImpureTypeNames = ImmutableHashSet.Create(
         StringComparer.Ordinal,
         "System.Random",
-        "System.DateTime",
         "System.Timers.Timer"
 
 

@@ -134,9 +134,9 @@ internal static class PurityClassificationEngine
     {
         if (memo.TryGetValue(symbol, out var cached))
         {
-            if (string.Equals(cached.Classification, "conservative_unknown", StringComparison.Ordinal) &&
-                bySymbol.TryGetValue(symbol, out var cachedSummary) &&
-                TryResolveReviewedUpgrade(assembly, symbol, cachedSummary, externalGeneratedPurityEntries, out var reviewedUpgrade))
+            if (bySymbol.TryGetValue(symbol, out var cachedSummary) &&
+                TryResolveReviewedUpgrade(assembly, symbol, cachedSummary, externalGeneratedPurityEntries, out var reviewedUpgrade) &&
+                ShouldPreferReviewedUpgrade(cached, reviewedUpgrade))
             {
                 memo[symbol] = reviewedUpgrade;
                 return reviewedUpgrade;
@@ -520,13 +520,13 @@ internal static class PurityClassificationEngine
                 EffectVisibilityClassification: effectVisibilityClassification);
         }
 
-        if (string.Equals(result.Classification, "conservative_unknown", StringComparison.Ordinal) &&
-            TryResolveReviewedUpgrade(
+        if (TryResolveReviewedUpgrade(
                 assembly,
                 symbol,
                 summary,
                 externalGeneratedPurityEntries,
-                out var reviewedClassification))
+                out var reviewedClassification) &&
+            ShouldPreferReviewedUpgrade(result, reviewedClassification))
         {
             result = reviewedClassification;
         }
