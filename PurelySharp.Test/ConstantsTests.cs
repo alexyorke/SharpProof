@@ -1062,6 +1062,24 @@ public static class KeyedCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void DictionaryAndImmutableHashSetEqualityHelpers_AreSourcedFromSemanticAnalysis_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Collections.Generic.Dictionary<TKey, TValue>.ContainsValue(TValue)",
+                "System.Collections.Generic.Dictionary<TKey, TValue>.TryGetValue(TKey, out TValue)",
+                "System.Collections.Immutable.ImmutableHashSet<T>.Add(T)",
+                "System.Collections.Immutable.ImmutableHashSet<T>.Contains(T)",
+                "System.Collections.Immutable.ImmutableHashSet<T>.Remove(T)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void LinqToLookupHelpers_AreSourcedFromSemanticAnalysis_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownImpureMethods, Does.Not.Contain("System.Linq.Enumerable.ToLookup"));

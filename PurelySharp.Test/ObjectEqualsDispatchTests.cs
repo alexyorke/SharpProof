@@ -1820,6 +1820,54 @@ public class TestClass
         }
 
         [Test]
+        public async Task ImmutableHashSetRemoveDispatchToImpureHashCodeOverride_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.Collections.Immutable;
+using PurelySharp.Attributes;
+
+public sealed class MutableRecord
+{
+    public override int GetHashCode()
+    {
+        Console.WriteLine(""hash"");
+        return 0;
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public ImmutableHashSet<MutableRecord> {|PS0002:TestMethod|}(ImmutableHashSet<MutableRecord> values, MutableRecord value)
+    {
+        return values.Remove(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ImmutableHashSetRemoveForBuiltinValueEquality_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections.Immutable;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ImmutableHashSet<int> TestMethod(ImmutableHashSet<int> values, int value)
+    {
+        return values.Remove(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ImmutableDictionarySetItemDispatchToImpureHashCodeOverride_Diagnostic()
         {
             var test = @"

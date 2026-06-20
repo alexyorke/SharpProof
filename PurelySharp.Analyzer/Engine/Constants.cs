@@ -739,8 +739,6 @@ public static class Constants
 
     public static readonly HashSet<string> KnownPureBCLMembers = new HashSet<string>(StringComparer.Ordinal)
     {
-        "System.Collections.Generic.Dictionary<TKey, TValue>.ContainsValue(TValue)",
-        "System.Collections.Generic.Dictionary<TKey, TValue>.TryGetValue(TKey, out TValue)",
         "System.Collections.Generic.HashSet<T>.IsSubsetOf(System.Collections.Generic.IEnumerable<T>)",
 
 
@@ -762,9 +760,6 @@ public static class Constants
         "System.Collections.Immutable.ImmutableDictionary.CreateRange<TKey, TValue>(System.Collections.Generic.IEqualityComparer<TKey>, System.Collections.Generic.IEqualityComparer<TValue>, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>>)",
         "System.Collections.Immutable.ImmutableHashSet.CreateRange<T>(System.Collections.Generic.IEnumerable<T>)",
         "System.Collections.Immutable.ImmutableHashSet.CreateRange<T>(System.Collections.Generic.IEqualityComparer<T>, System.Collections.Generic.IEnumerable<T>)",
-        "System.Collections.Immutable.ImmutableHashSet<T>.Add(T)",
-        "System.Collections.Immutable.ImmutableHashSet<T>.Contains(T)",
-        "System.Collections.Immutable.ImmutableHashSet<T>.Remove(T)",
         "System.Collections.Immutable.ImmutableHashSet<T>.System.Collections.Immutable.IImmutableSet<T>.Add(T)",
         "System.Collections.Immutable.ImmutableHashSet<T>.System.Collections.Immutable.IImmutableSet<T>.Clear()",
         "System.Collections.Immutable.ImmutableHashSet<T>.System.Collections.Immutable.IImmutableSet<T>.Remove(T)",
