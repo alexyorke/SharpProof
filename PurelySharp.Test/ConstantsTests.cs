@@ -247,7 +247,9 @@ public static class EnvironmentCatalogSignatureSamples
                 "System.Globalization.CultureInfo.CurrentUICulture.get",
                 "System.Globalization.CultureInfo.DefaultThreadCurrentCulture.get",
                 "System.Globalization.CultureInfo.DefaultThreadCurrentUICulture.get",
+                "System.Globalization.DateTimeFormatInfo.CurrentInfo.get",
                 "System.Globalization.CultureInfo.InstalledUICulture.get",
+                "System.Globalization.NumberFormatInfo.CurrentInfo.get",
                 "System.Globalization.RegionInfo.CurrentRegion.get",
             };
 

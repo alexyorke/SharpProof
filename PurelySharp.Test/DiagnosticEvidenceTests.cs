@@ -1981,6 +1981,18 @@ public class TestClass
     }
 
     [EnforcePure]
+    public object CurrentNumberFormat()
+    {
+        return NumberFormatInfo.CurrentInfo;
+    }
+
+    [EnforcePure]
+    public object CurrentDateTimeFormat()
+    {
+        return DateTimeFormatInfo.CurrentInfo;
+    }
+
+    [EnforcePure]
     public object InstalledUICulture()
     {
         return CultureInfo.InstalledUICulture;
@@ -2039,6 +2051,22 @@ public class TestClass
                             .Single(node => node.ToString() == "CultureInfo.DefaultThreadCurrentUICulture"))
                         .Symbol!).GetMethod!),
                 (
+                    "System.Globalization.NumberFormatInfo.CurrentInfo.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "NumberFormatInfo.CurrentInfo"))
+                        .Symbol!).GetMethod!),
+                (
+                    "System.Globalization.DateTimeFormatInfo.CurrentInfo.get",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "DateTimeFormatInfo.CurrentInfo"))
+                        .Symbol!).GetMethod!),
+                (
                     "System.Globalization.CultureInfo.InstalledUICulture.get",
                     ((IPropertySymbol)semanticModel.GetSymbolInfo(
                         syntaxTree.GetRoot()
@@ -2070,7 +2098,7 @@ public class TestClass
                     return (matched, classification);
                 });
 
-            Assert.That(purityDiagnostics, Has.Length.EqualTo(6));
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(8));
             Assert.That(
                 purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
                 Is.EqualTo(new[] { "generated_purity_summary" }));

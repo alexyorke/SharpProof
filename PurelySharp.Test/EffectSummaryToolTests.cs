@@ -6057,7 +6057,9 @@ public static class DuplicateReviewedSeedFixture
                 "System.Globalization.CultureInfo.get_CurrentUICulture",
                 "System.Globalization.CultureInfo.get_DefaultThreadCurrentCulture",
                 "System.Globalization.CultureInfo.get_DefaultThreadCurrentUICulture",
+                "System.Globalization.DateTimeFormatInfo.get_CurrentInfo",
                 "System.Globalization.CultureInfo.get_InstalledUICulture",
+                "System.Globalization.NumberFormatInfo.get_CurrentInfo",
                 "System.Globalization.RegionInfo.get_CurrentRegion");
 
             var report = summary.RootElement.GetProperty("PurityReport");
@@ -6074,8 +6076,12 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Globalization.CultureInfo.get_DefaultThreadCurrentCulture()", "caller_visible");
             AssertPurityClassification(summary, "System.Globalization.CultureInfo.get_DefaultThreadCurrentUICulture()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.Globalization.CultureInfo.get_DefaultThreadCurrentUICulture()", "caller_visible");
+            AssertPurityClassification(summary, "System.Globalization.DateTimeFormatInfo.get_CurrentInfo()", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Globalization.DateTimeFormatInfo.get_CurrentInfo()", "caller_visible");
             AssertPurityClassification(summary, "System.Globalization.CultureInfo.get_InstalledUICulture()", "impure", "global_state_read", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Globalization.CultureInfo.get_InstalledUICulture()", "caller_visible");
+            AssertPurityClassification(summary, "System.Globalization.NumberFormatInfo.get_CurrentInfo()", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Globalization.NumberFormatInfo.get_CurrentInfo()", "caller_visible");
             AssertPurityClassification(summary, "System.Globalization.RegionInfo.get_CurrentRegion()", "impure", "global_state_read", "global_state_write", "impure_callee", "object_state_write");
             AssertEffectVisibilityClassification(summary, "System.Globalization.RegionInfo.get_CurrentRegion()", "caller_visible");
 
@@ -6088,7 +6094,9 @@ public static class DuplicateReviewedSeedFixture
                     string.Equals(symbol, "System.Globalization.CultureInfo.get_CurrentUICulture()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Globalization.CultureInfo.get_DefaultThreadCurrentCulture()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Globalization.CultureInfo.get_DefaultThreadCurrentUICulture()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Globalization.DateTimeFormatInfo.get_CurrentInfo()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Globalization.CultureInfo.get_InstalledUICulture()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Globalization.NumberFormatInfo.get_CurrentInfo()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Globalization.RegionInfo.get_CurrentRegion()", StringComparison.Ordinal))
                 .OrderBy(symbol => symbol, StringComparer.Ordinal)
                 .ToArray();
@@ -6100,6 +6108,8 @@ public static class DuplicateReviewedSeedFixture
                 "System.Globalization.CultureInfo.get_DefaultThreadCurrentCulture()",
                 "System.Globalization.CultureInfo.get_DefaultThreadCurrentUICulture()",
                 "System.Globalization.CultureInfo.get_InstalledUICulture()",
+                "System.Globalization.DateTimeFormatInfo.get_CurrentInfo()",
+                "System.Globalization.NumberFormatInfo.get_CurrentInfo()",
                 "System.Globalization.RegionInfo.get_CurrentRegion()",
             }));
         }
