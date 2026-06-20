@@ -1609,7 +1609,7 @@ public static class StringComparisonFixture
             AssertEffectVisibilityClassification(
                 summary,
                 "System.Exception.get_Message()",
-                "internal_only");
+                "none");
             AssertPurityClassification(
                 summary,
                 "System.Object.GetType()",

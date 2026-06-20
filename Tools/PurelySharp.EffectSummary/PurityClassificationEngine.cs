@@ -134,6 +134,14 @@ internal static class PurityClassificationEngine
     {
         if (memo.TryGetValue(symbol, out var cached))
         {
+            if (string.Equals(cached.Classification, "conservative_unknown", StringComparison.Ordinal) &&
+                bySymbol.TryGetValue(symbol, out var cachedSummary) &&
+                TryResolveReviewedUpgrade(assembly, symbol, cachedSummary, externalGeneratedPurityEntries, out var reviewedUpgrade))
+            {
+                memo[symbol] = reviewedUpgrade;
+                return reviewedUpgrade;
+            }
+
             return cached;
         }
 
@@ -355,12 +363,24 @@ internal static class PurityClassificationEngine
                 freshOwnedInitializationMemo,
                 validationThrowHelperMemo,
                 visiting);
-            if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, calleeClassification))
+            var effectiveCalleeClassification = calleeClassification;
+            if (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+                TryResolveReviewedUpgrade(
+                    assembly,
+                    resolvedCallKey,
+                    resolvedCallSummary,
+                    externalGeneratedPurityEntries,
+                    out var reviewedCalleeClassification))
+            {
+                effectiveCalleeClassification = reviewedCalleeClassification;
+            }
+
+            if (ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, effectiveCalleeClassification))
             {
                 continue;
             }
 
-            if (string.Equals(calleeClassification.Classification, "impure", StringComparison.Ordinal))
+            if (string.Equals(effectiveCalleeClassification.Classification, "impure", StringComparison.Ordinal))
             {
                 if (IsPureArgumentGuardWrapper(resolvedCallSummary.Symbol) ||
                     ((treatsArgumentGuardThrowHelpersAsPure &&
@@ -393,25 +413,25 @@ internal static class PurityClassificationEngine
                 impureCategories.Add("impure_callee");
                 if (blockingCallChain.Length == 0)
                 {
-                    blockingCallChain = JoinCallChain(resolvedCallSummary.Symbol, calleeClassification.FirstBlockingCallChain);
+                    blockingCallChain = JoinCallChain(resolvedCallSummary.Symbol, effectiveCalleeClassification.FirstBlockingCallChain);
                 }
             }
-            else if (string.Equals(calleeClassification.Classification, "conservative_unknown", StringComparison.Ordinal))
+            else if (string.Equals(effectiveCalleeClassification.Classification, "conservative_unknown", StringComparison.Ordinal))
             {
                 conservativeCategories.Add("unknown_callee");
                 if (blockingCallChain.Length == 0)
                 {
-                    blockingCallChain = JoinCallChain(resolvedCallSummary.Symbol, calleeClassification.FirstBlockingCallChain);
+                    blockingCallChain = JoinCallChain(resolvedCallSummary.Symbol, effectiveCalleeClassification.FirstBlockingCallChain);
                 }
             }
-            else if (string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal))
+            else if (string.Equals(effectiveCalleeClassification.Classification, "pure", StringComparison.Ordinal))
             {
-                if (string.Equals(calleeClassification.FreshnessClassification, "fresh_owned_array_write", StringComparison.Ordinal))
+                if (string.Equals(effectiveCalleeClassification.FreshnessClassification, "fresh_owned_array_write", StringComparison.Ordinal))
                 {
                     freshOwnedArrayCalleeSeen = true;
                 }
 
-                if (string.Equals(calleeClassification.FreshnessClassification, "fresh_owned_object_write", StringComparison.Ordinal))
+                if (string.Equals(effectiveCalleeClassification.FreshnessClassification, "fresh_owned_object_write", StringComparison.Ordinal))
                 {
                     freshOwnedObjectCalleeSeen = true;
                 }
@@ -498,7 +518,8 @@ internal static class PurityClassificationEngine
                 EffectVisibilityClassification: effectVisibilityClassification);
         }
 
-        if (TryResolveReviewedImplementationClassification(
+        if (string.Equals(result.Classification, "conservative_unknown", StringComparison.Ordinal) &&
+            TryResolveReviewedUpgrade(
                 assembly,
                 symbol,
                 summary,
@@ -1774,6 +1795,22 @@ internal static class PurityClassificationEngine
 
         classification = CreateClassification(entry);
         return !string.Equals(classification.Classification, "conservative_unknown", StringComparison.Ordinal);
+    }
+
+    private static bool TryResolveReviewedUpgrade(
+        AssemblyEffectReport assembly,
+        string symbol,
+        MethodEffectSummary summary,
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
+        out MethodPurityClassification classification)
+    {
+        return TryResolveReviewedImplementationClassification(
+            assembly,
+            symbol,
+            summary,
+            externalGeneratedPurityEntries,
+            out classification) &&
+            !string.Equals(classification.Classification, "conservative_unknown", StringComparison.Ordinal);
     }
 
     private static bool TryGetExternalEntry(
