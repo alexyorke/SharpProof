@@ -815,7 +815,6 @@ public static class Constants
         "System.Linq.IQueryable<T>.Expression.get",
         "System.Linq.Queryable.Where<TSource>(System.Linq.IQueryable<TSource>, System.Linq.Expressions.Expression<System.Func<TSource, bool>>)",
         "System.Memory<T>.Span.get",
-        "System.Memory<T>.Slice(int, int)",
         "System.Numerics.Matrix4x4.CreateRotationX(float)",
         "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)",
         "System.Reflection.Metadata.MetadataReader.GetString(System.Reflection.Metadata.StringHandle)",

@@ -735,6 +735,13 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Memory.Slice.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Memory.Slice.PurelySharp.EffectSummary.json",
+      "SymbolPrefixes": [
+        "System.Memory`1.Slice(int, int)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/ReadOnlySequence.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/ReadOnlySequence.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Memory.dll",

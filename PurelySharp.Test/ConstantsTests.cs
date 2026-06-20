@@ -1800,6 +1800,29 @@ public static class StringJoinCatalogSignatureSamples
         }
 
         [Test]
+        public void MemorySlice_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+
+public static class MemorySliceCatalogSignatureSamples
+{
+    public static Memory<int> Sample(Memory<int> memory)
+    {
+        return memory.Slice(0, 0);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "MemorySliceGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "memory.Slice(0, 0)"));
+        }
+
+        [Test]
         public void ReadOnlySequenceHelpersAndSlice_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
