@@ -3161,6 +3161,22 @@ namespace PurelySharp.Analyzer.Engine
                 Constants.KnownFreshOwnedArrayReturningMembers.Contains(methodSymbol.ConstructedFrom.ToDisplayString());
         }
 
+        internal static bool IsKnownMutableCollectionBoundaryType(ITypeSymbol? typeSymbol)
+        {
+            if (typeSymbol is not INamedTypeSymbol namedType ||
+                namedType.IsValueType ||
+                namedType.TypeKind == TypeKind.Delegate ||
+                namedType.SpecialType == SpecialType.System_String)
+            {
+                return false;
+            }
+
+            return namedType.OriginalDefinition.ToDisplayString() is
+                "System.Collections.Generic.List<T>" or
+                "System.Collections.Generic.HashSet<T>" or
+                "System.Collections.Generic.Dictionary<TKey, TValue>";
+        }
+
 
         internal static bool HasImpureAttribute(ISymbol symbol)
         {

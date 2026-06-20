@@ -156,6 +156,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: nestedObjectEscapeSymbol,
                             catalogSource: nestedObjectCatalogSource));
                 }
+                else if (TryFindMutableCollectionReturnEscape(
+                             returnOperation.ReturnedValue,
+                             context.SemanticModel,
+                             out var collectionEscapeSyntax,
+                             out var collectionEscapeSymbol,
+                             out var collectionCatalogSource))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes mutable collection through '{collectionEscapeSyntax}'. Return statement is Impure.");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        collectionEscapeSyntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            "mutable_state_escape",
+                            ruleName: nameof(ReturnStatementPurityRule),
+                            operation: returnOperation,
+                            syntaxNode: collectionEscapeSyntax,
+                            symbol: collectionEscapeSymbol,
+                            catalogSource: collectionCatalogSource));
+                }
                 else if (TryFindFreshMutableObjectReturnEscape(
                              returnOperation.ReturnedValue,
                              context.SemanticModel,
@@ -702,6 +720,83 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return false;
         }
 
+        private static bool TryFindMutableCollectionReturnEscape(
+            IOperation returnedValue,
+            SemanticModel semanticModel,
+            out SyntaxNode escapeSyntax,
+            out ISymbol escapeSymbol,
+            out string catalogSource)
+        {
+            var unwrappedReturnedValue = PurityAnalysisEngine.SkipImplicitConversions(returnedValue);
+            if (unwrappedReturnedValue is IInvocationOperation invocationOperation &&
+                PurityAnalysisEngine.IsKnownMutableCollectionBoundaryType(invocationOperation.Type))
+            {
+                escapeSyntax = invocationOperation.Syntax;
+                escapeSymbol = invocationOperation.TargetMethod.OriginalDefinition;
+                catalogSource = "returned_mutable_collection_invocation";
+                return true;
+            }
+
+            if (unwrappedReturnedValue is ILocalReferenceOperation localReference &&
+                TryGetStableMutableCollectionLocalEscape(
+                    localReference.Local,
+                    returnedValue,
+                    semanticModel,
+                    out escapeSyntax,
+                    out escapeSymbol,
+                    out catalogSource))
+            {
+                return true;
+            }
+
+            if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
+            {
+                if (TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                {
+                    return TryFindMutableCollectionReturnEscape(
+                        conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
+                        semanticModel,
+                        out escapeSyntax,
+                        out escapeSymbol,
+                        out catalogSource);
+                }
+
+                return TryFindMutableCollectionReturnEscape(
+                           conditionalOperation.WhenTrue,
+                           semanticModel,
+                           out escapeSyntax,
+                           out escapeSymbol,
+                           out catalogSource) ||
+                       TryFindMutableCollectionReturnEscape(
+                           conditionalOperation.WhenFalse,
+                           semanticModel,
+                           out escapeSyntax,
+                           out escapeSymbol,
+                           out catalogSource);
+            }
+
+            if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
+            {
+                return TryFindMutableCollectionReturnEscape(
+                           coalesceOperation.Value,
+                           semanticModel,
+                           out escapeSyntax,
+                           out escapeSymbol,
+                           out catalogSource) ||
+                       TryFindMutableCollectionReturnEscape(
+                           coalesceOperation.WhenNull,
+                           semanticModel,
+                           out escapeSyntax,
+                           out escapeSymbol,
+                           out catalogSource);
+            }
+
+            escapeSyntax = null!;
+            escapeSymbol = null!;
+            catalogSource = string.Empty;
+            return false;
+        }
+
         private static bool TryFindReturnedInitializerMutableObjectEscape(
             IOperation returnedValue,
             SemanticModel semanticModel,
@@ -885,8 +980,58 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 semanticModel,
                 new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
                 out escapeSyntax,
-                out escapeSymbol,
-                out catalogSource);
+            out escapeSymbol,
+            out catalogSource);
+        }
+
+        private static bool TryGetStableMutableCollectionLocalEscape(
+            ILocalSymbol localSymbol,
+            IOperation returnedValue,
+            SemanticModel semanticModel,
+            out SyntaxNode escapeSyntax,
+            out ISymbol escapeSymbol,
+            out string catalogSource)
+        {
+            var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
+                .Select(reference => reference.GetSyntax())
+                .OfType<VariableDeclaratorSyntax>()
+                .FirstOrDefault();
+            var initializerSyntax = declaratorSyntax?.Initializer?.Value;
+            if (declaratorSyntax == null || initializerSyntax == null)
+            {
+                escapeSyntax = null!;
+                escapeSymbol = null!;
+                catalogSource = string.Empty;
+                return false;
+            }
+
+            if (HasAssignmentToLocalBetweenDeclarationAndReturn(localSymbol, returnedValue, declaratorSyntax, semanticModel))
+            {
+                escapeSyntax = null!;
+                escapeSymbol = null!;
+                catalogSource = string.Empty;
+                return false;
+            }
+
+            var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax));
+            if (initializerOperation != null &&
+                TryFindMutableCollectionReturnEscape(
+                    initializerOperation,
+                    semanticModel,
+                    out escapeSyntax,
+                    out escapeSymbol,
+                    out var nestedCatalogSource))
+            {
+                catalogSource = nestedCatalogSource == "returned_mutable_collection_invocation"
+                    ? "returned_mutable_collection_local"
+                    : nestedCatalogSource;
+                return true;
+            }
+
+            escapeSyntax = null!;
+            escapeSymbol = null!;
+            catalogSource = string.Empty;
+            return false;
         }
 
         private static bool TryGetStableMutableObjectLocalEscape(

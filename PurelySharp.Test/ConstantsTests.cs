@@ -1086,6 +1086,34 @@ public static class LinqCatalogSignatureSamples
         }
 
         [Test]
+        public void LinqMaterializationHelpers_AreSourcedFromReturnEscapeAnalysis_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Collections.Generic;
+using System.Linq;
+
+public static class LinqMaterializationCatalogSignatureSamples
+{
+    public static void Sample(IEnumerable<string> values)
+    {
+        values.ToList();
+        values.ToHashSet();
+        values.ToDictionary(value => value.Length);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "LinqMaterializationCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.ToList()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.ToHashSet()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.ToDictionary(value => value.Length)"));
+        }
+
+        [Test]
         public void MutableCollectionReadHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"

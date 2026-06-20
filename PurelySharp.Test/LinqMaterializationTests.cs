@@ -77,5 +77,52 @@ namespace TestNamespace
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task EnumerableToDictionary_Diagnostic()
+        {
+            var test = @"
+using System.Collections.Generic;
+using System.Linq;
+using PurelySharp.Attributes;
+
+namespace TestNamespace
+{
+    public class TestClass
+    {
+        [EnforcePure]
+        public Dictionary<int, string> {|PS0002:TestMethod|}(IEnumerable<string> numbers)
+        {
+            return numbers.ToDictionary(x => x.Length);
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task EnumerableToHashSetStableLocal_Diagnostic()
+        {
+            var test = @"
+using System.Collections.Generic;
+using System.Linq;
+using PurelySharp.Attributes;
+
+namespace TestNamespace
+{
+    public class TestClass
+    {
+        [EnforcePure]
+        public HashSet<int> {|PS0002:TestMethod|}(IEnumerable<int> numbers)
+        {
+            var materialized = numbers.Where(x => x > 0).ToHashSet();
+            return materialized;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }
