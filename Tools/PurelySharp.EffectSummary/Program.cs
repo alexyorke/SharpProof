@@ -261,9 +261,36 @@ internal sealed class CliOptions
             IgnoreReviewedPurityEntries = artifact.IgnoreReviewedPurityEntries ?? defaults?.IgnoreReviewedPurityEntries ?? false,
         };
 
+        var explicitAssemblyPaths = artifact.AssemblyPaths ?? Array.Empty<string>();
+        var hasPackageAssembly = HasPackageAssembly(artifact);
+        var hasExplicitRuntimeAssembly = !string.IsNullOrWhiteSpace(artifact.RuntimeAssemblyName);
+        if (hasExplicitRuntimeAssembly && (explicitAssemblyPaths.Length > 0 || hasPackageAssembly))
+        {
+            options.AssemblyPaths.Add(RuntimeAssemblyResolver.Resolve(options.Framework, options.RuntimeAssemblyName));
+        }
+
         if (artifact.AssemblyPaths != null)
         {
             options.AssemblyPaths.AddRange(artifact.AssemblyPaths);
+        }
+
+        if (hasPackageAssembly)
+        {
+            options.AssemblyPaths.Add(ResolveNuGetPackageAssemblyPath(artifact));
+        }
+
+        if (options.AssemblyPaths.Count > 1)
+        {
+            var pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+            options.AssemblyPaths.Clear();
+            options.AssemblyPaths.AddRange(
+                (hasExplicitRuntimeAssembly && (explicitAssemblyPaths.Length > 0 || hasPackageAssembly)
+                    ? new[] { RuntimeAssemblyResolver.Resolve(options.Framework, options.RuntimeAssemblyName) }
+                    : Array.Empty<string>())
+                .Concat(explicitAssemblyPaths)
+                .Concat(hasPackageAssembly ? new[] { ResolveNuGetPackageAssemblyPath(artifact) } : Array.Empty<string>())
+                .Select(Path.GetFullPath)
+                .Distinct(pathComparer));
         }
 
         if (artifact.SymbolPrefixes != null)
@@ -296,6 +323,158 @@ internal sealed class CliOptions
         }
 
         return options;
+    }
+
+    private static bool HasPackageAssembly(ArtifactSpecEntry artifact)
+    {
+        return !string.IsNullOrWhiteSpace(artifact.PackageId) ||
+            !string.IsNullOrWhiteSpace(artifact.PackageVersion) ||
+            !string.IsNullOrWhiteSpace(artifact.PackageAssemblyRelativePath);
+    }
+
+    private static string ResolveNuGetPackageAssemblyPath(ArtifactSpecEntry artifact)
+    {
+        if (string.IsNullOrWhiteSpace(artifact.PackageId) ||
+            string.IsNullOrWhiteSpace(artifact.PackageVersion) ||
+            string.IsNullOrWhiteSpace(artifact.PackageAssemblyRelativePath))
+        {
+            throw new InvalidOperationException(
+                "Artifact spec package assembly resolution requires PackageId, PackageVersion, and PackageAssemblyRelativePath.");
+        }
+
+        var packageRoot = ResolveNuGetPackageRoot();
+        var packageIdDirectory = Path.Combine(packageRoot, artifact.PackageId!.Trim().ToLowerInvariant());
+        var packageVersionDirectory = ResolveNuGetPackageVersionDirectoryPath(packageIdDirectory, artifact.PackageVersion!.Trim());
+        var relativePath = NormalizePackageAssemblyRelativePath(artifact.PackageAssemblyRelativePath!);
+        var assemblyPath = Path.GetFullPath(Path.Combine(packageVersionDirectory, relativePath));
+        if (!IsPathWithinDirectory(assemblyPath, packageVersionDirectory))
+        {
+            throw new InvalidOperationException(
+                $"Artifact spec package assembly path '{artifact.PackageAssemblyRelativePath}' must stay within package '{artifact.PackageId} {artifact.PackageVersion}'.");
+        }
+
+        if (!File.Exists(assemblyPath))
+        {
+            throw new FileNotFoundException(
+                $"Artifact spec package assembly '{artifact.PackageId} {artifact.PackageVersion} {artifact.PackageAssemblyRelativePath}' was not found at '{assemblyPath}'.",
+                assemblyPath);
+        }
+
+        return assemblyPath;
+    }
+
+    private static string ResolveNuGetPackageVersionDirectoryPath(string packageIdDirectory, string packageVersion)
+    {
+        var exactDirectory = Path.Combine(packageIdDirectory, packageVersion.Trim().ToLowerInvariant());
+        if (Directory.Exists(exactDirectory))
+        {
+            return Path.GetFullPath(exactDirectory);
+        }
+
+        if (!Directory.Exists(packageIdDirectory))
+        {
+            throw new DirectoryNotFoundException(
+                $"NuGet package directory '{packageIdDirectory}' was not found.");
+        }
+
+        var normalizedRequestedVersion = NormalizeNuGetVersionIdentity(packageVersion);
+        foreach (var candidateDirectory in Directory.EnumerateDirectories(packageIdDirectory))
+        {
+            var candidateVersion = Path.GetFileName(candidateDirectory);
+            if (string.Equals(
+                NormalizeNuGetVersionIdentity(candidateVersion),
+                normalizedRequestedVersion,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return Path.GetFullPath(candidateDirectory);
+            }
+        }
+
+        throw new DirectoryNotFoundException(
+            $"NuGet package version directory for '{Path.GetFileName(packageIdDirectory)} {packageVersion}' was not found under '{packageIdDirectory}'.");
+    }
+
+    private static string NormalizePackageAssemblyRelativePath(string relativePath)
+    {
+        var normalizedPath = relativePath
+            .Trim()
+            .Replace('\\', Path.DirectorySeparatorChar)
+            .Replace('/', Path.DirectorySeparatorChar);
+        if (string.IsNullOrWhiteSpace(normalizedPath))
+        {
+            throw new InvalidOperationException("Artifact spec package assembly path cannot be empty.");
+        }
+
+        if (Path.IsPathRooted(normalizedPath))
+        {
+            throw new InvalidOperationException(
+                $"Artifact spec package assembly path '{relativePath}' must be a relative path.");
+        }
+
+        return normalizedPath;
+    }
+
+    private static bool IsPathWithinDirectory(string candidatePath, string directoryPath)
+    {
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var normalizedDirectoryPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directoryPath));
+        var normalizedCandidatePath = Path.GetFullPath(candidatePath);
+        return string.Equals(normalizedCandidatePath, normalizedDirectoryPath, comparison) ||
+            normalizedCandidatePath.StartsWith(normalizedDirectoryPath + Path.DirectorySeparatorChar, comparison);
+    }
+
+    private static string NormalizeNuGetVersionIdentity(string version)
+    {
+        var trimmed = version.Trim();
+        if (trimmed.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var metadataSeparatorIndex = trimmed.IndexOf('+');
+        if (metadataSeparatorIndex >= 0)
+        {
+            trimmed = trimmed[..metadataSeparatorIndex];
+        }
+
+        var prereleaseSeparatorIndex = trimmed.IndexOf('-');
+        var releasePart = prereleaseSeparatorIndex >= 0 ? trimmed[..prereleaseSeparatorIndex] : trimmed;
+        var prereleasePart = prereleaseSeparatorIndex >= 0 ? trimmed[(prereleaseSeparatorIndex + 1)..] : string.Empty;
+
+        var releaseSegments = releasePart
+            .Split('.', StringSplitOptions.RemoveEmptyEntries)
+            .Select(segment => int.TryParse(segment, out var numericSegment) ? numericSegment.ToString() : segment)
+            .ToList();
+        while (releaseSegments.Count > 1 && string.Equals(releaseSegments[^1], "0", StringComparison.Ordinal))
+        {
+            releaseSegments.RemoveAt(releaseSegments.Count - 1);
+        }
+
+        var normalizedRelease = releaseSegments.Count == 0 ? "0" : string.Join(".", releaseSegments);
+        if (prereleasePart.Length == 0)
+        {
+            return normalizedRelease;
+        }
+
+        return normalizedRelease + "-" + prereleasePart.ToLowerInvariant();
+    }
+
+    private static string ResolveNuGetPackageRoot()
+    {
+        var configuredRoot = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
+        if (!string.IsNullOrWhiteSpace(configuredRoot))
+        {
+            return Path.GetFullPath(configuredRoot.Trim());
+        }
+
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (string.IsNullOrWhiteSpace(userProfile))
+        {
+            throw new InvalidOperationException(
+                "Unable to resolve the NuGet package root because NUGET_PACKAGES is unset and the user profile directory is unavailable.");
+        }
+
+        return Path.Combine(userProfile, ".nuget", "packages");
     }
 
     private static string ReadRequiredValue(string[] args, ref int index, string option)
@@ -377,6 +556,12 @@ internal sealed class ArtifactSpecEntry
     public string? RuntimeAssemblyName { get; set; }
 
     public string[]? AssemblyPaths { get; set; }
+
+    public string? PackageId { get; set; }
+
+    public string? PackageVersion { get; set; }
+
+    public string? PackageAssemblyRelativePath { get; set; }
 
     public string[]? SymbolPrefixes { get; set; }
 

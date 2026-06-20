@@ -1022,6 +1022,24 @@ public static class KeyedCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void ImmutableCollectionHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Collections.Immutable.ImmutableList.Create<T>()",
+                "System.Collections.Immutable.ImmutableHashSet.Create<T>()",
+                "System.Collections.Immutable.ImmutableHashSet<T>.Count.get",
+                "System.Collections.Immutable.ImmutableHashSet<T>.IsEmpty.get",
+                "System.Collections.Immutable.ImmutableHashSet<T>.KeyComparer.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void MutableCollectionReadHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"

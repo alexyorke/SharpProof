@@ -4040,12 +4040,17 @@ public static class StringComparisonFixture
                 Assert.That(outputPath, Is.Not.Null.And.Not.Empty);
                 var fileName = Path.GetFileName(outputPath!);
                 Assert.That(fileName, Is.Not.Null.And.Not.Empty);
-                var runtimeAssemblyName = artifact.TryGetProperty("RuntimeAssemblyName", out var runtimeAssemblyNameElement) &&
+                var expectedAssemblyFileName =
+                    artifact.TryGetProperty("RuntimeAssemblyName", out var runtimeAssemblyNameElement) &&
                     runtimeAssemblyNameElement.ValueKind == JsonValueKind.String &&
                     !string.IsNullOrWhiteSpace(runtimeAssemblyNameElement.GetString())
                         ? runtimeAssemblyNameElement.GetString()!
-                        : defaultRuntimeAssemblyName!;
-                artifactAssemblyByFileName[fileName!] = runtimeAssemblyName;
+                        : artifact.TryGetProperty("PackageAssemblyRelativePath", out var packageAssemblyRelativePathElement) &&
+                          packageAssemblyRelativePathElement.ValueKind == JsonValueKind.String &&
+                          !string.IsNullOrWhiteSpace(packageAssemblyRelativePathElement.GetString())
+                            ? Path.GetFileName(packageAssemblyRelativePathElement.GetString()!)
+                            : defaultRuntimeAssemblyName!;
+                artifactAssemblyByFileName[fileName!] = expectedAssemblyFileName;
             }
 
             var checkedInSummaryPaths = Directory.GetFiles(analyzerDirectory, "*.EffectSummary.json", SearchOption.TopDirectoryOnly)
@@ -4168,6 +4173,134 @@ public static class StringComparisonFixture
                         "System.Environment.get_Is64BitProcess()",
                         StringComparison.Ordinal)),
                 Is.True);
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_Resolves_NuGetPackageAssembly()
+        {
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-artifact-package-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var outputPath = Path.Combine(workingDirectory, "ImmutableCollections.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Defaults = new
+                    {
+                        Framework = "net8.0",
+                        IncludeCallees = true,
+                        IncludePurityClassification = true,
+                        CompareManualCatalogs = true,
+                    },
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = outputPath,
+                            PackageId = "System.Collections.Immutable",
+                            PackageVersion = "9.0",
+                            PackageAssemblyRelativePath = "lib/net8.0/System.Collections.Immutable.dll",
+                            Limit = 40,
+                            SymbolPrefixes = new[]
+                            {
+                                "System.Collections.Immutable.ImmutableQueue`1.Enqueue",
+                                "System.Collections.Immutable.ImmutableQueue`1.Dequeue",
+                                "System.Collections.Immutable.ImmutableStack`1.Push",
+                                "System.Collections.Immutable.ImmutableStack`1.Pop",
+                            },
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
+
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+            var methods = summary.RootElement.GetProperty("Assemblies")[0].GetProperty("Methods").EnumerateArray().ToArray();
+
+            Assert.That(
+                Path.GetFileName(summary.RootElement.GetProperty("Assemblies")[0].GetProperty("AssemblyPath").GetString()),
+                Is.EqualTo("System.Collections.Immutable.dll"));
+            Assert.That(
+                methods.Any(method =>
+                    string.Equals(method.GetProperty("Symbol").GetString(), "System.Collections.Immutable.ImmutableQueue`1.Enqueue(!0)", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                methods.Any(method =>
+                    string.Equals(method.GetProperty("Symbol").GetString(), "System.Collections.Immutable.ImmutableQueue`1.Dequeue()", StringComparison.Ordinal) &&
+                    string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(), "impure", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                methods.Any(method =>
+                    string.Equals(method.GetProperty("Symbol").GetString(), "System.Collections.Immutable.ImmutableStack`1.Push(!0)", StringComparison.Ordinal) &&
+                    string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                methods.Any(method =>
+                    string.Equals(method.GetProperty("Symbol").GetString(), "System.Collections.Immutable.ImmutableStack`1.Pop()", StringComparison.Ordinal) &&
+                    string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(), "impure", StringComparison.Ordinal)),
+                Is.True);
+        }
+
+        [Test]
+        public void EffectSummaryTool_ArtifactSpec_Rejects_Rooted_NuGetPackageAssemblyPath()
+        {
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-artifact-package-rooted-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var outputPath = Path.Combine(workingDirectory, "ImmutableCollections.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            var rootedRelativePath = OperatingSystem.IsWindows()
+                ? "\\lib\\net8.0\\System.Collections.Immutable.dll"
+                : "/lib/net8.0/System.Collections.Immutable.dll";
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Defaults = new
+                    {
+                        Framework = "net8.0",
+                        IncludeCallees = true,
+                        IncludePurityClassification = true,
+                        CompareManualCatalogs = true,
+                    },
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = outputPath,
+                            PackageId = "System.Collections.Immutable",
+                            PackageVersion = "9.0.0",
+                            PackageAssemblyRelativePath = rootedRelativePath,
+                            Limit = 10,
+                            SymbolPrefixes = new[]
+                            {
+                                "System.Collections.Immutable.ImmutableQueue`1.Enqueue",
+                            },
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            File.WriteAllText(artifactSpecPath, artifactSpecJson);
+
+            Assert.That(
+                async () => await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath),
+                Throws.TypeOf<AssertionException>().With.Message.Contains("must be a relative path"));
         }
 
         [Test]

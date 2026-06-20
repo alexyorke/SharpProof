@@ -516,6 +516,22 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/ImmutableCollections.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/ImmutableCollections.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Collections.Immutable.dll",
+      "PackageId": "System.Collections.Immutable",
+      "PackageVersion": "9.0.0",
+      "PackageAssemblyRelativePath": "lib/net8.0/System.Collections.Immutable.dll",
+      "Limit": 80,
+      "SymbolPrefixes": [
+        "System.Collections.Immutable.ImmutableList.Create()",
+        "System.Collections.Immutable.ImmutableHashSet.Create()",
+        "System.Collections.Immutable.ImmutableHashSet`1.get_Count",
+        "System.Collections.Immutable.ImmutableHashSet`1.get_IsEmpty",
+        "System.Collections.Immutable.ImmutableHashSet`1.get_KeyComparer"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/StaticCache.Getters.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/StaticCache.Getters.PurelySharp.EffectSummary.json",
       "Limit": 40,

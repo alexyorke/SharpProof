@@ -4897,6 +4897,123 @@ public class TestClass
         }
 
         [Test]
+        public void GeneratedPurityCatalog_Resolves_ImmutableCollectionPureMembers()
+        {
+            const string source = @"
+using System.Collections.Immutable;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ImmutableList<int> CreateList()
+    {
+        return ImmutableList.Create<int>();
+    }
+
+    [EnforcePure]
+    public ImmutableHashSet<int> CreateSet()
+    {
+        return ImmutableHashSet.Create<int>();
+    }
+
+    [EnforcePure]
+    public int SetCount(ImmutableHashSet<int> set)
+    {
+        return set.Count;
+    }
+
+    [EnforcePure]
+    public bool SetIsEmpty(ImmutableHashSet<int> set)
+    {
+        return set.IsEmpty;
+    }
+
+    [EnforcePure]
+    public object? SetComparer(ImmutableHashSet<int> set)
+    {
+        return set.KeyComparer;
+    }
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+
+            var trackedMembers = new (string Key, IMethodSymbol Symbol)[]
+            {
+                (
+                    "ImmutableList.Create<int>()",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "ImmutableList.Create<int>()"))
+                        .Symbol!),
+                (
+                    "ImmutableHashSet.Create<int>()",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "ImmutableHashSet.Create<int>()"))
+                        .Symbol!),
+                (
+                    "set.Count",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "set.Count"))
+                        .Symbol!).GetMethod!),
+                (
+                    "set.IsEmpty",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "set.IsEmpty"))
+                        .Symbol!).GetMethod!),
+                (
+                    "set.KeyComparer",
+                    ((IPropertySymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<MemberAccessExpressionSyntax>()
+                            .Single(node => node.ToString() == "set.KeyComparer"))
+                        .Symbol!).GetMethod!),
+            };
+
+            var resolutions = trackedMembers.ToDictionary(
+                trackedMember => trackedMember.Key,
+                trackedMember =>
+                {
+                    var args = new object?[] { trackedMember.Symbol.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var entry = args[2]!;
+                    var classification = matched
+                        ? (string)entry.GetType().GetProperty("Classification")!.GetValue(entry)!
+                        : string.Empty;
+                    return (matched, classification);
+                },
+                StringComparer.Ordinal);
+
+            Assert.That(resolutions["ImmutableList.Create<int>()"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["ImmutableHashSet.Create<int>()"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["set.Count"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["set.IsEmpty"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["set.KeyComparer"], Is.EqualTo((true, "pure")));
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_EmailAddressAttributeConstructor()
         {
             const string source = @"
