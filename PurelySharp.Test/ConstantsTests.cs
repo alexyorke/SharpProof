@@ -2172,6 +2172,12 @@ public static class UriCatalogSignatureSamples
         }
 
         [Test]
+        public void MonitorExit_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Threading.Monitor.Exit(object)");
+        }
+
+        [Test]
         public void AppDomainFriendlyName_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.AppDomain.FriendlyName.get");

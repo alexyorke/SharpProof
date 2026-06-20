@@ -7430,6 +7430,30 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_MonitorExit_UsesNamespaceFallbackAfterMemberCatalogRemoval()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Threading;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(object gate)
+    {
+        Monitor.Exit(gate);
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("synchronization"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("known_impure_namespace_or_type"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Threading.Monitor.Exit"));
+        }
+
+        [Test]
         public async Task Ps0002_ImmutableQueueDequeue_UsesGeneratedPurityCatalogSource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

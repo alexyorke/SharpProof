@@ -310,7 +310,6 @@ public static class Constants
         "System.Threading.Interlocked.Exchange(ref long, long)",
         "System.Threading.Interlocked.Exchange(ref object, object)",
         "System.Threading.Monitor.Enter(object)",
-        "System.Threading.Monitor.Exit(object)",
         "System.Threading.Monitor.Pulse(object)",
         "System.Threading.Monitor.Wait(object)",
         "System.Threading.Mutex.ReleaseMutex()",

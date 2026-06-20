@@ -5259,8 +5259,8 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.AppContext.get_TargetFrameworkName()", "pure");
-            AssertEffectVisibilityClassification(summary, "System.AppContext.get_TargetFrameworkName()", "none");
+            AssertPurityClassification(summary, "System.AppContext.get_TargetFrameworkName()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.AppContext.get_TargetFrameworkName()", "caller_visible");
             AssertPurityClassification(summary, "System.AppContext.get_BaseDirectory()", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.AppContext.get_BaseDirectory()", "caller_visible");
             AssertPurityClassification(summary, "System.AppContext.GetData(string)", "impure", "global_state_read");
@@ -5282,6 +5282,7 @@ public static class DuplicateReviewedSeedFixture
 
             Assert.That(generatedSymbols, Is.EqualTo(new[]
             {
+                "System.AppContext.GetBaseDirectoryCore()",
                 "System.AppContext.GetData(string)",
                 "System.AppContext.SetData(string, object)",
                 "System.AppContext.SetSwitch(string, bool)",
@@ -5306,12 +5307,7 @@ public static class DuplicateReviewedSeedFixture
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
-            Assert.That(
-                catalogComparison.GetProperty("KnownImpureMembers")
-                    .EnumerateArray()
-                    .Select(entry => entry.GetProperty("Symbol").GetString())
-                    .ToArray(),
-                Is.EqualTo(new[] { "System.Threading.Monitor.Exit(object)" }));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             AssertPurityClassification(summary, "System.AppDomain.get_Id()", "pure");
