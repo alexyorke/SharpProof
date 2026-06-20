@@ -1060,6 +1060,32 @@ public static class KeyedCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void LinqToLookupHelpers_AreSourcedFromSemanticAnalysis_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownImpureMethods, Does.Not.Contain("System.Linq.Enumerable.ToLookup"));
+
+            var source = @"
+using System.Collections.Generic;
+using System.Linq;
+
+public static class LinqCatalogSignatureSamples
+{
+    public static void Sample(IEnumerable<string> values)
+    {
+        values.ToLookup(value => value.Length);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "LinqCatalogSignatureResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "values.ToLookup(value => value.Length)"));
+        }
+
+        [Test]
         public void MutableCollectionReadHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"

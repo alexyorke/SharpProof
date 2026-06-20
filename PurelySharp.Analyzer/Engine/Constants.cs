@@ -697,7 +697,6 @@ public static class Constants
         "System.IO.Stream.WriteAsync(byte[], int, int, System.Threading.CancellationToken)",
         "System.IO.StreamReader.StreamReader(string)",
         "System.IO.StreamWriter.StreamWriter(string)",
-        "System.Linq.Enumerable.ToLookup",
         "System.Text.StringBuilder.AppendJoin(string, object[])",
         "System.Threading.Monitor.TryEnter(object)",
 
