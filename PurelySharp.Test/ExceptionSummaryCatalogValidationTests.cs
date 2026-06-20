@@ -921,6 +921,54 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_ToolOutput_CatchFilterContradiction_DoesNotSuppressMetadataThrow()
+        {
+            const string boundarySource = """
+using System;
+
+public static class SummaryBoundary
+{
+    public static int ThrowFormat()
+    {
+        throw new FormatException();
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryContradictoryFilter", boundarySource);
+            var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int x)
+    {
+        try
+        {
+            return SummaryBoundary.ThrowFormat();
+        }
+        catch (FormatException) when (x != x)
+        {
+            return 1;
+        }
+    }
+}
+""",
+                summaryJson,
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            AssertEffectSummaryException(diagnostics, "TestMethod", "System.FormatException");
+            var siteDiagnostic = diagnostics.Single(d =>
+                d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId &&
+                d.GetMessage().Contains("SummaryBoundary.ThrowFormat()", StringComparison.Ordinal));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.FormatException"));
+            Assert.That(siteDiagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+        }
+
+        [Test]
         public async Task Ps0010_EffectSummary_ToolOutput_PropagatesMetadataRethrow()
         {
             const string boundarySource = """
@@ -1187,6 +1235,62 @@ public class TestClass
             var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId);
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+        }
+
+        [Test]
+        public async Task Ps0002_EffectSummary_WithTrustedGeneratedImpureClassification_AffineContradictoryGuard_SuppressesImpurity()
+        {
+            const string boundarySource = """
+public static class ImpureBoundary
+{
+    private static int _state;
+
+    public static int Next()
+    {
+        _state++;
+        return _state;
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("GeneratedImpureBoundaryAffineGuard", boundarySource);
+            var identity = GetAssemblyIdentity(fixture.AssemblyPath);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(int x)
+    {
+        if (x + 1 <= 0 && x >= 0)
+        {
+            return ImpureBoundary.Next();
+        }
+
+        return 0;
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "ImpureBoundary.Next()",
+                            "impure",
+                            """[ "global_state_write" ]"""))
+                },
+                ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath)));
+
+            Assert.That(
+                diagnostics.Any(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Contradictory affine guards should suppress generated-summary impurity diagnostics.");
         }
 
         [Test]
