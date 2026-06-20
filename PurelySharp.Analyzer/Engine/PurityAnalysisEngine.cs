@@ -2899,13 +2899,32 @@ namespace PurelySharp.Analyzer.Engine
         }
         internal static bool IsStrictPurityProfile => ImpurityCatalog.IsStrictPurityProfile;
 
-        internal static bool IsKnownPureBCLArrayFactoryOperation(IOperation? operation, out IMethodSymbol factoryMethod)
+        internal static bool IsArrayEmptyFactoryOperation(IOperation? operation, out IMethodSymbol factoryMethod)
         {
             var unwrappedOperation = SkipImplicitConversions(operation);
             if (unwrappedOperation is IInvocationOperation invocation &&
                 invocation.Type is IArrayTypeSymbol &&
-                !IsArrayEmptyFactory(invocation.TargetMethod.OriginalDefinition) &&
-                IsKnownPureBCLMember(invocation.TargetMethod.OriginalDefinition))
+                IsArrayEmptyFactory(invocation.TargetMethod.OriginalDefinition))
+            {
+                factoryMethod = invocation.TargetMethod;
+                return true;
+            }
+
+            factoryMethod = null!;
+            return false;
+        }
+
+        internal static bool IsTrustedFreshArrayFactoryOperation(
+            IOperation? operation,
+            Compilation compilation,
+            out IMethodSymbol factoryMethod)
+        {
+            var unwrappedOperation = SkipImplicitConversions(operation);
+            if (unwrappedOperation is IInvocationOperation invocation &&
+                invocation.Type is IArrayTypeSymbol &&
+                IsTrustedGeneratedFreshOwnedArrayReturningMember(
+                    invocation.TargetMethod.OriginalDefinition,
+                    compilation))
             {
                 factoryMethod = invocation.TargetMethod;
                 return true;
@@ -4217,7 +4236,7 @@ namespace PurelySharp.Analyzer.Engine
 
             if (unwrappedValue is IArrayCreationOperation ||
                 IsArrayCollectionExpressionOperation(unwrappedValue) ||
-                IsKnownPureBCLArrayFactoryOperation(unwrappedValue, out _))
+                IsTrustedFreshArrayFactoryOperation(unwrappedValue, compilation, out _))
             {
                 return true;
             }

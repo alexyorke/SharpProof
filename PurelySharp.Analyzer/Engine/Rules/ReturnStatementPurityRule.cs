@@ -54,7 +54,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value flows from trusted array-return source '{trustedArrayReturnSymbol.ToDisplayString()}'. Return statement is Pure.");
                     return valueResult;
                 }
-                else if (IsKnownPureArrayFactoryReturn(sourceReturnedValue, out var factoryMethod))
+                else if (IsKnownPureArrayFactoryReturn(sourceReturnedValue, context.SemanticModel.Compilation, out var factoryMethod))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes mutable array from known-pure factory '{factoryMethod.ToDisplayString()}'. Return statement is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -269,10 +269,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static bool IsKnownPureArrayFactoryReturn(
             IOperation? returnedValue,
+            Compilation compilation,
             out IMethodSymbol factoryMethod)
         {
             var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
-            if (PurityAnalysisEngine.IsKnownPureBCLArrayFactoryOperation(unwrappedReturnedValue, out factoryMethod))
+            if (PurityAnalysisEngine.IsArrayEmptyFactoryOperation(unwrappedReturnedValue, out factoryMethod) ||
+                PurityAnalysisEngine.IsTrustedFreshArrayFactoryOperation(unwrappedReturnedValue, compilation, out factoryMethod))
             {
                 return true;
             }
@@ -283,17 +285,18 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 {
                     return IsKnownPureArrayFactoryReturn(
                         conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
+                        compilation,
                         out factoryMethod);
                 }
 
-                return IsKnownPureArrayFactoryReturn(conditionalOperation.WhenTrue, out factoryMethod) ||
-                    IsKnownPureArrayFactoryReturn(conditionalOperation.WhenFalse, out factoryMethod);
+                return IsKnownPureArrayFactoryReturn(conditionalOperation.WhenTrue, compilation, out factoryMethod) ||
+                    IsKnownPureArrayFactoryReturn(conditionalOperation.WhenFalse, compilation, out factoryMethod);
             }
 
             if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
             {
-                return IsKnownPureArrayFactoryReturn(coalesceOperation.Value, out factoryMethod) ||
-                    IsKnownPureArrayFactoryReturn(coalesceOperation.WhenNull, out factoryMethod);
+                return IsKnownPureArrayFactoryReturn(coalesceOperation.Value, compilation, out factoryMethod) ||
+                    IsKnownPureArrayFactoryReturn(coalesceOperation.WhenNull, compilation, out factoryMethod);
             }
 
             factoryMethod = null!;
@@ -604,8 +607,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return currentState.IsOwnedLocalArraySymbol(localReference.Local);
             }
 
-            return PurityAnalysisEngine.IsKnownPureBCLArrayFactoryOperation(unwrappedSource, out var factoryMethod) &&
-                IsArrayEmptyFactory(factoryMethod);
+            return PurityAnalysisEngine.IsArrayEmptyFactoryOperation(unwrappedSource, out _);
         }
 
         private static bool IsMemoryExtensionsArrayAsSpan(IMethodSymbol methodSymbol)
@@ -678,7 +680,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     return true;
                 }
 
-                if (IsKnownPureArrayFactoryReturn(assignment.Value, out var factoryMethod))
+                if (IsKnownPureArrayFactoryReturn(assignment.Value, semanticModel.Compilation, out var factoryMethod))
                 {
                     escapeSyntax = assignment.Value.Syntax;
                     escapeSymbol = factoryMethod;
@@ -704,7 +706,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         return true;
                     }
 
-                    if (IsKnownPureArrayFactoryReturn(argument.Value, out var factoryMethod))
+                    if (IsKnownPureArrayFactoryReturn(argument.Value, semanticModel.Compilation, out var factoryMethod))
                     {
                         escapeSyntax = argument.Value.Syntax;
                         escapeSymbol = factoryMethod;

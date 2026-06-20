@@ -3857,7 +3857,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             var originalDefinition = invocationOperation.TargetMethod.OriginalDefinition;
             return PurityAnalysisEngine.IsKnownFreshOwnedArrayReturningMember(originalDefinition, compilation) ||
-                PurityAnalysisEngine.IsKnownPureBCLArrayFactoryOperation(unwrappedSource, out _);
+                PurityAnalysisEngine.IsTrustedFreshArrayFactoryOperation(unwrappedSource, compilation, out _);
         }
 
         private static IEnumerable<IMethodSymbol> EnumerateComparerImplementations(ITypeSymbol comparerType)
