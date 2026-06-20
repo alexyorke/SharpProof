@@ -338,7 +338,7 @@ internal static class PurityClassificationEngine
                     continue;
                 }
 
-                if (TryClassifyUnresolvedInteropBoundaryCall(call, out var unresolvedInteropCategory))
+                if (TryClassifyUnresolvedInteropBoundaryCall(summary, call, out var unresolvedInteropCategory))
                 {
                     impureCategories.Add(unresolvedInteropCategory);
                     if (blockingCallChain.Length == 0)
@@ -1950,8 +1950,17 @@ internal static class PurityClassificationEngine
             EffectVisibilityClassification: entry.EffectVisibilityClassification);
     }
 
-    private static bool TryClassifyUnresolvedInteropBoundaryCall(string callSymbol, out string category)
+    private static bool TryClassifyUnresolvedInteropBoundaryCall(
+        MethodEffectSummary callerSummary,
+        string callSymbol,
+        out string category)
     {
+        if (IsInteropLastErrorBookkeepingCall(callerSummary, callSymbol))
+        {
+            category = string.Empty;
+            return false;
+        }
+
         if (callSymbol.StartsWith("Interop+", StringComparison.Ordinal) ||
             callSymbol.StartsWith("Internal.Win32.", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.InteropServices.NativeLibrary.", StringComparison.Ordinal) ||
@@ -2202,7 +2211,7 @@ internal static class PurityClassificationEngine
 
             if (!TryResolveCallSummary(call, bySymbol, out var resolvedCallKey, out var resolvedCallSummary))
             {
-                if (TryClassifyUnresolvedInteropBoundaryCall(call, out _))
+                if (TryClassifyUnresolvedInteropBoundaryCall(summary, call, out _))
                 {
                     compatibilityVisiting.Remove(symbol);
                     return false;
@@ -2344,7 +2353,7 @@ internal static class PurityClassificationEngine
 
             if (!TryResolveCallSummary(call, bySymbol, out var resolvedCallKey, out var resolvedCallSummary))
             {
-                if (TryClassifyUnresolvedInteropBoundaryCall(call, out _))
+                if (TryClassifyUnresolvedInteropBoundaryCall(summary, call, out _))
                 {
                     compatibilityVisiting.Remove(symbol);
                     return false;

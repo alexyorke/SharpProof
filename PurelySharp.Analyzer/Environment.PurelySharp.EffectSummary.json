@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-20T21:07:57.934517+00:00",
+  "GeneratedAtUtc": "2026-06-20T21:17:15.2612587+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -8,7 +8,7 @@
       "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
       "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
       "MethodCount": 34519,
-      "EmittedMethodCount": 100,
+      "EmittedMethodCount": 99,
       "Methods": [
         {
           "Symbol": "Interop\u002BKernel32.ExpandEnvironmentStrings(string, ref char, uint)",
@@ -3805,39 +3805,6 @@
           }
         },
         {
-          "Symbol": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)",
-          "ExactSymbolKey": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
-          "MetadataToken": "0x0600096D",
-          "RelativeVirtualAddress": 6879252,
-          "MethodBodySha256": "b2acfe61d667747d959e76c932b715aa36165cc356b1eddc87687a6e295e5310",
-          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600096D|il:b2acfe61d667747d959e76c932b715aa36165cc356b1eddc87687a6e295e5310",
-          "Effects": [
-            "reads_instance_field"
-          ],
-          "RootCandidates": [],
-          "TransitiveRootCandidates": [],
-          "ThrownExceptionTypes": [],
-          "TransitiveThrownExceptionTypes": [],
-          "ThrownExceptionSourcePaths": [],
-          "TransitiveThrownExceptionSourcePaths": [],
-          "Calls": [],
-          "Fields": [
-            "System.RuntimeTypeHandle.m_type"
-          ],
-          "CallSites": [],
-          "TransitiveThrownExceptionEdges": [],
-          "PurityClassification": {
-            "Classification": "pure",
-            "Categories": [],
-            "FirstBlockingCallChain": [],
-            "HasFreshArrayAllocationEvidence": false,
-            "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
-            "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "none"
-          }
-        },
-        {
           "Symbol": "System.Type.get_Assembly()",
           "ExactSymbolKey": "System.Type.get_Assembly()-\u003ESystem.Reflection.Assembly",
           "MetadataToken": "0x06000974",
@@ -6332,8 +6299,8 @@
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 100,
-    "PureCount": 24,
+    "MethodCount": 99,
+    "PureCount": 23,
     "ImpureCount": 64,
     "ConservativeUnknownCount": 12,
     "CatalogComparison": {
@@ -8571,26 +8538,6 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x06003613",
         "MethodBodySha256": "2c15814d10bb90e676165f8befaca316cb3a44466d51174a5f64125925b28577",
-        "Classification": "pure",
-        "PrimaryCategory": "generated_purity_summary",
-        "Categories": [],
-        "FirstBlockingCallChain": [],
-        "HasFreshArrayAllocationEvidence": false,
-        "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
-        "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "none"
-      },
-      {
-        "Symbol": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)",
-        "ExactSymbolKey": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
-        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600096D|il:b2acfe61d667747d959e76c932b715aa36165cc356b1eddc87687a6e295e5310",
-        "AssemblyName": "System.Private.CoreLib",
-        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
-        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
-        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
-        "MetadataToken": "0x0600096D",
-        "MethodBodySha256": "b2acfe61d667747d959e76c932b715aa36165cc356b1eddc87687a6e295e5310",
         "Classification": "pure",
         "PrimaryCategory": "generated_purity_summary",
         "Categories": [],
