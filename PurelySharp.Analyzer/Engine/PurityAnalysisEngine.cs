@@ -4440,26 +4440,34 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
+            if (IsInvariantCultureDeterministicParseInvocation(invocationOperation))
+            {
+                return false;
+            }
+
             if (targetMethod.Name == "Parse" &&
-                invocationOperation.Arguments.Length == 1 &&
+                invocationOperation.Arguments.Length >= 1 &&
                 IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type))
             {
-                return true;
+                return invocationOperation.Arguments.Length == 1 ||
+                    HasFormatProviderParameter(targetMethod);
             }
 
             if (targetMethod.Name == "TryParse" &&
-                invocationOperation.Arguments.Length == 2 &&
+                invocationOperation.Arguments.Length >= 2 &&
                 IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type))
             {
-                return true;
+                return invocationOperation.Arguments.Length == 2 ||
+                    HasFormatProviderParameter(targetMethod);
             }
 
             if ((targetMethod.Name == "ParseExact" || targetMethod.Name == "TryParseExact") &&
-                IsDateOnlyOrTimeOnlyType(targetMethod.ContainingType) &&
                 IsStringOrReadOnlySpanOfChar(targetMethod.Parameters[0].Type) &&
                 IsFormatSpecifierType(targetMethod.Parameters[1].Type))
             {
-                return invocationOperation.Arguments.Length == (targetMethod.Name == "ParseExact" ? 2 : 3);
+                return HasFormatProviderParameter(targetMethod) ||
+                    IsDateOnlyOrTimeOnlyType(targetMethod.ContainingType) &&
+                    invocationOperation.Arguments.Length == (targetMethod.Name == "ParseExact" ? 2 : 3);
             }
 
             if (targetMethod.Name == "ToString" &&
@@ -4520,6 +4528,20 @@ namespace PurelySharp.Analyzer.Engine
                 IsReadOnlySpanOfChar(typeSymbol) ||
                 typeSymbol is IArrayTypeSymbol arrayType &&
                 arrayType.ElementType.SpecialType == SpecialType.System_String;
+        }
+
+        private static bool HasFormatProviderParameter(IMethodSymbol methodSymbol)
+        {
+            foreach (var parameter in methodSymbol.Parameters)
+            {
+                if (parameter.Type.Name == "IFormatProvider" &&
+                    parameter.Type.ContainingNamespace?.ToDisplayString() == "System")
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsTimeOnlyInvariantCultureParseInvocation(IInvocationOperation invocationOperation)
