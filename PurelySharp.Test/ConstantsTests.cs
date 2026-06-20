@@ -1245,6 +1245,35 @@ public static class StaticCacheGetterCatalogSignatureSamples
         }
 
         [Test]
+        public void TaskWrappers_AreNotSourcedFromStaticCatalogs()
+        {
+            var source = @"
+using System.Threading.Tasks;
+
+public static class TaskWrapperCatalogSignatureSamples
+{
+    public static Task<int> FromResult()
+    {
+        return Task.FromResult(42);
+    }
+
+    public static Task<int> AsTask()
+    {
+        return new ValueTask<int>(42).AsTask();
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "TaskWrapperCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Task.FromResult(42)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "new ValueTask<int>(42).AsTask()"));
+        }
+
+        [Test]
         public void CancellationTokenNone_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"

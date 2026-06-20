@@ -802,8 +802,6 @@ public static class Constants
         "System.StringComparer.Ordinal.Equals(string, string)",
 
 
-        "System.Threading.Tasks.Task.FromResult<TResult>(TResult)",
-
         "System.Type.Equals(object)",
         "System.Type.Equals(System.Type)",
         "System.Type.GetHashCode()",
@@ -827,7 +825,6 @@ public static class Constants
         "System.Numerics.Plane.Normalize(System.Numerics.Plane)",
         "System.Reflection.Emit.Label.Equals(object)",
         "System.Threading.Tasks.ValueTask<TResult>.ValueTask(TResult)",
-        "System.Threading.Tasks.ValueTask.AsTask()",
         "System.IO.Hashing.Crc32.Hash(System.ReadOnlySpan<byte>)",
         "System.Runtime.InteropServices.MemoryMarshal.Read<T>(System.ReadOnlySpan<byte>)",
         "System.HashCode.Combine<T1, T2>(T1, T2)",

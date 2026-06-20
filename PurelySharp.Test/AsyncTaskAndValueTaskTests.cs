@@ -34,7 +34,7 @@ namespace TestNamespace
         }
 
         [Test]
-        public async Task Task_FromResult_NoDiagnostic()
+        public async Task Task_FromResult_Diagnostic()
         {
             var test = @"
 using System.Threading.Tasks;
@@ -45,9 +45,30 @@ namespace TestNamespace
     public class TestClass
     {
         [EnforcePure]
-        public Task<int> PureMethod()
+        public Task<int> {|PS0002:PureMethod|}()
         {
             return Task.FromResult(42);
+        }
+    }
+}";
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ValueTask_AsTask_Diagnostic()
+        {
+            var test = @"
+using System.Threading.Tasks;
+using PurelySharp.Attributes;
+
+namespace TestNamespace
+{
+    public class TestClass
+    {
+        [EnforcePure]
+        public Task<int> {|PS0002:PureMethod|}()
+        {
+            return new ValueTask<int>(42).AsTask();
         }
     }
 }";
@@ -98,7 +119,7 @@ namespace TestNamespace
         }
 
         [Test]
-        public async Task ConditionalReturn_NoDiagnostic()
+        public async Task ConditionalReturn_Diagnostic()
         {
             var test = @"
 using System.Threading.Tasks;
@@ -109,7 +130,7 @@ namespace TestNamespace
     public class TestClass
     {
         [EnforcePure]
-        public async Task<int> PureMethod(bool condition)
+        public async Task<int> {|PS0002:PureMethod|}(bool condition)
         {
             if (condition)
             {

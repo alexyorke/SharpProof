@@ -74,7 +74,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task AsyncAwait_NoDiagnostic()
+        public async Task AsyncAwait_Diagnostic()
         {
             var test = @"
 using System;
@@ -86,9 +86,9 @@ using System.Threading.Tasks;
 public class TestClass
 {
     [EnforcePure]
-    public async Task<int> TestMethod()
+    public async Task<int> {|PS0002:TestMethod|}()
     {
-        // Task.FromResult is treated as a deterministic completed task wrapper.
+        // Task.FromResult now follows reviewed runtime evidence.
         return await Task.FromResult(42);
     }
 }";

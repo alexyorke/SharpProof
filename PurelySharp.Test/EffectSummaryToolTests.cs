@@ -1348,6 +1348,9 @@ public static class StringComparisonFixture
             Assert.That(
                 (string)normalizeMethod.Invoke(null, new object[] { "System.Threading.Tasks.Task.FromResult<TResult>(TResult)" })!,
                 Is.EqualTo("System.Threading.Tasks.Task.FromResult(!!0)"));
+            Assert.That(
+                (string)normalizeMethod.Invoke(null, new object[] { "System.Threading.Tasks.ValueTask.AsTask()" })!,
+                Is.EqualTo("System.Threading.Tasks.ValueTask.AsTask()"));
 
             Assert.That(
                 (string)comparisonKeyMethod.Invoke(null, new object[] { "System.Environment.OSVersion.get" })!,
@@ -1358,6 +1361,9 @@ public static class StringComparisonFixture
             Assert.That(
                 (string)comparisonKeyMethod.Invoke(null, new object[] { "System.Collections.Immutable.ImmutableList<T>.this[int].get" })!,
                 Is.EqualTo((string)comparisonKeyMethod.Invoke(null, new object[] { "System.Collections.Immutable.ImmutableList`1.get_Item(int)" })!));
+            Assert.That(
+                (string)comparisonKeyMethod.Invoke(null, new object[] { "System.Threading.Tasks.ValueTask.AsTask()" })!,
+                Is.EqualTo("System.Threading.Tasks.ValueTask.AsTask()"));
         }
 
         [Test]
@@ -7197,8 +7203,9 @@ public static class DuplicateReviewedSeedFixture
                 "System.Linq.Enumerable.Any(");
             using var taskSummary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
-                20,
-                "System.Threading.Tasks.Task.FromResult(");
+                40,
+                "System.Threading.Tasks.Task.FromResult(",
+                "System.Threading.Tasks.ValueTask.AsTask");
 
             var enumerableKnownPureRow = enumerableSummary.RootElement
                 .GetProperty("PurityReport")
@@ -7221,26 +7228,39 @@ public static class DuplicateReviewedSeedFixture
                 Is.True,
                 "Enumerable.Any<TSource> should match a runtime exact key that uses method generic ordinals.");
 
-            var taskKnownPureRow = taskSummary.RootElement
+            var taskKnownPureRows = taskSummary.RootElement
                 .GetProperty("PurityReport")
                 .GetProperty("CatalogComparison")
                 .GetProperty("KnownPureMembers")
                 .EnumerateArray()
-                .Single(row => string.Equals(
-                    row.GetProperty("Symbol").GetString(),
-                    "System.Threading.Tasks.Task.FromResult<TResult>(TResult)",
-                    StringComparison.Ordinal));
-            var taskMatchedKeys = taskKnownPureRow
-                .GetProperty("MatchedExactSymbolKeys")
+                .Where(row => row.GetProperty("Symbol").GetString() is string symbol &&
+                    (string.Equals(symbol, "System.Threading.Tasks.Task.FromResult<TResult>(TResult)", StringComparison.Ordinal) ||
+                     string.Equals(symbol, "System.Threading.Tasks.ValueTask.AsTask()", StringComparison.Ordinal)))
+                .ToArray();
+            var generatedEntries = taskSummary.RootElement
+                .GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
                 .EnumerateArray()
-                .Select(static value => value.GetString())
-                .OfType<string>()
+                .Where(entry => entry.GetProperty("Symbol").GetString() is string symbol &&
+                    (string.Equals(symbol, "System.Threading.Tasks.Task.FromResult(!!0)", StringComparison.Ordinal) ||
+                     string.Equals(symbol, "System.Threading.Tasks.ValueTask.AsTask()", StringComparison.Ordinal)))
                 .ToArray();
 
-            Assert.That(
-                taskMatchedKeys.Any(static key => key.Contains("!!0", StringComparison.Ordinal)),
-                Is.True,
-                "Task.FromResult<TResult> should match a runtime exact key that uses method generic ordinals.");
+            Assert.That(taskKnownPureRows, Is.Empty);
+            Assert.That(generatedEntries.Select(entry => entry.GetProperty("Symbol").GetString()), Is.EquivalentTo(new[]
+            {
+                "System.Threading.Tasks.Task.FromResult(!!0)",
+                "System.Threading.Tasks.ValueTask.AsTask()",
+            }));
+            Assert.That(generatedEntries.Select(entry => entry.GetProperty("ExactSymbolKey").GetString()), Is.EquivalentTo(new[]
+            {
+                "System.Threading.Tasks.Task.FromResult(!!0)->System.Threading.Tasks.Task`1<!!0>",
+                "System.Threading.Tasks.ValueTask.AsTask()->System.Threading.Tasks.Task",
+            }));
+            AssertPurityClassification(taskSummary, "System.Threading.Tasks.Task.FromResult(!!0)", "impure", "caller_visible_memory_write", "global_state_read");
+            AssertEffectVisibilityClassification(taskSummary, "System.Threading.Tasks.Task.FromResult(!!0)", "caller_visible");
+            AssertPurityClassification(taskSummary, "System.Threading.Tasks.ValueTask.AsTask()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(taskSummary, "System.Threading.Tasks.ValueTask.AsTask()", "caller_visible");
         }
 
         [Test]

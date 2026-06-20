@@ -19,7 +19,7 @@ namespace PurelySharp.Test
 public sealed class EnforcePureAttribute : System.Attribute { }";
 
         [Test]
-        public async Task PureAsyncMethod_NoDiagnostic()
+        public async Task PureAsyncMethod_Diagnostic()
         {
             var test = @"
 using System;
@@ -29,14 +29,12 @@ using System.Threading.Tasks;
 public class TestClass
 {
     [EnforcePure]
-    public async Task<int> PureAsyncMethod()
+    public async Task<int> {|PS0002:PureAsyncMethod|}()
     {
-        // Task.FromResult is pure
+        // Task.FromResult now follows reviewed runtime evidence.
         return await Task.FromResult(42);
     }
 }";
-
-
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
 

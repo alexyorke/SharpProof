@@ -13,7 +13,7 @@ namespace PurelySharp.Test
     public class ComprehensiveAsyncTests
     {
         [Test]
-    public async Task PureAsyncMethod_WithFromResult_NoDiagnostic()
+    public async Task PureAsyncMethod_WithFromResult_Diagnostic()
         {
             var test = @"
 using System;
@@ -23,7 +23,7 @@ using System.Threading.Tasks;
 class Program
 {
     [EnforcePure]
-    public async Task<int> PureAsyncMethod()
+    public async Task<int> {|PS0002:PureAsyncMethod|}()
     {
         return await Task.FromResult(42);
     }
@@ -120,7 +120,7 @@ class Program
         }
 
         [Test]
-    public async Task AsyncMethod_AwaitingPureMethod_NoDiagnostic()
+    public async Task AsyncMethod_AwaitingImpureHelper_Diagnostic()
         {
             var test = @"
 using System;
@@ -130,15 +130,15 @@ using System.Threading.Tasks;
 class Program
 {
     [EnforcePure]
-    public async Task<int> Helper()
+    public async Task<int> {|PS0002:Helper|}()
     {
         return await Task.FromResult(42);
     }
 
     [EnforcePure]
-    public async Task<int> PureAsyncMethod()
+    public async Task<int> {|PS0002:PureAsyncMethod|}()
     {
-        return await Helper(); // Awaiting another pure method
+        return await Helper();
     }
 }";
 
@@ -219,7 +219,7 @@ class Program
         }
 
         [Test]
-    public async Task AsyncMethod_ConditionalAwait_NoDiagnostic()
+    public async Task AsyncMethod_ConditionalAwait_Diagnostic()
         {
             var test = @"
 using System;
@@ -229,7 +229,7 @@ using System.Threading.Tasks;
 class Program
 {
     [EnforcePure]
-    public async Task<int> PureAsyncMethod(bool condition)
+    public async Task<int> {|PS0002:PureAsyncMethod|}(bool condition)
     {
         if (condition)
         {

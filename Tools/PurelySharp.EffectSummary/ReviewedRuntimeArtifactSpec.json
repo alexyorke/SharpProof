@@ -551,6 +551,14 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Task.Wrappers.PurelySharp.EffectSummary.json",
+      "Limit": 40,
+      "SymbolPrefixes": [
+        "System.Threading.Tasks.Task.FromResult(",
+        "System.Threading.Tasks.ValueTask.AsTask"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/CancellationToken.None.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/CancellationToken.None.PurelySharp.EffectSummary.json",
       "Limit": 10,
