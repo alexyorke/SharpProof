@@ -1,0 +1,5 @@
+<Project>
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)..\analyzers\dotnet\cs\*.PurelySharp.EffectSummary.json" />
+  </ItemGroup>
+</Project>

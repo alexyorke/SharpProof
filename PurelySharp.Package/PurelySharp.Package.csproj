@@ -34,6 +34,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="buildTransitive\PurelySharp.targets" Pack="true" PackagePath="buildTransitive\PurelySharp.targets" />
     <None Update="tools\*.ps1" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="tools\%(Filename)%(Extension)" />
     <None Include="..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>

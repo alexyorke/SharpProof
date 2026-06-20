@@ -112,7 +112,10 @@ namespace TestNamespace {
             var projectPath = Path.Combine(FindRepositoryRoot(), "PurelySharp.Package", "PurelySharp.Package.csproj");
             var document = XDocument.Load(projectPath);
             var packageFiles = document
-                .Descendants("TfmSpecificPackageFile")
+                .Descendants()
+                .Where(element =>
+                    string.Equals(element.Name.LocalName, "TfmSpecificPackageFile", StringComparison.Ordinal) ||
+                    string.Equals(element.Name.LocalName, "None", StringComparison.Ordinal))
                 .Select(element => new
                 {
                     Include = element.Attribute("Include")?.Value ?? string.Empty,
@@ -144,6 +147,29 @@ namespace TestNamespace {
                 file.Include.EndsWith("*.PurelySharp.EffectSummary.json", StringComparison.Ordinal) &&
                 file.PackagePath == "analyzers/dotnet/cs"), Is.True,
                 "All domain-specific generated purity artifacts must be packed next to the analyzer, not just the root summary file.");
+
+            Assert.That(packageFiles.Any(file =>
+                file.Include.EndsWith("buildTransitive\\PurelySharp.targets", StringComparison.Ordinal) &&
+                file.PackagePath == "buildTransitive\\PurelySharp.targets"), Is.True,
+                "The package must ship a buildTransitive targets file so generated summaries flow into consumer AdditionalFiles.");
+        }
+
+        [Test]
+        public void PackageBuildTransitiveTargets_ShouldExposeGeneratedEffectSummariesAsAdditionalFiles()
+        {
+            var targetsPath = Path.Combine(FindRepositoryRoot(), "PurelySharp.Package", "buildTransitive", "PurelySharp.targets");
+            var document = XDocument.Load(targetsPath);
+
+            var additionalFiles = document
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "AdditionalFiles", StringComparison.Ordinal))
+                .Select(element => element.Attribute("Include")?.Value ?? string.Empty)
+                .ToArray();
+
+            Assert.That(additionalFiles, Is.Not.Empty,
+                "The buildTransitive targets file should contribute generated summaries as AdditionalFiles.");
+            Assert.That(additionalFiles, Has.Some.EqualTo("$(MSBuildThisFileDirectory)..\\analyzers\\dotnet\\cs\\*.PurelySharp.EffectSummary.json"),
+                "The buildTransitive targets file should surface analyzer-side summary JSONs from the packed analyzers directory.");
         }
 
         [Test]
