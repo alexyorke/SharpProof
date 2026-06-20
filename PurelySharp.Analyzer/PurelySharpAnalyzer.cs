@@ -53,9 +53,11 @@ namespace PurelySharp.Analyzer
                         ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(c, config.ReportExceptions, exceptionSummaryCatalog);
                     }
                 },
+                    SyntaxKind.AddAccessorDeclaration,
                     SyntaxKind.MethodDeclaration,
                     SyntaxKind.GetAccessorDeclaration,
                     SyntaxKind.InitAccessorDeclaration,
+                    SyntaxKind.RemoveAccessorDeclaration,
                     SyntaxKind.SetAccessorDeclaration,
                     SyntaxKind.ConstructorDeclaration,
                     SyntaxKind.ConversionOperatorDeclaration,

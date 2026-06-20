@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using NUnit.Framework;
+using PurelySharp.Analyzer;
 using VerifyCS = PurelySharp.Test.CSharpAnalyzerVerifier<
     PurelySharp.Analyzer.PurelySharpAnalyzer>;
 
@@ -151,7 +152,11 @@ public sealed class TestClass
     }
 }";
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            var expectedRemoveChanged = VerifyCS.Diagnostic(PurelySharpDiagnostics.MissingEnforcePureAttributeId)
+                .WithSpan(13, 9, 13, 15)
+                .WithArguments("remove_Changed");
+
+            await VerifyCS.VerifyAnalyzerAsync(test, expectedRemoveChanged);
         }
 
         [Test]
