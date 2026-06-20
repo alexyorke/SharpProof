@@ -2328,9 +2328,11 @@ public static class TypeMetadataCatalogSignatureSamples
 {
     public static MethodBase? DeclaringMethod(Type type) => type.DeclaringMethod;
     public static Type? DeclaringType(Type type) => type.DeclaringType;
+    public static bool IsContextful(Type type) => type.IsContextful;
     public static bool IsGenericType(Type type) => type.IsGenericType;
     public static bool IsGenericTypeDefinition(Type type) => type.IsGenericTypeDefinition;
     public static bool IsGenericParameter(Type type) => type.IsGenericParameter;
+    public static bool IsMarshalByRef(Type type) => type.IsMarshalByRef;
     public static MemberTypes MemberType(Type type) => type.MemberType;
     public static Type? ReflectedType(Type type) => type.ReflectedType;
 }";
@@ -2346,9 +2348,11 @@ public static class TypeMetadataCatalogSignatureSamples
             {
                 ("type.DeclaringMethod", "System.Type.DeclaringMethod.get"),
                 ("type.DeclaringType", "System.Type.DeclaringType.get"),
+                ("type.IsContextful", "System.Type.IsContextful.get"),
                 ("type.IsGenericType", "System.Type.IsGenericType.get"),
                 ("type.IsGenericTypeDefinition", "System.Type.IsGenericTypeDefinition.get"),
                 ("type.IsGenericParameter", "System.Type.IsGenericParameter.get"),
+                ("type.IsMarshalByRef", "System.Type.IsMarshalByRef.get"),
                 ("type.MemberType", "System.Type.MemberType.get"),
                 ("type.ReflectedType", "System.Type.ReflectedType.get"),
             };
