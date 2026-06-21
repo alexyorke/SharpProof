@@ -14,22 +14,25 @@ if (-not $root -or $root -eq "") {
     $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 }
 
+. (Join-Path $root "scripts\JobObjectHelpers.ps1")
+
+function Invoke-DotnetInRepo([string[]]$Arguments, [int]$MemoryLimitMb = 0) {
+    $exitCode = Invoke-ProcessUnderJobObject -FilePath "dotnet" -ArgumentList $Arguments -MemoryLimitMb $MemoryLimitMb -WorkingDirectory $root
+    if ($exitCode -ne 0) {
+        throw "dotnet $($Arguments -join ' ') failed with exit code $exitCode"
+    }
+}
+
 Write-Section "Changing directory to repo root: $root"
 Set-Location -Path $root -ErrorAction Stop
 
 Write-Section "Restoring packages"
-dotnet restore
-if ($LASTEXITCODE -ne 0) { throw "dotnet restore failed with exit code $LASTEXITCODE" }
+Invoke-DotnetInRepo @("restore")
 
 Write-Section "Building non-VSIX projects ($Configuration)"
-dotnet build .\PurelySharp.Attributes\PurelySharp.Attributes.csproj -c $Configuration
-if ($LASTEXITCODE -ne 0) { throw "dotnet build Attributes failed with exit code $LASTEXITCODE" }
-
-dotnet build .\PurelySharp.Analyzer\PurelySharp.Analyzer.csproj -c $Configuration
-if ($LASTEXITCODE -ne 0) { throw "dotnet build Analyzer failed with exit code $LASTEXITCODE" }
-
-dotnet build .\PurelySharp.CodeFixes\PurelySharp.CodeFixes.csproj -c $Configuration
-if ($LASTEXITCODE -ne 0) { throw "dotnet build CodeFixes failed with exit code $LASTEXITCODE" }
+Invoke-DotnetInRepo @("build", ".\PurelySharp.Attributes\PurelySharp.Attributes.csproj", "-c", $Configuration)
+Invoke-DotnetInRepo @("build", ".\PurelySharp.Analyzer\PurelySharp.Analyzer.csproj", "-c", $Configuration)
+Invoke-DotnetInRepo @("build", ".\PurelySharp.CodeFixes\PurelySharp.CodeFixes.csproj", "-c", $Configuration)
 
 $vsixDir = Join-Path $root "PurelySharp.Vsix\bin\$Configuration"
 $nugetOutputDir = Join-Path $root "artifacts\nuget"
@@ -79,11 +82,8 @@ if (-not $vsix) {
 Write-Section "Packing NuGet packages"
 Get-ChildItem -Path $nugetOutputDir -Filter *.nupkg -File -ErrorAction SilentlyContinue | Remove-Item -Force
 
-dotnet pack .\PurelySharp.Package\PurelySharp.Package.csproj -c $Configuration -o $nugetOutputDir
-if ($LASTEXITCODE -ne 0) { throw "dotnet pack PurelySharp failed with exit code $LASTEXITCODE" }
-
-dotnet pack .\PurelySharp.Attributes\PurelySharp.Attributes.csproj -c $Configuration -o $nugetOutputDir
-if ($LASTEXITCODE -ne 0) { throw "dotnet pack PurelySharp.Attributes failed with exit code $LASTEXITCODE" }
+Invoke-DotnetInRepo @("pack", ".\PurelySharp.Package\PurelySharp.Package.csproj", "-c", $Configuration, "-o", $nugetOutputDir)
+Invoke-DotnetInRepo @("pack", ".\PurelySharp.Attributes\PurelySharp.Attributes.csproj", "-c", $Configuration, "-o", $nugetOutputDir)
 
 $nupkgs = Get-ChildItem -Path $nugetOutputDir -Filter *.nupkg -File -ErrorAction Stop | Sort-Object Name
 

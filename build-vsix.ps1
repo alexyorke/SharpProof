@@ -6,6 +6,15 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path (Split-Path -Parent $PSCommandPath) 'scripts\JobObjectHelpers.ps1')
+
+function Invoke-DotnetInRepo([string[]]$Arguments, [int]$MemoryLimitMb = 0) {
+    $exitCode = Invoke-ProcessUnderJobObject -FilePath 'dotnet' -ArgumentList $Arguments -MemoryLimitMb $MemoryLimitMb -WorkingDirectory $repoRoot
+    if ($exitCode -ne 0) {
+        throw "dotnet $($Arguments -join ' ') failed with exit code $exitCode"
+    }
+}
+
 function Find-MSBuild {
     $pf86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
     $vswhere = Join-Path $pf86 'Microsoft Visual Studio\Installer\vswhere.exe'
@@ -46,7 +55,7 @@ if ($RunHarness) {
         throw "Harness project not found: $harnessProj"
     }
     Write-Host "Running harness against VSIX..." -ForegroundColor Cyan
-    dotnet run --project $harnessProj -c $Configuration -- "$vsix" | Out-Host
+    Invoke-DotnetInRepo @('run', '--project', $harnessProj, '-c', $Configuration, '--', $vsix)
 }
 
 

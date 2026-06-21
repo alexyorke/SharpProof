@@ -1,0 +1,180 @@
+[CmdletBinding()]
+param()
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+function Initialize-PurelySharpJobObjectInterop {
+    if ('PurelySharp.JobObjectNative' -as [type]) {
+        return
+    }
+
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+namespace PurelySharp
+{
+    public static class JobObjectNative
+    {
+        public const int JobObjectExtendedLimitInformation = 9;
+
+        [Flags]
+        public enum JobObjectLimitFlags : uint
+        {
+            JobMemory = 0x00000200,
+            KillOnJobClose = 0x00002000
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct IO_COUNTERS
+        {
+            public ulong ReadOperationCount;
+            public ulong WriteOperationCount;
+            public ulong OtherOperationCount;
+            public ulong ReadTransferCount;
+            public ulong WriteTransferCount;
+            public ulong OtherTransferCount;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct JOBOBJECT_BASIC_LIMIT_INFORMATION
+        {
+            public long PerProcessUserTimeLimit;
+            public long PerJobUserTimeLimit;
+            public JobObjectLimitFlags LimitFlags;
+            public UIntPtr MinimumWorkingSetSize;
+            public UIntPtr MaximumWorkingSetSize;
+            public uint ActiveProcessLimit;
+            public UIntPtr Affinity;
+            public uint PriorityClass;
+            public uint SchedulingClass;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+        {
+            public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+            public IO_COUNTERS IoInfo;
+            public UIntPtr ProcessMemoryLimit;
+            public UIntPtr JobMemoryLimit;
+            public UIntPtr PeakProcessMemoryUsed;
+            public UIntPtr PeakJobMemoryUsed;
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string lpName);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetInformationJobObject(
+            IntPtr hJob,
+            int jobObjectInfoClass,
+            IntPtr lpJobObjectInfo,
+            uint cbJobObjectInfoLength);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool CloseHandle(IntPtr hObject);
+    }
+}
+'@
+}
+
+function ConvertTo-WindowsCommandLineArgument {
+    param(
+        [AllowEmptyString()]
+        [string]$Argument
+    )
+
+    if ($null -eq $Argument) {
+        return '""'
+    }
+
+    if ($Argument.Length -eq 0) {
+        return '""'
+    }
+
+    if ($Argument.IndexOfAny([char[]]@(' ', "`t", '"')) -lt 0) {
+        return $Argument
+    }
+
+    $escaped = $Argument -replace '(\\*)"', '$1$1\"'
+    $escaped = $escaped -replace '(\\+)$', '$1$1'
+    return '"' + $escaped + '"'
+}
+
+function Invoke-ProcessUnderJobObject {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+
+        [string[]]$ArgumentList = @(),
+
+        [ValidateRange(0, 1048576)]
+        [int]$MemoryLimitMb = 0,
+
+        [string]$WorkingDirectory = (Get-Location).Path
+    )
+
+    Initialize-PurelySharpJobObjectInterop
+
+    $jobHandle = [PurelySharp.JobObjectNative]::CreateJobObject([IntPtr]::Zero, $null)
+    if ($jobHandle -eq [IntPtr]::Zero) {
+        $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+        throw "CreateJobObject failed with Win32 error $win32Error."
+    }
+
+    $limitInfo = New-Object PurelySharp.JobObjectNative+JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+    $limitInfo.BasicLimitInformation.LimitFlags = [PurelySharp.JobObjectNative+JobObjectLimitFlags]::KillOnJobClose
+    if ($MemoryLimitMb -gt 0) {
+        $limitInfo.BasicLimitInformation.LimitFlags = $limitInfo.BasicLimitInformation.LimitFlags -bor [PurelySharp.JobObjectNative+JobObjectLimitFlags]::JobMemory
+        $limitInfo.JobMemoryLimit = [UIntPtr]([uint64]$MemoryLimitMb * 1MB)
+    }
+
+    $limitInfoSize = [uint32][Runtime.InteropServices.Marshal]::SizeOf([type][PurelySharp.JobObjectNative+JOBOBJECT_EXTENDED_LIMIT_INFORMATION])
+    $limitInfoBuffer = [Runtime.InteropServices.Marshal]::AllocHGlobal([int]$limitInfoSize)
+
+    try {
+        [Runtime.InteropServices.Marshal]::StructureToPtr($limitInfo, $limitInfoBuffer, $false)
+        if (-not [PurelySharp.JobObjectNative]::SetInformationJobObject(
+                $jobHandle,
+                [PurelySharp.JobObjectNative]::JobObjectExtendedLimitInformation,
+                $limitInfoBuffer,
+                $limitInfoSize)) {
+            $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+            throw "SetInformationJobObject failed with Win32 error $win32Error."
+        }
+
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $FilePath
+        $startInfo.WorkingDirectory = $WorkingDirectory
+        $startInfo.UseShellExecute = $false
+        $startInfo.Arguments = (($ArgumentList | ForEach-Object { ConvertTo-WindowsCommandLineArgument $_ }) -join ' ')
+
+        $process = [System.Diagnostics.Process]::Start($startInfo)
+        if ($null -eq $process) {
+            throw "Failed to start process '$FilePath'."
+        }
+
+        if (-not [PurelySharp.JobObjectNative]::AssignProcessToJobObject($jobHandle, $process.Handle)) {
+            $win32Error = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+            if (-not $process.HasExited) {
+                throw "AssignProcessToJobObject failed with Win32 error $win32Error."
+            }
+        }
+
+        $process.WaitForExit()
+        $global:LASTEXITCODE = $process.ExitCode
+        return $process.ExitCode
+    }
+    finally {
+        [Runtime.InteropServices.Marshal]::FreeHGlobal($limitInfoBuffer)
+        [void][PurelySharp.JobObjectNative]::CloseHandle($jobHandle)
+    }
+}
