@@ -4334,6 +4334,23 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public void ReviewedRuntimeArtifactSpec_GuardHelpers_EnableTransitiveRoots()
+        {
+            var reviewedSpecPath = Path.Combine(GetRepositoryRoot(), "Tools", "PurelySharp.EffectSummary", "ReviewedRuntimeArtifactSpec.json");
+
+            using var reviewedSpec = JsonDocument.Parse(File.ReadAllText(reviewedSpecPath));
+            var guardHelpersArtifact = reviewedSpec.RootElement.GetProperty("Artifacts")
+                .EnumerateArray()
+                .Single(artifact =>
+                    string.Equals(
+                        artifact.GetProperty("OutputPath").GetString(),
+                        "PurelySharp.Analyzer/GuardHelpers.PurelySharp.EffectSummary.json",
+                        StringComparison.Ordinal));
+
+            Assert.That(guardHelpersArtifact.GetProperty("IncludeTransitiveRoots").GetBoolean(), Is.True);
+        }
+
+        [Test]
         public async Task EffectSummaryTool_ArtifactSpec_GeneratesMultipleOutputFiles()
         {
             var workingDirectory = Path.Combine(
@@ -6887,8 +6904,8 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfGreaterThan(!!0, !!0, string)", "none");
             AssertPurityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(!!0, !!0, string)", "pure");
             AssertEffectVisibilityClassification(summary, "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(!!0, !!0, string)", "none");
-            AssertPurityClassification(summary, "System.ArgumentNullException.ThrowIfNull(void*, string)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.ArgumentNullException.ThrowIfNull(void*, string)", "none");
+            AssertPurityClassification(summary, "System.ArgumentNullException.ThrowIfNull(void*, string)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.ArgumentNullException.ThrowIfNull(void*, string)", "caller_visible");
             AssertPurityClassification(summary, "System.ArgumentNullException.ThrowIfNull(nint, string)", "impure", "global_state_read");
             AssertEffectVisibilityClassification(summary, "System.ArgumentNullException.ThrowIfNull(nint, string)", "caller_visible");
             AssertThrownExceptions(summary, "System.ArgumentException.ThrowNullOrEmptyException(string, string)", "System.ArgumentException");
@@ -8615,7 +8632,7 @@ public sealed class StableCacheDerived : StaticFieldBase
 
         private static async Task<JsonDocument> RunRuntimeEffectSummaryAsync(int limit, params string[] symbolPrefixes)
         {
-            return await RunRuntimeEffectSummaryAsyncCore(limit, null, 1, false, symbolPrefixes);
+            return await RunRuntimeEffectSummaryAsyncCore(limit, null, 1, false, false, symbolPrefixes);
         }
 
         private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(
@@ -8623,7 +8640,7 @@ public sealed class StableCacheDerived : StaticFieldBase
             int limit,
             params string[] symbolPrefixes)
         {
-            return RunRuntimeEffectSummaryAsyncForAssembly(runtimeAssemblyName, limit, 1, false, symbolPrefixes);
+            return RunRuntimeEffectSummaryAsyncForAssembly(runtimeAssemblyName, limit, 1, false, false, symbolPrefixes);
         }
 
         private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(
@@ -8632,23 +8649,35 @@ public sealed class StableCacheDerived : StaticFieldBase
             int maxDepth,
             params string[] symbolPrefixes)
         {
-            return RunRuntimeEffectSummaryAsyncForAssembly(runtimeAssemblyName, limit, maxDepth, false, symbolPrefixes);
+            return RunRuntimeEffectSummaryAsyncForAssembly(runtimeAssemblyName, limit, maxDepth, false, false, symbolPrefixes);
         }
 
         private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(
             string runtimeAssemblyName,
             int limit,
             int maxDepth,
+            bool includeTransitiveRoots,
+            params string[] symbolPrefixes)
+        {
+            return RunRuntimeEffectSummaryAsyncForAssembly(runtimeAssemblyName, limit, maxDepth, includeTransitiveRoots, false, symbolPrefixes);
+        }
+
+        private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(
+            string runtimeAssemblyName,
+            int limit,
+            int maxDepth,
+            bool includeTransitiveRoots,
             bool ignoreReviewedPurityEntries,
             params string[] symbolPrefixes)
         {
-            return RunRuntimeEffectSummaryAsyncCore(limit, runtimeAssemblyName, maxDepth, ignoreReviewedPurityEntries, symbolPrefixes);
+            return RunRuntimeEffectSummaryAsyncCore(limit, runtimeAssemblyName, maxDepth, includeTransitiveRoots, ignoreReviewedPurityEntries, symbolPrefixes);
         }
 
         private static async Task<JsonDocument> RunRuntimeEffectSummaryAsyncCore(
             int limit,
             string? runtimeAssemblyName,
             int maxDepth,
+            bool includeTransitiveRoots,
             bool ignoreReviewedPurityEntries,
             params string[] symbolPrefixes)
         {
@@ -8682,6 +8711,10 @@ public sealed class StableCacheDerived : StaticFieldBase
             startInfo.ArgumentList.Add("--include-callees");
             startInfo.ArgumentList.Add("--max-depth");
             startInfo.ArgumentList.Add(maxDepth.ToString());
+            if (includeTransitiveRoots)
+            {
+                startInfo.ArgumentList.Add("--transitive-roots");
+            }
             startInfo.ArgumentList.Add("--classify-purity");
             startInfo.ArgumentList.Add("--compare-manual-catalogs");
             if (ignoreReviewedPurityEntries)

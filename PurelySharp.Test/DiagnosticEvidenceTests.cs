@@ -9740,6 +9740,49 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0011_EffectSummaryGuardHelperChain_UncaughtAtCallSite_ReportsRecursiveExceptionSet()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(string text)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(text);
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
+                    "PurelySharp.EffectSummary.json",
+                    CreateEffectSummaryJson(
+                        typeof(ArgumentException).Assembly.Location,
+                        "System.ArgumentException.ThrowIfNullOrEmpty(string, string)",
+                        Array.Empty<string>(),
+                        "System.ArgumentException",
+                        "System.ArgumentNullException"))));
+
+            var diagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("ArgumentException.ThrowIfNullOrEmpty(text)"));
+            Assert.That(
+                diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty],
+                Is.EqualTo("System.ArgumentException;System.ArgumentNullException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+            Assert.That(
+                diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty],
+                Does.Contain("System.ArgumentException=effect_summary:System.ArgumentException.ThrowIfNullOrEmpty"));
+            Assert.That(
+                diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty],
+                Does.Contain("System.ArgumentNullException=effect_summary:System.ArgumentException.ThrowIfNullOrEmpty"));
+            Assert.That(
+                diagnostic.Properties[PurelySharpDiagnostics.ExceptionSymbolProperty],
+                Does.Contain("System.ArgumentException.ThrowIfNullOrEmpty"));
+        }
+
+        [Test]
         public async Task Ps0011_EffectSummaryLibraryCall_CaughtAtCallSite_IsSuppressed()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

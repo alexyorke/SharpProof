@@ -259,6 +259,7 @@
     },
     {
       "OutputPath": "PurelySharp.Analyzer/GuardHelpers.PurelySharp.EffectSummary.json",
+      "IncludeTransitiveRoots": true,
       "Limit": 120,
       "SymbolPrefixes": [
         "System.ArgumentNullException.ThrowIfNull",
