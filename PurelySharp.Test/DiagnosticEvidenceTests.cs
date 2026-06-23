@@ -8761,6 +8761,77 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPuritySummary_Reports_InterpolatedSystemToString_WhenMetadataEvidenceIsConservativeUnknown()
+        {
+            const string boundarySource = @"
+namespace System
+{
+    public sealed class SyntheticSystemFormattingBoundary
+    {
+        public override string ToString()
+        {
+            return ""ok"";
+        }
+    }
+}";
+
+            var tempDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "diagnostic-evidence-boundary-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDirectory);
+
+            try
+            {
+                var assemblyPath = Path.Combine(tempDirectory, "SyntheticSystemFormattingBoundary.dll");
+                var boundarySyntaxTree = CSharpSyntaxTree.ParseText(boundarySource, new CSharpParseOptions(LanguageVersion.Preview));
+                var boundaryCompilation = CSharpCompilation.Create(
+                    "SyntheticSystemFormattingBoundary",
+                    new[] { boundarySyntaxTree },
+                    GetTrustedPlatformReferences(),
+                    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                var emitResult = boundaryCompilation.Emit(assemblyPath);
+                Assert.That(
+                    emitResult.Success,
+                    Is.True,
+                    string.Join(Environment.NewLine, emitResult.Diagnostics.Select(diagnostic => diagnostic.ToString())));
+
+                var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(System.SyntheticSystemFormattingBoundary value)
+    {
+        return $""{value}"";
+    }
+}",
+                    additionalFiles: ImmutableArray.Create<AdditionalText>(
+                        new InMemoryAdditionalText(
+                            "Synthetic.SystemFormattingBoundary.Unknown.PurelySharp.EffectSummary.json",
+                            CreatePuritySummaryJson(
+                                assemblyPath,
+                                "System.SyntheticSystemFormattingBoundary.ToString()",
+                                "conservative_unknown",
+                                "[\"metadata_only_or_external\"]"))),
+                    additionalMetadataReferences: ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(assemblyPath)));
+
+                var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+                Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+                Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("metadata_only_or_external"));
+                Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.SyntheticSystemFormattingBoundary.ToString"));
+            }
+            finally
+            {
+                if (Directory.Exists(tempDirectory))
+                {
+                    Directory.Delete(tempDirectory, recursive: true);
+                }
+            }
+        }
+
+        [Test]
         public async Task GeneratedPuritySummary_Allows_TypeGetTypeFromHandle_WhenMetadataEvidenceIsPure()
         {
             const string metadataSymbol = "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)";
