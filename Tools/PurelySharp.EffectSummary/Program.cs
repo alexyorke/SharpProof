@@ -1472,6 +1472,25 @@ internal static class AssemblyEffectSummarizer
             methodDefinitionHandlesByExactKey[GetMethodExactKey(reader, handle)] = handle;
         }
 
+        var handlesToSummarize = GetMethodHandlesToSummarize(
+            peReader,
+            reader,
+            methodDefinitionHandlesByExactKey,
+            symbolPrefixes,
+            exactSymbols,
+            exactSymbolKeys);
+        if (handlesToSummarize is { Count: 0 })
+        {
+            return new AssemblyEffectReport(
+                AssemblyName: assemblyName,
+                AssemblyPath: assemblyPath,
+                AssemblySha256: assemblySha256,
+                ModuleVersionId: moduleVersionId,
+                MethodCount: reader.MethodDefinitions.Count,
+                EmittedMethodCount: 0,
+                Methods: Array.Empty<MethodEffectSummary>());
+        }
+
         var staticFieldFacts = BuildStaticFieldFacts(
             peReader,
             reader,
@@ -1482,6 +1501,11 @@ internal static class AssemblyEffectSummarizer
             knownMethodReturnValueVisiting);
         foreach (var handle in reader.MethodDefinitions)
         {
+            if (handlesToSummarize is not null && !handlesToSummarize.Contains(handle))
+            {
+                continue;
+            }
+
             allSummaries.Add(SummarizeMethod(
                 peReader,
                 reader,
@@ -1517,6 +1541,161 @@ internal static class AssemblyEffectSummarizer
             MethodCount: reader.MethodDefinitions.Count,
             EmittedMethodCount: summaries.Length,
             Methods: summaries);
+    }
+
+    private static HashSet<MethodDefinitionHandle>? GetMethodHandlesToSummarize(
+        PEReader peReader,
+        MetadataReader reader,
+        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
+        IReadOnlyList<string> symbolPrefixes,
+        IReadOnlyList<string> exactSymbols,
+        IReadOnlyList<string> exactSymbolKeys)
+    {
+        if (symbolPrefixes.Count == 0 && exactSymbols.Count == 0 && exactSymbolKeys.Count == 0)
+        {
+            return null;
+        }
+
+        var rootHandles = GetRootMethodHandles(reader, symbolPrefixes, exactSymbols, exactSymbolKeys);
+        return CollectReachableMethodHandles(peReader, reader, methodDefinitionHandlesByExactKey, rootHandles);
+    }
+
+    private static HashSet<MethodDefinitionHandle> GetRootMethodHandles(
+        MetadataReader reader,
+        IReadOnlyList<string> symbolPrefixes,
+        IReadOnlyList<string> exactSymbols,
+        IReadOnlyList<string> exactSymbolKeys)
+    {
+        var exactSymbolSet = exactSymbols.Count == 0
+            ? null
+            : new HashSet<string>(exactSymbols, StringComparer.Ordinal);
+        var exactSymbolKeySet = exactSymbolKeys.Count == 0
+            ? null
+            : new HashSet<string>(exactSymbolKeys, StringComparer.Ordinal);
+        var rootHandles = new HashSet<MethodDefinitionHandle>();
+        foreach (var handle in reader.MethodDefinitions)
+        {
+            var symbol = GetMethodDisplaySymbol(reader, handle);
+            if (MatchesSymbolPrefix(symbol, symbolPrefixes))
+            {
+                rootHandles.Add(handle);
+                continue;
+            }
+
+            if (exactSymbolSet != null && exactSymbolSet.Contains(symbol))
+            {
+                rootHandles.Add(handle);
+                continue;
+            }
+
+            if (exactSymbolKeySet != null && exactSymbolKeySet.Contains(GetMethodExactKey(reader, handle)))
+            {
+                rootHandles.Add(handle);
+            }
+        }
+
+        return rootHandles;
+    }
+
+    private static HashSet<MethodDefinitionHandle> CollectReachableMethodHandles(
+        PEReader peReader,
+        MetadataReader reader,
+        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
+        IReadOnlyCollection<MethodDefinitionHandle> rootHandles)
+    {
+        var included = new HashSet<MethodDefinitionHandle>();
+        if (rootHandles.Count == 0)
+        {
+            return included;
+        }
+
+        var queue = new Queue<MethodDefinitionHandle>(rootHandles);
+        var calleeCache = new Dictionary<MethodDefinitionHandle, MethodDefinitionHandle[]>();
+        while (queue.Count > 0)
+        {
+            var handle = queue.Dequeue();
+            if (!included.Add(handle))
+            {
+                continue;
+            }
+
+            foreach (var calleeHandle in GetSameAssemblyCallees(
+                         peReader,
+                         reader,
+                         handle,
+                         methodDefinitionHandlesByExactKey,
+                         calleeCache))
+            {
+                if (!included.Contains(calleeHandle))
+                {
+                    queue.Enqueue(calleeHandle);
+                }
+            }
+        }
+
+        return included;
+    }
+
+    private static MethodDefinitionHandle[] GetSameAssemblyCallees(
+        PEReader peReader,
+        MetadataReader reader,
+        MethodDefinitionHandle handle,
+        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
+        Dictionary<MethodDefinitionHandle, MethodDefinitionHandle[]> calleeCache)
+    {
+        if (calleeCache.TryGetValue(handle, out var cached))
+        {
+            return cached;
+        }
+
+        var definition = reader.GetMethodDefinition(handle);
+        if (definition.RelativeVirtualAddress == 0)
+        {
+            return calleeCache[handle] = Array.Empty<MethodDefinitionHandle>();
+        }
+
+        var body = peReader.GetMethodBody(definition.RelativeVirtualAddress);
+        var il = body.GetILBytes();
+        if (il is null || il.Length == 0)
+        {
+            return calleeCache[handle] = Array.Empty<MethodDefinitionHandle>();
+        }
+
+        var callees = new HashSet<MethodDefinitionHandle>();
+        var offset = 0;
+        while (offset < il.Length)
+        {
+            var opCode = ReadOpCode(il, ref offset);
+            var operandOffset = offset;
+            var operandSize = GetOperandSize(opCode.OperandType, il, operandOffset);
+            var operandToken = operandSize == 4 && IsMetadataTokenOperand(opCode.OperandType)
+                ? BitConverter.ToInt32(il, operandOffset)
+                : (int?)null;
+            offset += operandSize;
+
+            if (operandToken is null ||
+                (opCode != OpCodes.Call &&
+                 opCode != OpCodes.Callvirt &&
+                 opCode != OpCodes.Newobj &&
+                 opCode != OpCodes.Ldftn &&
+                 opCode != OpCodes.Ldvirtftn))
+            {
+                continue;
+            }
+
+            if (TryResolveSameAssemblyMethodDefinitionHandle(
+                    reader,
+                    operandToken.Value,
+                    methodDefinitionHandlesByExactKey,
+                    out var calleeHandle))
+            {
+                callees.Add(calleeHandle);
+            }
+        }
+
+        cached = callees.ToArray();
+        calleeCache[handle] = cached;
+        return cached;
     }
 
     private static bool MatchesSymbolPrefix(string symbol, IReadOnlyList<string> symbolPrefixes)

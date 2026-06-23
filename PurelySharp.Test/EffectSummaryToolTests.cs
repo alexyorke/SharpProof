@@ -4357,6 +4357,18 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public void ReviewedRuntimeArtifactSpec_GuardHelpers_CheckedInArtifactPreservesTransitiveExceptions()
+        {
+            var summaryPath = Path.Combine(GetRepositoryRoot(), "PurelySharp.Analyzer", "GuardHelpers.PurelySharp.EffectSummary.json");
+
+            using var summary = JsonDocument.Parse(File.ReadAllText(summaryPath));
+
+            AssertTransitiveExceptionsContain(summary, "System.ArgumentException.ThrowIfNullOrEmpty(string, string)", "System.ArgumentException");
+            AssertTransitiveExceptionsContain(summary, "System.ArgumentNullException.ThrowIfNull(object, string)", "System.ArgumentNullException");
+            AssertTransitiveExceptionsContain(summary, "System.ArgumentOutOfRangeException.ThrowIfZero(!!0, string)", "System.ArgumentOutOfRangeException");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_ArtifactSpec_GeneratesMultipleOutputFiles()
         {
             var workingDirectory = Path.Combine(
@@ -8303,6 +8315,21 @@ public sealed class StableCacheDerived : StaticFieldBase
                 .ToArray();
 
             Assert.That(transitiveExceptions, Is.EqualTo(expectedExceptions));
+        }
+
+        private static void AssertTransitiveExceptionsContain(JsonDocument summary, string methodSymbol, params string[] expectedExceptions)
+        {
+            var method = FindMethod(summary, methodSymbol);
+            var transitiveExceptions = method.GetProperty("TransitiveThrownExceptionTypes")
+                .EnumerateArray()
+                .Select(value => value.GetString())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
+
+            foreach (var expectedException in expectedExceptions)
+            {
+                Assert.That(transitiveExceptions, Does.Contain(expectedException));
+            }
         }
 
         private static void AssertTransitiveExceptionSourcePaths(
