@@ -1891,13 +1891,6 @@ internal static class AssemblyEffectSummarizer
                     }
 
                     var chainedSourcePath = summary.Symbol + " -> " + nestedSource.SourcePath;
-                    var immediateCalleeEdge = new ThrownExceptionEdgeSummary(
-                        nestedSource.ExceptionType,
-                        chainedSourcePath,
-                        CalleeExactSymbolKey: propagationSite.ExactSymbolKey,
-                        Depth: 1);
-                    thrownSources[CreateThrownExceptionEdgeKey(immediateCalleeEdge)] = immediateCalleeEdge;
-
                     if (!string.IsNullOrWhiteSpace(nestedSource.CalleeExactSymbolKey))
                     {
                         var inheritedEdge = new ThrownExceptionEdgeSummary(
@@ -1906,6 +1899,15 @@ internal static class AssemblyEffectSummarizer
                             nestedSource.CalleeExactSymbolKey,
                             nestedSource.Depth + 1);
                         thrownSources[CreateThrownExceptionEdgeKey(inheritedEdge)] = inheritedEdge;
+                    }
+                    else
+                    {
+                        var immediateCalleeEdge = new ThrownExceptionEdgeSummary(
+                            nestedSource.ExceptionType,
+                            chainedSourcePath,
+                            CalleeExactSymbolKey: propagationSite.ExactSymbolKey,
+                            Depth: 1);
+                        thrownSources[CreateThrownExceptionEdgeKey(immediateCalleeEdge)] = immediateCalleeEdge;
                     }
                 }
             }

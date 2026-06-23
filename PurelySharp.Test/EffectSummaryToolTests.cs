@@ -296,9 +296,12 @@ public static class ExceptionFixture
             AssertTransitiveExceptionEdges(
                 boundedSummary,
                 "ExceptionFixture.Outer(string)",
-                ("System.InvalidOperationException", "ExceptionFixture.Inner(string)->string", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)", 2),
-                ("System.InvalidOperationException", "ExceptionFixture.Leaf(string)->string", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)", 3),
-                ("System.InvalidOperationException", "ExceptionFixture.Middle(string)->string", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)", 1));
+                ("System.InvalidOperationException", "ExceptionFixture.Leaf(string)->string", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)", 3));
+            Assert.That(
+                FindMethod(boundedSummary, "ExceptionFixture.Outer(string)")
+                    .GetProperty("TransitiveThrownExceptionEdges")
+                    .GetArrayLength(),
+                Is.EqualTo(1));
             Assert.That(
                 FindMethodsByPrefix(boundedSummary, "ExceptionFixture.")
                     .Select(method => method.GetProperty("Symbol").GetString())
@@ -320,9 +323,12 @@ public static class ExceptionFixture
             AssertTransitiveExceptionEdges(
                 unboundedSummary,
                 "ExceptionFixture.Outer(string)",
-                ("System.InvalidOperationException", "ExceptionFixture.Inner(string)->string", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)", 2),
-                ("System.InvalidOperationException", "ExceptionFixture.Leaf(string)->string", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)", 3),
-                ("System.InvalidOperationException", "ExceptionFixture.Middle(string)->string", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)", 1));
+                ("System.InvalidOperationException", "ExceptionFixture.Leaf(string)->string", "ExceptionFixture.Outer(string) -> ExceptionFixture.Middle(string) -> ExceptionFixture.Inner(string) -> ExceptionFixture.Leaf(string)", 3));
+            Assert.That(
+                FindMethod(unboundedSummary, "ExceptionFixture.Outer(string)")
+                    .GetProperty("TransitiveThrownExceptionEdges")
+                    .GetArrayLength(),
+                Is.EqualTo(1));
             Assert.That(
                 FindMethodsByPrefix(unboundedSummary, "ExceptionFixture.")
                     .Select(method => method.GetProperty("Symbol").GetString())

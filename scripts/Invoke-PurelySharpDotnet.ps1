@@ -1,9 +1,10 @@
 [CmdletBinding()]
 param(
+    [Parameter()]
     [ValidateRange(0, 1048576)]
     [int]$MemoryLimitMb = 0,
 
-    [Parameter(Mandatory = $true, ValueFromRemainingArguments = $true)]
+    [Parameter(Mandatory = $true, Position = 0, ValueFromRemainingArguments = $true)]
     [string[]]$DotnetArgs
 )
 
