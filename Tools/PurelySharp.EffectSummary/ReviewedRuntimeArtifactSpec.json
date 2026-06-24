@@ -569,6 +569,16 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Dictionary.Mutators.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "IncludeCallees": false,
+      "Limit": 80,
+      "SymbolPrefixes": [
+        "System.Collections.Generic.Dictionary`2.Clear",
+        "System.Collections.Generic.Dictionary`2.Remove"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Queue.Mutators.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Private.CoreLib.dll",
       "Limit": 40,

@@ -586,8 +586,6 @@ public static class Constants
         "System.Array.Reverse<T>(T[], int, int)",
         "System.Array.Sort<T>(T[], System.Collections.Generic.IComparer<T>?)",
         "System.Array.Sort<T>(T[], int, int, System.Collections.Generic.IComparer<T>?)",
-        "System.Collections.Generic.Dictionary<TKey, TValue>.Clear()",
-        "System.Collections.Generic.Dictionary<TKey, TValue>.Remove(TKey)",
         "System.Collections.Generic.Queue<T>.Clear()",
         "System.Collections.Generic.Stack<T>.Clear()",
         "System.Exception.Source.set",

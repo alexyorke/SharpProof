@@ -8205,6 +8205,52 @@ public static class DuplicateReviewedSeedFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeDictionaryMutatorSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                80,
+                "System.Collections.Generic.Dictionary`2.Clear",
+                "System.Collections.Generic.Dictionary`2.Remove");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.Dictionary<TKey, TValue>.Clear()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Dictionary<TKey, TValue>.Clear() should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.Dictionary<TKey, TValue>.Remove(TKey)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Dictionary<TKey, TValue>.Remove(TKey) should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(summary, "System.Collections.Generic.Dictionary`2.Clear()", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Dictionary`2.Clear()", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.Dictionary`2.Remove(!0)", "impure", "caller_visible_memory_write", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Dictionary`2.Remove(!0)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Dictionary`2.Clear()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Dictionary`2.Remove(!0)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeArrayCopyWriteHelperSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

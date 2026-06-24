@@ -508,6 +508,21 @@ public static class FileSystemPathGetterCatalogSignatureSamples
         }
 
         [Test]
+        public void DictionaryMutators_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Collections.Generic.Dictionary<TKey, TValue>.Clear()",
+                "System.Collections.Generic.Dictionary<TKey, TValue>.Remove(TKey)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void DelegateCombine_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.Delegate.Combine(System.Delegate, System.Delegate)");
