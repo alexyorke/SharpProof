@@ -795,7 +795,11 @@
     {
       "OutputPath": "PurelySharp.Analyzer/IndexHashCode.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/IndexHashCode.PurelySharp.EffectSummary.json",
+      "ExcludedSymbolPrefixes": [
+        "System.Object.GetHashCode"
+      ],
       "SymbolPrefixes": [
+        "System.HashCode.Combine",
         "System.HashCode.ToHashCode()",
         "System.Index.get_End",
         "System.Index.get_Start"
@@ -804,13 +808,45 @@
     {
       "OutputPath": "PurelySharp.Analyzer/SpanMemoryMarshal.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/SpanMemoryMarshal.PurelySharp.EffectSummary.json",
+      "Limit": 120,
       "SymbolPrefixes": [
+        "System.MemoryExtensions.BinarySearch",
         "System.ReadOnlySpan`1.get_Length",
         "System.ReadOnlySpan`1.get_IsEmpty",
         "System.ReadOnlySpan`1.Slice(int, int)",
         "System.Span`1.get_Length",
         "System.Span`1.get_IsEmpty",
-        "System.Runtime.InteropServices.MemoryMarshal.AsBytes"
+        "System.Runtime.InteropServices.MemoryMarshal.AsBytes",
+        "System.Runtime.InteropServices.MemoryMarshal.Read"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/StringInfo.PurelySharp.EffectSummary.json",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Globalization.StringInfo.ParseCombiningCharacters"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Delegate.Remove.PurelySharp.EffectSummary.json",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Delegate.Remove(System.Delegate, System.Delegate)"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Marshal.SizeOf.PurelySharp.EffectSummary.json",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Runtime.InteropServices.Marshal.SizeOf()"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Pipelines.Pipe.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.IO.Pipelines.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.IO.Pipelines.Pipe..ctor(System.IO.Pipelines.PipeOptions)"
       ]
     },
     {

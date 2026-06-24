@@ -3819,11 +3819,12 @@ public static class IndexHashCodeCatalogSignatureSamples
     {
         HashCode hash = default;
         var copy = new HashCode();
+        var combined = HashCode.Combine(1, 2);
         var end = Index.End;
         var start = Index.Start;
         _ = copy.ToHashCode();
         _ = hash.ToHashCode();
-        return 0;
+        return combined;
     }
 }";
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
@@ -3834,6 +3835,7 @@ public static class IndexHashCodeCatalogSignatureSamples
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new HashCode()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "HashCode.Combine(1, 2)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "hash.ToHashCode()"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "copy.ToHashCode()"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Index.End"));
@@ -3909,10 +3911,13 @@ public static class SpanMemoryMarshalCatalogSignatureSamples
 {
     public static int Sample(ReadOnlySpan<int> readOnly, Span<int> writable)
     {
+        ReadOnlySpan<byte> bytes = stackalloc byte[sizeof(int)];
         var head = readOnly.Slice(0, 0);
+        var index = readOnly.BinarySearch(0);
         var readOnlyBytes = MemoryMarshal.AsBytes(readOnly);
+        _ = MemoryMarshal.Read<int>(bytes);
         var writableBytes = MemoryMarshal.AsBytes(writable);
-        return readOnly.Length + writable.Length + head.Length + readOnlyBytes.Length + writableBytes.Length + (readOnly.IsEmpty ? 0 : 1) + (writable.IsEmpty ? 0 : 1);
+        return readOnly.Length + writable.Length + head.Length + index + readOnlyBytes.Length + writableBytes.Length + (readOnly.IsEmpty ? 0 : 1) + (writable.IsEmpty ? 0 : 1);
     }
 }";
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
@@ -3923,6 +3928,8 @@ public static class SpanMemoryMarshalCatalogSignatureSamples
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "readOnly.Slice(0, 0)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "readOnly.BinarySearch(0)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "MemoryMarshal.Read<int>(bytes)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "MemoryMarshal.AsBytes(writable)"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "readOnly.Length"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "writable.Length"));
@@ -3998,6 +4005,46 @@ public static class ListCapacityCatalogSignatureSamples
             {
                 AssertNotInManualCatalogs(member);
             }
+        }
+
+        [Test]
+        public void ReviewedRuntimeHelperSlices_AreNotBackedByStaticCatalogs()
+        {
+            const string source = @"
+using System;
+using System.Globalization;
+using System.IO.Pipelines;
+using System.Runtime.InteropServices;
+
+public static class ReviewedRuntimeHelperCatalogSignatureSamples
+{
+    public static int Sample(ReadOnlySpan<int> values, Delegate left, Delegate right)
+    {
+        _ = StringInfo.ParseCombiningCharacters(""text"");
+        _ = Delegate.Remove(left, right);
+        _ = Marshal.SizeOf<int>();
+        _ = new Pipe(PipeOptions.Default);
+        return values.Length;
+    }
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var coreLibDirectory = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+            var sharedDirectory = Directory.GetParent(Directory.GetParent(coreLibDirectory)!.FullName)!.FullName;
+            var pipelinesAssemblyPath = Directory.GetFiles(sharedDirectory, "System.IO.Pipelines.dll", SearchOption.AllDirectories)
+                .OrderByDescending(path => path, StringComparer.Ordinal)
+                .First();
+            var compilation = CSharpCompilation.Create(
+                "ReviewedRuntimeHelperCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences()
+                    .Add(MetadataReference.CreateFromFile(pipelinesAssemblyPath)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "StringInfo.ParseCombiningCharacters(\"text\")"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Delegate.Remove(left, right)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Marshal.SizeOf<int>()"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new Pipe(PipeOptions.Default)"));
         }
 
         [Test]

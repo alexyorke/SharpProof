@@ -742,6 +742,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
         {
             return TryGetDefaultComparisonCollectionKeyType(methodSymbol, out _) ||
                 TryGetDefaultEqualityCollectionElementType(methodSymbol, out _, out _) ||
+                IsHashCodeCombineMethod(methodSymbol) ||
                 TryGetEqualityComparerElementType(methodSymbol, out _) ||
                 TryGetComparerElementType(methodSymbol, out _);
         }
@@ -2023,10 +2024,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
             var methodSymbol = invocationOperation.TargetMethod;
-            if (methodSymbol.ContainingType?.ToDisplayString() != "System.HashCode" ||
-                methodSymbol.Name != "Combine" ||
-                !methodSymbol.IsGenericMethod ||
-                methodSymbol.TypeArguments.Length == 0)
+            if (!IsHashCodeCombineMethod(methodSymbol))
             {
                 return false;
             }
@@ -2041,6 +2039,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return true;
+        }
+
+        private static bool IsHashCodeCombineMethod(IMethodSymbol methodSymbol)
+        {
+            return methodSymbol.ContainingType?.ToDisplayString() == "System.HashCode" &&
+                methodSymbol.Name == "Combine" &&
+                methodSymbol.IsGenericMethod &&
+                methodSymbol.TypeArguments.Length > 0;
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckResolvedEqualityImplementation(
