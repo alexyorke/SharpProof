@@ -1478,7 +1478,9 @@ internal static class AssemblyEffectSummarizer
             methodDefinitionHandlesByExactKey,
             symbolPrefixes,
             exactSymbols,
-            exactSymbolKeys);
+            exactSymbolKeys,
+            includeCallees,
+            includeTransitiveRoots);
         if (handlesToSummarize is { Count: 0 })
         {
             return new AssemblyEffectReport(
@@ -1549,7 +1551,9 @@ internal static class AssemblyEffectSummarizer
         IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
         IReadOnlyList<string> symbolPrefixes,
         IReadOnlyList<string> exactSymbols,
-        IReadOnlyList<string> exactSymbolKeys)
+        IReadOnlyList<string> exactSymbolKeys,
+        bool includeCallees,
+        bool includeTransitiveRoots)
     {
         if (symbolPrefixes.Count == 0 && exactSymbols.Count == 0 && exactSymbolKeys.Count == 0)
         {
@@ -1557,7 +1561,16 @@ internal static class AssemblyEffectSummarizer
         }
 
         var rootHandles = GetRootMethodHandles(reader, symbolPrefixes, exactSymbols, exactSymbolKeys);
-        return CollectReachableMethodHandles(peReader, reader, methodDefinitionHandlesByExactKey, rootHandles);
+        if (!includeCallees && !includeTransitiveRoots)
+        {
+            return rootHandles;
+        }
+
+        return CollectReachableMethodHandles(
+            peReader,
+            reader,
+            methodDefinitionHandlesByExactKey,
+            rootHandles);
     }
 
     private static HashSet<MethodDefinitionHandle> GetRootMethodHandles(

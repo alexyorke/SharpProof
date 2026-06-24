@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-20T22:21:22.5991112+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:45:58.1707118+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -1499,42 +1499,7 @@
     "ConservativeUnknownCount": 4,
     "CatalogComparison": {
       "KnownPureMembers": [],
-      "KnownImpureMembers": [
-        {
-          "Symbol": "System.Globalization.DateTimeFormatInfo.CurrentInfo.get",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "global_state_read",
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Globalization.CultureInfo.GetFormat(System.Type)",
-            "System.Globalization.CultureInfo.get_DateTimeFormat()"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Globalization.DateTimeFormatInfo.get_CurrentInfo()-\u003ESystem.Globalization.DateTimeFormatInfo"
-          ]
-        },
-        {
-          "Symbol": "System.Globalization.NumberFormatInfo.CurrentInfo.get",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "global_state_read",
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Globalization.CultureInfo.GetFormat(System.Type)",
-            "System.Globalization.CultureInfo.get_DateTimeFormat()"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Globalization.NumberFormatInfo.get_CurrentInfo()-\u003ESystem.Globalization.NumberFormatInfo"
-          ]
-        }
-      ],
+      "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
   },

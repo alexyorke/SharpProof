@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T10:23:33.04498+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:36.4782332+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -24,12 +24,32 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "char.IsWhiteSpace(char)-\u003Ebool",
             "string.get_Chars(int)-\u003Echar",
             "string.get_Length()-\u003Eint"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "char.IsWhiteSpace(char)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Chars(int)-\u003Echar",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],

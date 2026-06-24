@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T09:34:12.0283664+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:49.2490243+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.Uri",
@@ -28,6 +28,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
             "System.MemoryExtensions.AsSpan(string, int, int)-\u003ESystem.ReadOnlySpan\u00601\u003Cchar\u003E",
@@ -43,6 +45,59 @@
           "Fields": [
             "System.String.Empty"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.MemoryExtensions.AsSpan(string, int, int)-\u003ESystem.ReadOnlySpan\u00601\u003Cchar\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Span\u00601\u003Cchar\u003E..ctor(void*, int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Text.ValueStringBuilder..ctor(System.Span\u00601\u003Cchar\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Text.ValueStringBuilder.EnsureCapacity(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.UriHelper.UnescapeString(string, int, int, ref System.Text.ValueStringBuilder, char, char, char, System.UnescapeMode, System.UriParser, bool)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "object.ToString()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.IndexOf(char)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],

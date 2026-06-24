@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-19T05:01:59.7971522+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:05.0656534+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Console",
@@ -55,6 +55,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -121,6 +122,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -187,6 +189,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -253,6 +256,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -319,6 +323,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -379,17 +384,18 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "global_state_write"
             ],
             "FirstBlockingCallChain": [
               "Interop\u002BKernel32.\u003CSetConsoleCursorPosition\u003Eg____PInvoke|49_0(nint, Interop\u002BKernel32\u002BCOORD)-\u003Eint"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
+            "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "caller_visible"
           }
@@ -445,17 +451,18 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "global_state_write"
             ],
             "FirstBlockingCallChain": [
               "Interop\u002BKernel32.\u003CSetConsoleTitle\u003Eg____PInvoke|53_0(ushort*)-\u003Eint"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
+            "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "caller_visible"
           }
@@ -481,6 +488,7 @@
             "Interop\u002BKEY_EVENT_RECORD._uChar"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -548,9 +556,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee",
               "throw"
             ],
@@ -592,9 +602,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -636,9 +649,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -693,6 +709,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -736,9 +753,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -797,9 +817,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_write",
               "impure_callee",
               "throw"
             ],
@@ -842,9 +864,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -886,9 +910,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -930,9 +956,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -998,9 +1027,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee",
               "throw"
             ],
@@ -1073,12 +1105,16 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Threading.Monitor.Exit(object)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
@@ -1122,18 +1158,26 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "conservative_unknown",
+            "Classification": "impure",
             "Categories": [
-              "dynamic_dispatch",
-              "virtual_call"
+              "global_state_read",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Console.get_Out()",
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "unknown"
+            "EffectVisibilityClassification": "caller_visible"
           }
         },
         {
@@ -1181,12 +1225,16 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Threading.Volatile.Write(ref !!0, !!0)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
@@ -1245,6 +1293,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1286,6 +1335,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -1324,6 +1374,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1366,6 +1417,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1404,6 +1456,7 @@
             "Interop\u002BKEY_EVENT_RECORD.bKeyDown"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -1437,6 +1490,7 @@
             "Interop\u002BKEY_EVENT_RECORD.wVirtualKeyCode"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -1470,6 +1524,7 @@
             "Interop\u002BKEY_EVENT_RECORD.dwControlKeyState"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -1573,6 +1628,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1712,6 +1768,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1775,10 +1832,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
+              "global_state_write",
               "impure_callee",
               "throw"
             ],
@@ -1820,9 +1878,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1899,9 +1959,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee",
               "throw"
             ],
@@ -2016,11 +2078,13 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
               "caller_visible_memory_write",
               "global_state_read",
+              "global_state_write",
               "impure_callee",
               "throw"
             ],
@@ -2119,11 +2183,13 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
               "caller_visible_memory_write",
               "global_state_read",
+              "global_state_write",
               "impure_callee",
               "object_state_write",
               "throw"
@@ -2170,6 +2236,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2214,9 +2281,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -2316,11 +2386,13 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
               "caller_visible_memory_write",
               "global_state_read",
+              "global_state_write",
               "impure_callee",
               "object_state_write",
               "throw"
@@ -2362,15 +2434,23 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "pure",
-            "Categories": [],
-            "FirstBlockingCallChain": [],
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "global_state_write",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.ConsolePal.GetBufferInfo(bool, ref bool)",
+              "Interop\u002BKernel32.GetConsoleScreenBufferInfo(nint, ref Interop\u002BKernel32\u002BCONSOLE_SCREEN_BUFFER_INFO)-\u003Ebool"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": false,
             "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "none"
+            "EffectVisibilityClassification": "caller_visible"
           }
         },
         {
@@ -2415,6 +2495,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "conservative_unknown",
             "Categories": [
@@ -2472,15 +2553,21 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "pure",
-            "Categories": [],
-            "FirstBlockingCallChain": [],
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "unknown_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.String.Join(string, object[])",
+              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+            ],
             "HasFreshArrayAllocationEvidence": true,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
-            "FreshnessClassification": "fresh_owned_array_write",
-            "EffectVisibilityClassification": "internal_only"
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "fresh_array_candidate_requires_non_pure_resolution",
+            "EffectVisibilityClassification": "unknown"
           }
         },
         {
@@ -2510,6 +2597,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "conservative_unknown",
             "Categories": [
@@ -2552,6 +2640,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "conservative_unknown",
             "Categories": [
@@ -2594,6 +2683,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "conservative_unknown",
             "Categories": [
@@ -2636,6 +2726,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "conservative_unknown",
             "Categories": [
@@ -2678,6 +2769,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "conservative_unknown",
             "Categories": [
@@ -2720,6 +2812,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2763,6 +2856,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2934,6 +3028,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2951,8 +3046,8 @@
   "PurityReport": {
     "SchemaVersion": 3,
     "MethodCount": 49,
-    "PureCount": 11,
-    "ImpureCount": 31,
+    "PureCount": 9,
+    "ImpureCount": 33,
     "ConservativeUnknownCount": 7,
     "CatalogComparison": {
       "KnownPureMembers": [],
@@ -3114,16 +3209,16 @@
         "MetadataToken": "0x06000019",
         "MethodBodySha256": "818e2568909a103f87ff96503d247914aaa50590d3b7b2e29d2d8d20f7e5eb26",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
-          "global_state_read"
+          "global_state_write"
         ],
         "FirstBlockingCallChain": [
           "Interop\u002BKernel32.\u003CSetConsoleCursorPosition\u003Eg____PInvoke|49_0(nint, Interop\u002BKernel32\u002BCOORD)-\u003Eint"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
+        "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "caller_visible"
       },
@@ -3138,16 +3233,16 @@
         "MetadataToken": "0x0600001D",
         "MethodBodySha256": "ca187104dac111997763b1d977a10398e4e51512ebe8fabe37ce50207e5c5654",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
-          "global_state_read"
+          "global_state_write"
         ],
         "FirstBlockingCallChain": [
           "Interop\u002BKernel32.\u003CSetConsoleTitle\u003Eg____PInvoke|53_0(ushort*)-\u003Eint"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
+        "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "caller_visible"
       },
@@ -3164,9 +3259,12 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_read",
         "Categories": [
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Threading.Volatile.Write(ref !!0, !!0)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,
@@ -3184,8 +3282,9 @@
         "MetadataToken": "0x06000070",
         "MethodBodySha256": "991f998b53bf47686a7d44badac85bca10e7fa043c65c475458977ed86dd0a84",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3210,8 +3309,9 @@
         "MetadataToken": "0x06000071",
         "MethodBodySha256": "c8e71b750b84cca5b107aa15ee6039f90783c70f0ac884f7939a94f013cd8544",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3236,8 +3336,10 @@
         "MetadataToken": "0x06000074",
         "MethodBodySha256": "fe606ef576ca436a0a4a658bb73e50343369c49c7355185018a37852106e27f0",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3262,8 +3364,10 @@
         "MetadataToken": "0x06000045",
         "MethodBodySha256": "1f33578dfee19627db015942195238a2f9c7a0b6867f8c1c1db3db921d5c6d1d",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3288,8 +3392,10 @@
         "MetadataToken": "0x06000046",
         "MethodBodySha256": "ec62bba2617d4a7bd58f594626a3febc7fd0c5a1f23434a679320517d0fbb443",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3314,8 +3420,10 @@
         "MetadataToken": "0x06000075",
         "MethodBodySha256": "f0bd5859be4096efb186033933aba1ae892c3e72ad7f96e7ab66eb62cf6edf41",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee",
           "throw"
         ],
@@ -3343,9 +3451,12 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_read",
         "Categories": [
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Threading.Monitor.Exit(object)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,
@@ -3362,18 +3473,25 @@
         "ModuleVersionId": "060fc4fa-c568-4535-982f-c524c7fb02c9",
         "MetadataToken": "0x0600009C",
         "MethodBodySha256": "7c347f4b8ff4ccab2bda4daa4d0c1dd4d8cc83ec6dc440f3ff28635103faef5c",
-        "Classification": "conservative_unknown",
-        "PrimaryCategory": "dynamic_dispatch",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
-          "dynamic_dispatch",
-          "virtual_call"
+          "global_state_read",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Console.get_Out()",
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "unknown"
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.Console.get_IsInputRedirected()",
@@ -3411,8 +3529,9 @@
         "MetadataToken": "0x06000044",
         "MethodBodySha256": "caf8f55a4d447828451df6a4404ce0f7b70172559b52fc5f73bd194378356d25",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee",
           "throw"
         ],
@@ -3437,8 +3556,10 @@
         "MetadataToken": "0x06000059",
         "MethodBodySha256": "6aff1b0f092e27588d93597ac000a4162bb81b774419fceeea2524b7e2b18336",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3463,8 +3584,9 @@
         "MetadataToken": "0x0600006F",
         "MethodBodySha256": "684e31441de2c6dd8e27474e0ba2aa91f0ffd2c9d44ba657859bc269f32b48ab",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_write",
           "impure_callee",
           "throw"
         ],
@@ -3513,8 +3635,9 @@
         "MetadataToken": "0x060000EA",
         "MethodBodySha256": "148faacf14347e1d4de3fa20ebfeaf3c9e30bc9d9ab214c8346431ad33e194a1",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3538,8 +3661,9 @@
         "MetadataToken": "0x060000EB",
         "MethodBodySha256": "d75e9d34249b75e6ae46f2a0a2c433755580747795189d6b7ccf00d5688cbe9d",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee",
           "throw"
         ],
@@ -3564,10 +3688,11 @@
         "MetadataToken": "0x060000ED",
         "MethodBodySha256": "cf212e2b6014d7c7092295d374a03e98e54a5b553ca71ac23dc429021b7ef7c2",
         "Classification": "impure",
-        "PrimaryCategory": "caller_visible_memory_write",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "caller_visible_memory_write",
           "global_state_read",
+          "global_state_write",
           "impure_callee",
           "throw"
         ],
@@ -3591,15 +3716,22 @@
         "ModuleVersionId": "060fc4fa-c568-4535-982f-c524c7fb02c9",
         "MetadataToken": "0x06000102",
         "MethodBodySha256": "6c7840836cc5073d7e0c96a26b39edd242a06878343f454de6df1066df5f8af4",
-        "Classification": "pure",
-        "PrimaryCategory": "generated_purity_summary",
-        "Categories": [],
-        "FirstBlockingCallChain": [],
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_write",
+        "Categories": [
+          "global_state_read",
+          "global_state_write",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.ConsolePal.GetBufferInfo(bool, ref bool)",
+          "Interop\u002BKernel32.GetConsoleScreenBufferInfo(nint, ref Interop\u002BKernel32\u002BCONSOLE_SCREEN_BUFFER_INFO)-\u003Ebool"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "none"
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.ConsolePal.IsAltKeyDown(Interop\u002BINPUT_RECORD)",
@@ -3672,7 +3804,7 @@
         "MetadataToken": "0x060000DB",
         "MethodBodySha256": "41bef01c5203b013356132a957f1eca71534e5dff90b86ea4e544cded8dbe1b4",
         "Classification": "impure",
-        "PrimaryCategory": "caller_visible_memory_write",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "caller_visible_memory_write",
           "global_state_read",
@@ -3702,10 +3834,11 @@
         "MetadataToken": "0x060000F3",
         "MethodBodySha256": "520103deab293789e6f4bf837593436b73c5152d3889c03fc46b55bf79ee86e9",
         "Classification": "impure",
-        "PrimaryCategory": "caller_visible_memory_write",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "caller_visible_memory_write",
           "global_state_read",
+          "global_state_write",
           "impure_callee",
           "object_state_write",
           "throw"
@@ -3730,10 +3863,11 @@
         "MetadataToken": "0x060000EE",
         "MethodBodySha256": "c38db2de953e2a91caac0484d35975ab4195147983f518c1e99e345a001d4955",
         "Classification": "impure",
-        "PrimaryCategory": "caller_visible_memory_write",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "caller_visible_memory_write",
           "global_state_read",
+          "global_state_write",
           "impure_callee",
           "object_state_write",
           "throw"
@@ -3874,8 +4008,10 @@
         "MetadataToken": "0x060000F2",
         "MethodBodySha256": "d866668669e261949de43a0419a31f54665b96f82611254d10c2e28f15b4cdac",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3899,9 +4035,9 @@
         "MetadataToken": "0x060000E9",
         "MethodBodySha256": "667d3263cf22edb073414a18e91350cd1bded93eae19cf34ff6950029dc4f5cc",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
-          "global_state_read",
+          "global_state_write",
           "impure_callee",
           "throw"
         ],
@@ -3985,15 +4121,20 @@
         "ModuleVersionId": "060fc4fa-c568-4535-982f-c524c7fb02c9",
         "MetadataToken": "0x0600010F",
         "MethodBodySha256": "6990549fcc23e7345884aa5468393585fe4ec44efef8fe6f57754243d9ae05c6",
-        "Classification": "pure",
-        "PrimaryCategory": "generated_purity_summary",
-        "Categories": [],
-        "FirstBlockingCallChain": [],
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "unknown_callee",
+        "Categories": [
+          "unknown_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.String.Join(string, object[])",
+          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+        ],
         "HasFreshArrayAllocationEvidence": true,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
-        "FreshnessClassification": "fresh_owned_array_write",
-        "EffectVisibilityClassification": "internal_only"
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "fresh_array_candidate_requires_non_pure_resolution",
+        "EffectVisibilityClassification": "unknown"
       },
       {
         "Symbol": "System.SR.GetResourceString(string)",

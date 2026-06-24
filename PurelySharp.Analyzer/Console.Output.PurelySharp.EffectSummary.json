@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-19T04:54:37.3208936+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:05.0175292+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Console",
@@ -48,6 +48,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -55,7 +56,11 @@
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -125,13 +130,17 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
               "global_state_read",
-              "global_state_write"
+              "global_state_write",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Threading.Monitor.Exit(object)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -200,13 +209,17 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
               "global_state_read",
-              "global_state_write"
+              "global_state_write",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Threading.Monitor.Exit(object)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -250,14 +263,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -302,14 +321,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -354,14 +379,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -406,14 +437,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -458,14 +495,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -510,14 +553,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -562,14 +611,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -614,14 +669,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -666,14 +727,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -718,14 +785,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -770,14 +843,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -822,14 +901,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -874,14 +959,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -926,14 +1017,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -978,14 +1075,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1030,14 +1133,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1082,14 +1191,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1140,14 +1255,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1192,14 +1313,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1244,14 +1371,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1296,14 +1429,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1354,14 +1493,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1406,14 +1551,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1458,14 +1609,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1510,14 +1667,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1562,14 +1725,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1614,14 +1783,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1666,14 +1841,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1718,14 +1899,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1770,14 +1957,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1822,14 +2015,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1874,14 +2073,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1926,14 +2131,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1978,14 +2189,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -2030,14 +2247,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Console.get_Out()",
-              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+              "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -2103,12 +2326,19 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Console.CreateOutputWriter(System.IO.Stream)",
+              "System.Console.get_OutputEncoding()",
+              "System.ConsolePal.get_OutputEncoding()",
+              "Interop\u002BKernel32.GetConsoleOutputCP()"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -2147,9 +2377,15 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_read",
         "Categories": [
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
@@ -2167,12 +2403,15 @@
         "MetadataToken": "0x06000082",
         "MethodBodySha256": "26d1c0eaa327a2ba42c40e088165535b2d28be02f2090c60bb9c1cde72b00ab2",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "global_state_read",
-          "global_state_write"
+          "global_state_write",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Threading.Monitor.Exit(object)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
@@ -2190,12 +2429,15 @@
         "MetadataToken": "0x06000081",
         "MethodBodySha256": "1f11c62e33ec69392c5c70ce348540f04ad56003a59c513b712e71a13e904257",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "global_state_read",
-          "global_state_write"
+          "global_state_write",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Threading.Monitor.Exit(object)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
@@ -2213,13 +2455,18 @@
         "MetadataToken": "0x0600009B",
         "MethodBodySha256": "ac0a9f2c7fad713dab94b9d5be977558727dcb8c87721b0e229b89f39e998ab0",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2238,13 +2485,18 @@
         "MetadataToken": "0x0600009C",
         "MethodBodySha256": "7c347f4b8ff4ccab2bda4daa4d0c1dd4d8cc83ec6dc440f3ff28635103faef5c",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2263,13 +2515,18 @@
         "MetadataToken": "0x0600009D",
         "MethodBodySha256": "2b33bdca32fdaa441bcf907f72d4823ae2b62f634477d70fdcd19321c66c7ace",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2288,13 +2545,18 @@
         "MetadataToken": "0x0600009E",
         "MethodBodySha256": "4fe725ea437e056523e8805d6ff65197913348315320795e901f6e18afeb59c1",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2313,13 +2575,18 @@
         "MetadataToken": "0x060000A0",
         "MethodBodySha256": "b5f3c86dc3a975100d0f7713419934dad7f8a3e7cb96293db5250f8c27730362",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2338,13 +2605,18 @@
         "MetadataToken": "0x0600009F",
         "MethodBodySha256": "82910b10f8da245a229a1f314f6869ffe5d3c3193331ab21971207a3d5d14325",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2363,13 +2635,18 @@
         "MetadataToken": "0x060000A1",
         "MethodBodySha256": "76f9b27941499b4afea4fde0f2c0eee7e13a504f038fe719fb488e4247fe13b0",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2388,13 +2665,18 @@
         "MetadataToken": "0x060000A2",
         "MethodBodySha256": "29974b9c1ce84f78821b245d7cc282b145570ac16b79b3c14ccbda2da534d088",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2413,13 +2695,18 @@
         "MetadataToken": "0x060000A4",
         "MethodBodySha256": "167037e84a7d9afc081b86ea413c7fea55c9c0a71b4c5cabe81efbb38b60cd7c",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2438,13 +2725,18 @@
         "MetadataToken": "0x060000A6",
         "MethodBodySha256": "4b6104da37269c55b346a45c1709be990a3c40d1ed2c917dd9c4582d024dea18",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2463,13 +2755,18 @@
         "MetadataToken": "0x060000A7",
         "MethodBodySha256": "bf0ac2d2f57fc451d396fc0a9279a57ff9c5ba81cefc78ce88948e3357912a8f",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2488,13 +2785,18 @@
         "MetadataToken": "0x06000097",
         "MethodBodySha256": "e835d5e963c08a6a3ea07db648c735d066c031c233fed881be0a00dcf1c2a5a9",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2513,13 +2815,18 @@
         "MetadataToken": "0x06000098",
         "MethodBodySha256": "e6c7b95253a944bf971d5b6368904efe56b5459e98299196c317e0afa4b92a8d",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2538,13 +2845,18 @@
         "MetadataToken": "0x06000099",
         "MethodBodySha256": "f8946938636984cb37c31f927214bf09472c94a5c0743e1607ac0b9b68ad1438",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2563,13 +2875,18 @@
         "MetadataToken": "0x0600009A",
         "MethodBodySha256": "7d0acf9daa4deddbddaa18a4a5be5220a1d8b0122c650d75c316957b2a4a4693",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2588,13 +2905,18 @@
         "MetadataToken": "0x060000A3",
         "MethodBodySha256": "faa5a66815da7c0979652a46a2336aa492ad1b3eda7a4f3794332a322c1efe6d",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2613,13 +2935,18 @@
         "MetadataToken": "0x060000A5",
         "MethodBodySha256": "84cfc421a058af2aed909e31fd595b361ca884e44d975bf18bb84bf6eae875b9",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2638,13 +2965,18 @@
         "MetadataToken": "0x06000085",
         "MethodBodySha256": "2771e680f6929cb12c23e6c12d22809d825c4cdd895eee3a350bb36dc667c06f",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2663,13 +2995,18 @@
         "MetadataToken": "0x06000086",
         "MethodBodySha256": "713d4874c0b625a1153bf91359785365031b8317ce4fb6b7e341e9d8a5d4712c",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2688,13 +3025,18 @@
         "MetadataToken": "0x06000087",
         "MethodBodySha256": "c6526cbfaa28d33136c82f2e7d79850679c18eaae6f3e08f54610c22e158c69f",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2713,13 +3055,18 @@
         "MetadataToken": "0x06000088",
         "MethodBodySha256": "9e6ba60683331c0c38e8ef7c353a45b86ed09153719adb322acb8f32a262c166",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2738,13 +3085,18 @@
         "MetadataToken": "0x06000089",
         "MethodBodySha256": "301735555d0ad93acef2eaeff997af910f5892e238290fa200efe0fe3b62a08f",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2763,13 +3115,18 @@
         "MetadataToken": "0x0600008A",
         "MethodBodySha256": "99561e0be4c7a27b98705f2cb61d1f9b95ce658910eb52df3f2c1553f3f17496",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2788,13 +3145,18 @@
         "MetadataToken": "0x0600008B",
         "MethodBodySha256": "d28f71e1521a96134048e35c85f13121029ee866965257b795ee91f4a949bb11",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2813,13 +3175,18 @@
         "MetadataToken": "0x0600008C",
         "MethodBodySha256": "31cc753f32f6abeca7bf4e71ac944b6e850dafc2c37c2c00ec82a7d109c978a0",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2838,13 +3205,18 @@
         "MetadataToken": "0x0600008D",
         "MethodBodySha256": "a58266e9b630bda2b785b81dad2596780086bb5c50f1b190e1aa4bd40b885c08",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2863,13 +3235,18 @@
         "MetadataToken": "0x0600008F",
         "MethodBodySha256": "8ee602ee1392be2f5129c265a5fc10957722b6ba1ecadf8fff1395ee05166b54",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2888,13 +3265,18 @@
         "MetadataToken": "0x06000091",
         "MethodBodySha256": "ec71f9af7ffdaa9eaabf442ecc3cd28acf8a3cf8118381072b56452f32ec0df2",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2913,13 +3295,18 @@
         "MetadataToken": "0x06000092",
         "MethodBodySha256": "520230e77d282b86500efaccb78093fbc1a697e743263a6bd347442177362d53",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2938,13 +3325,18 @@
         "MetadataToken": "0x06000093",
         "MethodBodySha256": "8d7e69f6c0f6c4ed62adad1015bb12340e9f85523bfbe90430b3b0d03d29b73d",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2963,13 +3355,18 @@
         "MetadataToken": "0x06000094",
         "MethodBodySha256": "deebe13490cbd0b451ebeb43750dad99449775f4d6d362e29df54c735c2ab85a",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -2988,13 +3385,18 @@
         "MetadataToken": "0x06000095",
         "MethodBodySha256": "1789dff3a9f3c1f49d2ce00c6e7599f6719c756e384585772edeceeb8e6e97b4",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -3013,13 +3415,18 @@
         "MetadataToken": "0x06000096",
         "MethodBodySha256": "048b4f01d5b63ef4b063e69e4dc776f30e9ed61ba89031ac8a4e2d56a661fef4",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -3038,13 +3445,18 @@
         "MetadataToken": "0x0600008E",
         "MethodBodySha256": "ea1f4cc89e9537ef900b29cedbf98de95e6bb6ed824d588849af82f5ed221f76",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -3063,13 +3475,18 @@
         "MetadataToken": "0x06000090",
         "MethodBodySha256": "0e813cb01ac79c98b74238a782c0a74629bf717ef328eff5ec7f0589b6f8a616",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Console.get_Out()",
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -3094,7 +3511,11 @@
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()"
+          "System.Console.\u003Cget_Out\u003Eg__EnsureInitialized|26_0()",
+          "System.Console.CreateOutputWriter(System.IO.Stream)",
+          "System.Console.get_OutputEncoding()",
+          "System.ConsolePal.get_OutputEncoding()",
+          "Interop\u002BKernel32.GetConsoleOutputCP()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,

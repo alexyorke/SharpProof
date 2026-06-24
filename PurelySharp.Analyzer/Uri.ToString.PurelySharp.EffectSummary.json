@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T23:39:49.6759621+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:49.3305608+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.Uri",
@@ -25,6 +25,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Uri.CreateUriInfo(System.Uri\u002BFlags)-\u003Evoid"
           ],
@@ -32,6 +34,14 @@
             "System.Uri._flags",
             "System.Uri._info"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Uri.CreateUriInfo(System.Uri\u002BFlags)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -61,6 +71,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Uri.EnsureUriInfo()-\u003ESystem.Uri\u002BUriInfo",
             "System.Uri.GetComponentsHelper(System.UriComponents, System.UriFormat)-\u003Estring",
@@ -73,6 +85,29 @@
             "System.Uri._string",
             "System.Uri._syntax"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Uri.EnsureUriInfo()-\u003ESystem.Uri\u002BUriInfo",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Uri.GetComponentsHelper(System.UriComponents, System.UriFormat)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Uri.GetParts(System.UriComponents, System.UriFormat)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.UriParser.get_IsSimple()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -103,10 +138,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Uri.InternalGetComponents(System.UriComponents, System.UriFormat)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Uri.InternalGetComponents(System.UriComponents, System.UriFormat)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -141,6 +186,13 @@
             "System.ArgumentOutOfRangeException"
           ],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.ArgumentOutOfRangeException",
+              "SourcePath": "System.Uri.GetComponentsHelper(System.UriComponents, System.UriFormat)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentOutOfRangeException..ctor(string)-\u003Evoid",
             "System.Globalization.CultureInfo.get_InvariantCulture()-\u003ESystem.Globalization.CultureInfo",
@@ -161,6 +213,54 @@
             "System.Uri._info",
             "System.Uri._syntax"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentOutOfRangeException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Globalization.CultureInfo.get_InvariantCulture()-\u003ESystem.Globalization.CultureInfo",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Uri.EnsureHostString(bool)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Uri.EnsureParseRemaining()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Uri.GetEscapedParts(System.UriComponents)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Uri.GetUnescapedParts(System.UriComponents, System.UriFormat)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.UriParser.get_DefaultPort()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.UriParser.get_SchemeName()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "ushort.ToString(System.IFormatProvider)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -188,10 +288,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.UriParser.InFact(System.UriSyntaxFlags)-\u003Ebool"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.UriParser.InFact(System.UriSyntaxFlags)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],

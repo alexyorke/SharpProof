@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T10:23:33.8874128+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:44.7530924+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -25,6 +25,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "char.IsWhiteSpace(char)-\u003Ebool",
             "string.TrimWhiteSpaceHelper(System.Text.TrimType)-\u003Estring",
@@ -34,6 +36,29 @@
           "Fields": [
             "System.String._firstChar"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "char.IsWhiteSpace(char)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.TrimWhiteSpaceHelper(System.Text.TrimType)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Chars(int)-\u003Echar",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -60,6 +85,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.TrimHelper(char*, int, System.Text.TrimType)-\u003Estring",
             "string.get_Chars(int)-\u003Echar",
@@ -68,6 +95,24 @@
           "Fields": [
             "System.String._firstChar"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.TrimHelper(char*, int, System.Text.TrimType)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Chars(int)-\u003Echar",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -93,11 +138,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.TrimHelper(char*, int, System.Text.TrimType)-\u003Estring",
             "string.TrimWhiteSpaceHelper(System.Text.TrimType)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.TrimHelper(char*, int, System.Text.TrimType)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.TrimWhiteSpaceHelper(System.Text.TrimType)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -123,10 +183,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.TrimWhiteSpaceHelper(System.Text.TrimType)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.TrimWhiteSpaceHelper(System.Text.TrimType)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -152,10 +222,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.TrimHelper(char*, int, System.Text.TrimType)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.TrimHelper(char*, int, System.Text.TrimType)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -181,11 +261,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.TrimHelper(char*, int, System.Text.TrimType)-\u003Estring",
             "string.TrimWhiteSpaceHelper(System.Text.TrimType)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.TrimHelper(char*, int, System.Text.TrimType)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.TrimWhiteSpaceHelper(System.Text.TrimType)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -211,10 +306,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.TrimWhiteSpaceHelper(System.Text.TrimType)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.TrimWhiteSpaceHelper(System.Text.TrimType)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -240,10 +345,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.TrimHelper(char*, int, System.Text.TrimType)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.TrimHelper(char*, int, System.Text.TrimType)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -269,11 +384,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.TrimHelper(char*, int, System.Text.TrimType)-\u003Estring",
             "string.TrimWhiteSpaceHelper(System.Text.TrimType)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.TrimHelper(char*, int, System.Text.TrimType)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.TrimWhiteSpaceHelper(System.Text.TrimType)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -299,6 +429,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "char.IsWhiteSpace(char)-\u003Ebool",
             "string.CreateTrimmedString(int, int)-\u003Estring",
@@ -306,6 +438,29 @@
             "string.get_Length()-\u003Eint"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "char.IsWhiteSpace(char)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.CreateTrimmedString(int, int)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Chars(int)-\u003Echar",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -331,12 +486,32 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.CreateTrimmedString(int, int)-\u003Estring",
             "string.get_Chars(int)-\u003Echar",
             "string.get_Length()-\u003Eint"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.CreateTrimmedString(int, int)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Chars(int)-\u003Echar",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-19T04:26:26.1134174+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:04.976773+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Console",
@@ -61,6 +61,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -121,6 +122,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -187,6 +189,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -247,6 +250,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -284,6 +288,7 @@
           "Calls": [],
           "Fields": [],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "conservative_unknown",
             "Categories": [
@@ -327,9 +332,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -371,6 +378,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -414,6 +422,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -457,9 +466,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -501,9 +513,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -545,9 +560,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -590,9 +608,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -635,9 +656,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -680,9 +704,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -725,9 +752,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -770,9 +800,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -815,9 +848,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -859,9 +894,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -903,9 +940,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -950,9 +989,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -998,9 +1040,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1043,9 +1088,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1087,9 +1134,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1131,6 +1180,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -1187,6 +1237,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -1225,6 +1276,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1267,6 +1319,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1326,6 +1379,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1385,6 +1439,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1474,6 +1529,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1528,9 +1584,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1580,9 +1639,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1647,6 +1709,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1716,6 +1779,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1773,9 +1837,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1885,6 +1952,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1934,9 +2002,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1982,9 +2053,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -2035,9 +2109,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -2087,9 +2163,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -2134,9 +2212,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -2182,9 +2263,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -2231,9 +2315,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -2280,9 +2367,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -2314,6 +2404,7 @@
           "Calls": [],
           "Fields": [],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2352,9 +2443,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -2465,6 +2559,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -2511,15 +2606,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "pure",
-            "Categories": [],
-            "FirstBlockingCallChain": [],
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "unknown_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.SR.GetResourceString(string)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
+            "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "none"
+            "EffectVisibilityClassification": "unknown"
           }
         },
         {
@@ -2547,6 +2647,7 @@
             "System.Text.ValueStringBuilder._pos"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2581,6 +2682,7 @@
             "System.Text.ValueStringBuilder._pos"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -2624,6 +2726,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2672,6 +2775,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2713,6 +2817,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2884,6 +2989,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2901,9 +3007,9 @@
   "PurityReport": {
     "SchemaVersion": 3,
     "MethodCount": 54,
-    "PureCount": 9,
+    "PureCount": 8,
     "ImpureCount": 44,
-    "ConservativeUnknownCount": 1,
+    "ConservativeUnknownCount": 2,
     "CatalogComparison": {
       "KnownPureMembers": [],
       "KnownImpureMembers": [],
@@ -3044,8 +3150,10 @@
         "MetadataToken": "0x06000051",
         "MethodBodySha256": "c94983393efaf913a7157691f8164928194ddb3d20915051efca3f4a37a8d605",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3070,8 +3178,10 @@
         "MetadataToken": "0x06000058",
         "MethodBodySha256": "4604669044e8fb66a3c022c40d7c56014c19a753d1e6e551f414e26dd09401ac",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3097,8 +3207,10 @@
         "MetadataToken": "0x06000056",
         "MethodBodySha256": "28db9ca692ebe029c486a20fb0eb446a3687e93ad4f93fde0f2edf6ac217b385",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3149,8 +3261,10 @@
         "MetadataToken": "0x06000069",
         "MethodBodySha256": "579cc0eb5c93976948a039b98e379d5018ecb2526489c8d85425956c494f17b9",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3176,8 +3290,9 @@
         "MetadataToken": "0x0600004D",
         "MethodBodySha256": "60c60e79c91a08de858fb3408ba0e923168864754e3f6bc4fe40e8bff51f04b3",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3202,8 +3317,10 @@
         "MetadataToken": "0x0600006B",
         "MethodBodySha256": "70fef63dc56a91d10bd08549a20c9784a8d5b10f935bd915d5297d9b2e7dab77",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3229,8 +3346,9 @@
         "MetadataToken": "0x06000067",
         "MethodBodySha256": "a4797cbce18afc61efc86bdd161a24e4b9c06318b67f3c17d2b01e6e1663b799",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3255,8 +3373,10 @@
         "MetadataToken": "0x06000053",
         "MethodBodySha256": "39f5bb7b76b2c18783fcc3c41534cdb16e34a5395235c07d5157db666ce5bcdf",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3281,8 +3401,9 @@
         "MetadataToken": "0x06000066",
         "MethodBodySha256": "c3586619924d68dbe65a88f562294bbafd1452c0f50ec199cbc48e78e6a2b91a",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3307,8 +3428,9 @@
         "MetadataToken": "0x06000065",
         "MethodBodySha256": "3852ef537530fc2d4cdfbb63546336e25c50ffce28436cb204bb35ae96aed042",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3358,8 +3480,9 @@
         "MetadataToken": "0x0600006E",
         "MethodBodySha256": "2bc4e21b5e649614074092298f791c1473d29c9d3fc98379bc2497c19f31fc23",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3384,8 +3507,9 @@
         "MetadataToken": "0x06000078",
         "MethodBodySha256": "cd757ec02b1fe2139803adb2a2600471e571eb5dcf1ddfea1768cf759fa7c8a9",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3410,8 +3534,10 @@
         "MetadataToken": "0x06000061",
         "MethodBodySha256": "179d1f9cbd5663bf23089407998f2f8844ab5069d5f34927e826f32ed0a41804",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3437,8 +3563,10 @@
         "MetadataToken": "0x0600005B",
         "MethodBodySha256": "db6126d80130aac25ff38d5e43c77d05517bba7049854aa4d2d7db1073411919",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3464,8 +3592,10 @@
         "MetadataToken": "0x0600005D",
         "MethodBodySha256": "de2defbbfe8544ebdec2aa817b7e533ced371a76dec2a8045c7ed0f2232ac9d4",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3491,8 +3621,10 @@
         "MetadataToken": "0x0600005F",
         "MethodBodySha256": "c374c227aba02468a0c8ac96f4a3df897a3f2429ea4b02bda00b938babe0bff9",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3538,8 +3670,10 @@
         "MetadataToken": "0x06000102",
         "MethodBodySha256": "6c7840836cc5073d7e0c96a26b39edd242a06878343f454de6df1066df5f8af4",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3563,7 +3697,7 @@
         "MetadataToken": "0x06000103",
         "MethodBodySha256": "8cd151adf2b387aa70196a634007cdc14dc60282bc509cb52a4370a481ff454e",
         "Classification": "impure",
-        "PrimaryCategory": "caller_visible_memory_write",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "caller_visible_memory_write",
           "global_state_read",
@@ -3591,8 +3725,10 @@
         "MetadataToken": "0x060000E7",
         "MethodBodySha256": "8482b737d4b1af27136129a593a6c29faec6369f4c913b307f4b65efdecb3276",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3637,8 +3773,10 @@
         "MetadataToken": "0x060000DE",
         "MethodBodySha256": "f265ac1f41f91d389dcc61ca2a3634fad1e56e04ea0295506a6c0eb4ad35fad8",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3662,8 +3800,10 @@
         "MetadataToken": "0x060000F1",
         "MethodBodySha256": "0febec40bbf9c226b2571939b582660fd084c1b319d7fa1fe1e6cf703bafcd1b",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3688,8 +3828,10 @@
         "MetadataToken": "0x060000EF",
         "MethodBodySha256": "18045251047b2dda3313f1e7102975e1ccff1252ddb93e61f0ba94d3e504ccf5",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3792,8 +3934,10 @@
         "MetadataToken": "0x060000E0",
         "MethodBodySha256": "a873e8301611ad25848821260531e1080c23241f21d87c1717202a97b5df8599",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3861,8 +4005,9 @@
         "MetadataToken": "0x060000F5",
         "MethodBodySha256": "d7cde75a1a7cc996aad35e89abecc135d1efbdf217b14692a24285f001e0de69",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3886,8 +4031,9 @@
         "MetadataToken": "0x060000F4",
         "MethodBodySha256": "fb42ee5948dcab5336ed34a9e40cad773771d07569b821fdb1ea20420cd91967",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -4013,8 +4159,10 @@
         "MetadataToken": "0x060000FC",
         "MethodBodySha256": "ee0609cc4e645c7e22e45ccb03f816ff7f3dc29da75323077d8417326a4c1b33",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -4039,8 +4187,10 @@
         "MetadataToken": "0x060000F6",
         "MethodBodySha256": "bf3ca47b64a99a6837968bb31523c2b3fb1e90ebfaa1d3daaf04f0c5ea57c6ac",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -4065,8 +4215,10 @@
         "MetadataToken": "0x060000F8",
         "MethodBodySha256": "33600fd01a9a9116265b0e2a4b260ecc4d50212c3db3e08c4af830ec57f9a068",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -4091,8 +4243,10 @@
         "MetadataToken": "0x060000FA",
         "MethodBodySha256": "a720fef84f41ed560fcf244ee02445865be84c85a93d190e41e7ed6e3c1b73b7",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -4136,15 +4290,19 @@
         "ModuleVersionId": "060fc4fa-c568-4535-982f-c524c7fb02c9",
         "MetadataToken": "0x06000124",
         "MethodBodySha256": "ce40f4e6f3407d5faa626a4471258c900d854649446f15dfa1ffc9212a117b40",
-        "Classification": "pure",
-        "PrimaryCategory": "generated_purity_summary",
-        "Categories": [],
-        "FirstBlockingCallChain": [],
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "unknown_callee",
+        "Categories": [
+          "unknown_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.SR.GetResourceString(string)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
+        "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "none"
+        "EffectVisibilityClassification": "unknown"
       },
       {
         "Symbol": "System.Text.ValueStringBuilder..ctor(System.Span\u00601\u003Cchar\u003E)",

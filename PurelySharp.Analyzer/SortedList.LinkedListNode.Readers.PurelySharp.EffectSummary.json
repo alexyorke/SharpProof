@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T15:18:20.5020256+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:09.9965177+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Collections",
@@ -24,10 +24,14 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
-            "System.Collections.Generic.LinkedListNode\u00601\u003C!0\u003E.item"
+            "System.Collections.Generic.LinkedListNode\u00601.item"
           ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -55,15 +59,30 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
             "System.Array.BinarySearch(!!0[], int, int, !!0, System.Collections.Generic.IComparer\u00601\u003C!!0\u003E)-\u003Eint"
           ],
           "Fields": [
-            "System.Collections.Generic.SortedList\u00602\u003C!0, !1\u003E._size",
-            "System.Collections.Generic.SortedList\u00602\u003C!0, !1\u003E.comparer",
-            "System.Collections.Generic.SortedList\u00602\u003C!0, !1\u003E.keys"
+            "System.Collections.Generic.SortedList\u00602._size",
+            "System.Collections.Generic.SortedList\u00602.comparer",
+            "System.Collections.Generic.SortedList\u00602.keys"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Array.BinarySearch(!!0[], int, int, !!0, System.Collections.Generic.IComparer\u00601\u003C!!0\u003E)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],

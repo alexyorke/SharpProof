@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T07:04:40.1142699+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:31.0312487+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -30,12 +30,37 @@
             "System.ArgumentException"
           ],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.ArgumentException",
+              "SourcePath": "System.String.CompareTo(object)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentException..ctor(string)-\u003Evoid",
             "System.SR.get_Arg_MustBeString()-\u003Estring",
             "string.CompareTo(string)-\u003Eint"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_Arg_MustBeString()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.CompareTo(string)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -63,10 +88,27 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.Compare(string, string, System.StringComparison)-\u003Eint"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.Compare(string, string, System.StringComparison)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": [
+                {
+                  "Target": "argument",
+                  "ParameterIndex": 2,
+                  "Type": "System.StringComparison",
+                  "Value": "System.StringComparison.CurrentCulture"
+                }
+              ]
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -90,8 +132,12 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -115,8 +161,12 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -140,8 +190,12 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -172,6 +226,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.MemoryExtensions.IndexOfAny(System.ReadOnlySpan\u00601\u003C!!0\u003E, System.Buffers.SearchValues\u00601\u003C!!0\u003E)-\u003Eint",
             "System.ReadOnlySpan\u00601\u003Cchar\u003E.Slice(int)-\u003ESystem.ReadOnlySpan\u00601\u003C!0\u003E",
@@ -184,6 +240,44 @@
           "Fields": [
             "System.String\u002BSearchValuesStorage.NewLineChars"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.MemoryExtensions.IndexOfAny(System.ReadOnlySpan\u00601\u003C!!0\u003E, System.Buffers.SearchValues\u00601\u003C!!0\u003E)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ReadOnlySpan\u00601\u003Cchar\u003E.Slice(int)-\u003ESystem.ReadOnlySpan\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ReadOnlySpan\u00601\u003Cchar\u003E.get_Item(int)-\u003Eref !0",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ReadOnlySpan\u00601\u003Cchar\u003E.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Chars(int)-\u003Echar",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.op_Inequality(string, string)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -213,6 +307,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.SpanHelpers.IndexOfChar(ref char, char, int)-\u003Eint",
             "string.get_Length()-\u003Eint"
@@ -220,6 +316,19 @@
           "Fields": [
             "System.String._firstChar"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.SpanHelpers.IndexOfChar(ref char, char, int)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -245,11 +354,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.IndexOf(char, int, int)-\u003Eint",
             "string.get_Length()-\u003Eint"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.IndexOf(char, int, int)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -277,7 +401,7 @@
           ],
           "RootCandidates": [
             "dynamic_dispatch",
-            "safe_static_cache_read",
+            "global_state_read",
             "throw"
           ],
           "TransitiveRootCandidates": [],
@@ -285,6 +409,13 @@
             "System.ArgumentException"
           ],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.ArgumentException",
+              "SourcePath": "System.String.IndexOf(char, System.StringComparison)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentException..ctor(string, string)-\u003Evoid",
             "System.Globalization.CompareInfo.IndexOf(string, char, System.Globalization.CompareOptions)-\u003Eint",
@@ -298,12 +429,60 @@
           "Fields": [
             "System.Globalization.CompareInfo.Invariant"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentException..ctor(string, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Globalization.CompareInfo.IndexOf(string, char, System.Globalization.CompareOptions)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Globalization.CultureInfo.get_CompareInfo()-\u003ESystem.Globalization.CompareInfo",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Globalization.CultureInfo.get_CurrentCulture()-\u003ESystem.Globalization.CultureInfo",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_NotSupported_StringComparison()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.GetCaseCompareOfComparisonCulture(System.StringComparison)-\u003ESystem.Globalization.CompareOptions",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.IndexOf(char)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.IndexOfCharOrdinalIgnoreCase(char)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "impure_callee",
               "throw"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Globalization.CultureInfo.get_CurrentCulture()",
+              "System.Globalization.CultureInfo.InitializeUserDefaultCulture()"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
@@ -327,6 +506,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Globalization.Ordinal.IndexOfOrdinalIgnoreCase(System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E)-\u003Eint",
             "System.PackedSpanHelpers.IndexOfAny(ref char, char, char, int)-\u003Eint",
@@ -342,6 +523,59 @@
           "Fields": [
             "System.String._firstChar"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Globalization.Ordinal.IndexOfOrdinalIgnoreCase(System.ReadOnlySpan\u00601\u003Cchar\u003E, System.ReadOnlySpan\u00601\u003Cchar\u003E)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.PackedSpanHelpers.IndexOfAny(ref char, char, char, int)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.PackedSpanHelpers.get_PackedIndexOfIsSupported()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ReadOnlySpan\u00601\u003Cchar\u003E..ctor(ref !0)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SpanHelpers.IndexOfAnyChar(ref char, char, char, int)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SpanHelpers.IndexOfChar(ref char, char, int)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "char.IsAscii(char)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "char.IsAsciiLetter(char)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.op_Implicit(string)-\u003ESystem.ReadOnlySpan\u00601\u003Cchar\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -368,6 +602,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)-\u003Eref !!0",
             "System.SpanHelpers.IndexOfChar(ref char, char, int)-\u003Eint",
@@ -377,6 +613,29 @@
           "Fields": [
             "System.String._firstChar"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)-\u003Eref !!0",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SpanHelpers.IndexOfChar(ref char, char, int)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -404,6 +663,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.MemoryExtensions.IndexOfAny(System.ReadOnlySpan\u00601\u003C!!0\u003E, System.ReadOnlySpan\u00601\u003C!!0\u003E)-\u003Eint",
             "System.ReadOnlySpan\u00601\u003Cchar\u003E..ctor(ref !0, int)-\u003Evoid",
@@ -414,6 +675,34 @@
           "Fields": [
             "System.String._firstChar"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.MemoryExtensions.IndexOfAny(System.ReadOnlySpan\u00601\u003C!!0\u003E, System.ReadOnlySpan\u00601\u003C!!0\u003E)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ReadOnlySpan\u00601\u003Cchar\u003E..ctor(ref !0, int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ReadOnlySpan\u00601\u003Cchar\u003E.op_Implicit(!0[])-\u003ESystem.ReadOnlySpan\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ThrowHelper.ThrowArgumentNullException(System.ExceptionArgument)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -439,11 +728,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.IndexOfAny(char[], int, int)-\u003Eint",
             "string.get_Length()-\u003Eint"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.IndexOfAny(char[], int, int)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -471,6 +775,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.MemoryExtensions.IndexOfAny(System.ReadOnlySpan\u00601\u003C!!0\u003E, System.ReadOnlySpan\u00601\u003C!!0\u003E)-\u003Eint",
             "System.ReadOnlySpan\u00601\u003Cchar\u003E..ctor(ref !0, int)-\u003Evoid",
@@ -483,6 +789,44 @@
           "Fields": [
             "System.String._firstChar"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.MemoryExtensions.IndexOfAny(System.ReadOnlySpan\u00601\u003C!!0\u003E, System.ReadOnlySpan\u00601\u003C!!0\u003E)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ReadOnlySpan\u00601\u003Cchar\u003E..ctor(ref !0, int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ReadOnlySpan\u00601\u003Cchar\u003E.op_Implicit(!0[])-\u003ESystem.ReadOnlySpan\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)-\u003Eref !!0",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ThrowHelper.ThrowArgumentNullException(System.ExceptionArgument)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -508,18 +852,38 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.IndexOf(string, System.StringComparison)-\u003Eint"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.IndexOf(string, System.StringComparison)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": [
+                {
+                  "Target": "argument",
+                  "ParameterIndex": 1,
+                  "Type": "System.StringComparison",
+                  "Value": "System.StringComparison.CurrentCulture"
+                }
+              ]
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.String.IndexOf(string, System.StringComparison)",
-              "System.String.IndexOf(string, int, int, System.StringComparison)"
+              "System.String.IndexOf(string, int, int, System.StringComparison)",
+              "System.Globalization.CultureInfo.get_CurrentCulture()",
+              "System.Globalization.CultureInfo.InitializeUserDefaultCulture()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -542,18 +906,38 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.IndexOf(string, int, System.StringComparison)-\u003Eint"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.IndexOf(string, int, System.StringComparison)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": [
+                {
+                  "Target": "argument",
+                  "ParameterIndex": 2,
+                  "Type": "System.StringComparison",
+                  "Value": "System.StringComparison.CurrentCulture"
+                }
+              ]
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.String.IndexOf(string, int, System.StringComparison)",
-              "System.String.IndexOf(string, int, int, System.StringComparison)"
+              "System.String.IndexOf(string, int, int, System.StringComparison)",
+              "System.Globalization.CultureInfo.get_CurrentCulture()",
+              "System.Globalization.CultureInfo.InitializeUserDefaultCulture()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -576,17 +960,37 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.IndexOf(string, int, int, System.StringComparison)-\u003Eint"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.IndexOf(string, int, int, System.StringComparison)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": [
+                {
+                  "Target": "argument",
+                  "ParameterIndex": 3,
+                  "Type": "System.StringComparison",
+                  "Value": "System.StringComparison.CurrentCulture"
+                }
+              ]
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.String.IndexOf(string, int, int, System.StringComparison)"
+              "System.String.IndexOf(string, int, int, System.StringComparison)",
+              "System.Globalization.CultureInfo.get_CurrentCulture()",
+              "System.Globalization.CultureInfo.InitializeUserDefaultCulture()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -609,18 +1013,36 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.IndexOf(string, int, int, System.StringComparison)-\u003Eint",
             "string.get_Length()-\u003Eint"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.IndexOf(string, int, int, System.StringComparison)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.String.IndexOf(string, int, int, System.StringComparison)"
+              "System.String.IndexOf(string, int, int, System.StringComparison)",
+              "System.Globalization.CultureInfo.get_CurrentCulture()",
+              "System.Globalization.CultureInfo.InitializeUserDefaultCulture()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -643,18 +1065,36 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.IndexOf(string, int, int, System.StringComparison)-\u003Eint",
             "string.get_Length()-\u003Eint"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.IndexOf(string, int, int, System.StringComparison)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.String.IndexOf(string, int, int, System.StringComparison)"
+              "System.String.IndexOf(string, int, int, System.StringComparison)",
+              "System.Globalization.CultureInfo.get_CurrentCulture()",
+              "System.Globalization.CultureInfo.InitializeUserDefaultCulture()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -679,7 +1119,7 @@
           ],
           "RootCandidates": [
             "dynamic_dispatch",
-            "safe_static_cache_read",
+            "global_state_read",
             "throw"
           ],
           "TransitiveRootCandidates": [],
@@ -687,6 +1127,13 @@
             "System.ArgumentNullException"
           ],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.ArgumentNullException",
+              "SourcePath": "System.String.IndexOf(string, int, int, System.StringComparison)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentException..ctor(string, string)-\u003Evoid",
             "System.ArgumentNullException..ctor(string)-\u003Evoid",
@@ -700,12 +1147,60 @@
           "Fields": [
             "System.Globalization.CompareInfo.Invariant"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentException..ctor(string, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ArgumentNullException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Globalization.CompareInfo.IndexOf(string, string, int, int, System.Globalization.CompareOptions)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Globalization.CultureInfo.get_CompareInfo()-\u003ESystem.Globalization.CompareInfo",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Globalization.CultureInfo.get_CurrentCulture()-\u003ESystem.Globalization.CultureInfo",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Globalization.Ordinal.IndexOf(string, string, int, int, bool)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_NotSupported_StringComparison()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.GetCaseCompareOfComparisonCulture(System.StringComparison)-\u003ESystem.Globalization.CompareOptions",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "impure_callee",
               "throw"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Globalization.CultureInfo.get_CurrentCulture()",
+              "System.Globalization.CultureInfo.InitializeUserDefaultCulture()"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
@@ -824,11 +1319,16 @@
         "MetadataToken": "0x0600094B",
         "MethodBodySha256": "84c3c18d3934343164ecdc19df521918b4c00f2948f763480fa93735b08be9f4",
         "Classification": "impure",
-        "PrimaryCategory": "throw",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
+          "impure_callee",
           "throw"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Globalization.CultureInfo.get_CurrentCulture()",
+          "System.Globalization.CultureInfo.InitializeUserDefaultCulture()"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,
@@ -886,13 +1386,16 @@
         "MetadataToken": "0x06000951",
         "MethodBodySha256": "2047f92ce6f393bd37008b82da0c52761e80e8b0a4881ab72cb0969f7cd80edb",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.String.IndexOf(string, System.StringComparison)",
-          "System.String.IndexOf(string, int, int, System.StringComparison)"
+          "System.String.IndexOf(string, int, int, System.StringComparison)",
+          "System.Globalization.CultureInfo.get_CurrentCulture()",
+          "System.Globalization.CultureInfo.InitializeUserDefaultCulture()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -911,12 +1414,15 @@
         "MetadataToken": "0x06000954",
         "MethodBodySha256": "25e2d3d1fcf5be881b70f43a377908e5dced990d0fbad644cc42b54de43ec0c6",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.String.IndexOf(string, int, int, System.StringComparison)"
+          "System.String.IndexOf(string, int, int, System.StringComparison)",
+          "System.Globalization.CultureInfo.get_CurrentCulture()",
+          "System.Globalization.CultureInfo.InitializeUserDefaultCulture()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -935,13 +1441,16 @@
         "MetadataToken": "0x06000952",
         "MethodBodySha256": "0f382e5964047113b5004b5a1f32404a6c69e9c54f651ef64116585376e1b724",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.String.IndexOf(string, int, System.StringComparison)",
-          "System.String.IndexOf(string, int, int, System.StringComparison)"
+          "System.String.IndexOf(string, int, int, System.StringComparison)",
+          "System.Globalization.CultureInfo.get_CurrentCulture()",
+          "System.Globalization.CultureInfo.InitializeUserDefaultCulture()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -960,12 +1469,15 @@
         "MetadataToken": "0x06000955",
         "MethodBodySha256": "9f3a85a776176728bd4f8f2c961e934829e304678747d41ed78de84661efd196",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.String.IndexOf(string, int, int, System.StringComparison)"
+          "System.String.IndexOf(string, int, int, System.StringComparison)",
+          "System.Globalization.CultureInfo.get_CurrentCulture()",
+          "System.Globalization.CultureInfo.InitializeUserDefaultCulture()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -984,12 +1496,15 @@
         "MetadataToken": "0x06000953",
         "MethodBodySha256": "2137623dca27dc1b18c5fdbfe8ce30022e82c8683873b4e21f5c517a715afa8c",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.String.IndexOf(string, int, int, System.StringComparison)"
+          "System.String.IndexOf(string, int, int, System.StringComparison)",
+          "System.Globalization.CultureInfo.get_CurrentCulture()",
+          "System.Globalization.CultureInfo.InitializeUserDefaultCulture()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -1008,11 +1523,16 @@
         "MetadataToken": "0x06000956",
         "MethodBodySha256": "bd27bf8a6517427157d8a725a5df69e5ae6a8acb38e5c3c625f287e5591ee004",
         "Classification": "impure",
-        "PrimaryCategory": "throw",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
+          "impure_callee",
           "throw"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Globalization.CultureInfo.get_CurrentCulture()",
+          "System.Globalization.CultureInfo.InitializeUserDefaultCulture()"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,

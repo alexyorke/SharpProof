@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T15:46:46.6162139+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:10.135652+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Collections",
@@ -28,12 +28,22 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Collections.Generic.SortedSet\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E.get_Count()-\u003Eint"
           ],
           "Fields": [
-            "System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E._set"
+            "System.Collections.Generic.SortedDictionary\u00602._set"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Generic.SortedSet\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E.get_Count()-\u003Eint",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -63,12 +73,22 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Collections.Generic.SortedSet\u00601\u003C!0\u003E.VersionCheck(bool)-\u003Evoid"
           ],
           "Fields": [
-            "System.Collections.Generic.SortedSet\u00601\u003C!0\u003E.count"
+            "System.Collections.Generic.SortedSet\u00601.count"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Generic.SortedSet\u00601\u003C!0\u003E.VersionCheck(bool)-\u003Evoid",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -92,8 +112,12 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],

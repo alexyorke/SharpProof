@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T20:45:50.386687+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:06.3587304+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -28,14 +28,34 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Collections.Generic.Comparer\u00601\u003C!!0\u003E.Compare(!0, !0)-\u003Eint",
             "System.Collections.Generic.Comparer\u00601\u003C!!0\u003E.get_Default()-\u003ESystem.Collections.Generic.Comparer\u00601\u003C!0\u003E",
             "System.Nullable\u00601\u003C!!0\u003E.get_HasValue()-\u003Ebool"
           ],
           "Fields": [
-            "System.Nullable\u00601\u003C!!0\u003E.value"
+            "System.Nullable\u00601.value"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Generic.Comparer\u00601\u003C!!0\u003E.Compare(!0, !0)-\u003Eint",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.Comparer\u00601\u003C!!0\u003E.get_Default()-\u003ESystem.Collections.Generic.Comparer\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Nullable\u00601\u003C!!0\u003E.get_HasValue()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "conservative_unknown",
             "Categories": [
@@ -68,14 +88,34 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Collections.Generic.EqualityComparer\u00601\u003C!!0\u003E.Equals(!0, !0)-\u003Ebool",
             "System.Collections.Generic.EqualityComparer\u00601\u003C!!0\u003E.get_Default()-\u003ESystem.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E",
             "System.Nullable\u00601\u003C!!0\u003E.get_HasValue()-\u003Ebool"
           ],
           "Fields": [
-            "System.Nullable\u00601\u003C!!0\u003E.value"
+            "System.Nullable\u00601.value"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Generic.EqualityComparer\u00601\u003C!!0\u003E.Equals(!0, !0)-\u003Ebool",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.EqualityComparer\u00601\u003C!!0\u003E.get_Default()-\u003ESystem.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Nullable\u00601\u003C!!0\u003E.get_HasValue()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "conservative_unknown",
             "Categories": [

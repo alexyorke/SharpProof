@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T17:55:50.5435233+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:45:55.8456067+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -24,13 +24,24 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Stopwatch.QueryPerformanceCounter()-\u003Elong"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Stopwatch.QueryPerformanceCounter()-\u003Elong",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -58,10 +69,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -106,8 +127,9 @@
         "MetadataToken": "0x06007C0D",
         "MethodBodySha256": "44bf8c087282e7a60a05f28dd5ba389937c84b9d187e819a9294b969d795058c",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [

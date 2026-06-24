@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T15:25:32.3755723+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:10.0654294+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Collections",
@@ -32,14 +32,34 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
             "System.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E..ctor(!0, !1)-\u003Evoid",
             "System.Collections.Generic.SortedSet\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E.Contains(!0)-\u003Ebool"
           ],
           "Fields": [
-            "System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E._set"
+            "System.Collections.Generic.SortedDictionary\u00602._set"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E..ctor(!0, !1)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.SortedSet\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E.Contains(!0)-\u003Ebool",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -76,6 +96,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Collections.Generic.EqualityComparer\u00601\u003C!1\u003E.get_Default()-\u003ESystem.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E",
             "System.Collections.Generic.SortedDictionary\u00602\u002B\u003C\u003Ec__DisplayClass34_0\u003C!0, !1\u003E..ctor()-\u003Evoid",
@@ -86,12 +108,40 @@
             "System.Collections.Generic.TreeWalkPredicate\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E..ctor(object, nint)-\u003Evoid"
           ],
           "Fields": [
-            "System.Collections.Generic.SortedDictionary\u00602\u002B\u003C\u003Ec__DisplayClass34_0\u003C!0, !1\u003E.found",
-            "System.Collections.Generic.SortedDictionary\u00602\u002B\u003C\u003Ec__DisplayClass34_0\u003C!0, !1\u003E.value",
-            "System.Collections.Generic.SortedDictionary\u00602\u002B\u003C\u003Ec__DisplayClass34_1\u003C!0, !1\u003E.CS$\u003C\u003E8__locals1",
-            "System.Collections.Generic.SortedDictionary\u00602\u002B\u003C\u003Ec__DisplayClass34_1\u003C!0, !1\u003E.valueComparer",
-            "System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E._set"
+            "System.Collections.Generic.SortedDictionary\u00602\u002B\u003C\u003Ec__DisplayClass34_0.found",
+            "System.Collections.Generic.SortedDictionary\u00602\u002B\u003C\u003Ec__DisplayClass34_0.value",
+            "System.Collections.Generic.SortedDictionary\u00602\u002B\u003C\u003Ec__DisplayClass34_1.CS$\u003C\u003E8__locals1",
+            "System.Collections.Generic.SortedDictionary\u00602\u002B\u003C\u003Ec__DisplayClass34_1.valueComparer",
+            "System.Collections.Generic.SortedDictionary\u00602._set"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Generic.EqualityComparer\u00601\u003C!1\u003E.get_Default()-\u003ESystem.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.SortedDictionary\u00602\u002B\u003C\u003Ec__DisplayClass34_0\u003C!0, !1\u003E..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.SortedDictionary\u00602\u002B\u003C\u003Ec__DisplayClass34_1\u003C!0, !1\u003E..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.SortedSet\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E.InOrderTreeWalk(System.Collections.Generic.TreeWalkPredicate\u00601\u003C!0\u003E)-\u003Ebool",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.TreeWalkPredicate\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E..ctor(object, nint)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -127,6 +177,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
             "System.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E..ctor(!0, !1)-\u003Evoid",
@@ -135,8 +187,36 @@
             "System.Collections.Generic.SortedSet\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E.FindNode(!0)-\u003ESystem.Collections.Generic.SortedSet\u00601\u002BNode\u003C!0\u003E"
           ],
           "Fields": [
-            "System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E._set"
+            "System.Collections.Generic.SortedDictionary\u00602._set"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E..ctor(!0, !1)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E.get_Value()-\u003E!1",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.SortedSet\u00601\u002BNode\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E.get_Item()-\u003E!0",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.SortedSet\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E.FindNode(!0)-\u003ESystem.Collections.Generic.SortedSet\u00601\u002BNode\u003C!0\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [

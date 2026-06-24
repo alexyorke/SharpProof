@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-19T01:46:17.3289105+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:16.897113+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -26,12 +26,15 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
-            "System.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E.key",
-            "System.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E.value"
+            "System.Collections.Generic.KeyValuePair\u00602.key",
+            "System.Collections.Generic.KeyValuePair\u00602.value"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -57,11 +60,14 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
-            "System.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E.key"
+            "System.Collections.Generic.KeyValuePair\u00602.key"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -87,11 +93,14 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
-            "System.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E.value"
+            "System.Collections.Generic.KeyValuePair\u00602.value"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],

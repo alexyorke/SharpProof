@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T15:54:44.1800209+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:11.0770998+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.ObjectModel",
@@ -29,6 +29,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "Enumerator\u003C!1\u003E.MoveNext()-\u003Ebool",
             "Enumerator\u003C!1\u003E.get_Current()-\u003E!0",
@@ -41,16 +43,67 @@
             "System.IDisposable.Dispose()-\u003Evoid"
           ],
           "Fields": [
-            "System.Collections.ObjectModel.KeyedCollection\u00602\u003C!0, !1\u003E.comparer",
-            "System.Collections.ObjectModel.KeyedCollection\u00602\u003C!0, !1\u003E.dict"
+            "System.Collections.ObjectModel.KeyedCollection\u00602.comparer",
+            "System.Collections.ObjectModel.KeyedCollection\u00602.dict"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "Enumerator\u003C!1\u003E.MoveNext()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "Enumerator\u003C!1\u003E.get_Current()-\u003E!0",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.Dictionary\u00602\u003C!0, !1\u003E.ContainsKey(!0)-\u003Ebool",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E.Equals(!0, !0)-\u003Ebool",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.List\u00601\u003C!1\u003E.GetEnumerator()-\u003EEnumerator\u003C!0\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.ObjectModel.KeyedCollection\u00602\u003C!0, !1\u003E.GetKeyForItem(!1)-\u003E!0",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.ObjectModel.KeyedCollection\u00602\u003C!0, !1\u003E.get_Items()-\u003ESystem.Collections.Generic.List\u00601\u003C!1\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.IDisposable.Dispose()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "conservative_unknown",
             "Categories": [
               "dynamic_dispatch",
+              "unknown_callee",
               "virtual_call"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.IDisposable.Dispose()"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -90,9 +143,12 @@
         "PrimaryCategory": "dynamic_dispatch",
         "Categories": [
           "dynamic_dispatch",
+          "unknown_callee",
           "virtual_call"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.IDisposable.Dispose()"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,

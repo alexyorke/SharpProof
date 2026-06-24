@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T22:57:27.5748567+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:15.4860076+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.ComponentModel.Annotations",
@@ -30,6 +30,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ComponentModel.DataAnnotations.RangeAttribute.GetValidationErrorMessage()-\u003Estring",
             "System.ComponentModel.DataAnnotations.RangeAttribute.set_Maximum(object)-\u003Evoid",
@@ -42,6 +44,39 @@
           "Fields": [
             "System.ComponentModel.DataAnnotations.RangeAttribute.\u003COperandType\u003Ek__BackingField"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.RangeAttribute.set_Maximum(object)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.RangeAttribute.set_Minimum(object)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.ValidationAttribute..ctor(bool)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.ValidationAttribute.set_ErrorMessageResourceAccessor(System.Func\u00601\u003Cstring\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Func\u00601\u003Cstring\u003E..ctor(object, nint)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -74,10 +109,14 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
             "System.ComponentModel.DataAnnotations.RangeAttribute.\u003CMinimum\u003Ek__BackingField"
           ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -107,10 +146,14 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
             "System.ComponentModel.DataAnnotations.RangeAttribute.\u003CMaximum\u003Ek__BackingField"
           ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -138,6 +181,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ComponentModel.DataAnnotations.RangeAttribute.get_MaximumIsExclusive()-\u003Ebool",
             "System.ComponentModel.DataAnnotations.RangeAttribute.get_MinimumIsExclusive()-\u003Ebool",
@@ -147,6 +192,39 @@
             "System.SR.get_RangeAttribute_ValidationError_MinExclusive_MaxExclusive()-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.RangeAttribute.get_MaximumIsExclusive()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.RangeAttribute.get_MinimumIsExclusive()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_RangeAttribute_ValidationError()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_RangeAttribute_ValidationError_MaxExclusive()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_RangeAttribute_ValidationError_MinExclusive()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_RangeAttribute_ValidationError_MinExclusive_MaxExclusive()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -179,6 +257,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ComponentModel.DataAnnotations.RequiredAttribute\u002B\u003C\u003Ec.\u003C.ctor\u003Eb__0_0()-\u003Estring",
             "System.ComponentModel.DataAnnotations.ValidationAttribute..ctor(System.Func\u00601\u003Cstring\u003E)-\u003Evoid",
@@ -188,6 +268,19 @@
             "System.ComponentModel.DataAnnotations.RequiredAttribute\u002B\u003C\u003Ec.\u003C\u003E9",
             "System.ComponentModel.DataAnnotations.RequiredAttribute\u002B\u003C\u003Ec.\u003C\u003E9__0_0"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.ValidationAttribute..ctor(System.Func\u00601\u003Cstring\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Func\u00601\u003Cstring\u003E..ctor(object, nint)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -216,10 +309,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.SR.get_RequiredAttribute_ValidationError()-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.SR.get_RequiredAttribute_ValidationError()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -254,6 +357,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ComponentModel.DataAnnotations.StringLengthAttribute\u002B\u003C\u003Ec.\u003C.ctor\u003Eb__0_0()-\u003Estring",
             "System.ComponentModel.DataAnnotations.ValidationAttribute..ctor(System.Func\u00601\u003Cstring\u003E)-\u003Evoid",
@@ -264,6 +369,19 @@
             "System.ComponentModel.DataAnnotations.StringLengthAttribute\u002B\u003C\u003Ec.\u003C\u003E9__0_0",
             "System.ComponentModel.DataAnnotations.StringLengthAttribute.\u003CMaximumLength\u003Ek__BackingField"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.ValidationAttribute..ctor(System.Func\u00601\u003Cstring\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Func\u00601\u003Cstring\u003E..ctor(object, nint)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -293,10 +411,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.SR.get_StringLengthAttribute_ValidationError()-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.SR.get_StringLengthAttribute_ValidationError()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -325,12 +453,22 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Attribute..ctor()-\u003Evoid"
           ],
           "Fields": [
             "System.ComponentModel.DataAnnotations.ValidationAttribute._errorMessageResourceAccessor"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Attribute..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -356,10 +494,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Attribute..ctor()-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Attribute..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -387,10 +535,14 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
             "System.ComponentModel.DataAnnotations.ValidationAttribute._errorMessageResourceAccessor"
           ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -542,7 +694,7 @@
         "MetadataToken": "0x06000148",
         "MethodBodySha256": "a5817a824197714d5cdabb4766b2b067531b7318d83cbb65e9b307727762a13b",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "global_state_read",
           "global_state_write"
@@ -585,7 +737,7 @@
         "MetadataToken": "0x06000151",
         "MethodBodySha256": "49c888373cfbfb2f74509fdec89da4927ea5a3a5eda7af22c561f64989ef4e7d",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "global_state_read",
           "global_state_write",

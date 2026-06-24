@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T06:25:45.2495056+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:42.042635+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -22,11 +22,13 @@
             "reads_static_field"
           ],
           "RootCandidates": [
-            "safe_static_cache_read"
+            "global_state_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.InternalSubString(int, int)-\u003Estring",
             "string.ThrowSubstringArgumentOutOfRange(int, int)-\u003Evoid",
@@ -35,6 +37,24 @@
           "Fields": [
             "System.String.Empty"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.InternalSubString(int, int)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.ThrowSubstringArgumentOutOfRange(int, int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -58,11 +78,13 @@
             "reads_static_field"
           ],
           "RootCandidates": [
-            "safe_static_cache_read"
+            "global_state_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.InternalSubString(int, int)-\u003Estring",
             "string.ThrowSubstringArgumentOutOfRange(int, int)-\u003Evoid",
@@ -71,6 +93,24 @@
           "Fields": [
             "System.String.Empty"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "string.InternalSubString(int, int)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.ThrowSubstringArgumentOutOfRange(int, int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "string.get_Length()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],

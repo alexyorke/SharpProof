@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T21:57:19.9966113+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:45:56.7444309+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -8,7 +8,7 @@
       "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
       "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
       "MethodCount": 34519,
-      "EmittedMethodCount": 15,
+      "EmittedMethodCount": 14,
       "Methods": [
         {
           "Symbol": "System.Object..ctor()",
@@ -22,8 +22,12 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -51,10 +55,14 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
             "System.TimeSpan._ticks"
           ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -80,11 +88,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Stopwatch.Reset()-\u003Evoid",
             "object..ctor()-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Stopwatch.Reset()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "object..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -114,6 +137,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Stopwatch.GetTimestamp()-\u003Elong"
           ],
@@ -121,17 +146,20 @@
             "System.Diagnostics.Stopwatch._isRunning",
             "System.Diagnostics.Stopwatch._startTimeStamp"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Stopwatch.GetTimestamp()-\u003Elong",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "impure_callee",
               "object_state_write"
             ],
-            "FirstBlockingCallChain": [
-              "System.Diagnostics.Stopwatch.GetTimestamp()",
-              "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
-              "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
-            ],
+            "FirstBlockingCallChain": [],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -154,11 +182,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Stopwatch..ctor()-\u003Evoid",
             "System.Diagnostics.Stopwatch.Start()-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Stopwatch..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Diagnostics.Stopwatch.Start()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -195,6 +238,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Stopwatch.GetTimestamp()-\u003Elong"
           ],
@@ -203,17 +248,20 @@
             "System.Diagnostics.Stopwatch._isRunning",
             "System.Diagnostics.Stopwatch._startTimeStamp"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Stopwatch.GetTimestamp()-\u003Elong",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "impure_callee",
               "object_state_write"
             ],
-            "FirstBlockingCallChain": [
-              "System.Diagnostics.Stopwatch.GetTimestamp()",
-              "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
-              "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
-            ],
+            "FirstBlockingCallChain": [],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -237,12 +285,16 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
             "System.Diagnostics.Stopwatch._elapsed",
             "System.Diagnostics.Stopwatch._isRunning",
             "System.Diagnostics.Stopwatch._startTimeStamp"
           ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -270,10 +322,14 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
             "System.Diagnostics.Stopwatch._isRunning"
           ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -300,22 +356,34 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Stopwatch.GetElapsedDateTimeTicks()-\u003Elong",
             "System.TimeSpan..ctor(long)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Stopwatch.GetElapsedDateTimeTicks()-\u003Elong",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.TimeSpan..ctor(long)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.Diagnostics.Stopwatch.GetElapsedDateTimeTicks()",
-              "System.Diagnostics.Stopwatch.GetRawElapsedTicks()",
-              "System.Diagnostics.Stopwatch.GetTimestamp()",
-              "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
-              "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
+              "System.Diagnostics.Stopwatch.GetElapsedDateTimeTicks()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -338,21 +406,28 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Stopwatch.GetElapsedDateTimeTicks()-\u003Elong"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Stopwatch.GetElapsedDateTimeTicks()-\u003Elong",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.Diagnostics.Stopwatch.GetElapsedDateTimeTicks()",
-              "System.Diagnostics.Stopwatch.GetRawElapsedTicks()",
-              "System.Diagnostics.Stopwatch.GetTimestamp()",
-              "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
-              "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
+              "System.Diagnostics.Stopwatch.GetElapsedDateTimeTicks()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -375,10 +450,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Stopwatch.GetRawElapsedTicks()-\u003Elong"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Stopwatch.GetRawElapsedTicks()-\u003Elong",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -411,13 +496,24 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Stopwatch.QueryPerformanceCounter()-\u003Elong"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Stopwatch.QueryPerformanceCounter()-\u003Elong",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -446,6 +542,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Stopwatch.GetTimestamp()-\u003Elong"
           ],
@@ -454,6 +552,14 @@
             "System.Diagnostics.Stopwatch._isRunning",
             "System.Diagnostics.Stopwatch._startTimeStamp"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Stopwatch.GetTimestamp()-\u003Elong",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -488,60 +594,31 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Stopwatch.GetRawElapsedTicks()-\u003Elong"
           ],
           "Fields": [
             "System.Diagnostics.Stopwatch.s_tickFrequency"
           ],
-          "PurityClassification": {
-            "Classification": "impure",
-            "Categories": [
-              "global_state_read",
-              "impure_callee"
-            ],
-            "FirstBlockingCallChain": [
-              "System.Diagnostics.Stopwatch.GetRawElapsedTicks()",
-              "System.Diagnostics.Stopwatch.GetTimestamp()",
-              "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
-              "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
-            ],
-            "HasFreshArrayAllocationEvidence": false,
-            "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": true,
-            "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "caller_visible"
-          }
-        },
-        {
-          "Symbol": "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
-          "ExactSymbolKey": "System.Diagnostics.Stopwatch.QueryPerformanceCounter()-\u003Elong",
-          "MetadataToken": "0x06007C14",
-          "RelativeVirtualAddress": 8187392,
-          "MethodBodySha256": "c25bc2f1738d6a43a9b375c025a912afb94e45e0842218e11a4631cf64c7f186",
-          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06007C14|il:c25bc2f1738d6a43a9b375c025a912afb94e45e0842218e11a4631cf64c7f186",
-          "Effects": [
-            "calls_method"
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Stopwatch.GetRawElapsedTicks()-\u003Elong",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
           ],
-          "RootCandidates": [],
-          "TransitiveRootCandidates": [],
-          "ThrownExceptionTypes": [],
-          "TransitiveThrownExceptionTypes": [],
-          "Calls": [
-            "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
-          ],
-          "Fields": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
               "global_state_read"
             ],
-            "FirstBlockingCallChain": [
-              "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
-            ],
+            "FirstBlockingCallChain": [],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
+            "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "caller_visible"
           }
@@ -551,9 +628,9 @@
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 15,
+    "MethodCount": 14,
     "PureCount": 4,
-    "ImpureCount": 11,
+    "ImpureCount": 10,
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
       "KnownPureMembers": [],
@@ -597,15 +674,9 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_read",
         "Categories": [
-          "global_state_read",
-          "impure_callee"
+          "global_state_read"
         ],
-        "FirstBlockingCallChain": [
-          "System.Diagnostics.Stopwatch.GetRawElapsedTicks()",
-          "System.Diagnostics.Stopwatch.GetTimestamp()",
-          "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
-          "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
-        ],
+        "FirstBlockingCallChain": [],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
@@ -649,36 +720,13 @@
         "MetadataToken": "0x06007C0D",
         "MethodBodySha256": "44bf8c087282e7a60a05f28dd5ba389937c84b9d187e819a9294b969d795058c",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
-          "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
-        ],
-        "HasFreshArrayAllocationEvidence": false,
-        "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
-        "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "caller_visible"
-      },
-      {
-        "Symbol": "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
-        "ExactSymbolKey": "System.Diagnostics.Stopwatch.QueryPerformanceCounter()-\u003Elong",
-        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06007C14|il:c25bc2f1738d6a43a9b375c025a912afb94e45e0842218e11a4631cf64c7f186",
-        "AssemblyName": "System.Private.CoreLib",
-        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
-        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
-        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
-        "MetadataToken": "0x06007C14",
-        "MethodBodySha256": "c25bc2f1738d6a43a9b375c025a912afb94e45e0842218e11a4631cf64c7f186",
-        "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
-        "Categories": [
-          "global_state_read"
-        ],
-        "FirstBlockingCallChain": [
           "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
         ],
         "HasFreshArrayAllocationEvidence": false,
@@ -720,16 +768,11 @@
         "MetadataToken": "0x06007C03",
         "MethodBodySha256": "50f7d33c98064a552c6f5f38edc9acd5e363cad57b134dedeef1d6b1ac019e79",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "object_state_write",
         "Categories": [
-          "impure_callee",
           "object_state_write"
         ],
-        "FirstBlockingCallChain": [
-          "System.Diagnostics.Stopwatch.GetTimestamp()",
-          "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
-          "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
-        ],
+        "FirstBlockingCallChain": [],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
@@ -774,16 +817,11 @@
         "MetadataToken": "0x06007C05",
         "MethodBodySha256": "e43e9786a881a5aaf1363261101f0962fd3da830bc0f32838ff1da51b20d2380",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "object_state_write",
         "Categories": [
-          "impure_callee",
           "object_state_write"
         ],
-        "FirstBlockingCallChain": [
-          "System.Diagnostics.Stopwatch.GetTimestamp()",
-          "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
-          "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
-        ],
+        "FirstBlockingCallChain": [],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
@@ -801,16 +839,13 @@
         "MetadataToken": "0x06007C0A",
         "MethodBodySha256": "d64b079d7e29dd6374835b0be98776db413389819be3d0ef1dd85e94c4c7ec05",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.Diagnostics.Stopwatch.GetElapsedDateTimeTicks()",
-          "System.Diagnostics.Stopwatch.GetRawElapsedTicks()",
-          "System.Diagnostics.Stopwatch.GetTimestamp()",
-          "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
-          "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
+          "System.Diagnostics.Stopwatch.GetElapsedDateTimeTicks()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
@@ -829,16 +864,13 @@
         "MetadataToken": "0x06007C0B",
         "MethodBodySha256": "25271b5688db273801a7de88dc182468fa0c4201e231b7c0bac43501806f9e70",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.Diagnostics.Stopwatch.GetElapsedDateTimeTicks()",
-          "System.Diagnostics.Stopwatch.GetRawElapsedTicks()",
-          "System.Diagnostics.Stopwatch.GetTimestamp()",
-          "System.Diagnostics.Stopwatch.QueryPerformanceCounter()",
-          "Interop\u002BKernel32.QueryPerformanceCounter(long*)-\u003EInterop\u002BBOOL"
+          "System.Diagnostics.Stopwatch.GetElapsedDateTimeTicks()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,

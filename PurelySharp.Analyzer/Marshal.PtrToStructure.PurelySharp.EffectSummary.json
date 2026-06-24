@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-19T13:19:32.1121331+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:19.6047021+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -32,6 +32,7 @@
           "Calls": [],
           "Fields": [],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "conservative_unknown",
             "Categories": [
@@ -128,16 +129,15 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
               "global_state_read",
-              "impure_callee",
               "throw"
             ],
             "FirstBlockingCallChain": [
-              "System.ArgumentException..ctor(string, string)",
-              "System.Exception.set_HResult(int)"
+              "System.Runtime.InteropServices.Marshal.PtrToStructureHelper(nint, object, bool)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -173,6 +173,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "conservative_unknown",
             "Categories": [
@@ -216,6 +217,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "conservative_unknown",
             "Categories": [
@@ -305,16 +307,15 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
               "global_state_read",
-              "impure_callee",
               "throw"
             ],
             "FirstBlockingCallChain": [
-              "System.ArgumentException..ctor(string, string)",
-              "System.Exception.set_HResult(int)"
+              "System.Runtime.InteropServices.Marshal.PtrToStructureHelper(nint, object, bool)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -355,12 +356,10 @@
         "PrimaryCategory": "global_state_read",
         "Categories": [
           "global_state_read",
-          "impure_callee",
           "throw"
         ],
         "FirstBlockingCallChain": [
-          "System.ArgumentException..ctor(string, string)",
-          "System.Exception.set_HResult(int)"
+          "System.Runtime.InteropServices.Marshal.PtrToStructureHelper(nint, object, bool)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
@@ -406,12 +405,10 @@
         "PrimaryCategory": "global_state_read",
         "Categories": [
           "global_state_read",
-          "impure_callee",
           "throw"
         ],
         "FirstBlockingCallChain": [
-          "System.ArgumentException..ctor(string, string)",
-          "System.Exception.set_HResult(int)"
+          "System.Runtime.InteropServices.Marshal.PtrToStructureHelper(nint, object, bool)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,

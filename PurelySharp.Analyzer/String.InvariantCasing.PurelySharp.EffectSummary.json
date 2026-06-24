@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T06:25:42.9616789+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:35.112345+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -27,12 +27,22 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Globalization.TextInfo.ToLower(string)-\u003Estring"
           ],
           "Fields": [
             "System.Globalization.TextInfo.Invariant"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Globalization.TextInfo.ToLower(string)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -61,12 +71,22 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Globalization.TextInfo.ToUpper(string)-\u003Estring"
           ],
           "Fields": [
             "System.Globalization.TextInfo.Invariant"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Globalization.TextInfo.ToUpper(string)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],

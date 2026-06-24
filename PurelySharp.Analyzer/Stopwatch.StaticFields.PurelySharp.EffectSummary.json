@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T18:25:42.4459568+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:45:56.2937226+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -24,10 +24,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "Interop\u002BKernel32.QueryPerformanceFrequency(long*)-\u003EInterop\u002BBOOL"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "Interop\u002BKernel32.QueryPerformanceFrequency(long*)-\u003EInterop\u002BBOOL",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -62,6 +72,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Stopwatch.QueryPerformanceFrequency()-\u003Elong"
           ],
@@ -70,6 +82,14 @@
             "System.Diagnostics.Stopwatch.IsHighResolution",
             "System.Diagnostics.Stopwatch.s_tickFrequency"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Stopwatch.QueryPerformanceFrequency()-\u003Elong",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -117,7 +137,7 @@
         "MetadataToken": "0x06007C15",
         "MethodBodySha256": "7276cd8f815c24f04d41b64228b5d9f36b316d90a1db9e10e32dae8993a6140e",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
           "global_state_read",
           "global_state_write",

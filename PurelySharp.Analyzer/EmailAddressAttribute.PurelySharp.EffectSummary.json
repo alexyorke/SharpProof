@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T14:11:13.3078182+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:15.3829714+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.ComponentModel.Annotations",
@@ -8,8 +8,122 @@
       "AssemblySha256": "9f8d4aaea363b146b5484e663d817f0390ff20583b397c124411c50210338ae3",
       "ModuleVersionId": "0aa36e89-1ccc-4191-bc0c-1d66b204a18d",
       "MethodCount": 493,
-      "EmittedMethodCount": 1,
+      "EmittedMethodCount": 4,
       "Methods": [
+        {
+          "Symbol": "System.SR.get_EmailAddressAttribute_Invalid()",
+          "ExactSymbolKey": "System.SR.get_EmailAddressAttribute_Invalid()-\u003Estring",
+          "MetadataToken": "0x0600001D",
+          "RelativeVirtualAddress": 79112,
+          "MethodBodySha256": "593374083c9e970aa47c70037113708485d05d35bc4b8981227ebf716c94720d",
+          "CacheKey": "mvid:0aa36e89-1ccc-4191-bc0c-1d66b204a18d|token:0x0600001D|il:593374083c9e970aa47c70037113708485d05d35bc4b8981227ebf716c94720d",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.SR.GetResourceString(string, string)-\u003Estring"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.SR.GetResourceString(string, string)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.ComponentModel.DataAnnotations.DataTypeAttribute..ctor(System.ComponentModel.DataAnnotations.DataType)",
+          "ExactSymbolKey": "System.ComponentModel.DataAnnotations.DataTypeAttribute..ctor(System.ComponentModel.DataAnnotations.DataType)-\u003Evoid",
+          "MetadataToken": "0x06000089",
+          "RelativeVirtualAddress": 83004,
+          "MethodBodySha256": "34fc4730968c04dbb139b280bef4a1ee2309afb05f7f410924f0840dc666bbbb",
+          "CacheKey": "mvid:0aa36e89-1ccc-4191-bc0c-1d66b204a18d|token:0x06000089|il:34fc4730968c04dbb139b280bef4a1ee2309afb05f7f410924f0840dc666bbbb",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "object_state_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.ComponentModel.DataAnnotations.DataTypeAttribute.get_DisplayFormat()-\u003ESystem.ComponentModel.DataAnnotations.DisplayFormatAttribute",
+            "System.ComponentModel.DataAnnotations.DataTypeAttribute.set_DisplayFormat(System.ComponentModel.DataAnnotations.DisplayFormatAttribute)-\u003Evoid",
+            "System.ComponentModel.DataAnnotations.DisplayFormatAttribute..ctor()-\u003Evoid",
+            "System.ComponentModel.DataAnnotations.DisplayFormatAttribute.set_ApplyFormatInEditMode(bool)-\u003Evoid",
+            "System.ComponentModel.DataAnnotations.DisplayFormatAttribute.set_DataFormatString(string)-\u003Evoid",
+            "System.ComponentModel.DataAnnotations.ValidationAttribute..ctor()-\u003Evoid"
+          ],
+          "Fields": [
+            "System.ComponentModel.DataAnnotations.DataTypeAttribute.\u003CDataType\u003Ek__BackingField"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.DataTypeAttribute.get_DisplayFormat()-\u003ESystem.ComponentModel.DataAnnotations.DisplayFormatAttribute",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.DataTypeAttribute.set_DisplayFormat(System.ComponentModel.DataAnnotations.DisplayFormatAttribute)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.DisplayFormatAttribute..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.DisplayFormatAttribute.set_ApplyFormatInEditMode(bool)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.DisplayFormatAttribute.set_DataFormatString(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.ValidationAttribute..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
         {
           "Symbol": "System.ComponentModel.DataAnnotations.EmailAddressAttribute..ctor()",
           "ExactSymbolKey": "System.ComponentModel.DataAnnotations.EmailAddressAttribute..ctor()-\u003Evoid",
@@ -24,12 +138,32 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ComponentModel.DataAnnotations.DataTypeAttribute..ctor(System.ComponentModel.DataAnnotations.DataType)-\u003Evoid",
             "System.ComponentModel.DataAnnotations.ValidationAttribute.set_DefaultErrorMessage(string)-\u003Evoid",
             "System.SR.get_EmailAddressAttribute_Invalid()-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.DataTypeAttribute..ctor(System.ComponentModel.DataAnnotations.DataType)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.ValidationAttribute.set_DefaultErrorMessage(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_EmailAddressAttribute_Invalid()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -40,15 +174,62 @@
             "FreshnessClassification": "fresh_owned_object_write",
             "EffectVisibilityClassification": "internal_only"
           }
+        },
+        {
+          "Symbol": "System.ComponentModel.DataAnnotations.ValidationAttribute.set_DefaultErrorMessage(string)",
+          "ExactSymbolKey": "System.ComponentModel.DataAnnotations.ValidationAttribute.set_DefaultErrorMessage(string)-\u003Evoid",
+          "MetadataToken": "0x06000175",
+          "RelativeVirtualAddress": 90956,
+          "MethodBodySha256": "5b5158c04ce4d6ab580770b2f8c83b85dcc8b317164167e215489cd4cfe544bf",
+          "CacheKey": "mvid:0aa36e89-1ccc-4191-bc0c-1d66b204a18d|token:0x06000175|il:5b5158c04ce4d6ab580770b2f8c83b85dcc8b317164167e215489cd4cfe544bf",
+          "Effects": [
+            "calls_method",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "object_state_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.ComponentModel.DataAnnotations.ValidationAttribute.set_CustomErrorMessageSet(bool)-\u003Evoid"
+          ],
+          "Fields": [
+            "System.ComponentModel.DataAnnotations.ValidationAttribute._defaultErrorMessage",
+            "System.ComponentModel.DataAnnotations.ValidationAttribute._errorMessageResourceAccessor"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ComponentModel.DataAnnotations.ValidationAttribute.set_CustomErrorMessageSet(bool)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "object_state_write"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
         }
       ]
     }
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 1,
-    "PureCount": 1,
-    "ImpureCount": 0,
+    "MethodCount": 4,
+    "PureCount": 3,
+    "ImpureCount": 1,
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
       "KnownPureMembers": [],
@@ -59,6 +240,26 @@
   "GeneratedPurityCatalog": {
     "SchemaVersion": 2,
     "Entries": [
+      {
+        "Symbol": "System.ComponentModel.DataAnnotations.DataTypeAttribute..ctor(System.ComponentModel.DataAnnotations.DataType)",
+        "ExactSymbolKey": "System.ComponentModel.DataAnnotations.DataTypeAttribute..ctor(System.ComponentModel.DataAnnotations.DataType)-\u003Evoid",
+        "CacheKey": "mvid:0aa36e89-1ccc-4191-bc0c-1d66b204a18d|token:0x06000089|il:34fc4730968c04dbb139b280bef4a1ee2309afb05f7f410924f0840dc666bbbb",
+        "AssemblyName": "System.ComponentModel.Annotations",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.ComponentModel.Annotations.dll",
+        "AssemblySha256": "9f8d4aaea363b146b5484e663d817f0390ff20583b397c124411c50210338ae3",
+        "ModuleVersionId": "0aa36e89-1ccc-4191-bc0c-1d66b204a18d",
+        "MetadataToken": "0x06000089",
+        "MethodBodySha256": "34fc4730968c04dbb139b280bef4a1ee2309afb05f7f410924f0840dc666bbbb",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
       {
         "Symbol": "System.ComponentModel.DataAnnotations.EmailAddressAttribute..ctor()",
         "ExactSymbolKey": "System.ComponentModel.DataAnnotations.EmailAddressAttribute..ctor()-\u003Evoid",
@@ -78,6 +279,48 @@
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "fresh_owned_object_write",
         "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.ComponentModel.DataAnnotations.ValidationAttribute.set_DefaultErrorMessage(string)",
+        "ExactSymbolKey": "System.ComponentModel.DataAnnotations.ValidationAttribute.set_DefaultErrorMessage(string)-\u003Evoid",
+        "CacheKey": "mvid:0aa36e89-1ccc-4191-bc0c-1d66b204a18d|token:0x06000175|il:5b5158c04ce4d6ab580770b2f8c83b85dcc8b317164167e215489cd4cfe544bf",
+        "AssemblyName": "System.ComponentModel.Annotations",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.ComponentModel.Annotations.dll",
+        "AssemblySha256": "9f8d4aaea363b146b5484e663d817f0390ff20583b397c124411c50210338ae3",
+        "ModuleVersionId": "0aa36e89-1ccc-4191-bc0c-1d66b204a18d",
+        "MetadataToken": "0x06000175",
+        "MethodBodySha256": "5b5158c04ce4d6ab580770b2f8c83b85dcc8b317164167e215489cd4cfe544bf",
+        "Classification": "impure",
+        "PrimaryCategory": "object_state_write",
+        "Categories": [
+          "object_state_write"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.SR.get_EmailAddressAttribute_Invalid()",
+        "ExactSymbolKey": "System.SR.get_EmailAddressAttribute_Invalid()-\u003Estring",
+        "CacheKey": "mvid:0aa36e89-1ccc-4191-bc0c-1d66b204a18d|token:0x0600001D|il:593374083c9e970aa47c70037113708485d05d35bc4b8981227ebf716c94720d",
+        "AssemblyName": "System.ComponentModel.Annotations",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.ComponentModel.Annotations.dll",
+        "AssemblySha256": "9f8d4aaea363b146b5484e663d817f0390ff20583b397c124411c50210338ae3",
+        "ModuleVersionId": "0aa36e89-1ccc-4191-bc0c-1d66b204a18d",
+        "MetadataToken": "0x0600001D",
+        "MethodBodySha256": "593374083c9e970aa47c70037113708485d05d35bc4b8981227ebf716c94720d",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
       }
     ]
   }

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-19T02:49:45.3952486+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:01.3135937+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -33,6 +33,17 @@
             "System.OutOfMemoryException"
           ],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.InvalidOperationException",
+              "SourcePath": "Interop.GetRandomBytes(byte*, int)"
+            },
+            {
+              "ExceptionType": "System.OutOfMemoryException",
+              "SourcePath": "Interop.GetRandomBytes(byte*, int)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "Interop\u002BBCrypt.BCryptGenRandom(nint, byte*, int, int)-\u003EInterop\u002BBCrypt\u002BNTSTATUS",
             "System.InvalidOperationException..ctor()-\u003Evoid",
@@ -58,10 +69,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
               "global_state_read",
+              "impure_callee",
               "throw"
             ],
             "FirstBlockingCallChain": [
@@ -88,6 +101,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "Interop\u002BKernel32.CreateDirectoryPrivate(string, Interop\u002BKernel32\u002BSECURITY_ATTRIBUTES*)-\u003Ebool",
             "System.IO.PathInternal.EnsureExtendedPrefix(string)-\u003Estring"
@@ -105,6 +120,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -138,6 +154,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ReadOnlySpan\u00601\u003Cchar\u003E..ctor(ref !0, int)-\u003Evoid",
             "string.GetRawStringData()-\u003Eref char",
@@ -161,6 +179,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -186,6 +205,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.get_Length()-\u003Eint"
           ],
@@ -197,6 +218,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -223,6 +245,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nint)-\u003Eref !!0",
             "System.ThrowHelper.ThrowIndexOutOfRangeException()-\u003Evoid"
@@ -243,6 +267,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -268,11 +293,14 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
             "System.String._stringLength"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -296,11 +324,13 @@
             "reads_static_field"
           ],
           "RootCandidates": [
-            "safe_static_cache_read"
+            "global_state_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "string.InternalSubString(int, int)-\u003Estring",
             "string.ThrowSubstringArgumentOutOfRange(int, int)-\u003Evoid",
@@ -326,6 +356,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -352,6 +383,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Runtime.CompilerServices.Unsafe.As(ref !!0)-\u003Eref !!1",
             "System.SpanHelpers.ContainsValueType(ref !!0, !!0, int)-\u003Ebool",
@@ -377,6 +410,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -405,6 +439,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Exception.set_HResult(int)-\u003Evoid",
             "System.SystemException..ctor(string)-\u003Evoid"
@@ -424,15 +460,20 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "pure",
-            "Categories": [],
-            "FirstBlockingCallChain": [],
+            "Classification": "impure",
+            "Categories": [
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Exception.set_HResult(int)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": false,
-            "FreshnessClassification": "fresh_owned_object_write",
-            "EffectVisibilityClassification": "internal_only"
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
           }
         },
         {
@@ -449,6 +490,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentException.ThrowNullOrEmptyException(string, string)-\u003Evoid",
             "string.IsNullOrEmpty(string)-\u003Ebool"
@@ -466,6 +509,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -497,6 +541,13 @@
             "System.ArgumentException"
           ],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.ArgumentException",
+              "SourcePath": "System.ArgumentException.ThrowNullOrEmptyException(string, string)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentException..ctor(string, string)-\u003Evoid",
             "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
@@ -520,12 +571,17 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "impure_callee",
               "throw"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
@@ -547,6 +603,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentNullException.Throw(string)-\u003Evoid"
           ],
@@ -558,6 +616,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -587,6 +646,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ReadOnlySpan\u00601\u003Cchar\u003E..ctor(ref !0, int)-\u003Evoid",
             "string.GetRawStringData()-\u003Eref char",
@@ -610,6 +671,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -635,6 +697,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.MemoryExtensions.IndexOfAny(System.ReadOnlySpan\u00601\u003C!!0\u003E, System.ReadOnlySpan\u00601\u003C!!0\u003E)-\u003Eint"
           ],
@@ -646,6 +710,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -671,6 +736,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.SR.GetResourceString(string)-\u003Estring"
           ],
@@ -682,6 +749,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -707,6 +775,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.SR.GetResourceString(string)-\u003Estring"
           ],
@@ -718,6 +788,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -743,6 +814,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.SR.GetResourceString(string)-\u003Estring"
           ],
@@ -754,6 +827,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -779,6 +853,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.SR.GetResourceString(string)-\u003Estring"
           ],
@@ -790,6 +866,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -820,6 +897,13 @@
             "System.IndexOutOfRangeException"
           ],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.IndexOutOfRangeException",
+              "SourcePath": "System.ThrowHelper.ThrowIndexOutOfRangeException()"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IndexOutOfRangeException..ctor()-\u003Evoid"
           ],
@@ -831,6 +915,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -860,6 +945,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
             "System.Text.ValueStringBuilder._arrayToReturnToPool",
@@ -867,6 +954,7 @@
             "System.Text.ValueStringBuilder._pos"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -892,11 +980,14 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
             "System.Text.ValueStringBuilder._pos"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -924,11 +1015,14 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
             "System.Text.ValueStringBuilder._pos"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -957,6 +1051,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Span\u00601\u003Cchar\u003E.get_Length()-\u003Eint",
             "System.Text.ValueStringBuilder.Grow(int)-\u003Evoid"
@@ -977,6 +1073,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -1002,11 +1099,14 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
             "System.Text.ValueStringBuilder._chars"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -1038,6 +1138,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Span\u00601\u003Cchar\u003E.get_Item(int)-\u003Eref !0",
             "System.Span\u00601\u003Cchar\u003E.get_Length()-\u003Eint",
@@ -1076,6 +1178,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1110,6 +1213,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Buffers.ArrayPool\u00601\u003Cchar\u003E.Return(!0[], bool)-\u003Evoid",
             "System.Buffers.ArrayPool\u00601\u003Cchar\u003E.get_Shared()-\u003ESystem.Buffers.ArrayPool\u00601\u003C!0\u003E"
@@ -1129,6 +1234,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1159,9 +1265,12 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "conservative_unknown",
             "Categories": [
@@ -1200,6 +1309,13 @@
             "System.PlatformNotSupportedException"
           ],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.PlatformNotSupportedException",
+              "SourcePath": "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nint)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.PlatformNotSupportedException..ctor()-\u003Evoid",
             "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
@@ -1223,6 +1339,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -1251,6 +1368,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentException.ThrowIfNullOrEmpty(string, string)-\u003Evoid",
             "System.IO.DirectoryInfo..ctor(string, string, string, bool)-\u003Evoid",
@@ -1280,14 +1399,19 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.IO.DirectoryInfo..ctor(string, string, string, bool)",
-              "System.IO.DirectoryInfo.Init(string, string, string, bool)"
+              "System.IO.DirectoryInfo.Init(string, string, string, bool)",
+              "System.IO.Path.GetFullPath(string)",
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -1311,6 +1435,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.Directory.CreateTempSubdirectoryCore(string)-\u003Estring",
             "System.IO.Directory.EnsureNoDirectorySeparators(string, string)-\u003Evoid",
@@ -1334,9 +1460,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1371,6 +1500,13 @@
             "System.ArgumentException"
           ],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.ArgumentException",
+              "SourcePath": "System.IO.Directory.EnsureNoDirectorySeparators(string, string)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentException..ctor(string, string)-\u003Evoid",
             "System.MemoryExtensions.AsSpan(string)-\u003ESystem.ReadOnlySpan\u00601\u003Cchar\u003E",
@@ -1406,12 +1542,17 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "impure_callee",
               "throw"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
@@ -1433,6 +1574,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.FileSystem.DirectoryExists(string)-\u003Ebool",
             "System.IO.Path.GetFullPath(string)-\u003Estring",
@@ -1456,9 +1599,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1494,6 +1639,13 @@
             "System.IO.IOException"
           ],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.IO.IOException",
+              "SourcePath": "System.IO.Directory.CreateTempSubdirectoryCore(string)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "Interop\u002BKernel32.CreateDirectory(string, Interop\u002BKernel32\u002BSECURITY_ATTRIBUTES*)-\u003Ebool",
             "Interop.GetRandomBytes(byte*, int)-\u003Evoid",
@@ -1613,9 +1765,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee",
               "throw"
             ],
@@ -1644,6 +1799,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.DirectoryInfo.Init(string, string, string, bool)-\u003Evoid",
             "System.IO.FileSystemInfo..ctor()-\u003Evoid"
@@ -1661,13 +1818,17 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.IO.DirectoryInfo.Init(string, string, string, bool)"
+              "System.IO.DirectoryInfo.Init(string, string, string, bool)",
+              "System.IO.Path.GetFullPath(string)",
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -1693,6 +1854,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.Path.GetFullPath(string)-\u003Estring"
           ],
@@ -1709,12 +1872,18 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "impure_callee",
               "object_state_write"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.IO.Path.GetFullPath(string)",
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -1736,6 +1905,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.FileSystem.FileExists(string)-\u003Ebool",
             "System.IO.Path.GetFullPath(string)-\u003Estring",
@@ -1771,9 +1942,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1802,6 +1975,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.FileSystem.DirectoryExists(string, ref int)-\u003Ebool"
           ],
@@ -1813,9 +1988,11 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1848,6 +2025,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.FileSystem.FillAttributeInfo(string, ref Interop\u002BKernel32\u002BWIN32_FILE_ATTRIBUTE_DATA, bool)-\u003Eint"
           ],
@@ -1861,10 +2040,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
               "caller_visible_memory_write",
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1896,6 +2077,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.FileSystem.FillAttributeInfo(string, ref Interop\u002BKernel32\u002BWIN32_FILE_ATTRIBUTE_DATA, bool)-\u003Eint"
           ],
@@ -1909,10 +2092,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
               "caller_visible_memory_write",
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1947,6 +2132,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "Interop\u002BKernel32\u002BWIN32_FILE_ATTRIBUTE_DATA.PopulateFrom(ref Interop\u002BKernel32\u002BWIN32_FIND_DATA)-\u003Evoid",
             "Interop\u002BKernel32.FindFirstFile(string, ref Interop\u002BKernel32\u002BWIN32_FIND_DATA)-\u003EMicrosoft.Win32.SafeHandles.SafeFindHandle",
@@ -2013,6 +2200,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -2054,6 +2242,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "Interop\u002BKernel32.CreateDirectory(string, Interop\u002BKernel32\u002BSECURITY_ATTRIBUTES*)-\u003Ebool",
             "System.Collections.Generic.List\u00601\u003Cstring\u003E..ctor()-\u003Evoid",
@@ -2176,10 +2366,12 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
               "caller_visible_memory_write",
+              "global_state_read",
               "impure_callee",
               "object_state_write",
               "throw"
@@ -2212,6 +2404,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.MarshalByRefObject..ctor()-\u003Evoid"
           ],
@@ -2225,6 +2419,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2250,6 +2445,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Exception.set_HResult(int)-\u003Evoid",
             "System.SystemException..ctor(string)-\u003Evoid"
@@ -2267,6 +2464,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2295,6 +2493,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.Path.get_Base32Char()-\u003ESystem.ReadOnlySpan\u00601\u003Cbyte\u003E",
             "System.ReadOnlySpan\u00601\u003Cbyte\u003E.get_Item(int)-\u003Eref !0",
@@ -2318,6 +2518,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -2351,6 +2552,13 @@
             "System.ArgumentException"
           ],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.ArgumentException",
+              "SourcePath": "System.IO.Path.GetFullPath(string)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentException..ctor(string, string)-\u003Evoid",
             "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
@@ -2404,12 +2612,17 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "impure_callee",
               "throw"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
@@ -2431,6 +2644,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.PathHelper.Normalize(string)-\u003Estring",
             "System.IO.PathInternal.IsExtended(System.ReadOnlySpan\u00601\u003Cchar\u003E)-\u003Ebool",
@@ -2454,15 +2669,23 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "pure",
-            "Categories": [],
-            "FirstBlockingCallChain": [],
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.IO.PathHelper.Normalize(string)",
+              "System.IO.PathHelper.TryExpandShortFileName(ref System.Text.ValueStringBuilder, string)",
+              "Interop\u002BKernel32.GetLongPathNameW(ref char, ref char, uint)-\u003Euint"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": false,
             "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "none"
+            "EffectVisibilityClassification": "caller_visible"
           }
         },
         {
@@ -2482,6 +2705,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.Path.\u003CGetTempPath\u003Eg__GetTempPathW|60_0(int, ref char)-\u003Euint",
             "System.IO.Win32Marshal.GetExceptionForLastWin32Error(string)-\u003ESystem.Exception",
@@ -2523,14 +2748,19 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "global_state_write",
               "impure_callee",
               "throw"
             ],
             "FirstBlockingCallChain": [
-              "System.Text.ValueStringBuilder.set_Length(int)"
+              "System.IO.Path.\u003CGetTempPath\u003Eg__GetTempPathW|60_0(int, ref char)",
+              "System.IO.Path.GetGetTempPathWFunc()",
+              "Interop\u002BKernel32.LoadLibraryEx(string, nint, int)-\u003Enint"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -2553,6 +2783,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.Path.GetPathRoot(System.ReadOnlySpan\u00601\u003Cchar\u003E)-\u003ESystem.ReadOnlySpan\u00601\u003Cchar\u003E",
             "System.IO.PathInternal.IsEffectivelyEmpty(System.ReadOnlySpan\u00601\u003Cchar\u003E)-\u003Ebool",
@@ -2600,6 +2832,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2625,6 +2858,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.PathInternal.IsDirectorySeparator(char)-\u003Ebool",
             "System.ReadOnlySpan\u00601\u003Cchar\u003E.get_Item(int)-\u003Eref !0",
@@ -2648,6 +2883,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2673,6 +2909,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.PathInternal.IsDevice(System.ReadOnlySpan\u00601\u003Cchar\u003E)-\u003Ebool",
             "System.IO.PathInternal.IsDeviceUNC(System.ReadOnlySpan\u00601\u003Cchar\u003E)-\u003Ebool",
@@ -2714,6 +2952,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2737,9 +2976,12 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2765,6 +3007,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ReadOnlySpan\u00601\u003Cchar\u003E.get_IsEmpty()-\u003Ebool",
             "System.ReadOnlySpan\u00601\u003Cchar\u003E.get_Item(int)-\u003Eref !0",
@@ -2788,6 +3032,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -2814,6 +3059,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.PathHelper.GetFullPathName(System.ReadOnlySpan\u00601\u003Cchar\u003E, ref System.Text.ValueStringBuilder)-\u003Evoid",
             "System.IO.PathHelper.TryExpandShortFileName(ref System.Text.ValueStringBuilder, string)-\u003Estring",
@@ -2873,13 +3120,16 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.Text.ValueStringBuilder.Dispose()"
+              "System.IO.PathHelper.TryExpandShortFileName(ref System.Text.ValueStringBuilder, string)",
+              "Interop\u002BKernel32.GetLongPathNameW(ref char, ref char, uint)-\u003Euint"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -2903,6 +3153,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.IO.DirectoryNotFoundException..ctor(string)-\u003Evoid",
             "System.IO.FileNotFoundException..ctor(string, string)-\u003Evoid",
@@ -3046,6 +3298,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -3053,8 +3306,8 @@
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": false,
-            "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "none"
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
           }
         }
       ]
@@ -3063,8 +3316,8 @@
   "PurityReport": {
     "SchemaVersion": 3,
     "MethodCount": 54,
-    "PureCount": 28,
-    "ImpureCount": 25,
+    "PureCount": 26,
+    "ImpureCount": 27,
     "ConservativeUnknownCount": 1,
     "CatalogComparison": {
       "KnownPureMembers": [],
@@ -3113,6 +3366,7 @@
         "PrimaryCategory": "global_state_read",
         "Categories": [
           "global_state_read",
+          "impure_callee",
           "throw"
         ],
         "FirstBlockingCallChain": [
@@ -3134,15 +3388,19 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x06000B70",
         "MethodBodySha256": "4bcbc8ccc59205a86a597988c392bca34641b6a173a9774dd85929eefaced4b3",
-        "Classification": "pure",
-        "PrimaryCategory": "generated_purity_summary",
-        "Categories": [],
-        "FirstBlockingCallChain": [],
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Exception.set_HResult(int)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": false,
-        "FreshnessClassification": "fresh_owned_object_write",
-        "EffectVisibilityClassification": "internal_only"
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.ArgumentException.ThrowIfNullOrEmpty(string, string)",
@@ -3175,11 +3433,15 @@
         "MetadataToken": "0x06000B78",
         "MethodBodySha256": "90c00f4714db15f63046f8652ab09eb972364d14e627d112fdcac28a3b33dee7",
         "Classification": "impure",
-        "PrimaryCategory": "throw",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
+          "impure_callee",
           "throw"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,
@@ -3217,13 +3479,17 @@
         "MetadataToken": "0x06007480",
         "MethodBodySha256": "4b39b1fe22092cab21477c6fd2aca71d166cf74214d2f23b406a02c6869f2b4e",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.IO.DirectoryInfo..ctor(string, string, string, bool)",
-          "System.IO.DirectoryInfo.Init(string, string, string, bool)"
+          "System.IO.DirectoryInfo.Init(string, string, string, bool)",
+          "System.IO.Path.GetFullPath(string)",
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
@@ -3242,8 +3508,10 @@
         "MetadataToken": "0x06007482",
         "MethodBodySha256": "159b32acd3344470ff16a114ad69efbaf5c19ca8db8e6e3278317dae58985539",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3268,8 +3536,10 @@
         "MetadataToken": "0x060074B4",
         "MethodBodySha256": "da0bb8cddc0944a8832b48d1df6d29608373956211f1f9fefa8da50fc3d2b3d2",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee",
           "throw"
         ],
@@ -3294,11 +3564,15 @@
         "MetadataToken": "0x06007483",
         "MethodBodySha256": "ae58395e9e2f6af61e2cd3c604ed5ddce11420625bc32b2f3be92e520e6d5357",
         "Classification": "impure",
-        "PrimaryCategory": "throw",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
+          "impure_callee",
           "throw"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,
@@ -3316,8 +3590,9 @@
         "MetadataToken": "0x06007484",
         "MethodBodySha256": "99939d2be4ba35c601e95efa82346ec3247ccc275255a964d6d4ce47b893c5b2",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3348,7 +3623,10 @@
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.IO.DirectoryInfo.Init(string, string, string, bool)"
+          "System.IO.DirectoryInfo.Init(string, string, string, bool)",
+          "System.IO.Path.GetFullPath(string)",
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
@@ -3367,11 +3645,16 @@
         "MetadataToken": "0x060074B7",
         "MethodBodySha256": "4c4c758c291d5f04c369500526a79bc1dcd62a6a0b028e4339de34183d340318",
         "Classification": "impure",
-        "PrimaryCategory": "object_state_write",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
+          "impure_callee",
           "object_state_write"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.IO.Path.GetFullPath(string)",
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
@@ -3389,8 +3672,9 @@
         "MetadataToken": "0x06007503",
         "MethodBodySha256": "5bfd0ac5c567ac9ee5b2d2803c7b3ca10717140ec48a194935988357a6f02c06",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3418,6 +3702,7 @@
         "PrimaryCategory": "caller_visible_memory_write",
         "Categories": [
           "caller_visible_memory_write",
+          "global_state_read",
           "impure_callee",
           "object_state_write",
           "throw"
@@ -3443,8 +3728,9 @@
         "MetadataToken": "0x060075F7",
         "MethodBodySha256": "c4cfac7c02d84958d882836b2e2cbb21df3bc5cd78e16c4ccbc4a62ea1ff35ae",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3472,6 +3758,7 @@
         "PrimaryCategory": "caller_visible_memory_write",
         "Categories": [
           "caller_visible_memory_write",
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3498,6 +3785,7 @@
         "PrimaryCategory": "caller_visible_memory_write",
         "Categories": [
           "caller_visible_memory_write",
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -3587,11 +3875,15 @@
         "MetadataToken": "0x060076C4",
         "MethodBodySha256": "7617df7f9003b52e6452d286dcab93a94aeeae16466cc82488fb27624ae7bcdc",
         "Classification": "impure",
-        "PrimaryCategory": "throw",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
+          "impure_callee",
           "throw"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,
@@ -3608,15 +3900,22 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x060076C6",
         "MethodBodySha256": "9260e4faaba406b90a5f22ce174b9fbcf9d1b637cc515b4f3f86c70fbd4d6e96",
-        "Classification": "pure",
-        "PrimaryCategory": "generated_purity_summary",
-        "Categories": [],
-        "FirstBlockingCallChain": [],
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
+        "Categories": [
+          "global_state_read",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.IO.PathHelper.Normalize(string)",
+          "System.IO.PathHelper.TryExpandShortFileName(ref System.Text.ValueStringBuilder, string)",
+          "Interop\u002BKernel32.GetLongPathNameW(ref char, ref char, uint)-\u003Euint"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "none"
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.IO.Path.GetPathRoot(string)",
@@ -3649,13 +3948,17 @@
         "MetadataToken": "0x060076C9",
         "MethodBodySha256": "21c0937be58861c988bd674bcbe4674c6315e67cd0034f5fd932e1504aa6c714",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_write",
         "Categories": [
+          "global_state_read",
+          "global_state_write",
           "impure_callee",
           "throw"
         ],
         "FirstBlockingCallChain": [
-          "System.Text.ValueStringBuilder.set_Length(int)"
+          "System.IO.Path.\u003CGetTempPath\u003Eg__GetTempPathW|60_0(int, ref char)",
+          "System.IO.Path.GetGetTempPathWFunc()",
+          "Interop\u002BKernel32.LoadLibraryEx(string, nint, int)-\u003Enint"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -3696,12 +3999,14 @@
         "MetadataToken": "0x06007A0A",
         "MethodBodySha256": "26c69ff3419ba01fe92a3a2e8c99a27818efc48a148a856153f54cef6e071dd0",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.Text.ValueStringBuilder.Dispose()"
+          "System.IO.PathHelper.TryExpandShortFileName(ref System.Text.ValueStringBuilder, string)",
+          "Interop\u002BKernel32.GetLongPathNameW(ref char, ref char, uint)-\u003Euint"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
@@ -3806,8 +4111,8 @@
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": false,
-        "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "none"
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
       },
       {
         "Symbol": "System.MemoryExtensions.AsSpan(string)",

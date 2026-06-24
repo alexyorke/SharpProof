@@ -1,5 +1,6 @@
 param(
-    [string]$Configuration = "Release"
+    [string]$Configuration = "Release",
+    [switch]$RefreshEffectSummaries
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,6 +29,14 @@ Set-Location -Path $root -ErrorAction Stop
 
 Write-Section "Restoring packages"
 Invoke-DotnetInRepo @("restore")
+
+if ($RefreshEffectSummaries) {
+    Write-Section "Refreshing generated effect summary artifacts"
+    & (Join-Path $root "scripts\Update-EffectSummaries.ps1") -Configuration $Configuration
+    if ($LASTEXITCODE -ne 0) {
+        throw "Effect summary regeneration failed with exit code $LASTEXITCODE"
+    }
+}
 
 Write-Section "Building non-VSIX projects ($Configuration)"
 Invoke-DotnetInRepo @("build", ".\PurelySharp.Attributes\PurelySharp.Attributes.csproj", "-c", $Configuration)

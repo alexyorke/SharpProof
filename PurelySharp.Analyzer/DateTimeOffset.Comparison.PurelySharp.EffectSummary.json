@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T00:46:24.459691+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:21.1607233+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -24,11 +24,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.DateTime.Compare(System.DateTime, System.DateTime)-\u003Eint",
             "System.DateTimeOffset.get_UtcDateTime()-\u003ESystem.DateTime"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.DateTime.Compare(System.DateTime, System.DateTime)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.DateTimeOffset.get_UtcDateTime()-\u003ESystem.DateTime",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -54,12 +69,32 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.DateTime.op_GreaterThan(System.DateTime, System.DateTime)-\u003Ebool",
             "System.DateTime.op_LessThan(System.DateTime, System.DateTime)-\u003Ebool",
             "System.DateTimeOffset.get_UtcDateTime()-\u003ESystem.DateTime"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.DateTime.op_GreaterThan(System.DateTime, System.DateTime)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.DateTime.op_LessThan(System.DateTime, System.DateTime)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.DateTimeOffset.get_UtcDateTime()-\u003ESystem.DateTime",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -85,11 +120,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.DateTime.Equals(System.DateTime)-\u003Ebool",
             "System.DateTimeOffset.get_UtcDateTime()-\u003ESystem.DateTime"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.DateTime.Equals(System.DateTime)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.DateTimeOffset.get_UtcDateTime()-\u003ESystem.DateTime",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -115,11 +165,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.DateTime.Equals(System.DateTime)-\u003Ebool",
             "System.DateTimeOffset.get_UtcDateTime()-\u003ESystem.DateTime"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.DateTime.Equals(System.DateTime)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.DateTimeOffset.get_UtcDateTime()-\u003ESystem.DateTime",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -145,6 +210,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.DateTime.get_Kind()-\u003ESystem.DateTimeKind",
             "System.DateTime.op_Equality(System.DateTime, System.DateTime)-\u003Ebool",
@@ -153,6 +220,34 @@
             "System.TimeSpan.op_Equality(System.TimeSpan, System.TimeSpan)-\u003Ebool"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.DateTime.get_Kind()-\u003ESystem.DateTimeKind",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.DateTime.op_Equality(System.DateTime, System.DateTime)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.DateTimeOffset.get_ClockDateTime()-\u003ESystem.DateTime",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.DateTimeOffset.get_Offset()-\u003ESystem.TimeSpan",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.TimeSpan.op_Equality(System.TimeSpan, System.TimeSpan)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -178,11 +273,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.DateTime.Equals(System.DateTime, System.DateTime)-\u003Ebool",
             "System.DateTimeOffset.get_UtcDateTime()-\u003ESystem.DateTime"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.DateTime.Equals(System.DateTime, System.DateTime)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.DateTimeOffset.get_UtcDateTime()-\u003ESystem.DateTime",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -208,11 +318,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.DateTime.Subtract(System.DateTime)-\u003ESystem.TimeSpan",
             "System.DateTimeOffset.get_UtcDateTime()-\u003ESystem.DateTime"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.DateTime.Subtract(System.DateTime)-\u003ESystem.TimeSpan",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.DateTimeOffset.get_UtcDateTime()-\u003ESystem.DateTime",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -239,6 +364,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.DateTime.Subtract(System.TimeSpan)-\u003ESystem.DateTime",
             "System.DateTimeOffset..ctor(System.DateTime, System.TimeSpan)-\u003Evoid",
@@ -246,6 +373,29 @@
             "System.DateTimeOffset.get_Offset()-\u003ESystem.TimeSpan"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.DateTime.Subtract(System.TimeSpan)-\u003ESystem.DateTime",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.DateTimeOffset..ctor(System.DateTime, System.TimeSpan)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.DateTimeOffset.get_ClockDateTime()-\u003ESystem.DateTime",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.DateTimeOffset.get_Offset()-\u003ESystem.TimeSpan",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -265,7 +415,12 @@
     "MethodCount": 8,
     "PureCount": 8,
     "ImpureCount": 0,
-    "ConservativeUnknownCount": 0
+    "ConservativeUnknownCount": 0,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
   },
   "GeneratedPurityCatalog": {
     "SchemaVersion": 2,

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-19T13:26:03.9154337+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:19.6366227+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Security.Claims",
@@ -31,6 +31,7 @@
             "System.Security.Claims.ClaimsIdentity._roleClaimType"
           ],
           "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -139,6 +140,7 @@
               ]
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -206,6 +208,7 @@
               "ArgumentEvidence": []
             }
           ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [

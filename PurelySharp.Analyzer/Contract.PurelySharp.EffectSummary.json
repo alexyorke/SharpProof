@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T16:41:07.8229189+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:45:54.0463167+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -8,7 +8,7 @@
       "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
       "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
       "MethodCount": 34519,
-      "EmittedMethodCount": 8,
+      "EmittedMethodCount": 9,
       "Methods": [
         {
           "Symbol": "System.Diagnostics.Contracts.Contract.Requires(bool)",
@@ -24,10 +24,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -53,10 +63,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -82,10 +102,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -111,10 +141,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -140,10 +180,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -169,10 +219,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -198,10 +258,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -227,10 +297,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -241,16 +321,137 @@
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "none"
           }
+        },
+        {
+          "Symbol": "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)",
+          "ExactSymbolKey": "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid",
+          "MetadataToken": "0x06007C56",
+          "RelativeVirtualAddress": 8188716,
+          "MethodBodySha256": "4754d24fdde32d433bbd255954dfbf807b5710d95f1cf2a94eb8706e7244ef51",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06007C56|il:4754d24fdde32d433bbd255954dfbf807b5710d95f1cf2a94eb8706e7244ef51",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Diagnostics.StackFrame.GetMethod()-\u003ESystem.Reflection.MethodBase",
+            "System.Diagnostics.StackTrace..ctor()-\u003Evoid",
+            "System.Diagnostics.StackTrace.GetFrame(int)-\u003ESystem.Diagnostics.StackFrame",
+            "System.Diagnostics.StackTrace.get_FrameCount()-\u003Eint",
+            "System.Reflection.Assembly.GetName()-\u003ESystem.Reflection.AssemblyName",
+            "System.Reflection.Assembly.op_Inequality(System.Reflection.Assembly, System.Reflection.Assembly)-\u003Ebool",
+            "System.Reflection.AssemblyName.get_Name()-\u003Estring",
+            "System.Reflection.MemberInfo.get_DeclaringType()-\u003ESystem.Type",
+            "System.Runtime.CompilerServices.ContractHelper.TriggerFailure(System.Diagnostics.Contracts.ContractFailureKind, string, string, string, System.Exception)-\u003Evoid",
+            "System.SR.Format(string, object, object)-\u003Estring",
+            "System.SR.get_MustUseCCRewrite()-\u003Estring",
+            "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+            "System.Type.get_Assembly()-\u003ESystem.Reflection.Assembly"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.StackFrame.GetMethod()-\u003ESystem.Reflection.MethodBase",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Diagnostics.StackTrace..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Diagnostics.StackTrace.GetFrame(int)-\u003ESystem.Diagnostics.StackFrame",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Diagnostics.StackTrace.get_FrameCount()-\u003Eint",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Reflection.Assembly.GetName()-\u003ESystem.Reflection.AssemblyName",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Reflection.Assembly.op_Inequality(System.Reflection.Assembly, System.Reflection.Assembly)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Reflection.AssemblyName.get_Name()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Reflection.MemberInfo.get_DeclaringType()-\u003ESystem.Type",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Runtime.CompilerServices.ContractHelper.TriggerFailure(System.Diagnostics.Contracts.ContractFailureKind, string, string, string, System.Exception)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.Format(string, object, object)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_MustUseCCRewrite()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.get_Assembly()-\u003ESystem.Reflection.Assembly",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "dynamic_dispatch",
+              "unknown_callee",
+              "virtual_call"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Reflection.Assembly.GetName()"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
         }
       ]
     }
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 8,
+    "MethodCount": 9,
     "PureCount": 8,
     "ImpureCount": 0,
-    "ConservativeUnknownCount": 0,
+    "ConservativeUnknownCount": 1,
     "CatalogComparison": {
       "KnownPureMembers": [],
       "KnownImpureMembers": [],
@@ -260,6 +461,32 @@
   "GeneratedPurityCatalog": {
     "SchemaVersion": 2,
     "Entries": [
+      {
+        "Symbol": "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)",
+        "ExactSymbolKey": "System.Diagnostics.Contracts.Contract.AssertMustUseRewriter(System.Diagnostics.Contracts.ContractFailureKind, string)-\u003Evoid",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06007C56|il:4754d24fdde32d433bbd255954dfbf807b5710d95f1cf2a94eb8706e7244ef51",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06007C56",
+        "MethodBodySha256": "4754d24fdde32d433bbd255954dfbf807b5710d95f1cf2a94eb8706e7244ef51",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "dynamic_dispatch",
+        "Categories": [
+          "dynamic_dispatch",
+          "unknown_callee",
+          "virtual_call"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Reflection.Assembly.GetName()"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
       {
         "Symbol": "System.Diagnostics.Contracts.Contract.Ensures(bool)",
         "ExactSymbolKey": "System.Diagnostics.Contracts.Contract.Ensures(bool)-\u003Evoid",

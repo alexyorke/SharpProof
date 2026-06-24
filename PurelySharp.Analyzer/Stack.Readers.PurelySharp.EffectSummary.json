@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T12:02:10.6638443+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:11.1564796+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Collections",
@@ -25,13 +25,23 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Array.LastIndexOf(!!0[], !!0, int)-\u003Eint"
           ],
           "Fields": [
-            "System.Collections.Generic.Stack\u00601\u003C!0\u003E._array",
-            "System.Collections.Generic.Stack\u00601\u003C!0\u003E._size"
+            "System.Collections.Generic.Stack\u00601._array",
+            "System.Collections.Generic.Stack\u00601._size"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Array.LastIndexOf(!!0[], !!0, int)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -58,13 +68,23 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Collections.Generic.Stack\u00601\u003C!0\u003E.ThrowForEmptyStack()-\u003Evoid"
           ],
           "Fields": [
-            "System.Collections.Generic.Stack\u00601\u003C!0\u003E._array",
-            "System.Collections.Generic.Stack\u00601\u003C!0\u003E._size"
+            "System.Collections.Generic.Stack\u00601._array",
+            "System.Collections.Generic.Stack\u00601._size"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Generic.Stack\u00601\u003C!0\u003E.ThrowForEmptyStack()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],

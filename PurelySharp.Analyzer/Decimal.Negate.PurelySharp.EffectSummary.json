@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-18T14:28:14.5936992+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:16.4308048+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -8,8 +8,48 @@
       "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
       "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
       "MethodCount": 34519,
-      "EmittedMethodCount": 1,
+      "EmittedMethodCount": 2,
       "Methods": [
+        {
+          "Symbol": "System.Decimal..ctor(ref decimal, int)",
+          "ExactSymbolKey": "decimal..ctor(ref decimal, int)-\u003Evoid",
+          "MetadataToken": "0x0600032B",
+          "RelativeVirtualAddress": 6783784,
+          "MethodBodySha256": "347896df8f11aba15799cebce7ac3f7c60c37771a279c320b021bf778f7da831",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600032B|il:347896df8f11aba15799cebce7ac3f7c60c37771a279c320b021bf778f7da831",
+          "Effects": [
+            "writes_indirect_memory",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "caller_visible_memory_write",
+            "object_state_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Decimal._flags"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "caller_visible_memory_write",
+              "object_state_write"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
         {
           "Symbol": "System.Decimal.Negate(decimal)",
           "ExactSymbolKey": "decimal.Negate(decimal)-\u003Edecimal",
@@ -25,12 +65,22 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "decimal..ctor(ref decimal, int)-\u003Evoid"
           ],
           "Fields": [
             "System.Decimal._flags"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "decimal..ctor(ref decimal, int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -47,9 +97,9 @@
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 1,
+    "MethodCount": 2,
     "PureCount": 1,
-    "ImpureCount": 0,
+    "ImpureCount": 1,
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
       "KnownPureMembers": [],
@@ -60,6 +110,29 @@
   "GeneratedPurityCatalog": {
     "SchemaVersion": 2,
     "Entries": [
+      {
+        "Symbol": "System.Decimal..ctor(ref decimal, int)",
+        "ExactSymbolKey": "decimal..ctor(ref decimal, int)-\u003Evoid",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600032B|il:347896df8f11aba15799cebce7ac3f7c60c37771a279c320b021bf778f7da831",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x0600032B",
+        "MethodBodySha256": "347896df8f11aba15799cebce7ac3f7c60c37771a279c320b021bf778f7da831",
+        "Classification": "impure",
+        "PrimaryCategory": "caller_visible_memory_write",
+        "Categories": [
+          "caller_visible_memory_write",
+          "object_state_write"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
       {
         "Symbol": "System.Decimal.Negate(decimal)",
         "ExactSymbolKey": "decimal.Negate(decimal)-\u003Edecimal",

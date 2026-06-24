@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-19T23:33:39.400765+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:45.2274028+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -637,6 +637,7 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "throw"
             ],
             "FirstBlockingCallChain": [
@@ -745,11 +746,10 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "impure_callee",
               "throw"
             ],
             "FirstBlockingCallChain": [
-              "System.Text.StringBuilder.CopyTo(int, System.Span\u00601\u003Cchar\u003E, int)"
+              "System.String.FastAllocateString(int)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -1287,8 +1287,9 @@
         "MetadataToken": "0x06003F32",
         "MethodBodySha256": "b7f5d894114a89ca843771fd0ea633a2ccd671c2d7e842fe9947bba6a3868c9d",
         "Classification": "impure",
-        "PrimaryCategory": "throw",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "throw"
         ],
         "FirstBlockingCallChain": [
@@ -1311,13 +1312,12 @@
         "MetadataToken": "0x06003F33",
         "MethodBodySha256": "dd6708fe7047cc4cac22cf0fd8727c5efd079c38317e161c026bede7c8d80a90",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "throw",
         "Categories": [
-          "impure_callee",
           "throw"
         ],
         "FirstBlockingCallChain": [
-          "System.Text.StringBuilder.CopyTo(int, System.Span\u00601\u003Cchar\u003E, int)"
+          "System.String.FastAllocateString(int)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,

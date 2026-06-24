@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-19T01:02:36.2072312+00:00",
+  "GeneratedAtUtc": "2026-06-24T07:46:27.9811498+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Linq",
@@ -26,10 +26,14 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [],
           "Fields": [
-            "System.Linq.EmptyPartition\u00601\u003C!!0\u003E.Instance"
+            "System.Linq.EmptyPartition\u00601.Instance"
           ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -55,11 +59,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable.OfTypeIterator(System.Collections.IEnumerable)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
             "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable.OfTypeIterator(System.Collections.IEnumerable)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -88,12 +107,22 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable\u002B\u003COfTypeIterator\u003Ed__66\u00601\u003C!!0\u003E..ctor(int)-\u003Evoid"
           ],
           "Fields": [
-            "System.Linq.Enumerable\u002B\u003COfTypeIterator\u003Ed__66\u00601\u003C!!0\u003E.\u003C\u003E3__source"
+            "System.Linq.Enumerable\u002B\u003COfTypeIterator\u003Ed__66\u00601.\u003C\u003E3__source"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable\u002B\u003COfTypeIterator\u003Ed__66\u00601\u003C!!0\u003E..ctor(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -119,11 +148,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable.CastIterator(System.Collections.IEnumerable)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
             "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable.CastIterator(System.Collections.IEnumerable)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -152,12 +196,22 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable\u002B\u003CCastIterator\u003Ed__68\u00601\u003C!!0\u003E..ctor(int)-\u003Evoid"
           ],
           "Fields": [
-            "System.Linq.Enumerable\u002B\u003CCastIterator\u003Ed__68\u00601\u003C!!0\u003E.\u003C\u003E3__source"
+            "System.Linq.Enumerable\u002B\u003CCastIterator\u003Ed__68\u00601.\u003C\u003E3__source"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable\u002B\u003CCastIterator\u003Ed__68\u00601\u003C!!0\u003E..ctor(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -183,12 +237,32 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable.ChunkIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, int)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0[]\u003E",
             "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid",
             "System.Linq.ThrowHelper.ThrowArgumentOutOfRangeException(System.Linq.ExceptionArgument)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable.ChunkIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, int)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0[]\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Linq.ThrowHelper.ThrowArgumentOutOfRangeException(System.Linq.ExceptionArgument)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -217,13 +291,23 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable\u002B\u003CChunkIterator\u003Ed__70\u00601\u003C!!0\u003E..ctor(int)-\u003Evoid"
           ],
           "Fields": [
-            "System.Linq.Enumerable\u002B\u003CChunkIterator\u003Ed__70\u00601\u003C!!0\u003E.\u003C\u003E3__size",
-            "System.Linq.Enumerable\u002B\u003CChunkIterator\u003Ed__70\u00601\u003C!!0\u003E.\u003C\u003E3__source"
+            "System.Linq.Enumerable\u002B\u003CChunkIterator\u003Ed__70\u00601.\u003C\u003E3__size",
+            "System.Linq.Enumerable\u002B\u003CChunkIterator\u003Ed__70\u00601.\u003C\u003E3__source"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable\u002B\u003CChunkIterator\u003Ed__70\u00601\u003C!!0\u003E..ctor(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -249,10 +333,20 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable.Distinct(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -279,11 +373,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable\u002BDistinctIterator\u00601\u003C!!0\u003E..ctor(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003Evoid",
             "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable\u002BDistinctIterator\u00601\u003C!!0\u003E..ctor(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -310,12 +419,32 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable\u002BRangeIterator..ctor(int, int)-\u003Evoid",
             "System.Linq.Enumerable.Empty()-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
             "System.Linq.ThrowHelper.ThrowArgumentOutOfRangeException(System.Linq.ExceptionArgument)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable\u002BRangeIterator..ctor(int, int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable.Empty()-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Linq.ThrowHelper.ThrowArgumentOutOfRangeException(System.Linq.ExceptionArgument)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -342,12 +471,32 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable\u002BRepeatIterator\u00601\u003C!!0\u003E..ctor(!0, int)-\u003Evoid",
             "System.Linq.Enumerable.Empty()-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
             "System.Linq.ThrowHelper.ThrowArgumentOutOfRangeException(System.Linq.ExceptionArgument)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable\u002BRepeatIterator\u00601\u003C!!0\u003E..ctor(!0, int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable.Empty()-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Linq.ThrowHelper.ThrowArgumentOutOfRangeException(System.Linq.ExceptionArgument)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -374,11 +523,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable\u002BReverseIterator\u00601\u003C!!0\u003E..ctor(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E)-\u003Evoid",
             "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable\u002BReverseIterator\u00601\u003C!!0\u003E..ctor(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -404,11 +568,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable.TakeWhileIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00602\u003C!!0, bool\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
             "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable.TakeWhileIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00602\u003C!!0, bool\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -437,13 +616,23 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__283\u00601\u003C!!0\u003E..ctor(int)-\u003Evoid"
           ],
           "Fields": [
-            "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__283\u00601\u003C!!0\u003E.\u003C\u003E3__predicate",
-            "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__283\u00601\u003C!!0\u003E.\u003C\u003E3__source"
+            "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__283\u00601.\u003C\u003E3__predicate",
+            "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__283\u00601.\u003C\u003E3__source"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__283\u00601\u003C!!0\u003E..ctor(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -469,11 +658,26 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable.TakeWhileIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00603\u003C!!0, int, bool\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
             "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable.TakeWhileIterator(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E, System.Func\u00603\u003C!!0, int, bool\u003E)-\u003ESystem.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -502,13 +706,23 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__285\u00601\u003C!!0\u003E..ctor(int)-\u003Evoid"
           ],
           "Fields": [
-            "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__285\u00601\u003C!!0\u003E.\u003C\u003E3__predicate",
-            "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__285\u00601\u003C!!0\u003E.\u003C\u003E3__source"
+            "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__285\u00601.\u003C\u003E3__predicate",
+            "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__285\u00601.\u003C\u003E3__source"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable\u002B\u003CTakeWhileIterator\u003Ed__285\u00601\u003C!!0\u003E..ctor(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -537,6 +751,8 @@
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.Linq.Enumerable\u002BIterator\u00601\u003Cint\u003E..ctor()-\u003Evoid"
           ],
@@ -544,6 +760,14 @@
             "System.Linq.Enumerable\u002BRangeIterator._end",
             "System.Linq.Enumerable\u002BRangeIterator._start"
           ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Enumerable\u002BIterator\u00601\u003Cint\u003E..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "pure",
             "Categories": [],
@@ -575,11 +799,31 @@
             "System.ArgumentNullException"
           ],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.ArgumentNullException",
+              "SourcePath": "System.Linq.ThrowHelper.ThrowArgumentNullException(System.Linq.ExceptionArgument)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentNullException..ctor(string)-\u003Evoid",
             "System.Linq.ThrowHelper.GetArgumentString(System.Linq.ExceptionArgument)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentNullException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Linq.ThrowHelper.GetArgumentString(System.Linq.ExceptionArgument)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
@@ -613,11 +857,31 @@
             "System.ArgumentOutOfRangeException"
           ],
           "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.ArgumentOutOfRangeException",
+              "SourcePath": "System.Linq.ThrowHelper.ThrowArgumentOutOfRangeException(System.Linq.ExceptionArgument)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
           "Calls": [
             "System.ArgumentOutOfRangeException..ctor(string)-\u003Evoid",
             "System.Linq.ThrowHelper.GetArgumentString(System.Linq.ExceptionArgument)-\u003Estring"
           ],
           "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentOutOfRangeException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Linq.ThrowHelper.GetArgumentString(System.Linq.ExceptionArgument)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [

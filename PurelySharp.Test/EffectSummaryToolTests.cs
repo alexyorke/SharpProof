@@ -345,6 +345,50 @@ public static class ExceptionFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_FilteredSummary_WithoutIncludeCallees_EmitsOnlyRootMethods()
+        {
+            var source = """
+using System;
+
+public static class FilterFixture
+{
+    public static int Outer(int value) => Middle(value) + 1;
+
+    private static int Middle(int value) => Inner(value) + 1;
+
+    private static int Inner(int value)
+    {
+        if (value < 0)
+        {
+            throw new InvalidOperationException();
+        }
+
+        return value;
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryFilteredRootOnly", source);
+            using var summary = await RunFilteredEffectSummaryAsync(
+                fixture.AssemblyPath,
+                includeTransitiveRoots: false,
+                maxDepth: 1,
+                includeCallees: false,
+                "FilterFixture.Outer");
+
+            Assert.That(
+                FindMethodsByPrefix(summary, "FilterFixture.")
+                    .Select(method => method.GetProperty("Symbol").GetString())
+                    .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                    .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                    .ToArray(),
+                Is.EqualTo(new[]
+                {
+                    "FilterFixture.Outer(int)",
+                }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_Produces_ReportOnly_Purity_Classifications()
         {
             var source = """
@@ -8562,6 +8606,21 @@ public sealed class StableCacheDerived : StaticFieldBase
             int maxDepth,
             params string[] symbolPrefixes)
         {
+            return await RunFilteredEffectSummaryAsync(
+                assemblyPath,
+                includeTransitiveRoots,
+                maxDepth,
+                includeCallees: true,
+                symbolPrefixes);
+        }
+
+        private static async Task<JsonDocument> RunFilteredEffectSummaryAsync(
+            string assemblyPath,
+            bool includeTransitiveRoots,
+            int maxDepth,
+            bool includeCallees = true,
+            params string[] symbolPrefixes)
+        {
             var outputPath = Path.Combine(
                 TestContext.CurrentContext.WorkDirectory,
                 "effect-summary-filtered-" + Guid.NewGuid().ToString("N") + ".json");
@@ -8579,7 +8638,10 @@ public sealed class StableCacheDerived : StaticFieldBase
                 startInfo.ArgumentList.Add("--symbol-prefix");
                 startInfo.ArgumentList.Add(symbolPrefix);
             }
-            startInfo.ArgumentList.Add("--include-callees");
+            if (includeCallees)
+            {
+                startInfo.ArgumentList.Add("--include-callees");
+            }
             startInfo.ArgumentList.Add("--max-depth");
             startInfo.ArgumentList.Add(maxDepth.ToString());
             if (includeTransitiveRoots)
