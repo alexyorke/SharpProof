@@ -245,6 +245,17 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Reflection.PathMetadata.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Reflection.PathMetadata.PurelySharp.EffectSummary.json",
+      "Limit": 24,
+      "SymbolPrefixes": [
+        "System.Reflection.Assembly.get_Location",
+        "System.Reflection.Module.get_FullyQualifiedName",
+        "System.Reflection.Module.get_Name",
+        "System.Reflection.Module.get_ScopeName"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Directory.CurrentDirectory.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Environment.PurelySharp.EffectSummary.json",
       "Limit": 80,

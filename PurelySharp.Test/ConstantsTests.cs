@@ -2678,6 +2678,55 @@ public static class UriCatalogSignatureSamples
         }
 
         [Test]
+        public void ReflectionPathMetadataGetters_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System.Reflection;
+
+public static class ReflectionPathMetadataCatalogSignatureSamples
+{
+    public static string Sample(Assembly assembly, Module module)
+    {
+        var location = assembly.Location;
+        var fullyQualifiedName = module.FullyQualifiedName;
+        var name = module.Name;
+        return location + fullyQualifiedName + name + module.ScopeName;
+    }
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ReflectionPathMetadataCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMembers = new[]
+            {
+                ("assembly.Location", "System.Reflection.Assembly.Location.get"),
+                ("module.FullyQualifiedName", "System.Reflection.Module.FullyQualifiedName.get"),
+                ("module.Name", "System.Reflection.Module.Name.get"),
+                ("module.ScopeName", "System.Reflection.Module.ScopeName.get"),
+            };
+
+            foreach (var trackedMember in trackedMembers)
+            {
+                var memberAccess = syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<MemberAccessExpressionSyntax>()
+                    .Single(node => node.ToString() == trackedMember.Item1);
+                var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(memberAccess).Symbol!;
+                var signature = GetPropertySignature(compilation, syntaxTree, trackedMember.Item1);
+                var (matched, classification) = GetGeneratedPurityClassification(propertySymbol.GetMethod!, compilation);
+
+                Assert.That(signature, Is.EqualTo(trackedMember.Item2));
+                AssertNotInManualCatalogs(signature);
+                Assert.That(matched, Is.True, trackedMember.Item2);
+                Assert.That(classification, Is.EqualTo("impure"), trackedMember.Item2);
+            }
+        }
+
+        [Test]
         public void StopwatchGetTimestamp_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.Diagnostics.Stopwatch.GetTimestamp()");

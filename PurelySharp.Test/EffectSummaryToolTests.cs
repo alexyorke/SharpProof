@@ -6098,6 +6098,49 @@ public static class DuplicateReviewedSeedFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeReflectionPathMetadataSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                24,
+                "System.Reflection.Assembly.get_Location",
+                "System.Reflection.Module.get_FullyQualifiedName",
+                "System.Reflection.Module.get_Name",
+                "System.Reflection.Module.get_ScopeName");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Reflection.Assembly.get_Location()", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Reflection.Assembly.get_Location()", "caller_visible");
+            AssertPurityClassification(summary, "System.Reflection.Module.get_FullyQualifiedName()", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Reflection.Module.get_FullyQualifiedName()", "caller_visible");
+            AssertPurityClassification(summary, "System.Reflection.Module.get_Name()", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Reflection.Module.get_Name()", "caller_visible");
+            AssertPurityClassification(summary, "System.Reflection.Module.get_ScopeName()", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Reflection.Module.get_ScopeName()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.Reflection.", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Reflection.Assembly.get_Location()",
+                "System.Reflection.Module.get_FullyQualifiedName()",
+                "System.Reflection.Module.get_Name()",
+                "System.Reflection.Module.get_ScopeName()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStopwatchGetTimestampSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
