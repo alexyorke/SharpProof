@@ -45,11 +45,7 @@ public static class Constants
         "object.Equals(object)",
         "object.GetHashCode()",
         "System.Diagnostics.ActivitySource.StartActivity(string)",
-        "System.Diagnostics.Debug.Assert(bool)",
         "System.Diagnostics.Debugger.Break()",
-        "System.Diagnostics.DiagnosticListener.DiagnosticListener(string)",
-        "System.Diagnostics.FileVersionInfo.FileVersion.get",
-        "System.Diagnostics.StackFrame.GetMethod()",
         "System.Type.GetConstructor(System.Type[])",
         "System.Type.GetConstructors()",
         "System.Type.GetConstructors(System.Reflection.BindingFlags)",
@@ -596,7 +592,6 @@ public static class Constants
     public static readonly HashSet<string> KnownPureBCLMembers = new HashSet<string>(StringComparer.Ordinal)
     {
         "System.Collections.Generic.HashSet<T>.IsSubsetOf(System.Collections.Generic.IEnumerable<T>)",
-
 
         "System.Collections.Immutable.ImmutableList<T>.Add(T)",
         "System.Collections.Immutable.ImmutableList<T>.SetItem(int, T)",

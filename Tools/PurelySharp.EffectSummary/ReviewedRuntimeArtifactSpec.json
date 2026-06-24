@@ -691,6 +691,34 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Diagnostics.AssertAndStackFrame.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Diagnostics.AssertAndStackFrame.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Diagnostics.Debug.Assert(bool)",
+        "System.Diagnostics.StackFrame.GetMethod()"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Diagnostics.DiagnosticListener.Constructor.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Diagnostics.DiagnosticListener.Constructor.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Diagnostics.DiagnosticSource.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Diagnostics.DiagnosticListener..ctor(string)"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Diagnostics.FileVersionInfo.Getter.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Diagnostics.FileVersionInfo.Getter.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Diagnostics.FileVersionInfo.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Diagnostics.FileVersionInfo.get_FileVersion()"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Reflection.StaticAttributeHelpers.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Reflection.StaticAttributeHelpers.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Private.CoreLib.dll",

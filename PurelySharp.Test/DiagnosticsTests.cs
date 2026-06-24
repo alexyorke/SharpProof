@@ -11,7 +11,7 @@ namespace PurelySharp.Test
     public class DiagnosticsTests
     {
         [Test]
-        public async Task FileVersionInfoFileVersion_Diagnostic()
+        public async Task FileVersionInfoFileVersion_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -21,7 +21,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string? {|PS0002:TestMethod|}(FileVersionInfo fileVersionInfo)
+    public string? TestMethod(FileVersionInfo fileVersionInfo)
     {
         return fileVersionInfo.FileVersion;
     }
@@ -69,7 +69,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task DebugAssert_Diagnostic()
+        public async Task DebugAssert_NoDiagnostic()
         {
             var test = @"
 using System.Diagnostics;
@@ -78,7 +78,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public void {|PS0002:TestMethod|}()
+    public void TestMethod()
     {
         Debug.Assert(true);
     }

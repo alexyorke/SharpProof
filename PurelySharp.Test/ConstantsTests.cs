@@ -662,6 +662,36 @@ public static class AdditionalConcurrentCollectionMutatorCatalogSignatureSamples
         }
 
         [Test]
+        public void DiagnosticsHelpers_AreSourcedFromGeneratedEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System.Diagnostics;
+using System.Reflection;
+
+public static class DiagnosticsCatalogSignatureSamples
+{
+    public static MethodBase? Sample(FileVersionInfo fileVersionInfo, StackFrame stackFrame)
+    {
+        Debug.Assert(true);
+        _ = new DiagnosticListener(""test"");
+        _ = fileVersionInfo.FileVersion;
+        return stackFrame.GetMethod();
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "DiagnosticsCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Debug.Assert(true)"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new DiagnosticListener(\"test\")"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "fileVersionInfo.FileVersion"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "stackFrame.GetMethod()"));
+        }
+
+        [Test]
         public void StaticCustomAttributeHelpers_AreSourcedFromGeneratedEvidence_NotStaticCatalogs()
         {
             const string source = @"

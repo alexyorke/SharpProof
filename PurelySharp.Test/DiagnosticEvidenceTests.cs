@@ -46,7 +46,7 @@ public class TestClass
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityOperationKindProperty], Is.EqualTo("Invocation"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("known_impure_namespace_or_type"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.Debug.WriteLine"));
@@ -115,7 +115,7 @@ public class TestClass
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("Format"));
         }
@@ -148,7 +148,7 @@ public class TestClass
                 .Single(d => d.GetMessage().Contains("'TestMethod'", StringComparison.Ordinal));
 
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("config_known_impure"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("TestClass.CustomApi"));
         }
@@ -6117,6 +6117,124 @@ public class TestClass
             Assert.That(classifications["System.Collections.Concurrent.BlockingCollection<T>.Take()"], Is.EqualTo((true, "impure")));
             Assert.That(classifications["System.Collections.Concurrent.ConcurrentBag<T>.Add(T)"], Is.EqualTo((true, "impure")));
             Assert.That(classifications["System.Collections.Concurrent.ConcurrentBag<T>.TryTake(out T)"], Is.EqualTo((true, "impure")));
+        }
+
+        [Test]
+        public async Task Ps0002_DiagnosticListenerConstructor_UsesGeneratedPurityCatalogSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Diagnostics;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public DiagnosticListener TestMethod()
+    {
+        return new DiagnosticListener(""test"");
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.DiagnosticListener.DiagnosticListener(string)"));
+        }
+
+        [Test]
+        public void GeneratedPurityCatalog_Resolves_DiagnosticsHelpersFromGeneratedEvidence()
+        {
+            const string source = @"
+using System.Diagnostics;
+using System.Reflection;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void AssertMethod()
+    {
+        Debug.Assert(true);
+    }
+
+    [EnforcePure]
+    public DiagnosticListener ListenerMethod()
+    {
+        return new DiagnosticListener(""test"");
+    }
+
+    [EnforcePure]
+    public string? FileVersionMethod(FileVersionInfo fileVersionInfo)
+    {
+        return fileVersionInfo.FileVersion;
+    }
+
+    [EnforcePure]
+    public MethodBase? StackFrameMethod(StackFrame stackFrame)
+    {
+        return stackFrame.GetMethod();
+    }
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var assertMethod = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "Debug.Assert(true)"))
+                .Symbol!;
+            var listenerCtor = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<ObjectCreationExpressionSyntax>()
+                    .Single(node => node.ToString() == "new DiagnosticListener(\"test\")"))
+                .Symbol!;
+            var fileVersionProperty = (IPropertySymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<MemberAccessExpressionSyntax>()
+                    .Single(node => node.ToString() == "fileVersionInfo.FileVersion"))
+                .Symbol!;
+            var stackFrameMethod = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "stackFrame.GetMethod()"))
+                .Symbol!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var trackedMembers = new (string Label, ISymbol Symbol)[]
+            {
+                ("System.Diagnostics.Debug.Assert(bool)", assertMethod.OriginalDefinition),
+                ("System.Diagnostics.DiagnosticListener.DiagnosticListener(string)", listenerCtor.OriginalDefinition),
+                ("System.Diagnostics.FileVersionInfo.FileVersion.get", fileVersionProperty.GetMethod!.OriginalDefinition),
+                ("System.Diagnostics.StackFrame.GetMethod()", stackFrameMethod.OriginalDefinition),
+            };
+            var classifications = trackedMembers.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(classifications["System.Diagnostics.Debug.Assert(bool)"], Is.EqualTo((true, "pure")));
+            Assert.That(classifications["System.Diagnostics.DiagnosticListener.DiagnosticListener(string)"], Is.EqualTo((true, "impure")));
+            Assert.That(classifications["System.Diagnostics.FileVersionInfo.FileVersion.get"], Is.EqualTo((true, "pure")));
+            Assert.That(classifications["System.Diagnostics.StackFrame.GetMethod()"], Is.EqualTo((true, "pure")));
         }
 
         [Test]

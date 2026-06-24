@@ -1835,6 +1835,122 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeDiagnosticsAssertAndStackFrameSlice_UsesGeneratedEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.Diagnostics.Debug.Assert(bool)",
+                "System.Diagnostics.StackFrame.GetMethod()");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Diagnostics.Debug.Assert(bool)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Debug.Assert(bool) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Diagnostics.StackFrame.GetMethod()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "StackFrame.GetMethod() should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(summary, "System.Diagnostics.Debug.Assert(bool)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.Debug.Assert(bool)", "internal_only");
+            AssertPurityClassification(summary, "System.Diagnostics.StackFrame.GetMethod()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.StackFrame.GetMethod()", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Diagnostics.Debug.Assert(bool)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Diagnostics.StackFrame.GetMethod()"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeDiagnosticListenerConstructorSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Diagnostics.DiagnosticSource.dll",
+                20,
+                "System.Diagnostics.DiagnosticListener..ctor(string)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Diagnostics.DiagnosticListener.DiagnosticListener(string)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "DiagnosticListener(string) should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(summary, "System.Diagnostics.DiagnosticListener..ctor(string)", "impure", "global_state_read", "global_state_write", "impure_callee", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.DiagnosticListener..ctor(string)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Diagnostics.DiagnosticListener..ctor(string)"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeFileVersionInfoGetterSlice_UsesGeneratedEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Diagnostics.FileVersionInfo.dll",
+                20,
+                "System.Diagnostics.FileVersionInfo.get_FileVersion()");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Diagnostics.FileVersionInfo.FileVersion.get",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "FileVersionInfo.FileVersion.get should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(summary, "System.Diagnostics.FileVersionInfo.get_FileVersion()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.FileVersionInfo.get_FileVersion()", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Diagnostics.FileVersionInfo.get_FileVersion()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeSortedCollectionAndBitArrayMutatorSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
