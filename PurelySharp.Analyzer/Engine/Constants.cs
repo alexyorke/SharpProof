@@ -737,13 +737,11 @@ public static class Constants
         "System.Type.GetHashCode()",
 
 
-        "System.Buffers.Text.Utf8Parser.TryParse(System.ReadOnlySpan<byte>, out int, out int)",
         "System.Linq.IQueryable<T>.Expression.get",
         "System.Linq.Queryable.Where<TSource>(System.Linq.IQueryable<TSource>, System.Linq.Expressions.Expression<System.Func<TSource, bool>>)",
         "System.Memory<T>.Span.get",
         "System.Numerics.Matrix4x4.CreateRotationX(float)",
         "System.Numerics.Plane.Normalize(System.Numerics.Plane)",
-        "System.IO.Hashing.Crc32.Hash(System.ReadOnlySpan<byte>)",
         "System.Delegate.Combine(System.Delegate, System.Delegate)",
         "System.FormattableString.Format.get",
         "System.FormattableString.Invariant(System.FormattableString)",

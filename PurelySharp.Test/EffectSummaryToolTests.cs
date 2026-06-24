@@ -1210,6 +1210,98 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeUtf8ParserInt32Slice_UsesGeneratedImpureCatalogEntries()
+        {
+            const string symbol = "System.Buffers.Text.Utf8Parser.TryParse(System.ReadOnlySpan`1<byte>, ref int, ref int, char)";
+
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                60,
+                symbol);
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, symbol, "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, symbol, "caller_visible");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_Crc32HashSlice_UsesGeneratedPurityCatalogEntry()
+        {
+            const string symbol = "System.IO.Hashing.Crc32.Hash(System.ReadOnlySpan`1<byte>)";
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-crc32-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var outputPath = Path.Combine(workingDirectory, "Crc32.Hash.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Defaults = new
+                    {
+                        Framework = "net8.0",
+                        IncludeCallees = true,
+                        IncludePurityClassification = true,
+                        CompareManualCatalogs = true,
+                    },
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = outputPath,
+                            PackageId = "System.IO.Hashing",
+                            PackageVersion = "8.0.0",
+                            PackageAssemblyRelativePath = "lib/net8.0/System.IO.Hashing.dll",
+                            Limit = 20,
+                            SymbolPrefixes = new[]
+                            {
+                                "System.IO.Hashing.Crc32.Hash(System.ReadOnlySpan`1<byte>)",
+                            },
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
+
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, symbol, "pure");
+            AssertEffectVisibilityClassification(summary, symbol, "internal_only");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain(symbol));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeArrayPredicateSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

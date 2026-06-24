@@ -462,6 +462,47 @@ public static class FileSystemPathGetterCatalogSignatureSamples
         }
 
         [Test]
+        public void Utf8ParserAndCrc32Helpers_AreSourcedFromGeneratedEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+using System.Buffers.Text;
+using System.IO.Hashing;
+
+public static class Utf8ParserAndCrc32CatalogSignatureSamples
+{
+    public static bool Sample(ReadOnlySpan<byte> bytes)
+    {
+        _ = Utf8Parser.TryParse(bytes, out int value, out int consumed);
+        _ = Crc32.Hash(bytes);
+        return value >= 0 && consumed >= 0;
+    }
+}";
+
+            var packageAssemblyPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".nuget",
+                "packages",
+                "system.io.hashing",
+                "8.0.0",
+                "lib",
+                "net8.0",
+                "System.IO.Hashing.dll");
+            Assert.That(File.Exists(packageAssemblyPath), Is.True, packageAssemblyPath);
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "Utf8ParserAndCrc32GeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences()
+                    .Add(MetadataReference.CreateFromFile(packageAssemblyPath)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Utf8Parser.TryParse(bytes, out int value, out int consumed)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Crc32.Hash(bytes)"));
+        }
+
+        [Test]
         public void ArrayPredicateHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"

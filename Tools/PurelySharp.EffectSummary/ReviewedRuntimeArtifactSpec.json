@@ -849,6 +849,14 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Utf8Parser.Int32.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "Limit": 60,
+      "SymbolPrefixes": [
+        "System.Buffers.Text.Utf8Parser.TryParse(System.ReadOnlySpan`1<byte>, ref int, ref int, char)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/StringInfo.PurelySharp.EffectSummary.json",
       "Limit": 20,
       "SymbolPrefixes": [
@@ -1003,6 +1011,16 @@
         "System.Security.Cryptography.CryptographicOperations.FixedTimeEquals"
       ],
       "RuntimeAssemblyName": "System.Security.Cryptography.dll"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Crc32.Hash.PurelySharp.EffectSummary.json",
+      "PackageId": "System.IO.Hashing",
+      "PackageVersion": "8.0.0",
+      "PackageAssemblyRelativePath": "lib/net8.0/System.IO.Hashing.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.IO.Hashing.Crc32.Hash(System.ReadOnlySpan`1<byte>)"
+      ]
     },
     {
       "OutputPath": "PurelySharp.Analyzer/DataContractAttribute.PurelySharp.EffectSummary.json",

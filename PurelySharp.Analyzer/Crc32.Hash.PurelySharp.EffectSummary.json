@@ -1,0 +1,164 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-24T09:56:52.2083524+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.IO.Hashing",
+      "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.io.hashing\\8.0.0\\lib\\net8.0\\System.IO.Hashing.dll",
+      "AssemblySha256": "53726755857b538b3676cabc39989874be072028fd5b39360a7580d73a14e562",
+      "ModuleVersionId": "bbaf96f9-eefb-428f-b6ec-be83e6b417a2",
+      "MethodCount": 190,
+      "EmittedMethodCount": 2,
+      "Methods": [
+        {
+          "Symbol": "System.IO.Hashing.Crc32.Hash(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.IO.Hashing.Crc32.Hash(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]",
+          "MetadataToken": "0x06000018",
+          "RelativeVirtualAddress": 8968,
+          "MethodBodySha256": "4e1a0de06717396ddd20f556fd5d255d481716904109fd95ff5a336b0ff7b2d6",
+          "CacheKey": "mvid:bbaf96f9-eefb-428f-b6ec-be83e6b417a2|token:0x06000018|il:4e1a0de06717396ddd20f556fd5d255d481716904109fd95ff5a336b0ff7b2d6",
+          "Effects": [
+            "allocates_array",
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(System.Span\u00601\u003Cbyte\u003E, uint)-\u003Evoid",
+            "System.IO.Hashing.Crc32.HashToUInt32(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Euint",
+            "System.Span\u00601\u003Cbyte\u003E.op_Implicit(!0[])-\u003ESystem.Span\u00601\u003C!0\u003E"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(System.Span\u00601\u003Cbyte\u003E, uint)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.IO.Hashing.Crc32.HashToUInt32(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Euint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Span\u00601\u003Cbyte\u003E.op_Implicit(!0[])-\u003ESystem.Span\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_array_candidate_via_local_helpers",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.IO.Hashing.Crc32.HashToUInt32(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+          "ExactSymbolKey": "System.IO.Hashing.Crc32.HashToUInt32(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Euint",
+          "MetadataToken": "0x0600001B",
+          "RelativeVirtualAddress": 9099,
+          "MethodBodySha256": "284378108a775a8f09304e89caceaf0c5a0cdcdc538ac4271625b1b40e3df620",
+          "CacheKey": "mvid:bbaf96f9-eefb-428f-b6ec-be83e6b417a2|token:0x0600001B|il:284378108a775a8f09304e89caceaf0c5a0cdcdc538ac4271625b1b40e3df620",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.IO.Hashing.Crc32.Update(uint, System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Euint"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.IO.Hashing.Crc32.Update(uint, System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Euint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 2,
+    "PureCount": 2,
+    "ImpureCount": 0,
+    "ConservativeUnknownCount": 0,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.IO.Hashing.Crc32.Hash(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.IO.Hashing.Crc32.Hash(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Ebyte[]",
+        "CacheKey": "mvid:bbaf96f9-eefb-428f-b6ec-be83e6b417a2|token:0x06000018|il:4e1a0de06717396ddd20f556fd5d255d481716904109fd95ff5a336b0ff7b2d6",
+        "AssemblyName": "System.IO.Hashing",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.io.hashing\\8.0.0\\lib\\net8.0\\System.IO.Hashing.dll",
+        "AssemblySha256": "53726755857b538b3676cabc39989874be072028fd5b39360a7580d73a14e562",
+        "ModuleVersionId": "bbaf96f9-eefb-428f-b6ec-be83e6b417a2",
+        "MetadataToken": "0x06000018",
+        "MethodBodySha256": "4e1a0de06717396ddd20f556fd5d255d481716904109fd95ff5a336b0ff7b2d6",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_array_candidate_via_local_helpers",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.IO.Hashing.Crc32.HashToUInt32(System.ReadOnlySpan\u00601\u003Cbyte\u003E)",
+        "ExactSymbolKey": "System.IO.Hashing.Crc32.HashToUInt32(System.ReadOnlySpan\u00601\u003Cbyte\u003E)-\u003Euint",
+        "CacheKey": "mvid:bbaf96f9-eefb-428f-b6ec-be83e6b417a2|token:0x0600001B|il:284378108a775a8f09304e89caceaf0c5a0cdcdc538ac4271625b1b40e3df620",
+        "AssemblyName": "System.IO.Hashing",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.io.hashing\\8.0.0\\lib\\net8.0\\System.IO.Hashing.dll",
+        "AssemblySha256": "53726755857b538b3676cabc39989874be072028fd5b39360a7580d73a14e562",
+        "ModuleVersionId": "bbaf96f9-eefb-428f-b6ec-be83e6b417a2",
+        "MetadataToken": "0x0600001B",
+        "MethodBodySha256": "284378108a775a8f09304e89caceaf0c5a0cdcdc538ac4271625b1b40e3df620",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      }
+    ]
+  }
+}
