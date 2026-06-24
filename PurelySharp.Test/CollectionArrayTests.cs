@@ -29,7 +29,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task QueueToArray_Diagnostic()
+        public async Task QueueToArray_NoDiagnostic()
         {
             var test = @"
 using System.Collections.Generic;
@@ -38,7 +38,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public int[] {|PS0002:TestMethod|}(Queue<int> values)
+    public int[] TestMethod(Queue<int> values)
     {
         return values.ToArray();
     }

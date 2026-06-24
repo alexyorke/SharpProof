@@ -487,6 +487,25 @@ public static class FileSystemPathGetterCatalogSignatureSamples
         }
 
         [Test]
+        public void QueueAndStackHelpers_AreSourcedFromGeneratedEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Collections.Generic.Queue<T>.ToArray()",
+                "System.Collections.Generic.Queue<T>.Dequeue()",
+                "System.Collections.Generic.Queue<T>.Enqueue(T)",
+                "System.Collections.Generic.Stack<T>.ToArray()",
+                "System.Collections.Generic.Stack<T>.Pop()",
+                "System.Collections.Generic.Stack<T>.Push(T)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void Utf8ParserAndCrc32Helpers_AreSourcedFromGeneratedEvidence_NotStaticCatalogs()
         {
             var source = @"

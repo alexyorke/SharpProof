@@ -494,6 +494,49 @@ public class TestClass
         }
 
         [Test]
+        public async Task MethodWithQueueEnqueue_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Queue<int> values)
+    {
+        values.Enqueue(1);
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                 .WithSpan(9, 17, 9, 27)
+                                 .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
+        public async Task MethodWithQueueDequeue_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(Queue<int> values)
+    {
+        return values.Dequeue();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task PureMethodWithStackPeek_NoDiagnostic()
         {
             var test = @"
@@ -527,6 +570,49 @@ public class TestClass
     public bool TestMethod(Stack<int> values, int value)
     {
         return values.Contains(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task MethodWithStackPush_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Stack<int> values)
+    {
+        values.Push(1);
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                 .WithSpan(9, 17, 9, 27)
+                                 .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
+        public async Task MethodWithStackPop_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(Stack<int> values)
+    {
+        return values.Pop();
     }
 }";
 

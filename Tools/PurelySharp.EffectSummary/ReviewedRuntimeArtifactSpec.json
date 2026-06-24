@@ -547,6 +547,26 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Queue.Mutators.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "Limit": 40,
+      "SymbolPrefixes": [
+        "System.Collections.Generic.Queue`1.Enqueue",
+        "System.Collections.Generic.Queue`1.Dequeue",
+        "System.Collections.Generic.Queue`1.ToArray"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Stack.Mutators.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Collections.dll",
+      "Limit": 40,
+      "SymbolPrefixes": [
+        "System.Collections.Generic.Stack`1.Push",
+        "System.Collections.Generic.Stack`1.Pop",
+        "System.Collections.Generic.Stack`1.ToArray"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/ImmutableCollections.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/ImmutableCollections.PurelySharp.EffectSummary.json",
       "PackageId": "System.Collections.Immutable",

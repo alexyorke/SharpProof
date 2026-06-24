@@ -8188,6 +8188,122 @@ public static class DuplicateReviewedSeedFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeQueueMutatorSlice_UsesGeneratedPurityAndFreshArrayEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                80,
+                "System.Collections.Generic.Queue`1.Enqueue",
+                "System.Collections.Generic.Queue`1.Dequeue",
+                "System.Collections.Generic.Queue`1.ToArray");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.Queue<T>.Enqueue(T)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Queue<T>.Enqueue(T) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.Queue<T>.Dequeue()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Queue<T>.Dequeue() should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.Queue<T>.ToArray()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Queue<T>.ToArray() should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(summary, "System.Collections.Generic.Queue`1.Enqueue(!0)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Queue`1.Enqueue(!0)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.Queue`1.Dequeue()", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Queue`1.Dequeue()", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.Queue`1.ToArray()", "pure");
+            AssertFreshnessClassification(summary, "System.Collections.Generic.Queue`1.ToArray()", "fresh_array_candidate_via_local_helpers");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Queue`1.ToArray()", "internal_only");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Queue`1.Enqueue(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Queue`1.Dequeue()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Queue`1.ToArray()"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeStackMutatorSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Collections.dll",
+                80,
+                "System.Collections.Generic.Stack`1.Push",
+                "System.Collections.Generic.Stack`1.Pop",
+                "System.Collections.Generic.Stack`1.ToArray");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.Stack<T>.Push(T)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Stack<T>.Push(T) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.Stack<T>.Pop()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Stack<T>.Pop() should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.Stack<T>.ToArray()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Stack<T>.ToArray() should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(summary, "System.Collections.Generic.Stack`1.Push(!0)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Stack`1.Push(!0)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.Stack`1.Pop()", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Stack`1.Pop()", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.Stack`1.ToArray()", "impure", "caller_visible_memory_write");
+            AssertFreshnessClassification(summary, "System.Collections.Generic.Stack`1.ToArray()", "fresh_array_candidate_requires_non_pure_resolution");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Stack`1.ToArray()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Stack`1.Push(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Stack`1.Pop()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Stack`1.ToArray()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeFileNotFoundExceptionSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.IO.FileNotFoundException", limit: 80);
