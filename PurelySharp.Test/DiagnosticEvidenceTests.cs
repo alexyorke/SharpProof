@@ -5992,6 +5992,134 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_AdditionalConcurrentCollectionMutatorsAsGeneratedImpureEvidence()
+        {
+            const string source = @"
+using System.Collections.Concurrent;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TryAddMethod(ConcurrentDictionary<int, int> dictionary)
+    {
+        return dictionary.TryAdd(1, 2);
+    }
+
+    [EnforcePure]
+    public void BlockingAddMethod(BlockingCollection<int> blockingCollection)
+    {
+        blockingCollection.Add(1);
+    }
+
+    [EnforcePure]
+    public int BlockingTakeMethod(BlockingCollection<int> blockingCollection)
+    {
+        return blockingCollection.Take();
+    }
+
+    [EnforcePure]
+    public void BagAddMethod(ConcurrentBag<int> bag)
+    {
+        bag.Add(1);
+    }
+
+    [EnforcePure]
+    public bool BagTryTakeMethod(ConcurrentBag<int> bag)
+    {
+        return bag.TryTake(out _);
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics.Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId).ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var tryAdd = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "dictionary.TryAdd(1, 2)"))
+                .Symbol!;
+            var blockingAdd = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "blockingCollection.Add(1)"))
+                .Symbol!;
+            var blockingTake = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "blockingCollection.Take()"))
+                .Symbol!;
+            var bagAdd = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "bag.Add(1)"))
+                .Symbol!;
+            var bagTryTake = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "bag.TryTake(out _)"))
+                .Symbol!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
+            {
+                ("System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>.TryAdd(TKey, TValue)", tryAdd.OriginalDefinition),
+                ("System.Collections.Concurrent.BlockingCollection<T>.Add(T)", blockingAdd.OriginalDefinition),
+                ("System.Collections.Concurrent.BlockingCollection<T>.Take()", blockingTake.OriginalDefinition),
+                ("System.Collections.Concurrent.ConcurrentBag<T>.Add(T)", bagAdd.OriginalDefinition),
+                ("System.Collections.Concurrent.ConcurrentBag<T>.TryTake(out T)", bagTryTake.OriginalDefinition),
+            };
+            var classifications = trackedMembers.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(5));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "generated_purity_summary" }));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty]),
+                Has.Some.Contain("System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>.TryAdd(TKey, TValue)"));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty]),
+                Has.Some.Contain("System.Collections.Concurrent.BlockingCollection<T>.Add(T)"));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty]),
+                Has.Some.Contain("System.Collections.Concurrent.BlockingCollection<T>.Take()"));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty]),
+                Has.Some.Contain("System.Collections.Concurrent.ConcurrentBag<T>.Add(T)"));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty]),
+                Has.Some.Contain("System.Collections.Concurrent.ConcurrentBag<T>.TryTake(out T)"));
+            Assert.That(classifications["System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>.TryAdd(TKey, TValue)"], Is.EqualTo((true, "impure")));
+            Assert.That(classifications["System.Collections.Concurrent.BlockingCollection<T>.Add(T)"], Is.EqualTo((true, "impure")));
+            Assert.That(classifications["System.Collections.Concurrent.BlockingCollection<T>.Take()"], Is.EqualTo((true, "impure")));
+            Assert.That(classifications["System.Collections.Concurrent.ConcurrentBag<T>.Add(T)"], Is.EqualTo((true, "impure")));
+            Assert.That(classifications["System.Collections.Concurrent.ConcurrentBag<T>.TryTake(out T)"], Is.EqualTo((true, "impure")));
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_SortedCollectionAndBitArrayMutatorsAsGeneratedImpureEvidence()
         {
             const string source = @"

@@ -278,9 +278,6 @@ public static class Constants
         "System.Xml.XmlWriter.Create(System.IO.Stream)",
         "System.Xml.XmlWriter.WriteStartElement(string)",
         "System.Xml.XmlWriter.WriteString(string)",
-        "System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>.TryAdd(TKey, TValue)",
-        "System.Collections.Concurrent.BlockingCollection<T>.Add(T)",
-        "System.Collections.Concurrent.BlockingCollection<T>.Take()",
         "System.Collections.ObjectModel.ObservableCollection<T>.Add(T)",
         "System.ComponentModel.BackgroundWorker.RunWorkerAsync()",
         "System.Diagnostics.EventLog.WriteEntry(string)",
@@ -534,8 +531,6 @@ public static class Constants
 
         "System.Activator.CreateInstanceFrom(string, string)",
         "System.Array.Sort<T>(T[], System.Comparison<T>)",
-        "System.Collections.Concurrent.ConcurrentBag<T>.Add(T)",
-        "System.Collections.Concurrent.ConcurrentBag<T>.TryTake(out T)",
         "System.Collections.Generic.Dictionary<TKey, TValue>.Values.CopyTo(TValue[], int)",
         "System.Collections.Generic.ICollection<T>.Add(T)",
         "System.Collections.Generic.ICollection<T>.Clear()",

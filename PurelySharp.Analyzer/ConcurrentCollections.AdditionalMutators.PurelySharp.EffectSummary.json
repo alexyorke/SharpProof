@@ -1,0 +1,2512 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-24T16:02:54.0948022+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.Collections.Concurrent",
+      "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+      "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+      "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+      "MethodCount": 430,
+      "EmittedMethodCount": 27,
+      "Methods": [
+        {
+          "Symbol": "System.ThrowHelper.ThrowKeyNullException()",
+          "ExactSymbolKey": "System.ThrowHelper.ThrowKeyNullException()-\u003Evoid",
+          "MetadataToken": "0x06000001",
+          "RelativeVirtualAddress": 134244,
+          "MethodBodySha256": "07648952b01014c15341ebb5a0505b58dd56b1494fc3def49f0d868e1af68d02",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000001|il:07648952b01014c15341ebb5a0505b58dd56b1494fc3def49f0d868e1af68d02",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.ThrowHelper.ThrowArgumentNullException(string)-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ThrowHelper.ThrowArgumentNullException(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.SR.get_BlockingCollection_CantTakeWhenDone()",
+          "ExactSymbolKey": "System.SR.get_BlockingCollection_CantTakeWhenDone()-\u003Estring",
+          "MetadataToken": "0x0600000E",
+          "RelativeVirtualAddress": 134524,
+          "MethodBodySha256": "cc650e8a5065d82535d93d42fcadb0900bc72f8223d52099e0908f348c9ef0ae",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x0600000E|il:cc650e8a5065d82535d93d42fcadb0900bc72f8223d52099e0908f348c9ef0ae",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.SR.GetResourceString(string)-\u003Estring"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.SR.GetResourceString(string)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "unknown_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.SR.GetResourceString(string)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.Add(!0)",
+          "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.Add(!0)-\u003Evoid",
+          "MetadataToken": "0x0600003B",
+          "RelativeVirtualAddress": 135464,
+          "MethodBodySha256": "d8006f31e5f38c9058eddef68dfe27988217173f6c7ae0ca7dd6a6760a49a63e",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x0600003B|il:d8006f31e5f38c9058eddef68dfe27988217173f6c7ae0ca7dd6a6760a49a63e",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryAddWithNoTimeValidation(!0, int, System.Threading.CancellationToken)-\u003Ebool",
+            "System.Threading.CancellationToken.get_None()-\u003ESystem.Threading.CancellationToken"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryAddWithNoTimeValidation(!0, int, System.Threading.CancellationToken)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.CancellationToken.get_None()-\u003ESystem.Threading.CancellationToken",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Concurrent.BlockingCollection\u00601.TryAddWithNoTimeValidation(!0, int, System.Threading.CancellationToken)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.Add(!0, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.Add(!0, System.Threading.CancellationToken)-\u003Evoid",
+          "MetadataToken": "0x0600003C",
+          "RelativeVirtualAddress": 135480,
+          "MethodBodySha256": "76e9f34567a84cddf2c9589e334972dfa9714a7faf6a8465892e199bb5ee131e",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x0600003C|il:76e9f34567a84cddf2c9589e334972dfa9714a7faf6a8465892e199bb5ee131e",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryAddWithNoTimeValidation(!0, int, System.Threading.CancellationToken)-\u003Ebool"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryAddWithNoTimeValidation(!0, int, System.Threading.CancellationToken)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Concurrent.BlockingCollection\u00601.TryAddWithNoTimeValidation(!0, int, System.Threading.CancellationToken)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.TryAddWithNoTimeValidation(!0, int, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.TryAddWithNoTimeValidation(!0, int, System.Threading.CancellationToken)-\u003Ebool",
+          "MetadataToken": "0x06000041",
+          "RelativeVirtualAddress": 135580,
+          "MethodBodySha256": "5832ccf560abd523707f49bd2a6a312f0d67d7ab7734469f4b50f092399a15f3",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000041|il:5832ccf560abd523707f49bd2a6a312f0d67d7ab7734469f4b50f092399a15f3",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "reads_instance_field",
+            "throws",
+            "virtual_call",
+            "writes_indirect_memory"
+          ],
+          "RootCandidates": [
+            "caller_visible_memory_write",
+            "dynamic_dispatch",
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.InvalidOperationException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.InvalidOperationException",
+              "SourcePath": "System.Collections.Concurrent.BlockingCollection\u00601.TryAddWithNoTimeValidation(!0, int, System.Threading.CancellationToken)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.CheckDisposed()-\u003Evoid",
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.get_IsAddingCompleted()-\u003Ebool",
+            "System.Collections.Concurrent.IProducerConsumerCollection\u00601\u003C!0\u003E.TryAdd(!0)-\u003Ebool",
+            "System.InvalidOperationException..ctor(string)-\u003Evoid",
+            "System.SR.get_BlockingCollection_Add_ConcurrentCompleteAdd()-\u003Estring",
+            "System.SR.get_BlockingCollection_Add_Failed()-\u003Estring",
+            "System.SR.get_BlockingCollection_Completed()-\u003Estring",
+            "System.Threading.CancellationToken.ThrowIfCancellationRequested()-\u003Evoid",
+            "System.Threading.CancellationTokenSource.CreateLinkedTokenSource(System.Threading.CancellationToken, System.Threading.CancellationToken)-\u003ESystem.Threading.CancellationTokenSource",
+            "System.Threading.CancellationTokenSource.Dispose()-\u003Evoid",
+            "System.Threading.CancellationTokenSource.get_Token()-\u003ESystem.Threading.CancellationToken",
+            "System.Threading.Interlocked.CompareExchange(ref int, int, int)-\u003Eint",
+            "System.Threading.Interlocked.Decrement(ref int)-\u003Eint",
+            "System.Threading.SemaphoreSlim.Release()-\u003Eint",
+            "System.Threading.SemaphoreSlim.Wait(int, System.Threading.CancellationToken)-\u003Ebool",
+            "System.Threading.SpinWait.Reset()-\u003Evoid",
+            "System.Threading.SpinWait.SpinOnce()-\u003Evoid",
+            "System.Threading.SpinWait.SpinOnce(int)-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Collections.Concurrent.BlockingCollection\u00601._collection",
+            "System.Collections.Concurrent.BlockingCollection\u00601._currentAdders",
+            "System.Collections.Concurrent.BlockingCollection\u00601._freeNodes",
+            "System.Collections.Concurrent.BlockingCollection\u00601._occupiedNodes",
+            "System.Collections.Concurrent.BlockingCollection\u00601._producersCancellationTokenSource"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.CheckDisposed()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.get_IsAddingCompleted()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.IProducerConsumerCollection\u00601\u003C!0\u003E.TryAdd(!0)-\u003Ebool",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.InvalidOperationException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_BlockingCollection_Add_ConcurrentCompleteAdd()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_BlockingCollection_Add_Failed()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_BlockingCollection_Completed()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.CancellationToken.ThrowIfCancellationRequested()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.CancellationTokenSource.CreateLinkedTokenSource(System.Threading.CancellationToken, System.Threading.CancellationToken)-\u003ESystem.Threading.CancellationTokenSource",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.CancellationTokenSource.Dispose()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.CancellationTokenSource.get_Token()-\u003ESystem.Threading.CancellationToken",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Interlocked.CompareExchange(ref int, int, int)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Interlocked.Decrement(ref int)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.SemaphoreSlim.Release()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.SemaphoreSlim.Wait(int, System.Threading.CancellationToken)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.SpinWait.Reset()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.SpinWait.SpinOnce()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.SpinWait.SpinOnce(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "caller_visible_memory_write",
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.Take()",
+          "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.Take()-\u003E!0",
+          "MetadataToken": "0x06000042",
+          "RelativeVirtualAddress": 135972,
+          "MethodBodySha256": "d4fbf26b9c868c6ddf05a9394e61e35d5c1b673816c83c9b01aa9f20bdac49f1",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000042|il:d4fbf26b9c868c6ddf05a9394e61e35d5c1b673816c83c9b01aa9f20bdac49f1",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws"
+          ],
+          "RootCandidates": [
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.InvalidOperationException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.InvalidOperationException",
+              "SourcePath": "System.Collections.Concurrent.BlockingCollection\u00601.Take()"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryTake(ref !0, int, System.Threading.CancellationToken)-\u003Ebool",
+            "System.InvalidOperationException..ctor(string)-\u003Evoid",
+            "System.SR.get_BlockingCollection_CantTakeWhenDone()-\u003Estring",
+            "System.Threading.CancellationToken.get_None()-\u003ESystem.Threading.CancellationToken"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryTake(ref !0, int, System.Threading.CancellationToken)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.InvalidOperationException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_BlockingCollection_CantTakeWhenDone()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.CancellationToken.get_None()-\u003ESystem.Threading.CancellationToken",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [
+              "System.SR.get_BlockingCollection_CantTakeWhenDone()",
+              "System.SR.GetResourceString(string)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.Take(System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.Take(System.Threading.CancellationToken)-\u003E!0",
+          "MetadataToken": "0x06000043",
+          "RelativeVirtualAddress": 136016,
+          "MethodBodySha256": "fc723dbf8acac30b7153ba43351a95619ae4507cd0b8ab129d6a34563e10943c",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000043|il:fc723dbf8acac30b7153ba43351a95619ae4507cd0b8ab129d6a34563e10943c",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws"
+          ],
+          "RootCandidates": [
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.InvalidOperationException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.InvalidOperationException",
+              "SourcePath": "System.Collections.Concurrent.BlockingCollection\u00601.Take(System.Threading.CancellationToken)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryTake(ref !0, int, System.Threading.CancellationToken)-\u003Ebool",
+            "System.InvalidOperationException..ctor(string)-\u003Evoid",
+            "System.SR.get_BlockingCollection_CantTakeWhenDone()-\u003Estring"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryTake(ref !0, int, System.Threading.CancellationToken)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.InvalidOperationException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_BlockingCollection_CantTakeWhenDone()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [
+              "System.SR.get_BlockingCollection_CantTakeWhenDone()",
+              "System.SR.GetResourceString(string)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.TryTake(ref !0, int, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.TryTake(ref !0, int, System.Threading.CancellationToken)-\u003Ebool",
+          "MetadataToken": "0x06000047",
+          "RelativeVirtualAddress": 136128,
+          "MethodBodySha256": "cebb85d182afc8b47d04b91232a04164fa4bd460534f984f9b897a2a6bf1e828",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000047|il:cebb85d182afc8b47d04b91232a04164fa4bd460534f984f9b897a2a6bf1e828",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryTakeWithNoTimeValidation(ref !0, int, System.Threading.CancellationToken, System.Threading.CancellationTokenSource)-\u003Ebool",
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.ValidateMillisecondsTimeout(int)-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryTakeWithNoTimeValidation(ref !0, int, System.Threading.CancellationToken, System.Threading.CancellationTokenSource)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.ValidateMillisecondsTimeout(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.AddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0)",
+          "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.AddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0)-\u003Eint",
+          "MetadataToken": "0x06000049",
+          "RelativeVirtualAddress": 136420,
+          "MethodBodySha256": "9cfa1e1f933b373b0d2a032cd2e6ba10744f51dcef14d2e80e1feaca9c1cca02",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000049|il:9cfa1e1f933b373b0d2a032cd2e6ba10744f51dcef14d2e80e1feaca9c1cca02",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryAddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0, int, System.Threading.CancellationToken)-\u003Eint",
+            "System.Threading.CancellationToken.get_None()-\u003ESystem.Threading.CancellationToken"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryAddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0, int, System.Threading.CancellationToken)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.CancellationToken.get_None()-\u003ESystem.Threading.CancellationToken",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.AddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.AddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0, System.Threading.CancellationToken)-\u003Eint",
+          "MetadataToken": "0x0600004A",
+          "RelativeVirtualAddress": 136436,
+          "MethodBodySha256": "7b84aec2a8debf7d033e020d21837938a4f1a36ce05f768dcd5d981d4384e0f2",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x0600004A|il:7b84aec2a8debf7d033e020d21837938a4f1a36ce05f768dcd5d981d4384e0f2",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryAddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0, int, System.Threading.CancellationToken)-\u003Eint"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryAddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0, int, System.Threading.CancellationToken)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.TryAddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0, int, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.TryAddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0, int, System.Threading.CancellationToken)-\u003Eint",
+          "MetadataToken": "0x0600004E",
+          "RelativeVirtualAddress": 136516,
+          "MethodBodySha256": "30bccab9f587e04c4126f7a0d429df6e980bce7c144bd164fa92a0c7abe0b2ab",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x0600004E|il:30bccab9f587e04c4126f7a0d429df6e980bce7c144bd164fa92a0c7abe0b2ab",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryAddToAnyCore(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0, int, System.Threading.CancellationToken)-\u003Eint",
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.ValidateMillisecondsTimeout(int)-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryAddToAnyCore(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0, int, System.Threading.CancellationToken)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.ValidateMillisecondsTimeout(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.TakeFromAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0)",
+          "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.TakeFromAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0)-\u003Eint",
+          "MetadataToken": "0x06000053",
+          "RelativeVirtualAddress": 137064,
+          "MethodBodySha256": "21777fb7326ac60e9a2264032e467c4975c331aeef230612f2f1f5250d04a7f0",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000053|il:21777fb7326ac60e9a2264032e467c4975c331aeef230612f2f1f5250d04a7f0",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TakeFromAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, System.Threading.CancellationToken)-\u003Eint",
+            "System.Threading.CancellationToken.get_None()-\u003ESystem.Threading.CancellationToken"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TakeFromAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, System.Threading.CancellationToken)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.CancellationToken.get_None()-\u003ESystem.Threading.CancellationToken",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "unknown_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Concurrent.BlockingCollection\u00601.TakeFromAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, System.Threading.CancellationToken)",
+              "System.Collections.Concurrent.BlockingCollection\u00601.TryTakeFromAnyCore(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, int, bool, System.Threading.CancellationToken)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.TakeFromAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.TakeFromAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, System.Threading.CancellationToken)-\u003Eint",
+          "MetadataToken": "0x06000054",
+          "RelativeVirtualAddress": 137080,
+          "MethodBodySha256": "e4ae28bc282464cb25af5913f5a8cd81a080a02ffe35344c0b65a13ad03680ba",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000054|il:e4ae28bc282464cb25af5913f5a8cd81a080a02ffe35344c0b65a13ad03680ba",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryTakeFromAnyCore(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, int, bool, System.Threading.CancellationToken)-\u003Eint"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryTakeFromAnyCore(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, int, bool, System.Threading.CancellationToken)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "unknown_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Concurrent.BlockingCollection\u00601.TryTakeFromAnyCore(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, int, bool, System.Threading.CancellationToken)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.TryTakeFromAnyCore(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, int, bool, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.TryTakeFromAnyCore(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, int, bool, System.Threading.CancellationToken)-\u003Eint",
+          "MetadataToken": "0x06000059",
+          "RelativeVirtualAddress": 137196,
+          "MethodBodySha256": "c160a43c6371bb20623ba6531849ad36841000c3682ced5f939bdd6bd244c417",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000059|il:c160a43c6371bb20623ba6531849ad36841000c3682ced5f939bdd6bd244c417",
+          "Effects": [
+            "calls_method",
+            "reads_instance_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryTake(ref !0)-\u003Ebool",
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryTakeFromAnyCoreSlow(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, int, bool, System.Threading.CancellationToken)-\u003Eint",
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.ValidateCollectionsArray(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], bool)-\u003Evoid",
+            "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.get_IsCompleted()-\u003Ebool",
+            "System.Threading.SemaphoreSlim.get_CurrentCount()-\u003Eint"
+          ],
+          "Fields": [
+            "System.Collections.Concurrent.BlockingCollection\u00601._occupiedNodes"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryTake(ref !0)-\u003Ebool",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.TryTakeFromAnyCoreSlow(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, int, bool, System.Threading.CancellationToken)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.ValidateCollectionsArray(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], bool)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E.get_IsCompleted()-\u003Ebool",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.SemaphoreSlim.get_CurrentCount()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "dynamic_dispatch",
+              "virtual_call"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.ConcurrentBag\u00601.Add(!0)",
+          "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601.Add(!0)-\u003Evoid",
+          "MetadataToken": "0x0600007F",
+          "RelativeVirtualAddress": 139244,
+          "MethodBodySha256": "0be5a4a419c504365ce4069c03990c746fe0e6260f870c48337eff5f8620ef1a",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x0600007F|il:0be5a4a419c504365ce4069c03990c746fe0e6260f870c48337eff5f8620ef1a",
+          "Effects": [
+            "calls_method",
+            "reads_instance_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E.LocalPush(!0, ref long)-\u003Evoid",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u003C!0\u003E.GetCurrentThreadWorkStealingQueue(bool)-\u003ESystem.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E"
+          ],
+          "Fields": [
+            "System.Collections.Concurrent.ConcurrentBag\u00601._emptyToNonEmptyListTransitionCount"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E.LocalPush(!0, ref long)-\u003Evoid",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601\u003C!0\u003E.GetCurrentThreadWorkStealingQueue(bool)-\u003ESystem.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue.LocalPush(!0, ref long)",
+              "System.Array.Copy(System.Array, System.Array, int)",
+              "System.Array.CopyImpl(System.Array, int, System.Array, int, int, bool)",
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.ConcurrentBag\u00601.TryTake(ref !0)",
+          "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601.TryTake(ref !0)-\u003Ebool",
+          "MetadataToken": "0x06000081",
+          "RelativeVirtualAddress": 139280,
+          "MethodBodySha256": "c77299f05977bc0ba623b0bdbdee0c350345ee8926fa59d024a17aeddc736946",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000081|il:c77299f05977bc0ba623b0bdbdee0c350345ee8926fa59d024a17aeddc736946",
+          "Effects": [
+            "calls_method",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E.TryLocalPop(ref !0)-\u003Ebool",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u003C!0\u003E.GetCurrentThreadWorkStealingQueue(bool)-\u003ESystem.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u003C!0\u003E.TrySteal(ref !0, bool)-\u003Ebool"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E.TryLocalPop(ref !0)-\u003Ebool",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601\u003C!0\u003E.GetCurrentThreadWorkStealingQueue(bool)-\u003ESystem.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601\u003C!0\u003E.TrySteal(ref !0, bool)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue.TryLocalPop(ref !0)",
+              "System.Threading.Monitor.Exit(object)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.ConcurrentBag\u00601.GetCurrentThreadWorkStealingQueue(bool)",
+          "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601.GetCurrentThreadWorkStealingQueue(bool)-\u003ESystem.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E",
+          "MetadataToken": "0x06000083",
+          "RelativeVirtualAddress": 139368,
+          "MethodBodySha256": "31a22984299174e2693543fce392306d03113fa84dfa3d3646a9e47a9c3bfdaa",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000083|il:31a22984299174e2693543fce392306d03113fa84dfa3d3646a9e47a9c3bfdaa",
+          "Effects": [
+            "calls_method",
+            "reads_instance_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u003C!0\u003E.CreateWorkStealingQueueForCurrentThread()-\u003ESystem.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E",
+            "System.Threading.ThreadLocal\u00601\u003CSystem.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E\u003E.get_Value()-\u003E!0"
+          ],
+          "Fields": [
+            "System.Collections.Concurrent.ConcurrentBag\u00601._locals"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601\u003C!0\u003E.CreateWorkStealingQueueForCurrentThread()-\u003ESystem.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.ThreadLocal\u00601\u003CSystem.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E\u003E.get_Value()-\u003E!0",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "dynamic_dispatch",
+              "virtual_call"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.ConcurrentBag\u00601.TrySteal(ref !0, bool)",
+          "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601.TrySteal(ref !0, bool)-\u003Ebool",
+          "MetadataToken": "0x06000086",
+          "RelativeVirtualAddress": 139564,
+          "MethodBodySha256": "4f5d6097bb2c0912961d7b975b78405e0935b22c84ae44b6dbf12372152a813f",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000086|il:4f5d6097bb2c0912961d7b975b78405e0935b22c84ae44b6dbf12372152a813f",
+          "Effects": [
+            "calls_method",
+            "reads_instance_field",
+            "reads_static_field"
+          ],
+          "RootCandidates": [
+            "global_state_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.CDSCollectionETWBCLProvider.ConcurrentBag_TryPeekSteals()-\u003Evoid",
+            "System.Collections.Concurrent.CDSCollectionETWBCLProvider.ConcurrentBag_TryTakeSteals()-\u003Evoid",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u003C!0\u003E.GetCurrentThreadWorkStealingQueue(bool)-\u003ESystem.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u003C!0\u003E.TryStealFromTo(System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E, System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E, ref !0, bool)-\u003Ebool",
+            "System.Diagnostics.Tracing.EventSource.IsEnabled()-\u003Ebool",
+            "System.Threading.Interlocked.Read(ref long)-\u003Elong"
+          ],
+          "Fields": [
+            "System.Collections.Concurrent.CDSCollectionETWBCLProvider.Log",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._nextQueue",
+            "System.Collections.Concurrent.ConcurrentBag\u00601._emptyToNonEmptyListTransitionCount",
+            "System.Collections.Concurrent.ConcurrentBag\u00601._workStealingQueues"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.CDSCollectionETWBCLProvider.ConcurrentBag_TryPeekSteals()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.CDSCollectionETWBCLProvider.ConcurrentBag_TryTakeSteals()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601\u003C!0\u003E.GetCurrentThreadWorkStealingQueue(bool)-\u003ESystem.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601\u003C!0\u003E.TryStealFromTo(System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E, System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E, ref !0, bool)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Diagnostics.Tracing.EventSource.IsEnabled()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Interlocked.Read(ref long)-\u003Elong",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Concurrent.ConcurrentBag\u00601.GetCurrentThreadWorkStealingQueue(bool)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue.LocalPush(!0, ref long)",
+          "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue.LocalPush(!0, ref long)-\u003Evoid",
+          "MetadataToken": "0x06000099",
+          "RelativeVirtualAddress": 140816,
+          "MethodBodySha256": "6b820a1cec7520dd5446b0212c8140b132f5acb83d4ba1e0bd1e5fae5f76d9be",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000099|il:6b820a1cec7520dd5446b0212c8140b132f5acb83d4ba1e0bd1e5fae5f76d9be",
+          "Effects": [
+            "allocates_array",
+            "calls_method",
+            "reads_instance_field",
+            "writes_indirect_memory",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "caller_visible_memory_write",
+            "object_state_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Array.Copy(System.Array, System.Array, int)-\u003Evoid",
+            "System.Array.Copy(System.Array, int, System.Array, int, int)-\u003Evoid",
+            "System.Threading.Interlocked.Exchange(ref int, int)-\u003Eint",
+            "System.Threading.Interlocked.Increment(ref long)-\u003Elong",
+            "System.Threading.Monitor.Enter(object, ref bool)-\u003Evoid",
+            "System.Threading.Monitor.Exit(object)-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._addTakeCount",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._array",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._currentOp",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._frozen",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._headIndex",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._mask",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._stealCount",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._tailIndex"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Array.Copy(System.Array, System.Array, int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Array.Copy(System.Array, int, System.Array, int, int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Interlocked.Exchange(ref int, int)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Interlocked.Increment(ref long)-\u003Elong",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Monitor.Enter(object, ref bool)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Monitor.Exit(object)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "caller_visible_memory_write",
+              "impure_callee",
+              "object_state_write"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Array.Copy(System.Array, System.Array, int)",
+              "System.Array.CopyImpl(System.Array, int, System.Array, int, int, bool)",
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
+            ],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "fresh_array_candidate_requires_non_pure_resolution",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue.TryLocalPop(ref !0)",
+          "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue.TryLocalPop(ref !0)-\u003Ebool",
+          "MetadataToken": "0x0600009B",
+          "RelativeVirtualAddress": 141540,
+          "MethodBodySha256": "7f295a9a674484a9bda76794d61aa53fcab1beb9ef548baa2a3460261c47dff1",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x0600009B|il:7f295a9a674484a9bda76794d61aa53fcab1beb9ef548baa2a3460261c47dff1",
+          "Effects": [
+            "calls_method",
+            "reads_instance_field",
+            "writes_indirect_memory",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "caller_visible_memory_write",
+            "object_state_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences()-\u003Ebool",
+            "System.Threading.Interlocked.Exchange(ref int, int)-\u003Eint",
+            "System.Threading.Monitor.Enter(object, ref bool)-\u003Evoid",
+            "System.Threading.Monitor.Exit(object)-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._addTakeCount",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._array",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._currentOp",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._frozen",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._headIndex",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._mask",
+            "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue._tailIndex"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Interlocked.Exchange(ref int, int)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Monitor.Enter(object, ref bool)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Monitor.Exit(object)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "caller_visible_memory_write",
+              "object_state_write"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Threading.Monitor.Exit(object)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.ConcurrentDictionary\u00602.GetHashCode(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, !0)",
+          "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602.GetHashCode(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, !0)-\u003Eint",
+          "MetadataToken": "0x060000AF",
+          "RelativeVirtualAddress": 143144,
+          "MethodBodySha256": "a7e104cc923aadc31e67fc7ecc19d62b7f4107eed3568e38e286b399db9a1860",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x060000AF|il:a7e104cc923aadc31e67fc7ecc19d62b7f4107eed3568e38e286b399db9a1860",
+          "Effects": [
+            "calls_method",
+            "reads_instance_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E.GetHashCode(!0)-\u003Eint",
+            "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+            "System.Type.get_IsValueType()-\u003Ebool",
+            "object.GetHashCode()-\u003Eint"
+          ],
+          "Fields": [
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602._comparerIsDefaultForClasses"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E.GetHashCode(!0)-\u003Eint",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.get_IsValueType()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "object.GetHashCode()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "dynamic_dispatch",
+              "unknown_callee",
+              "virtual_call"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Generic.IEqualityComparer\u00601.GetHashCode(!0)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.ConcurrentDictionary\u00602.NodeEqualsKey(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E, !0)",
+          "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602.NodeEqualsKey(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E, !0)-\u003Ebool",
+          "MetadataToken": "0x060000B0",
+          "RelativeVirtualAddress": 143228,
+          "MethodBodySha256": "08e9b7711e15264d134bdcfc0c877c51fbd3a6462ba98bc2e4d64719bb7647c0",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x060000B0|il:08e9b7711e15264d134bdcfc0c877c51fbd3a6462ba98bc2e4d64719bb7647c0",
+          "Effects": [
+            "calls_method",
+            "reads_instance_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E.Equals(!0, !0)-\u003Ebool",
+            "System.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E.get_Default()-\u003ESystem.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E",
+            "System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E.Equals(!0, !0)-\u003Ebool",
+            "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+            "System.Type.get_IsValueType()-\u003Ebool"
+          ],
+          "Fields": [
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode._key"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E.Equals(!0, !0)-\u003Ebool",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E.get_Default()-\u003ESystem.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E.Equals(!0, !0)-\u003Ebool",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.get_IsValueType()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "dynamic_dispatch",
+              "unknown_callee",
+              "virtual_call"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Generic.EqualityComparer\u00601.Equals(!0, !0)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.ConcurrentDictionary\u00602.TryAdd(!0, !1)",
+          "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602.TryAdd(!0, !1)-\u003Ebool",
+          "MetadataToken": "0x060000B2",
+          "RelativeVirtualAddress": 143492,
+          "MethodBodySha256": "a237638f4090ae077e774762e45d32a186dd247b35471720e0b01724d7e4b570",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x060000B2|il:a237638f4090ae077e774762e45d32a186dd247b35471720e0b01724d7e4b570",
+          "Effects": [
+            "allocates_box",
+            "calls_method",
+            "reads_instance_field",
+            "writes_indirect_memory"
+          ],
+          "RootCandidates": [
+            "caller_visible_memory_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.TryAddInternal(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, !0, System.Nullable\u00601\u003Cint\u003E, !1, bool, bool, ref !1)-\u003Ebool",
+            "System.ThrowHelper.ThrowKeyNullException()-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602._tables"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.TryAddInternal(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, !0, System.Nullable\u00601\u003Cint\u003E, !1, bool, bool, ref !1)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ThrowHelper.ThrowKeyNullException()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "caller_visible_memory_write",
+              "global_state_read",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Concurrent.ConcurrentDictionary\u00602.TryAddInternal(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, !0, System.Nullable\u00601\u003Cint\u003E, !1, bool, bool, ref !1)",
+              "System.Collections.Concurrent.ConcurrentDictionary\u00602.GetBucketAndLock(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, int, ref uint)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.ConcurrentDictionary\u00602.TryAddInternal(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, !0, System.Nullable\u00601\u003Cint\u003E, !1, bool, bool, ref !1)",
+          "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602.TryAddInternal(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, !0, System.Nullable\u00601\u003Cint\u003E, !1, bool, bool, ref !1)-\u003Ebool",
+          "MetadataToken": "0x060000C2",
+          "RelativeVirtualAddress": 145504,
+          "MethodBodySha256": "534440227b757ac10555418e21e59688f47a4d64bca963a8ca33170759ec410c",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x060000C2|il:534440227b757ac10555418e21e59688f47a4d64bca963a8ca33170759ec410c",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "reads_instance_field",
+            "reads_static_field",
+            "writes_indirect_memory",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "caller_visible_memory_write",
+            "global_state_read",
+            "object_state_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E..ctor(!0, !1, int, System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E)-\u003Evoid",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.GetBucketAndLock(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, int, ref uint)-\u003Eref System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.GetHashCode(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, !0)-\u003Eint",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.GrowTable(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, bool, bool)-\u003Evoid",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.NodeEqualsKey(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E, !0)-\u003Ebool",
+            "System.Nullable\u00601\u003Cint\u003E.GetValueOrDefault()-\u003E!0",
+            "System.Nullable\u00601\u003Cint\u003E.get_HasValue()-\u003Ebool",
+            "System.Threading.Monitor.Enter(object, ref bool)-\u003Evoid",
+            "System.Threading.Monitor.Exit(object)-\u003Evoid",
+            "System.Threading.Volatile.Write(ref !!0, !!0)-\u003Evoid",
+            "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+            "System.Type.get_IsValueType()-\u003Ebool"
+          ],
+          "Fields": [
+            "System.Collections.Concurrent.ConcurrentDictionaryTypeProps\u00601.IsWriteAtomic",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode._hashcode",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode._key",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode._next",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode._value",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables._comparer",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables._countPerLock",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables._locks",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602._budget",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602._tables"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E..ctor(!0, !1, int, System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.GetBucketAndLock(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, int, ref uint)-\u003Eref System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.GetHashCode(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, !0)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.GrowTable(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, bool, bool)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.NodeEqualsKey(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E, !0)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Nullable\u00601\u003Cint\u003E.GetValueOrDefault()-\u003E!0",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Nullable\u00601\u003Cint\u003E.get_HasValue()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Monitor.Enter(object, ref bool)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Monitor.Exit(object)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Volatile.Write(ref !!0, !!0)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.get_IsValueType()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "caller_visible_memory_write",
+              "global_state_read",
+              "impure_callee",
+              "object_state_write"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Concurrent.ConcurrentDictionary\u00602.GetBucketAndLock(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, int, ref uint)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.ConcurrentDictionary\u00602.GrowTable(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, bool, bool)",
+          "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602.GrowTable(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, bool, bool)-\u003Evoid",
+          "MetadataToken": "0x060000EA",
+          "RelativeVirtualAddress": 148052,
+          "MethodBodySha256": "f73dde518caae9affebb26845ebb1eb7e1b7fe37349b48622261fd5fbb9e6ca6",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x060000EA|il:f73dde518caae9affebb26845ebb1eb7e1b7fe37349b48622261fd5fbb9e6ca6",
+          "Effects": [
+            "allocates_array",
+            "allocates_object",
+            "calls_method",
+            "reads_instance_field",
+            "virtual_call",
+            "writes_indirect_memory",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "caller_visible_memory_write",
+            "dynamic_dispatch",
+            "object_state_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Array.Copy(System.Array, System.Array, int)-\u003Evoid",
+            "System.Array.get_MaxLength()-\u003Eint",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E..ctor(!0, !1, int, System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E)-\u003Evoid",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E..ctor(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BVolatileNode\u003C!0, !1\u003E[], object[], int[], System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003Evoid",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.AcquireFirstLock(ref int)-\u003Evoid",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.AcquirePostFirstLock(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, ref int)-\u003Evoid",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.GetBucketAndLock(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, int, ref uint)-\u003Eref System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.GetCountNoLocks()-\u003Eint",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.ReleaseLocks(int)-\u003Evoid",
+            "System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E.GetHashCode(!0)-\u003Eint",
+            "System.Collections.Generic.NonRandomizedStringEqualityComparer.GetUnderlyingEqualityComparer()-\u003ESystem.Collections.Generic.IEqualityComparer\u00601\u003Cstring\u003E",
+            "System.Collections.HashHelpers.GetPrime(int)-\u003Eint",
+            "System.Math.Max(int, int)-\u003Eint",
+            "object..ctor()-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode._hashcode",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode._key",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode._next",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode._value",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables._buckets",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables._comparer",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables._locks",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BVolatileNode._node",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602._budget",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602._growLockArray",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602._tables"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Array.Copy(System.Array, System.Array, int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Array.get_MaxLength()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E..ctor(!0, !1, int, System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E..ctor(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BVolatileNode\u003C!0, !1\u003E[], object[], int[], System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.AcquireFirstLock(ref int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.AcquirePostFirstLock(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, ref int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.GetBucketAndLock(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, int, ref uint)-\u003Eref System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.GetCountNoLocks()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u003C!0, !1\u003E.ReleaseLocks(int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E.GetHashCode(!0)-\u003Eint",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.NonRandomizedStringEqualityComparer.GetUnderlyingEqualityComparer()-\u003ESystem.Collections.Generic.IEqualityComparer\u00601\u003Cstring\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.HashHelpers.GetPrime(int)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Math.Max(int, int)-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "object..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "caller_visible_memory_write",
+              "impure_callee",
+              "object_state_write"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Array.Copy(System.Array, System.Array, int)",
+              "System.Array.CopyImpl(System.Array, int, System.Array, int, int, bool)",
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
+            ],
+            "HasFreshArrayAllocationEvidence": true,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "fresh_array_candidate_requires_non_pure_resolution",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.ConcurrentDictionary\u00602.GetBucketAndLock(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, int, ref uint)",
+          "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602.GetBucketAndLock(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, int, ref uint)-\u003Eref System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E",
+          "MetadataToken": "0x060000F3",
+          "RelativeVirtualAddress": 149264,
+          "MethodBodySha256": "94834766e6ece708eecc8de7bd8417c8dbea33aabf935e26254c4d8ea10c1cd5",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x060000F3|il:94834766e6ece708eecc8de7bd8417c8dbea33aabf935e26254c4d8ea10c1cd5",
+          "Effects": [
+            "calls_method",
+            "reads_instance_field",
+            "writes_indirect_memory"
+          ],
+          "RootCandidates": [
+            "caller_visible_memory_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.HashHelpers.FastMod(uint, uint, ulong)-\u003Euint",
+            "nint.get_Size()-\u003Eint"
+          ],
+          "Fields": [
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables._buckets",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables._fastModBucketsMultiplier",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables._locks",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BVolatileNode._node"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.HashHelpers.FastMod(uint, uint, ulong)-\u003Euint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "nint.get_Size()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "caller_visible_memory_write"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode..ctor(!0, !1, int, System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E)",
+          "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode..ctor(!0, !1, int, System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E)-\u003Evoid",
+          "MetadataToken": "0x060000FB",
+          "RelativeVirtualAddress": 149652,
+          "MethodBodySha256": "5bfdff808fb0e0133e33316e8760261870e506c7e6c402abb414c32dd8429cd1",
+          "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x060000FB|il:5bfdff808fb0e0133e33316e8760261870e506c7e6c402abb414c32dd8429cd1",
+          "Effects": [
+            "calls_method",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "fresh_owned_object_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "object..ctor()-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode._hashcode",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode._key",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode._next",
+            "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode._value"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "object..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 27,
+    "PureCount": 6,
+    "ImpureCount": 14,
+    "ConservativeUnknownCount": 7,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.Add(!0)",
+        "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.Add(!0)-\u003Evoid",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x0600003B|il:d8006f31e5f38c9058eddef68dfe27988217173f6c7ae0ca7dd6a6760a49a63e",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x0600003B",
+        "MethodBodySha256": "d8006f31e5f38c9058eddef68dfe27988217173f6c7ae0ca7dd6a6760a49a63e",
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Concurrent.BlockingCollection\u00601.TryAddWithNoTimeValidation(!0, int, System.Threading.CancellationToken)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.Add(!0, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.Add(!0, System.Threading.CancellationToken)-\u003Evoid",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x0600003C|il:76e9f34567a84cddf2c9589e334972dfa9714a7faf6a8465892e199bb5ee131e",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x0600003C",
+        "MethodBodySha256": "76e9f34567a84cddf2c9589e334972dfa9714a7faf6a8465892e199bb5ee131e",
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Concurrent.BlockingCollection\u00601.TryAddWithNoTimeValidation(!0, int, System.Threading.CancellationToken)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.AddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0)",
+        "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.AddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0)-\u003Eint",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000049|il:9cfa1e1f933b373b0d2a032cd2e6ba10744f51dcef14d2e80e1feaca9c1cca02",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x06000049",
+        "MethodBodySha256": "9cfa1e1f933b373b0d2a032cd2e6ba10744f51dcef14d2e80e1feaca9c1cca02",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.AddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.AddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0, System.Threading.CancellationToken)-\u003Eint",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x0600004A|il:7b84aec2a8debf7d033e020d21837938a4f1a36ce05f768dcd5d981d4384e0f2",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x0600004A",
+        "MethodBodySha256": "7b84aec2a8debf7d033e020d21837938a4f1a36ce05f768dcd5d981d4384e0f2",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.Take()",
+        "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.Take()-\u003E!0",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000042|il:d4fbf26b9c868c6ddf05a9394e61e35d5c1b673816c83c9b01aa9f20bdac49f1",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x06000042",
+        "MethodBodySha256": "d4fbf26b9c868c6ddf05a9394e61e35d5c1b673816c83c9b01aa9f20bdac49f1",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [
+          "System.SR.get_BlockingCollection_CantTakeWhenDone()",
+          "System.SR.GetResourceString(string)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.Take(System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.Take(System.Threading.CancellationToken)-\u003E!0",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000043|il:fc723dbf8acac30b7153ba43351a95619ae4507cd0b8ab129d6a34563e10943c",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x06000043",
+        "MethodBodySha256": "fc723dbf8acac30b7153ba43351a95619ae4507cd0b8ab129d6a34563e10943c",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [
+          "System.SR.get_BlockingCollection_CantTakeWhenDone()",
+          "System.SR.GetResourceString(string)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.TakeFromAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0)",
+        "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.TakeFromAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0)-\u003Eint",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000053|il:21777fb7326ac60e9a2264032e467c4975c331aeef230612f2f1f5250d04a7f0",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x06000053",
+        "MethodBodySha256": "21777fb7326ac60e9a2264032e467c4975c331aeef230612f2f1f5250d04a7f0",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "unknown_callee",
+        "Categories": [
+          "unknown_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Concurrent.BlockingCollection\u00601.TakeFromAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, System.Threading.CancellationToken)",
+          "System.Collections.Concurrent.BlockingCollection\u00601.TryTakeFromAnyCore(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, int, bool, System.Threading.CancellationToken)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.TakeFromAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.TakeFromAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, System.Threading.CancellationToken)-\u003Eint",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000054|il:e4ae28bc282464cb25af5913f5a8cd81a080a02ffe35344c0b65a13ad03680ba",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x06000054",
+        "MethodBodySha256": "e4ae28bc282464cb25af5913f5a8cd81a080a02ffe35344c0b65a13ad03680ba",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "unknown_callee",
+        "Categories": [
+          "unknown_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Concurrent.BlockingCollection\u00601.TryTakeFromAnyCore(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, int, bool, System.Threading.CancellationToken)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.TryAddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0, int, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.TryAddToAny(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], !0, int, System.Threading.CancellationToken)-\u003Eint",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x0600004E|il:30bccab9f587e04c4126f7a0d429df6e980bce7c144bd164fa92a0c7abe0b2ab",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x0600004E",
+        "MethodBodySha256": "30bccab9f587e04c4126f7a0d429df6e980bce7c144bd164fa92a0c7abe0b2ab",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.TryAddWithNoTimeValidation(!0, int, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.TryAddWithNoTimeValidation(!0, int, System.Threading.CancellationToken)-\u003Ebool",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000041|il:5832ccf560abd523707f49bd2a6a312f0d67d7ab7734469f4b50f092399a15f3",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x06000041",
+        "MethodBodySha256": "5832ccf560abd523707f49bd2a6a312f0d67d7ab7734469f4b50f092399a15f3",
+        "Classification": "impure",
+        "PrimaryCategory": "caller_visible_memory_write",
+        "Categories": [
+          "caller_visible_memory_write",
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.TryTake(ref !0, int, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.TryTake(ref !0, int, System.Threading.CancellationToken)-\u003Ebool",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000047|il:cebb85d182afc8b47d04b91232a04164fa4bd460534f984f9b897a2a6bf1e828",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x06000047",
+        "MethodBodySha256": "cebb85d182afc8b47d04b91232a04164fa4bd460534f984f9b897a2a6bf1e828",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.BlockingCollection\u00601.TryTakeFromAnyCore(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, int, bool, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Collections.Concurrent.BlockingCollection\u00601.TryTakeFromAnyCore(System.Collections.Concurrent.BlockingCollection\u00601\u003C!0\u003E[], ref !0, int, bool, System.Threading.CancellationToken)-\u003Eint",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000059|il:c160a43c6371bb20623ba6531849ad36841000c3682ced5f939bdd6bd244c417",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x06000059",
+        "MethodBodySha256": "c160a43c6371bb20623ba6531849ad36841000c3682ced5f939bdd6bd244c417",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "dynamic_dispatch",
+        "Categories": [
+          "dynamic_dispatch",
+          "virtual_call"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue.LocalPush(!0, ref long)",
+        "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue.LocalPush(!0, ref long)-\u003Evoid",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000099|il:6b820a1cec7520dd5446b0212c8140b132f5acb83d4ba1e0bd1e5fae5f76d9be",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x06000099",
+        "MethodBodySha256": "6b820a1cec7520dd5446b0212c8140b132f5acb83d4ba1e0bd1e5fae5f76d9be",
+        "Classification": "impure",
+        "PrimaryCategory": "caller_visible_memory_write",
+        "Categories": [
+          "caller_visible_memory_write",
+          "impure_callee",
+          "object_state_write"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Array.Copy(System.Array, System.Array, int)",
+          "System.Array.CopyImpl(System.Array, int, System.Array, int, int, bool)",
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
+        ],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "fresh_array_candidate_requires_non_pure_resolution",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue.TryLocalPop(ref !0)",
+        "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue.TryLocalPop(ref !0)-\u003Ebool",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x0600009B|il:7f295a9a674484a9bda76794d61aa53fcab1beb9ef548baa2a3460261c47dff1",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x0600009B",
+        "MethodBodySha256": "7f295a9a674484a9bda76794d61aa53fcab1beb9ef548baa2a3460261c47dff1",
+        "Classification": "impure",
+        "PrimaryCategory": "caller_visible_memory_write",
+        "Categories": [
+          "caller_visible_memory_write",
+          "object_state_write"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Threading.Monitor.Exit(object)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.ConcurrentBag\u00601.Add(!0)",
+        "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601.Add(!0)-\u003Evoid",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x0600007F|il:0be5a4a419c504365ce4069c03990c746fe0e6260f870c48337eff5f8620ef1a",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x0600007F",
+        "MethodBodySha256": "0be5a4a419c504365ce4069c03990c746fe0e6260f870c48337eff5f8620ef1a",
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue.LocalPush(!0, ref long)",
+          "System.Array.Copy(System.Array, System.Array, int)",
+          "System.Array.CopyImpl(System.Array, int, System.Array, int, int, bool)",
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.ConcurrentBag\u00601.GetCurrentThreadWorkStealingQueue(bool)",
+        "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601.GetCurrentThreadWorkStealingQueue(bool)-\u003ESystem.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue\u003C!0\u003E",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000083|il:31a22984299174e2693543fce392306d03113fa84dfa3d3646a9e47a9c3bfdaa",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x06000083",
+        "MethodBodySha256": "31a22984299174e2693543fce392306d03113fa84dfa3d3646a9e47a9c3bfdaa",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "dynamic_dispatch",
+        "Categories": [
+          "dynamic_dispatch",
+          "virtual_call"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.ConcurrentBag\u00601.TrySteal(ref !0, bool)",
+        "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601.TrySteal(ref !0, bool)-\u003Ebool",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000086|il:4f5d6097bb2c0912961d7b975b78405e0935b22c84ae44b6dbf12372152a813f",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x06000086",
+        "MethodBodySha256": "4f5d6097bb2c0912961d7b975b78405e0935b22c84ae44b6dbf12372152a813f",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
+        "Categories": [
+          "global_state_read"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Concurrent.ConcurrentBag\u00601.GetCurrentThreadWorkStealingQueue(bool)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.ConcurrentBag\u00601.TryTake(ref !0)",
+        "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentBag\u00601.TryTake(ref !0)-\u003Ebool",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000081|il:c77299f05977bc0ba623b0bdbdee0c350345ee8926fa59d024a17aeddc736946",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x06000081",
+        "MethodBodySha256": "c77299f05977bc0ba623b0bdbdee0c350345ee8926fa59d024a17aeddc736946",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
+        "Categories": [
+          "global_state_read",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Concurrent.ConcurrentBag\u00601\u002BWorkStealingQueue.TryLocalPop(ref !0)",
+          "System.Threading.Monitor.Exit(object)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode..ctor(!0, !1, int, System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E)",
+        "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode..ctor(!0, !1, int, System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E)-\u003Evoid",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x060000FB|il:5bfdff808fb0e0133e33316e8760261870e506c7e6c402abb414c32dd8429cd1",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x060000FB",
+        "MethodBodySha256": "5bfdff808fb0e0133e33316e8760261870e506c7e6c402abb414c32dd8429cd1",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.ConcurrentDictionary\u00602.GetBucketAndLock(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, int, ref uint)",
+        "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602.GetBucketAndLock(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, int, ref uint)-\u003Eref System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x060000F3|il:94834766e6ece708eecc8de7bd8417c8dbea33aabf935e26254c4d8ea10c1cd5",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x060000F3",
+        "MethodBodySha256": "94834766e6ece708eecc8de7bd8417c8dbea33aabf935e26254c4d8ea10c1cd5",
+        "Classification": "impure",
+        "PrimaryCategory": "caller_visible_memory_write",
+        "Categories": [
+          "caller_visible_memory_write"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.ConcurrentDictionary\u00602.GetHashCode(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, !0)",
+        "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602.GetHashCode(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, !0)-\u003Eint",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x060000AF|il:a7e104cc923aadc31e67fc7ecc19d62b7f4107eed3568e38e286b399db9a1860",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x060000AF",
+        "MethodBodySha256": "a7e104cc923aadc31e67fc7ecc19d62b7f4107eed3568e38e286b399db9a1860",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "dynamic_dispatch",
+        "Categories": [
+          "dynamic_dispatch",
+          "unknown_callee",
+          "virtual_call"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Generic.IEqualityComparer\u00601.GetHashCode(!0)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.ConcurrentDictionary\u00602.GrowTable(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, bool, bool)",
+        "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602.GrowTable(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, bool, bool)-\u003Evoid",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x060000EA|il:f73dde518caae9affebb26845ebb1eb7e1b7fe37349b48622261fd5fbb9e6ca6",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x060000EA",
+        "MethodBodySha256": "f73dde518caae9affebb26845ebb1eb7e1b7fe37349b48622261fd5fbb9e6ca6",
+        "Classification": "impure",
+        "PrimaryCategory": "caller_visible_memory_write",
+        "Categories": [
+          "caller_visible_memory_write",
+          "impure_callee",
+          "object_state_write"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Array.Copy(System.Array, System.Array, int)",
+          "System.Array.CopyImpl(System.Array, int, System.Array, int, int, bool)",
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
+        ],
+        "HasFreshArrayAllocationEvidence": true,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "fresh_array_candidate_requires_non_pure_resolution",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.ConcurrentDictionary\u00602.NodeEqualsKey(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E, !0)",
+        "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602.NodeEqualsKey(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BNode\u003C!0, !1\u003E, !0)-\u003Ebool",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x060000B0|il:08e9b7711e15264d134bdcfc0c877c51fbd3a6462ba98bc2e4d64719bb7647c0",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x060000B0",
+        "MethodBodySha256": "08e9b7711e15264d134bdcfc0c877c51fbd3a6462ba98bc2e4d64719bb7647c0",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "dynamic_dispatch",
+        "Categories": [
+          "dynamic_dispatch",
+          "unknown_callee",
+          "virtual_call"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Generic.EqualityComparer\u00601.Equals(!0, !0)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.ConcurrentDictionary\u00602.TryAdd(!0, !1)",
+        "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602.TryAdd(!0, !1)-\u003Ebool",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x060000B2|il:a237638f4090ae077e774762e45d32a186dd247b35471720e0b01724d7e4b570",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x060000B2",
+        "MethodBodySha256": "a237638f4090ae077e774762e45d32a186dd247b35471720e0b01724d7e4b570",
+        "Classification": "impure",
+        "PrimaryCategory": "caller_visible_memory_write",
+        "Categories": [
+          "caller_visible_memory_write",
+          "global_state_read",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Concurrent.ConcurrentDictionary\u00602.TryAddInternal(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, !0, System.Nullable\u00601\u003Cint\u003E, !1, bool, bool, ref !1)",
+          "System.Collections.Concurrent.ConcurrentDictionary\u00602.GetBucketAndLock(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, int, ref uint)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Collections.Concurrent.ConcurrentDictionary\u00602.TryAddInternal(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, !0, System.Nullable\u00601\u003Cint\u003E, !1, bool, bool, ref !1)",
+        "ExactSymbolKey": "System.Collections.Concurrent.ConcurrentDictionary\u00602.TryAddInternal(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, !0, System.Nullable\u00601\u003Cint\u003E, !1, bool, bool, ref !1)-\u003Ebool",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x060000C2|il:534440227b757ac10555418e21e59688f47a4d64bca963a8ca33170759ec410c",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x060000C2",
+        "MethodBodySha256": "534440227b757ac10555418e21e59688f47a4d64bca963a8ca33170759ec410c",
+        "Classification": "impure",
+        "PrimaryCategory": "caller_visible_memory_write",
+        "Categories": [
+          "caller_visible_memory_write",
+          "global_state_read",
+          "impure_callee",
+          "object_state_write"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Concurrent.ConcurrentDictionary\u00602.GetBucketAndLock(System.Collections.Concurrent.ConcurrentDictionary\u00602\u002BTables\u003C!0, !1\u003E, int, ref uint)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.SR.get_BlockingCollection_CantTakeWhenDone()",
+        "ExactSymbolKey": "System.SR.get_BlockingCollection_CantTakeWhenDone()-\u003Estring",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x0600000E|il:cc650e8a5065d82535d93d42fcadb0900bc72f8223d52099e0908f348c9ef0ae",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x0600000E",
+        "MethodBodySha256": "cc650e8a5065d82535d93d42fcadb0900bc72f8223d52099e0908f348c9ef0ae",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "unknown_callee",
+        "Categories": [
+          "unknown_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.SR.GetResourceString(string)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.ThrowHelper.ThrowKeyNullException()",
+        "ExactSymbolKey": "System.ThrowHelper.ThrowKeyNullException()-\u003Evoid",
+        "CacheKey": "mvid:09804107-27f6-4f23-8283-dabb17feacb4|token:0x06000001|il:07648952b01014c15341ebb5a0505b58dd56b1494fc3def49f0d868e1af68d02",
+        "AssemblyName": "System.Collections.Concurrent",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.Concurrent.dll",
+        "AssemblySha256": "6ffcd942293576dbd3ab66ca6ef2ea0428f9e84bdacec63316bc5c069041f37c",
+        "ModuleVersionId": "09804107-27f6-4f23-8283-dabb17feacb4",
+        "MetadataToken": "0x06000001",
+        "MethodBodySha256": "07648952b01014c15341ebb5a0505b58dd56b1494fc3def49f0d868e1af68d02",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      }
+    ]
+  }
+}

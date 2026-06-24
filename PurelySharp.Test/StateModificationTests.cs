@@ -631,6 +631,116 @@ public class TestClass
         }
 
         [Test]
+        public async Task ConcurrentDictionaryTryAdd_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Concurrent;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(ConcurrentDictionary<int, int> dictionary)
+    {
+        return dictionary.TryAdd(1, 2);
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                 .WithSpan(8, 17, 8, 27)
+                                 .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
+        public async Task BlockingCollectionAdd_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Concurrent;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(BlockingCollection<int> values)
+    {
+        values.Add(1);
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                 .WithSpan(8, 17, 8, 27)
+                                 .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
+        public async Task BlockingCollectionTake_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Concurrent;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(BlockingCollection<int> values)
+    {
+        return values.Take();
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                 .WithSpan(8, 16, 8, 26)
+                                 .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
+        public async Task ConcurrentBagAdd_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Concurrent;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(ConcurrentBag<int> values)
+    {
+        values.Add(1);
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                 .WithSpan(8, 17, 8, 27)
+                                 .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
+        public async Task ConcurrentBagTryTake_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Concurrent;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(ConcurrentBag<int> values)
+    {
+        return values.TryTake(out _);
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                 .WithSpan(8, 17, 8, 27)
+                                 .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
         public async Task MethodWithDictionaryClear_Diagnostic()
         {
             var test = @"

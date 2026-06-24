@@ -678,6 +678,19 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/ConcurrentCollections.AdditionalMutators.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/ConcurrentCollections.AdditionalMutators.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Collections.Concurrent.dll",
+      "Limit": 80,
+      "SymbolPrefixes": [
+        "System.Collections.Concurrent.ConcurrentDictionary`2.TryAdd",
+        "System.Collections.Concurrent.BlockingCollection`1.Add",
+        "System.Collections.Concurrent.BlockingCollection`1.Take",
+        "System.Collections.Concurrent.ConcurrentBag`1.Add",
+        "System.Collections.Concurrent.ConcurrentBag`1.TryTake"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Reflection.StaticAttributeHelpers.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Reflection.StaticAttributeHelpers.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Private.CoreLib.dll",

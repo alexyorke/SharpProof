@@ -1756,6 +1756,85 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeAdditionalConcurrentCollectionMutatorSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Collections.Concurrent.dll",
+                80,
+                "System.Collections.Concurrent.ConcurrentDictionary`2.TryAdd",
+                "System.Collections.Concurrent.BlockingCollection`1.Add",
+                "System.Collections.Concurrent.BlockingCollection`1.Take",
+                "System.Collections.Concurrent.ConcurrentBag`1.Add",
+                "System.Collections.Concurrent.ConcurrentBag`1.TryTake");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>.TryAdd(TKey, TValue)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "ConcurrentDictionary<TKey, TValue>.TryAdd(TKey, TValue) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Concurrent.BlockingCollection<T>.Add(T)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "BlockingCollection<T>.Add(T) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Concurrent.BlockingCollection<T>.Take()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "BlockingCollection<T>.Take() should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Concurrent.ConcurrentBag<T>.Add(T)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "ConcurrentBag<T>.Add(T) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Concurrent.ConcurrentBag<T>.TryTake(out T)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "ConcurrentBag<T>.TryTake(out T) should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(summary, "System.Collections.Concurrent.ConcurrentDictionary`2.TryAdd(!0, !1)", "impure", "caller_visible_memory_write", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Concurrent.ConcurrentDictionary`2.TryAdd(!0, !1)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Concurrent.BlockingCollection`1.Add(!0)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Concurrent.BlockingCollection`1.Add(!0)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Concurrent.BlockingCollection`1.Take()", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Concurrent.BlockingCollection`1.Take()", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Concurrent.ConcurrentBag`1.Add(!0)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Concurrent.ConcurrentBag`1.Add(!0)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Concurrent.ConcurrentBag`1.TryTake(ref !0)", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Concurrent.ConcurrentBag`1.TryTake(ref !0)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Concurrent.ConcurrentDictionary`2.TryAdd(!0, !1)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Concurrent.BlockingCollection`1.Add(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Concurrent.BlockingCollection`1.Take()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Concurrent.ConcurrentBag`1.Add(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Concurrent.ConcurrentBag`1.TryTake(ref !0)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeSortedCollectionAndBitArrayMutatorSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

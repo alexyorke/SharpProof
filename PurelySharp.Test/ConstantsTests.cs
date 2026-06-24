@@ -628,6 +628,40 @@ public static class ConcurrentQueueMutatorCatalogSignatureSamples
         }
 
         [Test]
+        public void AdditionalConcurrentCollectionMutators_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System.Collections.Concurrent;
+
+public static class AdditionalConcurrentCollectionMutatorCatalogSignatureSamples
+{
+    public static void Sample(
+        ConcurrentDictionary<int, int> dictionary,
+        BlockingCollection<int> blockingCollection,
+        ConcurrentBag<int> bag)
+    {
+        _ = dictionary.TryAdd(1, 2);
+        blockingCollection.Add(1);
+        _ = blockingCollection.Take();
+        bag.Add(1);
+        _ = bag.TryTake(out _);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "AdditionalConcurrentCollectionMutatorCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "dictionary.TryAdd(1, 2)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "blockingCollection.Add(1)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "blockingCollection.Take()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "bag.Add(1)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "bag.TryTake(out _)"));
+        }
+
+        [Test]
         public void StaticCustomAttributeHelpers_AreSourcedFromGeneratedEvidence_NotStaticCatalogs()
         {
             const string source = @"
