@@ -3939,6 +3939,87 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_TypeMetadataGettersAsPureEvidence()
+        {
+            const string source = @"
+using System;
+using System.Reflection;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public object? TestMethod(Type type)
+    {
+        _ = type.DeclaringMethod;
+        _ = type.DeclaringType;
+        _ = type.IsContextful;
+        _ = type.IsGenericType;
+        _ = type.IsGenericTypeDefinition;
+        _ = type.IsGenericParameter;
+        _ = type.IsMarshalByRef;
+        _ = type.MemberType;
+        return type.ReflectedType;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var trackedMembers = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "type.DeclaringMethod" ||
+                    node.ToString() == "type.DeclaringType" ||
+                    node.ToString() == "type.IsContextful" ||
+                    node.ToString() == "type.IsGenericType" ||
+                    node.ToString() == "type.IsGenericTypeDefinition" ||
+                    node.ToString() == "type.IsGenericParameter" ||
+                    node.ToString() == "type.IsMarshalByRef" ||
+                    node.ToString() == "type.MemberType" ||
+                    node.ToString() == "type.ReflectedType")
+                .Select(node => (node.ToString(), (IPropertySymbol)semanticModel.GetSymbolInfo(node).Symbol!))
+                .ToArray();
+            var resolutions = trackedMembers.ToDictionary(
+                trackedMember => trackedMember.Item1,
+                trackedMember =>
+                {
+                    var args = new object?[] { trackedMember.Item2.GetMethod!.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = matched
+                        ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                        : string.Empty;
+                    return (matched, classification);
+                },
+                StringComparer.Ordinal);
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow the reviewed System.Type metadata getters.");
+            Assert.That(resolutions["type.DeclaringMethod"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.DeclaringType"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsContextful"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsGenericType"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsGenericTypeDefinition"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsGenericParameter"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsMarshalByRef"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.MemberType"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.ReflectedType"], Is.EqualTo((true, "pure")));
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_PathCombineAsPureEvidence()
         {
             const string source = @"

@@ -601,7 +601,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsGenericType_Diagnostic()
+        public async Task TypeIsGenericType_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -609,7 +609,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(System.Type type)
+    public bool TestMethod(System.Type type)
     {
         return type.IsGenericType;
     }
@@ -879,7 +879,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsGenericTypeDefinition_Diagnostic()
+        public async Task TypeIsGenericTypeDefinition_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -887,7 +887,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(System.Type type)
+    public bool TestMethod(System.Type type)
     {
         return type.IsGenericTypeDefinition;
     }
@@ -915,7 +915,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsGenericParameter_Diagnostic()
+        public async Task TypeIsGenericParameter_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -923,7 +923,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(System.Type type)
+    public bool TestMethod(System.Type type)
     {
         return type.IsGenericParameter;
     }
@@ -1239,7 +1239,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsMarshalByRef_Diagnostic()
+        public async Task TypeIsMarshalByRef_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -1247,7 +1247,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(System.Type type)
+    public bool TestMethod(System.Type type)
     {
         return type.IsMarshalByRef;
     }
@@ -1401,7 +1401,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsContextful_Diagnostic()
+        public async Task TypeIsContextful_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -1409,7 +1409,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(System.Type type)
+    public bool TestMethod(System.Type type)
     {
         return type.IsContextful;
     }
@@ -1509,7 +1509,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeDeclaringMethod_Diagnostic()
+        public async Task TypeDeclaringMethod_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -1517,7 +1517,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public System.Reflection.MethodBase {|PS0002:TestMethod|}(System.Type type)
+    public System.Reflection.MethodBase TestMethod(System.Type type)
     {
         return type.DeclaringMethod;
     }
@@ -1563,7 +1563,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeDeclaringType_Diagnostic()
+        public async Task TypeDeclaringType_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -1571,7 +1571,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public System.Type {|PS0002:TestMethod|}(System.Type type)
+    public System.Type TestMethod(System.Type type)
     {
         return type.DeclaringType;
     }
@@ -1581,7 +1581,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeReflectedType_Diagnostic()
+        public async Task TypeReflectedType_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -1589,7 +1589,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public System.Type {|PS0002:TestMethod|}(System.Type type)
+    public System.Type TestMethod(System.Type type)
     {
         return type.ReflectedType;
     }
@@ -1599,7 +1599,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeMemberType_Diagnostic()
+        public async Task TypeMemberType_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -1608,7 +1608,7 @@ using System.Reflection;
 public class TestClass
 {
     [EnforcePure]
-    public MemberTypes {|PS0002:TestMethod|}(System.Type type)
+    public MemberTypes TestMethod(System.Type type)
     {
         return type.MemberType;
     }
