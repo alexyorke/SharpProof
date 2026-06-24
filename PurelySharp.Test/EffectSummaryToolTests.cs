@@ -8281,6 +8281,8 @@ public static class DuplicateReviewedSeedFixture
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
                 80,
+                "System.Array.Clear(System.Array)",
+                "System.Array.Clear(System.Array, int, int)",
                 "System.Array.Copy(System.Array, int, System.Array, int, int)",
                 "System.Array.CopyTo(System.Array, int)",
                 "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)");
@@ -8291,6 +8293,20 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
             var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
 
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Array.Clear(System.Array)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "System.Array.Clear(System.Array) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Array.Clear(System.Array, int, int)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "System.Array.Clear(System.Array, int, int) should no longer overlap the manual impure catalog.");
             Assert.That(
                 knownImpureRows.Any(row => string.Equals(
                     row.GetProperty("Symbol").GetString(),
@@ -8313,6 +8329,10 @@ public static class DuplicateReviewedSeedFixture
                 Is.False,
                 "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int) should no longer overlap the manual impure catalog.");
 
+            AssertPurityClassification(summary, "System.Array.Clear(System.Array)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Array.Clear(System.Array)", "caller_visible");
+            AssertPurityClassification(summary, "System.Array.Clear(System.Array, int, int)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Array.Clear(System.Array, int, int)", "caller_visible");
             AssertPurityClassification(summary, "System.Array.Copy(System.Array, int, System.Array, int, int)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Array.Copy(System.Array, int, System.Array, int, int)", "caller_visible");
             AssertPurityClassification(summary, "System.Array.CopyTo(System.Array, int)", "impure", "impure_callee");
@@ -8327,6 +8347,8 @@ public static class DuplicateReviewedSeedFixture
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .ToArray();
 
+            Assert.That(generatedSymbols, Does.Contain("System.Array.Clear(System.Array)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Array.Clear(System.Array, int, int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Array.Copy(System.Array, int, System.Array, int, int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Array.CopyTo(System.Array, int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)"));
