@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T07:46:45.2274028+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:22:35.745161+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -553,7 +553,7 @@
             "throws"
           ],
           "RootCandidates": [
-            "global_state_read",
+            "safe_static_cache_read",
             "throw"
           ],
           "TransitiveRootCandidates": [],
@@ -637,7 +637,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "throw"
             ],
             "FirstBlockingCallChain": [
@@ -1287,9 +1286,8 @@
         "MetadataToken": "0x06003F32",
         "MethodBodySha256": "b7f5d894114a89ca843771fd0ea633a2ccd671c2d7e842fe9947bba6a3868c9d",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "throw",
         "Categories": [
-          "global_state_read",
           "throw"
         ],
         "FirstBlockingCallChain": [

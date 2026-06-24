@@ -2298,7 +2298,13 @@ internal static class AssemblyEffectSummarizer
         var sameAssemblyFieldSymbols = new HashSet<string>(StringComparer.Ordinal);
         foreach (var fieldToken in sameAssemblyStaticReadFieldTokens)
         {
-            if (!staticFieldFacts.TryGetValue(fieldToken, out var fact) || !sameAssemblyFieldPredicate(fact.Kind))
+            if (!staticFieldFacts.TryGetValue(fieldToken, out var fact))
+            {
+                return false;
+            }
+
+            if (!sameAssemblyFieldPredicate(fact.Kind) &&
+                !externalFieldPredicate(fact.Symbol))
             {
                 return false;
             }

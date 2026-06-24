@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T07:46:04.8937738+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:22:00.7689456+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -1819,9 +1819,13 @@
             "Classification": "impure",
             "Categories": [
               "caller_visible_memory_write",
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.DateTime.AddYears(int)",
+              "System.DateTime.GetDate(ref int, ref int, ref int)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
@@ -3224,9 +3228,13 @@
         "PrimaryCategory": "caller_visible_memory_write",
         "Categories": [
           "caller_visible_memory_write",
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.DateTime.AddYears(int)",
+          "System.DateTime.GetDate(ref int, ref int, ref int)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,

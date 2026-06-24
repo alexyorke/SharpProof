@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T07:46:29.7506405+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:22:22.7165743+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -135,7 +135,7 @@
           ],
           "RootCandidates": [
             "dynamic_dispatch",
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
@@ -189,7 +189,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -357,7 +356,7 @@
             "reads_static_field"
           ],
           "RootCandidates": [
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
@@ -3376,20 +3375,18 @@
           ],
           "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "impure",
+            "Classification": "conservative_unknown",
             "Categories": [
-              "impure_callee"
+              "unknown_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.IO.Win32Marshal.GetExceptionForWin32Error(int, string)",
-              "System.IO.PathTooLongException..ctor(string)",
-              "System.Exception.set_HResult(int)"
+              "System.Runtime.InteropServices.Marshal.GetLastPInvokeError()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "caller_visible"
+            "EffectVisibilityClassification": "unknown"
           }
         },
         {
@@ -3428,8 +3425,8 @@
     "SchemaVersion": 3,
     "MethodCount": 55,
     "PureCount": 28,
-    "ImpureCount": 25,
-    "ConservativeUnknownCount": 2,
+    "ImpureCount": 24,
+    "ConservativeUnknownCount": 3,
     "CatalogComparison": {
       "KnownPureMembers": [],
       "KnownImpureMembers": [],
@@ -4216,21 +4213,19 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x06007A0E",
         "MethodBodySha256": "bfb216439684becfab6a0341b80ff3840a44d47dc5fa3e948998ea2f875c4b55",
-        "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "unknown_callee",
         "Categories": [
-          "impure_callee"
+          "unknown_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.IO.Win32Marshal.GetExceptionForWin32Error(int, string)",
-          "System.IO.PathTooLongException..ctor(string)",
-          "System.Exception.set_HResult(int)"
+          "System.Runtime.InteropServices.Marshal.GetLastPInvokeError()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "caller_visible"
+        "EffectVisibilityClassification": "unknown"
       },
       {
         "Symbol": "System.IO.Win32Marshal.TryMakeWin32ErrorCodeFromHR(int)",
@@ -4598,9 +4593,8 @@
         "MetadataToken": "0x060008A6",
         "MethodBodySha256": "379cee4c90de67fe57292e4b825e66a45b2219104090cba310d9dff04d8c7c6c",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [

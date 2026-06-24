@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T07:46:04.4655506+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:22:00.344145+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -1395,12 +1395,15 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "impure_callee",
               "throw"
             ],
             "FirstBlockingCallChain": [
               "System.SR.Format(string, object, object)",
               "System.String.Join(string, object[])",
-              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+              "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -1474,12 +1477,15 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
+              "impure_callee",
               "throw"
             ],
             "FirstBlockingCallChain": [
               "System.SR.Format(string, object, object)",
               "System.String.Join(string, object[])",
-              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+              "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -1780,19 +1786,21 @@
           ],
           "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "conservative_unknown",
+            "Classification": "impure",
             "Categories": [
-              "unknown_callee"
+              "global_state_read",
+              "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.String.Join(string, object[])",
-              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+              "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
             ],
             "HasFreshArrayAllocationEvidence": true,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": true,
+            "HasUnsupportedEffects": false,
             "FreshnessClassification": "fresh_array_candidate_requires_non_pure_resolution",
-            "EffectVisibilityClassification": "unknown"
+            "EffectVisibilityClassification": "caller_visible"
           }
         },
         {
@@ -1889,8 +1897,8 @@
     "SchemaVersion": 3,
     "MethodCount": 39,
     "PureCount": 33,
-    "ImpureCount": 4,
-    "ConservativeUnknownCount": 2,
+    "ImpureCount": 5,
+    "ConservativeUnknownCount": 1,
     "CatalogComparison": {
       "KnownPureMembers": [],
       "KnownImpureMembers": [],
@@ -2211,14 +2219,17 @@
         "MetadataToken": "0x0600105A",
         "MethodBodySha256": "270e354478209c631dc377f15daf7734c184056c73ab2698971b14970ef61608",
         "Classification": "impure",
-        "PrimaryCategory": "throw",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
+          "impure_callee",
           "throw"
         ],
         "FirstBlockingCallChain": [
           "System.SR.Format(string, object, object)",
           "System.String.Join(string, object[])",
-          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+          "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
@@ -2237,14 +2248,17 @@
         "MetadataToken": "0x06001059",
         "MethodBodySha256": "aa6a106b9892a1dc8fbf981c92504129d7c071f8a61e28b39cb8b45c68446824",
         "Classification": "impure",
-        "PrimaryCategory": "throw",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
+          "impure_callee",
           "throw"
         ],
         "FirstBlockingCallChain": [
           "System.SR.Format(string, object, object)",
           "System.String.Join(string, object[])",
-          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+          "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
@@ -2646,20 +2660,22 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x06001D6B",
         "MethodBodySha256": "d9eeb68af9a865402e206003fcbdd0489c39ef34a141dca3da17c8a3310b3754",
-        "Classification": "conservative_unknown",
-        "PrimaryCategory": "unknown_callee",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
-          "unknown_callee"
+          "global_state_read",
+          "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.String.Join(string, object[])",
-          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+          "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
         ],
         "HasFreshArrayAllocationEvidence": true,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": true,
+        "HasUnsupportedEffects": false,
         "FreshnessClassification": "fresh_array_candidate_requires_non_pure_resolution",
-        "EffectVisibilityClassification": "unknown"
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.SR.get_ArgumentOutOfRange_Range()",

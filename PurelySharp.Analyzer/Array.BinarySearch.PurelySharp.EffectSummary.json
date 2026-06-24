@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T07:45:51.5837849+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:21:48.7667984+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -157,9 +157,13 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "impure_callee",
               "throw"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.IndexOutOfRangeException..ctor(string)",
+              "System.Exception.set_HResult(int)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
@@ -1260,11 +1264,15 @@
         "MetadataToken": "0x06000214",
         "MethodBodySha256": "fb8a32efb902b5cf0ada89a20de8a16692cdef6f38e9bb8dfc63282ff28b2fa4",
         "Classification": "impure",
-        "PrimaryCategory": "throw",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
+          "impure_callee",
           "throw"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.IndexOutOfRangeException..ctor(string)",
+          "System.Exception.set_HResult(int)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,

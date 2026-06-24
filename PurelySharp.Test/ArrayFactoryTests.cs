@@ -28,6 +28,26 @@ public class TestClass
         }
 
         [Test]
+        public async Task ArrayEmptyStandaloneInvocation_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        _ = Array.Empty<int>();
+        return 0;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ArrayEmptyConditionalReturned_NoDiagnostic()
         {
             var test = @"

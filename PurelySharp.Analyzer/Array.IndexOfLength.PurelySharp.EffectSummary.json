@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T07:45:52.6517581+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:21:49.5680043+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -202,7 +202,10 @@
             "Categories": [
               "throw"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.SR.get_IndexOutOfRange_ArrayRankIndex()",
+              "System.SR.GetResourceString(string)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
@@ -804,7 +807,10 @@
         "Categories": [
           "throw"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.SR.get_IndexOutOfRange_ArrayRankIndex()",
+          "System.SR.GetResourceString(string)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,

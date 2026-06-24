@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T07:46:01.3135937+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:21:56.9208578+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -324,7 +324,7 @@
             "reads_static_field"
           ],
           "RootCandidates": [
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],

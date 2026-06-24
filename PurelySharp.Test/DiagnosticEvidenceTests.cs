@@ -3665,6 +3665,59 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_ArrayEmptyAsPureSafeStaticCacheEvidence()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod()
+    {
+        _ = Array.Empty<int>();
+        return 0;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var invocation = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Single(node => node.ToString() == "Array.Empty<int>()");
+            var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(invocation).Symbol!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
+            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+            var purityEntry = args[2];
+            var classification = matched && purityEntry != null
+                ? (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                : string.Empty;
+            var freshnessClassification = matched && purityEntry != null
+                ? (string)purityEntry.GetType().GetProperty("FreshnessClassification")!.GetValue(purityEntry)!
+                : string.Empty;
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow standalone Array.Empty<int>() invocations without the manual pure catalog.");
+            Assert.That(matched, Is.True,
+                "Generated purity catalog should resolve Array.Empty<T>() to runtime-backed purity evidence.");
+            Assert.That(classification, Is.EqualTo("pure"));
+            Assert.That(freshnessClassification, Is.EqualTo("none"));
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_TypeGetTypeFromHandleAsPureEvidence()
         {
             const string source = @"

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T07:45:54.9381048+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:21:51.4852556+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -151,7 +151,7 @@
           ],
           "RootCandidates": [
             "dynamic_dispatch",
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],

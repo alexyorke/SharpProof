@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T07:46:49.0737098+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:22:39.0900742+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.Uri",
@@ -22,7 +22,7 @@
             "reads_static_field"
           ],
           "RootCandidates": [
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T07:45:53.6309676+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:21:50.3231123+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -54,14 +54,20 @@
           ],
           "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "pure",
-            "Categories": [],
-            "FirstBlockingCallChain": [],
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "unknown_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.SR.Format(string, object)",
+              "System.String.Join(string, object[])",
+              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
+            "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "none"
+            "EffectVisibilityClassification": "unknown"
           }
         },
         {
@@ -646,9 +652,9 @@
   "PurityReport": {
     "SchemaVersion": 3,
     "MethodCount": 10,
-    "PureCount": 4,
+    "PureCount": 3,
     "ImpureCount": 5,
-    "ConservativeUnknownCount": 1,
+    "ConservativeUnknownCount": 2,
     "CatalogComparison": {
       "KnownPureMembers": [],
       "KnownImpureMembers": [],
@@ -832,15 +838,21 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x0600051D",
         "MethodBodySha256": "9485a147383caf18bd0dbb54041b2c5a953f5aad4a6ac19f2886853de2a0fb85",
-        "Classification": "pure",
-        "PrimaryCategory": "generated_purity_summary",
-        "Categories": [],
-        "FirstBlockingCallChain": [],
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "unknown_callee",
+        "Categories": [
+          "unknown_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.SR.Format(string, object)",
+          "System.String.Join(string, object[])",
+          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
+        "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "none"
+        "EffectVisibilityClassification": "unknown"
       },
       {
         "Symbol": "System.SR.get_AggregateException_ctor_DefaultMessage()",

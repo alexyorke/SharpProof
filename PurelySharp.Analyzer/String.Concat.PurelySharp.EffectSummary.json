@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T07:46:32.3606591+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:22:25.0172199+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -24,7 +24,7 @@
           ],
           "RootCandidates": [
             "dynamic_dispatch",
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
@@ -177,7 +177,7 @@
           "RootCandidates": [
             "caller_visible_memory_write",
             "dynamic_dispatch",
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
@@ -232,7 +232,6 @@
             "Classification": "impure",
             "Categories": [
               "caller_visible_memory_write",
-              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -305,7 +304,7 @@
           ],
           "RootCandidates": [
             "dynamic_dispatch",
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
@@ -377,7 +376,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -402,7 +400,7 @@
             "reads_static_field"
           ],
           "RootCandidates": [
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
@@ -610,7 +608,7 @@
             "reads_static_field"
           ],
           "RootCandidates": [
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
@@ -691,7 +689,7 @@
             "reads_static_field"
           ],
           "RootCandidates": [
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
@@ -768,7 +766,7 @@
             "reads_static_field"
           ],
           "RootCandidates": [
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
@@ -845,7 +843,7 @@
             "reads_static_field"
           ],
           "RootCandidates": [
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
@@ -920,7 +918,7 @@
             "reads_static_field"
           ],
           "RootCandidates": [
-            "global_state_read"
+            "safe_static_cache_read"
           ],
           "TransitiveRootCandidates": [],
           "ThrownExceptionTypes": [],
@@ -1043,9 +1041,8 @@
         "MetadataToken": "0x060008E2",
         "MethodBodySha256": "c34eb1b6884fd14c146d8ac333b8fae79d423943f1c4ba92b282988a0838ab38",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -1223,7 +1220,6 @@
         "PrimaryCategory": "caller_visible_memory_write",
         "Categories": [
           "caller_visible_memory_write",
-          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
