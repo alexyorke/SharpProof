@@ -725,24 +725,6 @@ public static class Constants
         "System.Collections.Immutable.ImmutableStack<T>.System.Collections.Immutable.IImmutableStack<T>.Pop()",
         "System.Collections.Immutable.ImmutableStack<T>.System.Collections.Immutable.IImmutableStack<T>.Push(T)",
 
-
-
-
-
-        "System.Linq.Enumerable.All<TSource>(System.Collections.Generic.IEnumerable<TSource>, System.Func<TSource, bool>)",
-        "System.Linq.Enumerable.Any<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
-        "System.Linq.Enumerable.Count<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
-        "System.Linq.Enumerable.FirstOrDefault<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
-        "System.Linq.Enumerable.Select<TSource, TResult>(System.Collections.Generic.IEnumerable<TSource>, System.Func<TSource, TResult>)",
-        "System.Linq.Enumerable.SequenceEqual<TSource>(System.Collections.Generic.IEnumerable<TSource>, System.Collections.Generic.IEnumerable<TSource>)",
-        "System.Linq.Enumerable.Where<TSource>(System.Collections.Generic.IEnumerable<TSource>, System.Func<TSource, bool>)",
-
-
-
-
-
-        "System.Linq.Enumerable.Contains<TSource>(System.Collections.Generic.IEnumerable<TSource>, TSource)",
-
         "System.Numerics.BigInteger.Add(System.Numerics.BigInteger, System.Numerics.BigInteger)",
         "System.Numerics.Complex.Complex(double, double)",
         "System.Numerics.Complex.Abs(System.Numerics.Complex)",
@@ -792,12 +774,6 @@ public static class Constants
         "System.Security.AllowPartiallyTrustedCallersAttribute.AllowPartiallyTrustedCallersAttribute()",
         "System.Delegate.Combine(System.Delegate, System.Delegate)",
         "System.Delegate.Remove(System.Delegate, System.Delegate)",
-        "System.Linq.Enumerable.ElementAt<TSource>(System.Collections.Generic.IEnumerable<TSource>, int)",
-        "System.Linq.Enumerable.First<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
-        "System.Linq.Enumerable.Last<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
-        "System.Linq.Enumerable.Single<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
-        "System.Linq.Enumerable.Skip<TSource>(System.Collections.Generic.IEnumerable<TSource>, int)",
-        "System.Linq.Enumerable.Take<TSource>(System.Collections.Generic.IEnumerable<TSource>, int)",
         "System.Runtime.InteropServices.Marshal.SizeOf<T>()",
         "System.FormattableString.Format.get",
         "System.FormattableString.Invariant(System.FormattableString)",

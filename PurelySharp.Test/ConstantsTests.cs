@@ -1116,6 +1116,63 @@ public static class LinqCatalogSignatureSamples
         }
 
         [Test]
+        public void LinqPureHelpers_AreSourcedFromSemanticAnalysis_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Collections.Generic;
+using System.Linq;
+
+public static class LinqPureCatalogSignatureSamples
+{
+    public static int Sample(IEnumerable<int> values, IEnumerable<int> other)
+    {
+        _ = values.All(value => value > 0);
+        _ = values.Any();
+        _ = values.Contains(1);
+        _ = values.Count();
+        _ = values.ElementAt(0);
+        _ = values.First();
+        _ = values.FirstOrDefault();
+        _ = values.Last();
+        _ = values.SequenceEqual(other);
+        _ = values.Single();
+        _ = values.Skip(1);
+        _ = values.Take(2);
+        return values.Where(value => value > 0).Select(value => value + 1).Count();
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "LinqPureCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            var invocations = new[]
+            {
+                "values.All(value => value > 0)",
+                "values.Any()",
+                "values.Contains(1)",
+                "values.Count()",
+                "values.ElementAt(0)",
+                "values.First()",
+                "values.FirstOrDefault()",
+                "values.Last()",
+                "values.SequenceEqual(other)",
+                "values.Single()",
+                "values.Skip(1)",
+                "values.Take(2)",
+                "values.Where(value => value > 0)",
+                "values.Where(value => value > 0).Select(value => value + 1)",
+            };
+
+            foreach (var invocation in invocations)
+            {
+                AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, invocation));
+            }
+        }
+
+        [Test]
         public void LinqMaterializationHelpers_AreSourcedFromReturnEscapeAnalysis_NotStaticCatalogs()
         {
             var source = @"

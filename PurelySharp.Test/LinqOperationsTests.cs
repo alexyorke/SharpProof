@@ -573,6 +573,43 @@ public class TestClass
         }
 
         [Test]
+        public async Task LinqScalarHelpers_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections.Generic;
+using System.Linq;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(IEnumerable<int> values, IEnumerable<int> other)
+    {
+        var allPositive = values.All(static value => value >= 0);
+        var hasAny = values.Any();
+        var containsOne = values.Contains(1);
+        var count = values.Count();
+        var first = values.First();
+        var firstOrDefault = values.FirstOrDefault();
+        var last = values.Last();
+        var single = values.Single();
+        var element = values.ElementAt(0);
+        var same = values.SequenceEqual(other);
+        var skipped = values.Skip(1);
+        var taken = values.Take(2);
+        return (allPositive ? 1 : 0) +
+               (hasAny ? 1 : 0) +
+               (containsOne ? 1 : 0) +
+               (same ? 1 : 0) +
+               count + first + firstOrDefault + last + single + element +
+               skipped.FirstOrDefault() + taken.FirstOrDefault();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task LinqUnionDefaultEqualityDispatchToImpureEquatable_Diagnostic()
         {
             var test = @"
