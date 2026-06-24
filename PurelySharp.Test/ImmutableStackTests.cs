@@ -88,5 +88,29 @@ public class TestClass
                     .WithSpan(8, 32, 8, 40)
                     .WithArguments("PopValue"));
         }
+
+        [Test]
+        public async Task IImmutableStackPop_KnownConcreteReceiver_Diagnostic()
+        {
+            var test = @"
+using System.Collections.Immutable;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public IImmutableStack<int> PopValue()
+    {
+        IImmutableStack<int> stack = ImmutableStack<int>.Empty;
+        return stack.Pop();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(
+                test,
+                VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedId)
+                    .WithSpan(8, 33, 8, 41)
+                    .WithArguments("PopValue"));
+        }
     }
 }

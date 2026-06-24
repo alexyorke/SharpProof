@@ -1210,6 +1210,65 @@ public static class KeyedCollectionCatalogSignatureSamples
         }
 
         [Test]
+        public void ImmutableCollectionInterfaceHelpers_UseDispatchToReachGeneratedEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Collections.Immutable.ImmutableQueue<T>.System.Collections.Immutable.IImmutableQueue<T>.Dequeue()",
+                "System.Collections.Immutable.ImmutableStack<T>.System.Collections.Immutable.IImmutableStack<T>.Pop()",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
+        public void ImmutableCollectionInterfaceHelpers_AreNotDirectlyBackedByGeneratedCatalogRows()
+        {
+            var source = @"
+using System.Collections.Immutable;
+
+public static class ImmutableInterfaceCatalogSignatureSamples
+{
+    public static IImmutableQueue<int> QueueSample(IImmutableQueue<int> queue)
+    {
+        return queue.Dequeue();
+    }
+
+    public static IImmutableStack<int> StackSample(IImmutableStack<int> stack)
+    {
+        return stack.Pop();
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ImmutableInterfaceCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+
+            var queueInvocation = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Single(node => node.ToString() == "queue.Dequeue()");
+            var queueMethod = (IMethodSymbol)semanticModel.GetSymbolInfo(queueInvocation).Symbol!;
+            var (queueMatched, _) = GetGeneratedPurityClassification(queueMethod, compilation);
+
+            var stackInvocation = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Single(node => node.ToString() == "stack.Pop()");
+            var stackMethod = (IMethodSymbol)semanticModel.GetSymbolInfo(stackInvocation).Symbol!;
+            var (stackMatched, _) = GetGeneratedPurityClassification(stackMethod, compilation);
+
+            Assert.That(queueMatched, Is.False, "Interface Dequeue should resolve through dispatch, not direct generated catalog lookup.");
+            Assert.That(stackMatched, Is.False, "Interface Pop should resolve through dispatch, not direct generated catalog lookup.");
+        }
+
+        [Test]
         public void ImmutableListEqualityHelpers_AreSourcedFromSemanticAnalysis_NotStaticCatalogs()
         {
             var members = new[]

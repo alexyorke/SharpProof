@@ -69,5 +69,29 @@ public class TestClass
                     .WithSpan(8, 32, 8, 44)
                     .WithArguments("DequeueValue"));
         }
+
+        [Test]
+        public async Task IImmutableQueueDequeue_KnownConcreteReceiver_Diagnostic()
+        {
+            var test = @"
+using System.Collections.Immutable;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public IImmutableQueue<int> DequeueValue()
+    {
+        IImmutableQueue<int> queue = ImmutableQueue<int>.Empty;
+        return queue.Dequeue();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(
+                test,
+                VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedId)
+                    .WithSpan(8, 33, 8, 45)
+                    .WithArguments("DequeueValue"));
+        }
     }
 }
