@@ -571,11 +571,7 @@ public static class Constants
 
         "System.Array.ConstrainedCopy(System.Array, int, System.Array, int, int)",
         "System.Array.Copy(System.Array, System.Array, int)",
-        "System.Array.Fill<T>(T[], T)",
-        "System.Array.Fill<T>(T[], T, int, int)",
-        "System.Span<T>.Clear()",
         "System.Span<T>.CopyTo(System.Span<T>)",
-        "System.Span<T>.Fill(T)",
         "System.Span<T>.TryCopyTo(System.Span<T>)",
         "System.MemoryExtensions.Reverse<T>(System.Span<T>)",
         "System.Array.Resize<T>(ref T[], int)",

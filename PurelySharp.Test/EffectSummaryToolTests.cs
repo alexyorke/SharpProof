@@ -8285,7 +8285,11 @@ public static class DuplicateReviewedSeedFixture
                 "System.Array.Clear(System.Array, int, int)",
                 "System.Array.Copy(System.Array, int, System.Array, int, int)",
                 "System.Array.CopyTo(System.Array, int)",
-                "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)");
+                "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)",
+                "System.Array.Fill(!!0[], !!0)",
+                "System.Array.Fill(!!0[], !!0, int, int)",
+                "System.Span`1.Clear()",
+                "System.Span`1.Fill(!0)");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -8328,6 +8332,34 @@ public static class DuplicateReviewedSeedFixture
                     StringComparison.Ordinal)),
                 Is.False,
                 "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Array.Fill<T>(T[], T)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "System.Array.Fill<T>(T[], T) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Array.Fill<T>(T[], T, int, int)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "System.Array.Fill<T>(T[], T, int, int) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Span<T>.Clear()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "System.Span<T>.Clear() should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Span<T>.Fill(T)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "System.Span<T>.Fill(T) should no longer overlap the manual impure catalog.");
 
             AssertPurityClassification(summary, "System.Array.Clear(System.Array)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Array.Clear(System.Array)", "caller_visible");
@@ -8339,6 +8371,14 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Array.CopyTo(System.Array, int)", "caller_visible");
             AssertPurityClassification(summary, "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)", "impure", "impure_callee", "throw");
             AssertEffectVisibilityClassification(summary, "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)", "caller_visible");
+            AssertPurityClassification(summary, "System.Array.Fill(!!0[], !!0)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Array.Fill(!!0[], !!0)", "caller_visible");
+            AssertPurityClassification(summary, "System.Array.Fill(!!0[], !!0, int, int)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Array.Fill(!!0[], !!0, int, int)", "caller_visible");
+            AssertPurityClassification(summary, "System.Span`1.Clear()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Span`1.Clear()", "caller_visible");
+            AssertPurityClassification(summary, "System.Span`1.Fill(!0)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Span`1.Fill(!0)", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -8352,6 +8392,10 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(generatedSymbols, Does.Contain("System.Array.Copy(System.Array, int, System.Array, int, int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Array.CopyTo(System.Array, int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Array.Fill(!!0[], !!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Array.Fill(!!0[], !!0, int, int)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Span`1.Clear()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Span`1.Fill(!0)"));
         }
 
         [Test]

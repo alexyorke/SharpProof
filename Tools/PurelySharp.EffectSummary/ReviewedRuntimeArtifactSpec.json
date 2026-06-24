@@ -39,11 +39,14 @@
     {
       "OutputPath": "PurelySharp.Analyzer/Array.CopyWriteHelpers.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Private.CoreLib.dll",
-      "Limit": 40,
+      "Limit": 60,
       "SymbolPrefixes": [
         "System.Array.Copy(System.Array, int, System.Array, int, int)",
         "System.Array.CopyTo(System.Array, int)",
-        "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)"
+        "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)",
+        "System.Array.Fill(",
+        "System.Span`1.Clear()",
+        "System.Span`1.Fill(!0)"
       ]
     },
     {

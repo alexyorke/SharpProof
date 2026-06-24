@@ -561,6 +561,10 @@ public static class FileSystemPathGetterCatalogSignatureSamples
                 "System.Array.Copy(System.Array, int, System.Array, int, int)",
                 "System.Array.CopyTo(System.Array, int)",
                 "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)",
+                "System.Array.Fill<T>(T[], T)",
+                "System.Array.Fill<T>(T[], T, int, int)",
+                "System.Span<T>.Clear()",
+                "System.Span<T>.Fill(T)",
             };
 
             foreach (var member in members)
