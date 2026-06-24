@@ -4377,10 +4377,19 @@ public static class StringComparisonFixture
                     catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(),
                     Is.EqualTo(0),
                     summaryPath);
+                var staleKnownImpureRows = catalogComparison.GetProperty("KnownImpureMembers")
+                    .EnumerateArray()
+                    .Where(row => string.Equals(
+                        row.GetProperty("Classification").GetString(),
+                        "pure",
+                        StringComparison.Ordinal))
+                    .Select(row => row.GetProperty("Symbol").GetString())
+                    .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                    .ToArray();
                 Assert.That(
-                    catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(),
-                    Is.EqualTo(0),
-                    summaryPath);
+                    staleKnownImpureRows,
+                    Is.Empty,
+                    summaryPath + ": " + string.Join(", ", staleKnownImpureRows));
                 Assert.That(
                     catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(),
                     Is.EqualTo(0),
@@ -7638,6 +7647,87 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Find(System.Predicate`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.FindLast(System.Predicate`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeDataContractAttributeSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Runtime.Serialization.Primitives.dll",
+                8,
+                "System.Runtime.Serialization.DataContractAttribute..ctor()");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Runtime.Serialization.DataContractAttribute..ctor()", "pure");
+            AssertFreshnessClassification(summary, "System.Runtime.Serialization.DataContractAttribute..ctor()", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Runtime.Serialization.DataContractAttribute..ctor()", "internal_only");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => string.Equals(symbol, "System.Runtime.Serialization.DataContractAttribute..ctor()", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[] { "System.Runtime.Serialization.DataContractAttribute..ctor()" }));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeParallelEnumerableAndLabelSlices_UsesGeneratedPurityCatalogEntries()
+        {
+            using var parallelSummary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Linq.Parallel.dll",
+                20,
+                "System.Linq.ParallelEnumerable.AsParallel");
+            using var labelSummary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                8,
+                "System.Reflection.Emit.Label.Equals(object)");
+
+            var parallelReport = parallelSummary.RootElement.GetProperty("PurityReport");
+            var parallelCatalogComparison = parallelReport.GetProperty("CatalogComparison");
+            Assert.That(parallelCatalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(parallelCatalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(parallelCatalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(parallelSummary, "System.Linq.ParallelEnumerable.AsParallel(System.Collections.IEnumerable)", "pure");
+            AssertEffectVisibilityClassification(parallelSummary, "System.Linq.ParallelEnumerable.AsParallel(System.Collections.IEnumerable)", "internal_only");
+            AssertPurityClassification(parallelSummary, "System.Linq.ParallelEnumerable.AsParallel(System.Collections.Generic.IEnumerable`1<!!0>)", "pure");
+            AssertEffectVisibilityClassification(parallelSummary, "System.Linq.ParallelEnumerable.AsParallel(System.Collections.Generic.IEnumerable`1<!!0>)", "none");
+
+            var parallelGeneratedSymbols = parallelSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => string.Equals(symbol, "System.Linq.ParallelEnumerable.AsParallel(System.Collections.Generic.IEnumerable`1<!!0>)", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(
+                parallelGeneratedSymbols,
+                Is.EqualTo(new[] { "System.Linq.ParallelEnumerable.AsParallel(System.Collections.Generic.IEnumerable`1<!!0>)" }));
+
+            var labelReport = labelSummary.RootElement.GetProperty("PurityReport");
+            var labelCatalogComparison = labelReport.GetProperty("CatalogComparison");
+            Assert.That(labelCatalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(labelCatalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(labelCatalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(labelSummary, "System.Reflection.Emit.Label.Equals(object)", "pure");
+            AssertEffectVisibilityClassification(labelSummary, "System.Reflection.Emit.Label.Equals(object)", "none");
+
+            var labelGeneratedSymbols = labelSummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => string.Equals(symbol, "System.Reflection.Emit.Label.Equals(object)", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(labelGeneratedSymbols, Is.EqualTo(new[] { "System.Reflection.Emit.Label.Equals(object)" }));
         }
 
         [Test]

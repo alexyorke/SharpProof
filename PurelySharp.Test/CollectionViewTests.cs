@@ -162,7 +162,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ListAsReadOnly_Diagnostic()
+        public async Task ListAsReadOnly_NoDiagnostic()
         {
             var test = @"
 using System.Collections.Generic;
@@ -172,7 +172,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public ReadOnlyCollection<int> {|PS0002:TestMethod|}(List<int> values)
+    public ReadOnlyCollection<int> TestMethod(List<int> values)
     {
         return values.AsReadOnly();
     }

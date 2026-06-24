@@ -941,6 +941,14 @@
       "RuntimeAssemblyName": "System.Security.Cryptography.dll"
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/DataContractAttribute.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Runtime.Serialization.Primitives.dll",
+      "Limit": 8,
+      "SymbolPrefixes": [
+        "System.Runtime.Serialization.DataContractAttribute..ctor()"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/DateTimeOffset.Comparison.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/DateTimeOffset.Comparison.PurelySharp.EffectSummary.json"
     },
@@ -1033,6 +1041,22 @@
     {
       "OutputPath": "PurelySharp.Analyzer/Path.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/Path.PurelySharp.EffectSummary.json"
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/ParallelEnumerable.AsParallel.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Linq.Parallel.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Linq.ParallelEnumerable.AsParallel"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Reflection.Emit.Label.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "Limit": 8,
+      "SymbolPrefixes": [
+        "System.Reflection.Emit.Label.Equals(object)"
+      ]
     },
     {
       "OutputPath": "PurelySharp.Analyzer/String.Additional.PurelySharp.EffectSummary.json",

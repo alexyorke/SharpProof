@@ -3984,6 +3984,23 @@ public static class ListCapacityCatalogSignatureSamples
         }
 
         [Test]
+        public void ReviewedRuntimePureHelpers_AreNotBackedByStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Collections.Generic.List<T>.AsReadOnly()",
+                "System.Runtime.Serialization.DataContractAttribute.DataContractAttribute()",
+                "System.Linq.ParallelEnumerable.AsParallel<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
+                "System.Reflection.Emit.Label.Equals(object)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void EmailAddressConstructorGeneratedPurityEntryResolvesAgainstNet80References()
         {
             var source = @"

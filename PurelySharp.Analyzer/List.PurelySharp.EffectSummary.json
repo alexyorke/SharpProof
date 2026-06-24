@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:39:09.3351055+00:00",
+  "GeneratedAtUtc": "2026-06-24T09:02:49.0353038+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -4385,17 +4385,6 @@
           "EffectVisibilityClassification": "caller_visible",
           "MatchedExactSymbolKeys": [
             "System.Collections.Generic.List\u00601.AddRange(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.List\u003CT\u003E.AsReadOnly()",
-          "Catalog": "known_impure",
-          "Classification": "pure",
-          "Categories": [],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "none",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.List\u00601.AsReadOnly()-\u003ESystem.Collections.ObjectModel.ReadOnlyCollection\u00601\u003C!0\u003E"
           ]
         },
         {
