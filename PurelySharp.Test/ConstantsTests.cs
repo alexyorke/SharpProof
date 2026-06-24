@@ -2780,6 +2780,55 @@ public static class IPEndPointCatalogSignatureSamples
         }
 
         [Test]
+        public void NumericsRuntimeCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Numerics.BigInteger.Add(System.Numerics.BigInteger, System.Numerics.BigInteger)",
+                "System.Numerics.Complex.Complex(double, double)",
+                "System.Numerics.Complex.Abs(System.Numerics.Complex)",
+            };
+
+            foreach (var member in members)
+            {
+                Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(member));
+                Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(member));
+            }
+        }
+
+        [Test]
+        public void VectorMathCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Numerics.Quaternion.Quaternion(float, float, float, float)",
+                "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)",
+            };
+
+            foreach (var member in members)
+            {
+                Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(member));
+                Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(member));
+            }
+        }
+
+        [Test]
+        public void DrawingPrimitivesCatalog_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Drawing.Color.FromArgb(int, int, int, int)",
+                "System.Drawing.Point.Point(int, int)",
+            };
+
+            foreach (var member in members)
+            {
+                Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(member));
+                Assert.That(Constants.KnownFreshOwnedArrayReturningMembers, Does.Not.Contain(member));
+            }
+        }
+
+        [Test]
         public void BitConverterReadHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain("System.BitConverter.ToInt32(byte[], int)"));

@@ -569,6 +569,33 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Numerics.Runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Runtime.Numerics.dll",
+      "Limit": 8,
+      "SymbolPrefixes": [
+        "System.Numerics.BigInteger.Add(System.Numerics.BigInteger, System.Numerics.BigInteger)",
+        "System.Numerics.Complex..ctor(double, double)",
+        "System.Numerics.Complex.Abs(System.Numerics.Complex)"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Numerics.VectorMath.PurelySharp.EffectSummary.json",
+      "Limit": 12,
+      "SymbolPrefixes": [
+        "System.Numerics.Quaternion..ctor(float, float, float, float)",
+        "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Drawing.Primitives.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Drawing.Primitives.dll",
+      "Limit": 8,
+      "SymbolPrefixes": [
+        "System.Drawing.Color.FromArgb(int, int, int, int)",
+        "System.Drawing.Point..ctor(int, int)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/ConfigurationManager.AppSettings.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/ConfigurationManager.AppSettings.PurelySharp.EffectSummary.json",
       "PackageId": "System.Configuration.ConfigurationManager",

@@ -724,11 +724,6 @@ public static class Constants
         "System.Collections.Immutable.ImmutableStack<T>.System.Collections.Immutable.IImmutableStack<T>.Clear()",
         "System.Collections.Immutable.ImmutableStack<T>.System.Collections.Immutable.IImmutableStack<T>.Pop()",
         "System.Collections.Immutable.ImmutableStack<T>.System.Collections.Immutable.IImmutableStack<T>.Push(T)",
-
-        "System.Numerics.BigInteger.Add(System.Numerics.BigInteger, System.Numerics.BigInteger)",
-        "System.Numerics.Complex.Complex(double, double)",
-        "System.Numerics.Complex.Abs(System.Numerics.Complex)",
-
         "System.Security.Cryptography.Aes.DecryptCbc(byte[], byte[], byte[], System.Security.Cryptography.PaddingMode)",
         "System.Security.Cryptography.Aes.EncryptCbc(byte[], byte[], byte[], System.Security.Cryptography.PaddingMode)",
         "System.Security.Cryptography.MD5.ComputeHash(byte[])",
@@ -743,16 +738,12 @@ public static class Constants
         "System.Type.GetHashCode()",
 
 
-
         "System.Buffers.Text.Utf8Parser.TryParse(System.ReadOnlySpan<byte>, out int, out int)",
-        "System.Drawing.Color.FromArgb(int, int, int, int)",
-        "System.Drawing.Point.Point(int, int)",
         "System.Globalization.StringInfo.ParseCombiningCharacters(string)",
         "System.Linq.IQueryable<T>.Expression.get",
         "System.Linq.Queryable.Where<TSource>(System.Linq.IQueryable<TSource>, System.Linq.Expressions.Expression<System.Func<TSource, bool>>)",
         "System.Memory<T>.Span.get",
         "System.Numerics.Matrix4x4.CreateRotationX(float)",
-        "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)",
         "System.Reflection.Metadata.MetadataReader.GetString(System.Reflection.Metadata.StringHandle)",
         "System.Runtime.Intrinsics.X86.Sse.Add(System.Runtime.Intrinsics.Vector128<float>, System.Runtime.Intrinsics.Vector128<float>)",
         "System.Runtime.Intrinsics.X86.Avx2.Multiply(System.Runtime.Intrinsics.Vector256<double>, System.Runtime.Intrinsics.Vector256<double>)",
@@ -767,7 +758,6 @@ public static class Constants
         "System.Linq.Expressions.Expression.Call(System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])",
         "System.Linq.ParallelEnumerable.AsParallel<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
         "System.MemoryExtensions.BinarySearch<T>(System.ReadOnlySpan<T>, T)",
-        "System.Numerics.Quaternion.Quaternion(float, float, float, float)",
         "System.Reflection.Emit.OpCodes.Ldarg_0.get",
         "System.Runtime.CompilerServices.IsExternalInit",
         "System.Runtime.Serialization.DataContractAttribute.DataContractAttribute()",

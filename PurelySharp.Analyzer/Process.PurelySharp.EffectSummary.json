@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:22:01.0634139+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:38:49.5535496+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Diagnostics.Process",
@@ -743,7 +743,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -10389,9 +10388,8 @@
         "MetadataToken": "0x06000078",
         "MethodBodySha256": "88062b15bddf068c9c1b454ed9924fe2f5212caa869cf06e493d83adc2572dc5",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [

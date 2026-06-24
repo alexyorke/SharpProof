@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:22:00.8683509+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:38:49.4078898+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Console",
@@ -2991,14 +2991,21 @@
           ],
           "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "pure",
-            "Categories": [],
-            "FirstBlockingCallChain": [],
+            "Classification": "impure",
+            "Categories": [
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.SR.Format(string, object)",
+              "System.String.Join(string, object[])",
+              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+              "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": false,
             "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "none"
+            "EffectVisibilityClassification": "caller_visible"
           }
         }
       ]
@@ -3007,8 +3014,8 @@
   "PurityReport": {
     "SchemaVersion": 3,
     "MethodCount": 54,
-    "PureCount": 8,
-    "ImpureCount": 44,
+    "PureCount": 7,
+    "ImpureCount": 45,
     "ConservativeUnknownCount": 2,
     "CatalogComparison": {
       "KnownPureMembers": [],
@@ -4270,15 +4277,22 @@
         "ModuleVersionId": "060fc4fa-c568-4535-982f-c524c7fb02c9",
         "MetadataToken": "0x060001A8",
         "MethodBodySha256": "3f8952a07e3e35be6ec5fe6358ccbfa3b1fdd83bbbcfc6227935435d4d27cf93",
-        "Classification": "pure",
-        "PrimaryCategory": "generated_purity_summary",
-        "Categories": [],
-        "FirstBlockingCallChain": [],
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.SR.Format(string, object)",
+          "System.String.Join(string, object[])",
+          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+          "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "none"
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.SR.get_IO_NoConsole()",

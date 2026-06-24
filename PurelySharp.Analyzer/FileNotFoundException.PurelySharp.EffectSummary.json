@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:22:17.5319157+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:39:05.9135191+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -582,10 +582,10 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
+              "System.Exception.get_Message()",
               "System.SR.Format(string, object)",
               "System.String.Join(string, object[])",
               "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
@@ -927,12 +927,12 @@
         "MetadataToken": "0x060073F1",
         "MethodBodySha256": "234207417537b47c328ae7076fd33800e1218e09c2c6556f0611dcb358ab3d4a",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
+          "System.Exception.get_Message()",
           "System.SR.Format(string, object)",
           "System.String.Join(string, object[])",
           "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",

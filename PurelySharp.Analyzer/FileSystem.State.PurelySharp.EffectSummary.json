@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:21:56.9208578+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:38:45.550835+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -3300,14 +3300,21 @@
           ],
           "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "pure",
-            "Categories": [],
-            "FirstBlockingCallChain": [],
+            "Classification": "impure",
+            "Categories": [
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.SR.Format(string, object)",
+              "System.String.Join(string, object[])",
+              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+              "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": false,
-            "FreshnessClassification": "fresh_owned_object_write",
-            "EffectVisibilityClassification": "internal_only"
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
           }
         }
       ]
@@ -3316,8 +3323,8 @@
   "PurityReport": {
     "SchemaVersion": 3,
     "MethodCount": 54,
-    "PureCount": 26,
-    "ImpureCount": 27,
+    "PureCount": 25,
+    "ImpureCount": 28,
     "ConservativeUnknownCount": 1,
     "CatalogComparison": {
       "KnownPureMembers": [],
@@ -4104,15 +4111,22 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x06007A0F",
         "MethodBodySha256": "1d10de2cd63aebf2e906ced556c14eab2099c518a182d73060c48b0f44de6a25",
-        "Classification": "pure",
-        "PrimaryCategory": "generated_purity_summary",
-        "Categories": [],
-        "FirstBlockingCallChain": [],
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.SR.Format(string, object)",
+          "System.String.Join(string, object[])",
+          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+          "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": false,
-        "FreshnessClassification": "fresh_owned_object_write",
-        "EffectVisibilityClassification": "internal_only"
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.MemoryExtensions.AsSpan(string)",

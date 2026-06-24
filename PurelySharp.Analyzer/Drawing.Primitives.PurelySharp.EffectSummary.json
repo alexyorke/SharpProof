@@ -1,0 +1,272 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-24T08:38:52.770652+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.Drawing.Primitives",
+      "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Drawing.Primitives.dll",
+      "AssemblySha256": "6d056c7523d827c5dd264aea88a97342aeaa8a5e5b9a27c5c4e1886ee18c7d05",
+      "ModuleVersionId": "11ae09cd-0a1a-406f-804c-2fa922706d75",
+      "MethodCount": 439,
+      "EmittedMethodCount": 4,
+      "Methods": [
+        {
+          "Symbol": "System.Drawing.Point..ctor(int, int)",
+          "ExactSymbolKey": "System.Drawing.Point..ctor(int, int)-\u003Evoid",
+          "MetadataToken": "0x0600000E",
+          "RelativeVirtualAddress": 56208,
+          "MethodBodySha256": "b477cbd36edb8c0499bc52af6e3e7011a408f70356e69852b4e49f47a62cd234",
+          "CacheKey": "mvid:11ae09cd-0a1a-406f-804c-2fa922706d75|token:0x0600000E|il:b477cbd36edb8c0499bc52af6e3e7011a408f70356e69852b4e49f47a62cd234",
+          "Effects": [
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "fresh_owned_object_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Drawing.Point.x",
+            "System.Drawing.Point.y"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Drawing.Color.CheckByte(int, string)",
+          "ExactSymbolKey": "System.Drawing.Color.CheckByte(int, string)-\u003Evoid",
+          "MetadataToken": "0x0600016C",
+          "RelativeVirtualAddress": 64380,
+          "MethodBodySha256": "f314390b4f7265bae2b065de08d8b616ca8bffecb81d9293b090fb4e71db9695",
+          "CacheKey": "mvid:11ae09cd-0a1a-406f-804c-2fa922706d75|token:0x0600016C|il:f314390b4f7265bae2b065de08d8b616ca8bffecb81d9293b090fb4e71db9695",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Drawing.Color.\u003CCheckByte\u003Eg__ThrowOutOfByteRange|327_0(int, string)-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Drawing.Color.\u003CCheckByte\u003Eg__ThrowOutOfByteRange|327_0(int, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Drawing.Color.FromArgb(uint)",
+          "ExactSymbolKey": "System.Drawing.Color.FromArgb(uint)-\u003ESystem.Drawing.Color",
+          "MetadataToken": "0x0600016D",
+          "RelativeVirtualAddress": 64400,
+          "MethodBodySha256": "bcf5e575dc72c8d0554dfe17a486155315bcb4cd7bcc8e215ae50e81af5f545d",
+          "CacheKey": "mvid:11ae09cd-0a1a-406f-804c-2fa922706d75|token:0x0600016D|il:bcf5e575dc72c8d0554dfe17a486155315bcb4cd7bcc8e215ae50e81af5f545d",
+          "Effects": [
+            "allocates_object"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Drawing.Color..ctor(long, short, string, System.Drawing.KnownColor)-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Drawing.Color..ctor(long, short, string, System.Drawing.KnownColor)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Drawing.Color.FromArgb(int, int, int, int)",
+          "ExactSymbolKey": "System.Drawing.Color.FromArgb(int, int, int, int)-\u003ESystem.Drawing.Color",
+          "MetadataToken": "0x0600016F",
+          "RelativeVirtualAddress": 64420,
+          "MethodBodySha256": "829d39822687695725a1897309eae6ffc535a4d75fdeb7591cadd9e93419be04",
+          "CacheKey": "mvid:11ae09cd-0a1a-406f-804c-2fa922706d75|token:0x0600016F|il:829d39822687695725a1897309eae6ffc535a4d75fdeb7591cadd9e93419be04",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Drawing.Color.CheckByte(int, string)-\u003Evoid",
+            "System.Drawing.Color.FromArgb(uint)-\u003ESystem.Drawing.Color"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Drawing.Color.CheckByte(int, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Drawing.Color.FromArgb(uint)-\u003ESystem.Drawing.Color",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 4,
+    "PureCount": 4,
+    "ImpureCount": 0,
+    "ConservativeUnknownCount": 0,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.Drawing.Color.CheckByte(int, string)",
+        "ExactSymbolKey": "System.Drawing.Color.CheckByte(int, string)-\u003Evoid",
+        "CacheKey": "mvid:11ae09cd-0a1a-406f-804c-2fa922706d75|token:0x0600016C|il:f314390b4f7265bae2b065de08d8b616ca8bffecb81d9293b090fb4e71db9695",
+        "AssemblyName": "System.Drawing.Primitives",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Drawing.Primitives.dll",
+        "AssemblySha256": "6d056c7523d827c5dd264aea88a97342aeaa8a5e5b9a27c5c4e1886ee18c7d05",
+        "ModuleVersionId": "11ae09cd-0a1a-406f-804c-2fa922706d75",
+        "MetadataToken": "0x0600016C",
+        "MethodBodySha256": "f314390b4f7265bae2b065de08d8b616ca8bffecb81d9293b090fb4e71db9695",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Drawing.Color.FromArgb(int, int, int, int)",
+        "ExactSymbolKey": "System.Drawing.Color.FromArgb(int, int, int, int)-\u003ESystem.Drawing.Color",
+        "CacheKey": "mvid:11ae09cd-0a1a-406f-804c-2fa922706d75|token:0x0600016F|il:829d39822687695725a1897309eae6ffc535a4d75fdeb7591cadd9e93419be04",
+        "AssemblyName": "System.Drawing.Primitives",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Drawing.Primitives.dll",
+        "AssemblySha256": "6d056c7523d827c5dd264aea88a97342aeaa8a5e5b9a27c5c4e1886ee18c7d05",
+        "ModuleVersionId": "11ae09cd-0a1a-406f-804c-2fa922706d75",
+        "MetadataToken": "0x0600016F",
+        "MethodBodySha256": "829d39822687695725a1897309eae6ffc535a4d75fdeb7591cadd9e93419be04",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Drawing.Color.FromArgb(uint)",
+        "ExactSymbolKey": "System.Drawing.Color.FromArgb(uint)-\u003ESystem.Drawing.Color",
+        "CacheKey": "mvid:11ae09cd-0a1a-406f-804c-2fa922706d75|token:0x0600016D|il:bcf5e575dc72c8d0554dfe17a486155315bcb4cd7bcc8e215ae50e81af5f545d",
+        "AssemblyName": "System.Drawing.Primitives",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Drawing.Primitives.dll",
+        "AssemblySha256": "6d056c7523d827c5dd264aea88a97342aeaa8a5e5b9a27c5c4e1886ee18c7d05",
+        "ModuleVersionId": "11ae09cd-0a1a-406f-804c-2fa922706d75",
+        "MetadataToken": "0x0600016D",
+        "MethodBodySha256": "bcf5e575dc72c8d0554dfe17a486155315bcb4cd7bcc8e215ae50e81af5f545d",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Drawing.Point..ctor(int, int)",
+        "ExactSymbolKey": "System.Drawing.Point..ctor(int, int)-\u003Evoid",
+        "CacheKey": "mvid:11ae09cd-0a1a-406f-804c-2fa922706d75|token:0x0600000E|il:b477cbd36edb8c0499bc52af6e3e7011a408f70356e69852b4e49f47a62cd234",
+        "AssemblyName": "System.Drawing.Primitives",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Drawing.Primitives.dll",
+        "AssemblySha256": "6d056c7523d827c5dd264aea88a97342aeaa8a5e5b9a27c5c4e1886ee18c7d05",
+        "ModuleVersionId": "11ae09cd-0a1a-406f-804c-2fa922706d75",
+        "MetadataToken": "0x0600000E",
+        "MethodBodySha256": "b477cbd36edb8c0499bc52af6e3e7011a408f70356e69852b4e49f47a62cd234",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:22:00.344145+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:38:48.8719336+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -1395,7 +1395,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "impure_callee",
               "throw"
             ],
@@ -1477,7 +1476,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "impure_callee",
               "throw"
             ],
@@ -1788,7 +1786,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -2219,9 +2216,8 @@
         "MetadataToken": "0x0600105A",
         "MethodBodySha256": "270e354478209c631dc377f15daf7734c184056c73ab2698971b14970ef61608",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "global_state_read",
           "impure_callee",
           "throw"
         ],
@@ -2248,9 +2244,8 @@
         "MetadataToken": "0x06001059",
         "MethodBodySha256": "aa6a106b9892a1dc8fbf981c92504129d7c071f8a61e28b39cb8b45c68446824",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "global_state_read",
           "impure_callee",
           "throw"
         ],
@@ -2661,9 +2656,8 @@
         "MetadataToken": "0x06001D6B",
         "MethodBodySha256": "d9eeb68af9a865402e206003fcbdd0489c39ef34a141dca3da17c8a3310b3754",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [

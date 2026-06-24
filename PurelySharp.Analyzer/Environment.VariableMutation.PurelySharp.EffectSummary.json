@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:21:55.7369227+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:38:44.3816791+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -517,7 +517,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "impure_callee",
               "throw"
             ],
@@ -1573,7 +1572,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -2984,9 +2982,8 @@
         "MetadataToken": "0x060004E6",
         "MethodBodySha256": "a6c31692058d1bba674eb1a264f391e93cfa156c5a94acc2b5575da91f9ae56e",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "global_state_read",
           "impure_callee",
           "throw"
         ],
@@ -3243,9 +3240,8 @@
         "MetadataToken": "0x06001D6A",
         "MethodBodySha256": "c039fcf8065df0574663f4038678520259296706d1fbdb8765b8e9263ff446d9",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [

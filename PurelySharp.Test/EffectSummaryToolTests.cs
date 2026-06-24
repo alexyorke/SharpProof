@@ -952,6 +952,67 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeNumericsPureHelpersSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Runtime.Numerics.dll",
+                8,
+                "System.Numerics.BigInteger.Add(System.Numerics.BigInteger, System.Numerics.BigInteger)",
+                "System.Numerics.Complex..ctor(double, double)",
+                "System.Numerics.Complex.Abs(System.Numerics.Complex)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Numerics.BigInteger.Add(System.Numerics.BigInteger, System.Numerics.BigInteger)", "pure");
+            AssertPurityClassification(summary, "System.Numerics.Complex..ctor(double, double)", "pure");
+            AssertPurityClassification(summary, "System.Numerics.Complex.Abs(System.Numerics.Complex)", "pure");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeVectorMathPureHelpersSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                12,
+                "System.Numerics.Quaternion..ctor(float, float, float, float)",
+                "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Numerics.Quaternion..ctor(float, float, float, float)", "pure");
+            AssertPurityClassification(summary, "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)", "pure");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeDrawingPrimitivesPureHelpersSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Drawing.Primitives.dll",
+                8,
+                "System.Drawing.Color.FromArgb(int, int, int, int)",
+                "System.Drawing.Point..ctor(int, int)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Drawing.Color.FromArgb(int, int, int, int)", "pure");
+            AssertPurityClassification(summary, "System.Drawing.Point..ctor(int, int)", "pure");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeConvertBase64Slice_TreatsRuntimeHelpersAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Convert.FromBase64", limit: 20);

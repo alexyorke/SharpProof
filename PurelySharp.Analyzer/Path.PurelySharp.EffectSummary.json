@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:22:22.7165743+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:39:10.8979379+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -3375,18 +3375,22 @@
           ],
           "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "conservative_unknown",
+            "Classification": "impure",
             "Categories": [
-              "unknown_callee"
+              "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.Runtime.InteropServices.Marshal.GetLastPInvokeError()"
+              "System.IO.Win32Marshal.GetExceptionForWin32Error(int, string)",
+              "System.SR.Format(string, object)",
+              "System.String.Join(string, object[])",
+              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+              "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "unknown"
+            "EffectVisibilityClassification": "caller_visible"
           }
         },
         {
@@ -3425,8 +3429,8 @@
     "SchemaVersion": 3,
     "MethodCount": 55,
     "PureCount": 28,
-    "ImpureCount": 24,
-    "ConservativeUnknownCount": 3,
+    "ImpureCount": 25,
+    "ConservativeUnknownCount": 2,
     "CatalogComparison": {
       "KnownPureMembers": [],
       "KnownImpureMembers": [],
@@ -4213,19 +4217,23 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x06007A0E",
         "MethodBodySha256": "bfb216439684becfab6a0341b80ff3840a44d47dc5fa3e948998ea2f875c4b55",
-        "Classification": "conservative_unknown",
-        "PrimaryCategory": "unknown_callee",
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "unknown_callee"
+          "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.Runtime.InteropServices.Marshal.GetLastPInvokeError()"
+          "System.IO.Win32Marshal.GetExceptionForWin32Error(int, string)",
+          "System.SR.Format(string, object)",
+          "System.String.Join(string, object[])",
+          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+          "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "unknown"
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.IO.Win32Marshal.TryMakeWin32ErrorCodeFromHR(int)",

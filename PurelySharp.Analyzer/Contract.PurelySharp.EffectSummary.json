@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:21:50.7211902+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:38:39.4781124+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -427,11 +427,9 @@
           ],
           "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "conservative_unknown",
+            "Classification": "impure",
             "Categories": [
-              "dynamic_dispatch",
-              "unknown_callee",
-              "virtual_call"
+              "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "System.Reflection.Assembly.GetName()"
@@ -440,7 +438,7 @@
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
-            "EffectVisibilityClassification": "unknown"
+            "EffectVisibilityClassification": "caller_visible"
           }
         }
       ]
@@ -450,8 +448,8 @@
     "SchemaVersion": 3,
     "MethodCount": 9,
     "PureCount": 8,
-    "ImpureCount": 0,
-    "ConservativeUnknownCount": 1,
+    "ImpureCount": 1,
+    "ConservativeUnknownCount": 0,
     "CatalogComparison": {
       "KnownPureMembers": [],
       "KnownImpureMembers": [],
@@ -471,12 +469,10 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x06007C56",
         "MethodBodySha256": "4754d24fdde32d433bbd255954dfbf807b5710d95f1cf2a94eb8706e7244ef51",
-        "Classification": "conservative_unknown",
-        "PrimaryCategory": "dynamic_dispatch",
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "dynamic_dispatch",
-          "unknown_callee",
-          "virtual_call"
+          "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "System.Reflection.Assembly.GetName()"
@@ -485,7 +481,7 @@
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "unknown"
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.Diagnostics.Contracts.Contract.Ensures(bool)",

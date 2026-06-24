@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:21:48.2044137+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:38:37.0057663+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -2996,7 +2996,8 @@
               "System.Convert.ToBase64String(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Base64FormattingOptions)",
               "System.SR.Format(string, object)",
               "System.String.Join(string, object[])",
-              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+              "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -3055,7 +3056,8 @@
               "System.Convert.ToBase64String(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Base64FormattingOptions)",
               "System.SR.Format(string, object)",
               "System.String.Join(string, object[])",
-              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+              "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -3102,7 +3104,8 @@
               "System.Convert.ToBase64String(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Base64FormattingOptions)",
               "System.SR.Format(string, object)",
               "System.String.Join(string, object[])",
-              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+              "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -3173,7 +3176,8 @@
               "System.Convert.ToBase64String(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Base64FormattingOptions)",
               "System.SR.Format(string, object)",
               "System.String.Join(string, object[])",
-              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+              "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -3307,12 +3311,14 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "impure_callee",
               "throw"
             ],
             "FirstBlockingCallChain": [
               "System.SR.Format(string, object)",
               "System.String.Join(string, object[])",
-              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+              "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -10845,14 +10851,16 @@
         "MetadataToken": "0x06000F08",
         "MethodBodySha256": "02dd06c83d57413bbec6ce51b0af765535a546c5b7e3d4057e5ad9fde329d486",
         "Classification": "impure",
-        "PrimaryCategory": "throw",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
+          "impure_callee",
           "throw"
         ],
         "FirstBlockingCallChain": [
           "System.SR.Format(string, object)",
           "System.String.Join(string, object[])",
-          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+          "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
@@ -10879,7 +10887,8 @@
           "System.Convert.ToBase64String(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Base64FormattingOptions)",
           "System.SR.Format(string, object)",
           "System.String.Join(string, object[])",
-          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+          "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
@@ -10906,7 +10915,8 @@
           "System.Convert.ToBase64String(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Base64FormattingOptions)",
           "System.SR.Format(string, object)",
           "System.String.Join(string, object[])",
-          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+          "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
@@ -10934,7 +10944,8 @@
           "System.Convert.ToBase64String(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Base64FormattingOptions)",
           "System.SR.Format(string, object)",
           "System.String.Join(string, object[])",
-          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+          "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -10961,7 +10972,8 @@
           "System.Convert.ToBase64String(System.ReadOnlySpan\u00601\u003Cbyte\u003E, System.Base64FormattingOptions)",
           "System.SR.Format(string, object)",
           "System.String.Join(string, object[])",
-          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])"
+          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
+          "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:21:56.5251062+00:00",
+  "GeneratedAtUtc": "2026-06-24T08:38:45.1603363+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -93,7 +93,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "global_state_write",
               "impure_callee"
             ],
@@ -244,7 +243,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "global_state_write",
               "impure_callee"
             ],
@@ -658,7 +656,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "global_state_write",
               "impure_callee",
               "throw"
@@ -929,7 +926,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1532,7 +1528,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1713,7 +1708,6 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
@@ -1882,7 +1876,6 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_write",
         "Categories": [
-          "global_state_read",
           "global_state_write",
           "impure_callee"
         ],
@@ -1910,7 +1903,6 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_write",
         "Categories": [
-          "global_state_read",
           "global_state_write",
           "impure_callee",
           "throw"
@@ -1966,7 +1958,6 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_write",
         "Categories": [
-          "global_state_read",
           "global_state_write",
           "impure_callee"
         ],
@@ -2047,9 +2038,8 @@
         "MetadataToken": "0x06007A0E",
         "MethodBodySha256": "bfb216439684becfab6a0341b80ff3840a44d47dc5fa3e948998ea2f875c4b55",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -2076,9 +2066,8 @@
         "MetadataToken": "0x06007A0F",
         "MethodBodySha256": "1d10de2cd63aebf2e906ced556c14eab2099c518a182d73060c48b0f44de6a25",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
@@ -2188,9 +2177,8 @@
         "MetadataToken": "0x06001D6A",
         "MethodBodySha256": "c039fcf8065df0574663f4038678520259296706d1fbdb8765b8e9263ff446d9",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
