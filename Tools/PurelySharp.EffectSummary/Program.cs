@@ -1927,6 +1927,7 @@ internal static class AssemblyEffectSummarizer
             RootCandidates: GetRootCandidates(
                     effects,
                     calls,
+                    fields,
                     staticFields,
                     sameAssemblyStaticReadFieldTokens,
                     staticFieldFacts,
@@ -2177,6 +2178,7 @@ internal static class AssemblyEffectSummarizer
     private static IEnumerable<string> GetRootCandidates(
         IEnumerable<string> effects,
         IEnumerable<string> calls,
+        IEnumerable<string> fields,
         IEnumerable<string> staticReadFields,
         IReadOnlySet<int> sameAssemblyStaticReadFieldTokens,
         IReadOnlyDictionary<int, StaticFieldFact> staticFieldFacts,
@@ -2185,6 +2187,7 @@ internal static class AssemblyEffectSummarizer
         var roots = new SortedSet<string>(StringComparer.Ordinal);
         var effectSet = new HashSet<string>(effects, StringComparer.Ordinal);
         var callSet = new HashSet<string>(calls, StringComparer.Ordinal);
+        var fieldSet = new HashSet<string>(fields, StringComparer.Ordinal);
         var staticReadFieldSet = new HashSet<string>(staticReadFields, StringComparer.Ordinal);
         foreach (var effect in effects)
         {
@@ -2209,6 +2212,12 @@ internal static class AssemblyEffectSummarizer
                         roots.Add("safe_static_cache_read");
                     }
                     else
+                    {
+                        roots.Add("global_state_read");
+                    }
+                    break;
+                case "reads_instance_field":
+                    if (IsThreadingRuntimeStateRead(fieldSet))
                     {
                         roots.Add("global_state_read");
                     }
@@ -2240,6 +2249,26 @@ internal static class AssemblyEffectSummarizer
         }
 
         return roots;
+    }
+
+    private static bool IsThreadingRuntimeStateRead(IReadOnlySet<string> fields)
+    {
+        foreach (var field in fields)
+        {
+            if (!(field.StartsWith("System.Threading.", StringComparison.Ordinal) ||
+                  field.StartsWith("System.Threading.Tasks.", StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            if (field.EndsWith("._state", StringComparison.Ordinal) ||
+                field.EndsWith(".m_stateFlags", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsSafeStaticCacheRead(

@@ -1555,6 +1555,72 @@ public static class TaskWrapperCatalogSignatureSamples
         }
 
         [Test]
+        public void TaskSchedulingHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+using System.Threading.Tasks;
+
+public static class TaskSchedulingCatalogSignatureSamples
+{
+    public static Task DelayMilliseconds()
+    {
+        return Task.Delay(100);
+    }
+
+    public static Task DelayTimeSpan()
+    {
+        return Task.Delay(TimeSpan.FromMilliseconds(100));
+    }
+
+    public static Task RunAction()
+    {
+        return Task.Run(static () => { });
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "TaskSchedulingCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Task.Delay(100)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Task.Delay(TimeSpan.FromMilliseconds(100))"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Task.Run(static () => { })"));
+        }
+
+        [Test]
+        public void ThreadingStateReaders_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Threading;
+using System.Threading.Tasks;
+
+public static class ThreadingStateCatalogSignatureSamples
+{
+    public static bool IsCanceled(CancellationToken token)
+    {
+        return token.IsCancellationRequested;
+    }
+
+    public static bool IsCompleted(Task task)
+    {
+        return task.IsCompleted;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ThreadingStateCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "token.IsCancellationRequested"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "task.IsCompleted"));
+        }
+
+        [Test]
         public void ValueTaskResultConstructor_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"

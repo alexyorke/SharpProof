@@ -724,10 +724,15 @@
     },
     {
       "OutputPath": "PurelySharp.Analyzer/Task.Wrappers.PurelySharp.EffectSummary.json",
-      "Limit": 40,
+      "Limit": 80,
+      "IgnoreReviewedPurityEntries": true,
       "SymbolPrefixes": [
         "System.Threading.Tasks.Task.FromResult(",
-        "System.Threading.Tasks.ValueTask.AsTask"
+        "System.Threading.Tasks.ValueTask.AsTask",
+        "System.Threading.Tasks.Task.Delay(",
+        "System.Threading.Tasks.Task.Run(System.Action)",
+        "System.Threading.Tasks.Task.get_IsCompleted",
+        "System.Threading.CancellationToken.get_IsCancellationRequested"
       ]
     },
     {

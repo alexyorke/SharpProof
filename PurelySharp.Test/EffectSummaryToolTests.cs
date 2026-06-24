@@ -8859,26 +8859,20 @@ public static class DuplicateReviewedSeedFixture
                 "System.Threading.Tasks.Task.FromResult(",
                 "System.Threading.Tasks.ValueTask.AsTask");
 
-            var enumerableKnownPureRow = enumerableSummary.RootElement
-                .GetProperty("PurityReport")
-                .GetProperty("CatalogComparison")
-                .GetProperty("KnownPureMembers")
+            var enumerableEntry = enumerableSummary.RootElement
+                .GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
                 .EnumerateArray()
-                .Single(row => string.Equals(
-                    row.GetProperty("Symbol").GetString(),
-                    "System.Linq.Enumerable.Any<TSource>(System.Collections.Generic.IEnumerable<TSource>)",
+                .Single(entry => string.Equals(
+                    entry.GetProperty("Symbol").GetString(),
+                    "System.Linq.Enumerable.Any(System.Collections.Generic.IEnumerable`1<!!0>)",
                     StringComparison.Ordinal));
-            var enumerableMatchedKeys = enumerableKnownPureRow
-                .GetProperty("MatchedExactSymbolKeys")
-                .EnumerateArray()
-                .Select(static value => value.GetString())
-                .OfType<string>()
-                .ToArray();
+            var enumerableExactKey = enumerableEntry.GetProperty("ExactSymbolKey").GetString();
 
             Assert.That(
-                enumerableMatchedKeys.Any(static key => key.Contains("!!0", StringComparison.Ordinal)),
-                Is.True,
-                "Enumerable.Any<TSource> should match a runtime exact key that uses method generic ordinals.");
+                enumerableExactKey,
+                Does.Contain("!!0"),
+                "Enumerable.Any<TSource> should preserve method generic ordinals in the generated exact key.");
 
             var taskKnownPureRows = taskSummary.RootElement
                 .GetProperty("PurityReport")
@@ -8913,6 +8907,77 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(taskSummary, "System.Threading.Tasks.Task.FromResult(!!0)", "caller_visible");
             AssertPurityClassification(taskSummary, "System.Threading.Tasks.ValueTask.AsTask()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(taskSummary, "System.Threading.Tasks.ValueTask.AsTask()", "caller_visible");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeTaskSchedulingSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                80,
+                "System.Threading.Tasks.Task.Delay(",
+                "System.Threading.Tasks.Task.Run(System.Action)");
+
+            var knownImpureRows = summary.RootElement
+                .GetProperty("PurityReport")
+                .GetProperty("CatalogComparison")
+                .GetProperty("KnownImpureMembers")
+                .EnumerateArray()
+                .Select(row => row.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(knownImpureRows, Does.Not.Contain("System.Threading.Tasks.Task.Delay(int)"));
+            Assert.That(knownImpureRows, Does.Not.Contain("System.Threading.Tasks.Task.Delay(System.TimeSpan)"));
+            Assert.That(knownImpureRows, Does.Not.Contain("System.Threading.Tasks.Task.Run(System.Action)"));
+
+            AssertPurityClassification(summary, "System.Threading.Tasks.Task.Delay(int)", "impure", "global_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Threading.Tasks.Task.Delay(int)", "caller_visible");
+            AssertPrimaryCategory(summary, "System.Threading.Tasks.Task.Delay(int)", "global_state_write");
+            AssertPurityClassification(summary, "System.Threading.Tasks.Task.Delay(System.TimeSpan)", "impure", "global_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Threading.Tasks.Task.Delay(System.TimeSpan)", "caller_visible");
+            AssertPrimaryCategory(summary, "System.Threading.Tasks.Task.Delay(System.TimeSpan)", "global_state_write");
+            AssertPurityClassification(summary, "System.Threading.Tasks.Task.Run(System.Action)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Threading.Tasks.Task.Run(System.Action)", "caller_visible");
+            AssertPrimaryCategory(summary, "System.Threading.Tasks.Task.Run(System.Action)", "caller_visible_memory_write");
+
+            var generatedSymbols = summary.RootElement
+                .GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Threading.Tasks.Task.Delay(int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Threading.Tasks.Task.Delay(System.TimeSpan)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Threading.Tasks.Task.Run(System.Action)", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(
+                generatedSymbols,
+                Is.EquivalentTo(new[]
+                {
+                    "System.Threading.Tasks.Task.Delay(int)",
+                    "System.Threading.Tasks.Task.Delay(System.TimeSpan)",
+                    "System.Threading.Tasks.Task.Run(System.Action)",
+                }));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RawThreadingStateReaders_UseGeneratedGlobalStateReadEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                40,
+                2,
+                false,
+                true,
+                "System.Threading.CancellationToken.get_IsCancellationRequested",
+                "System.Threading.Tasks.Task.get_IsCompleted");
+
+            AssertPurityClassification(summary, "System.Threading.CancellationToken.get_IsCancellationRequested()", "impure", "global_state_read");
+            AssertPrimaryCategory(summary, "System.Threading.CancellationToken.get_IsCancellationRequested()", "global_state_read");
+            AssertPurityClassification(summary, "System.Threading.Tasks.Task.get_IsCompleted()", "impure", "global_state_read");
+            AssertPrimaryCategory(summary, "System.Threading.Tasks.Task.get_IsCompleted()", "global_state_read");
         }
 
         [Test]

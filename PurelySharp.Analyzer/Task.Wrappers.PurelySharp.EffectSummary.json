@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:38:53.739743+00:00",
+  "GeneratedAtUtc": "2026-06-24T13:17:23.0088326+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -8,8 +8,41 @@
       "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
       "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
       "MethodCount": 34519,
-      "EmittedMethodCount": 8,
+      "EmittedMethodCount": 33,
       "Methods": [
+        {
+          "Symbol": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)",
+          "ExactSymbolKey": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+          "MetadataToken": "0x0600096D",
+          "RelativeVirtualAddress": 6879252,
+          "MethodBodySha256": "b2acfe61d667747d959e76c932b715aa36165cc356b1eddc87687a6e295e5310",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600096D|il:b2acfe61d667747d959e76c932b715aa36165cc356b1eddc87687a6e295e5310",
+          "Effects": [
+            "reads_instance_field"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.RuntimeTypeHandle.m_type"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
         {
           "Symbol": "System.Type.op_Equality(System.Type, System.Type)",
           "ExactSymbolKey": "System.Type.op_Equality(System.Type, System.Type)-\u003Ebool",
@@ -56,6 +89,96 @@
           }
         },
         {
+          "Symbol": "System.ArgumentNullException.ThrowIfNull(object, string)",
+          "ExactSymbolKey": "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+          "MetadataToken": "0x06000B7F",
+          "RelativeVirtualAddress": 6896816,
+          "MethodBodySha256": "1e0ff4485c0ebfcab45ab6b433d535581e24e5b381f44026eaaa475025612b06",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000B7F|il:1e0ff4485c0ebfcab45ab6b433d535581e24e5b381f44026eaaa475025612b06",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.ArgumentNullException.Throw(string)-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentNullException.Throw(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)",
+          "ExactSymbolKey": "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)-\u003Evoid",
+          "MetadataToken": "0x06002247",
+          "RelativeVirtualAddress": 7200184,
+          "MethodBodySha256": "30b55478ce2cf09d1a605f9f4642e8bd4cc36516697388c632f9e98965ca56e8",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06002247|il:30b55478ce2cf09d1a605f9f4642e8bd4cc36516697388c632f9e98965ca56e8",
+          "Effects": [
+            "calls_method",
+            "throws"
+          ],
+          "RootCandidates": [
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.ArgumentOutOfRangeException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.ArgumentOutOfRangeException",
+              "SourcePath": "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.ThrowHelper.GetArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)-\u003ESystem.ArgumentOutOfRangeException"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ThrowHelper.GetArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)-\u003ESystem.ArgumentOutOfRangeException",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
           "Symbol": "System.UInt128.op_Equality(System.UInt128, System.UInt128)",
           "ExactSymbolKey": "System.UInt128.op_Equality(System.UInt128, System.UInt128)-\u003Ebool",
           "MetadataToken": "0x0600271F",
@@ -87,6 +210,371 @@
             "HasUnsupportedEffects": false,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.TimeProvider.get_System()",
+          "ExactSymbolKey": "System.TimeProvider.get_System()-\u003ESystem.TimeProvider",
+          "MetadataToken": "0x060028DB",
+          "RelativeVirtualAddress": 7297028,
+          "MethodBodySha256": "651459a2ebfe0805391148c5985ef6a8e147a0ae3fc78a6bba9d67902390fb61",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060028DB|il:651459a2ebfe0805391148c5985ef6a8e147a0ae3fc78a6bba9d67902390fb61",
+          "Effects": [
+            "reads_static_field"
+          ],
+          "RootCandidates": [
+            "safe_static_cache_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.TimeProvider.\u003CSystem\u003Ek__BackingField"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Threading.CancellationToken.get_IsCancellationRequested()",
+          "ExactSymbolKey": "System.Threading.CancellationToken.get_IsCancellationRequested()-\u003Ebool",
+          "MetadataToken": "0x0600378D",
+          "RelativeVirtualAddress": 7540928,
+          "MethodBodySha256": "8018a7e0d5dd405f3dd5164e79c6cbce3c10f41d306e2b290d7085c05209e519",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600378D|il:8018a7e0d5dd405f3dd5164e79c6cbce3c10f41d306e2b290d7085c05209e519",
+          "Effects": [
+            "calls_method",
+            "reads_instance_field"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Threading.CancellationTokenSource.get_IsCancellationRequested()-\u003Ebool"
+          ],
+          "Fields": [
+            "System.Threading.CancellationToken._source"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Threading.CancellationTokenSource.get_IsCancellationRequested()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.CancellationToken.get_CanBeCanceled()",
+          "ExactSymbolKey": "System.Threading.CancellationToken.get_CanBeCanceled()-\u003Ebool",
+          "MetadataToken": "0x0600378E",
+          "RelativeVirtualAddress": 7540952,
+          "MethodBodySha256": "a3dd3457018771cdc0dc45a784f3cfb6f83762d21e857be9800beb9e87b0bd2e",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600378E|il:a3dd3457018771cdc0dc45a784f3cfb6f83762d21e857be9800beb9e87b0bd2e",
+          "Effects": [
+            "reads_instance_field"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Threading.CancellationToken._source"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Threading.CancellationTokenSource.get_IsCancellationRequested()",
+          "ExactSymbolKey": "System.Threading.CancellationTokenSource.get_IsCancellationRequested()-\u003Ebool",
+          "MetadataToken": "0x060037B1",
+          "RelativeVirtualAddress": 7541948,
+          "MethodBodySha256": "a5cb71f691867eb8cabc26493332644eb0011573499338ee2bb22858c638cbba",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060037B1|il:a5cb71f691867eb8cabc26493332644eb0011573499338ee2bb22858c638cbba",
+          "Effects": [
+            "reads_instance_field"
+          ],
+          "RootCandidates": [
+            "global_state_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Threading.CancellationTokenSource._state"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task\u00601..ctor(!0)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task\u00601..ctor(!0)-\u003Evoid",
+          "MetadataToken": "0x06003BD0",
+          "RelativeVirtualAddress": 7603560,
+          "MethodBodySha256": "c8b38b4a5e62aa72358e0ab05ee91e3e1c0e7fc4e996f767f5c7ff138af1da96",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003BD0|il:c8b38b4a5e62aa72358e0ab05ee91e3e1c0e7fc4e996f767f5c7ff138af1da96",
+          "Effects": [
+            "calls_method",
+            "writes_indirect_memory",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "caller_visible_memory_write",
+            "object_state_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Threading.Tasks.Task..ctor(bool, System.Threading.Tasks.TaskCreationOptions, System.Threading.CancellationToken)-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Threading.Tasks.Task\u00601.m_result"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task..ctor(bool, System.Threading.Tasks.TaskCreationOptions, System.Threading.CancellationToken)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "caller_visible_memory_write",
+              "object_state_write"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task.InternalStartNew(System.Threading.Tasks.Task, System.Delegate, object, System.Threading.CancellationToken, System.Threading.Tasks.TaskScheduler, System.Threading.Tasks.TaskCreationOptions, System.Threading.Tasks.InternalTaskOptions)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task.InternalStartNew(System.Threading.Tasks.Task, System.Delegate, object, System.Threading.CancellationToken, System.Threading.Tasks.TaskScheduler, System.Threading.Tasks.TaskCreationOptions, System.Threading.Tasks.InternalTaskOptions)-\u003ESystem.Threading.Tasks.Task",
+          "MetadataToken": "0x06003C92",
+          "RelativeVirtualAddress": 7612908,
+          "MethodBodySha256": "d66eeada65494a15cf3445347c97de354883f308a2e730e75805c16c715d7027",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003C92|il:d66eeada65494a15cf3445347c97de354883f308a2e730e75805c16c715d7027",
+          "Effects": [
+            "allocates_object",
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Threading.Tasks.Task..ctor(System.Delegate, object, System.Threading.Tasks.Task, System.Threading.CancellationToken, System.Threading.Tasks.TaskCreationOptions, System.Threading.Tasks.InternalTaskOptions, System.Threading.Tasks.TaskScheduler)-\u003Evoid",
+            "System.Threading.Tasks.Task.ScheduleAndStart(bool)-\u003Evoid",
+            "System.ThrowHelper.ThrowArgumentNullException(System.ExceptionArgument)-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task..ctor(System.Delegate, object, System.Threading.Tasks.Task, System.Threading.CancellationToken, System.Threading.Tasks.TaskCreationOptions, System.Threading.Tasks.InternalTaskOptions, System.Threading.Tasks.TaskScheduler)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.ScheduleAndStart(bool)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ThrowHelper.ThrowArgumentNullException(System.ExceptionArgument)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task.get_IsCompleted()",
+          "ExactSymbolKey": "System.Threading.Tasks.Task.get_IsCompleted()-\u003Ebool",
+          "MetadataToken": "0x06003CA0",
+          "RelativeVirtualAddress": 7613492,
+          "MethodBodySha256": "bd64f2610756a72754a7e4284586193480dbb74e8391906b2a4154ebd21e80b5",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003CA0|il:bd64f2610756a72754a7e4284586193480dbb74e8391906b2a4154ebd21e80b5",
+          "Effects": [
+            "calls_method",
+            "reads_instance_field"
+          ],
+          "RootCandidates": [
+            "global_state_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Threading.Tasks.Task.IsCompletedMethod(int)-\u003Ebool"
+          ],
+          "Fields": [
+            "System.Threading.Tasks.Task.m_stateFlags"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.IsCompletedMethod(int)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task.IsCompletedMethod(int)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task.IsCompletedMethod(int)-\u003Ebool",
+          "MetadataToken": "0x06003CA1",
+          "RelativeVirtualAddress": 7613520,
+          "MethodBodySha256": "32acda1a9ac354dbd703322a156c6cbf46df77ad9df520655bb63a6dcf64ac3e",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003CA1|il:32acda1a9ac354dbd703322a156c6cbf46df77ad9df520655bb63a6dcf64ac3e",
+          "Effects": [],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task.get_IsCompletedSuccessfully()",
+          "ExactSymbolKey": "System.Threading.Tasks.Task.get_IsCompletedSuccessfully()-\u003Ebool",
+          "MetadataToken": "0x06003CA2",
+          "RelativeVirtualAddress": 7613532,
+          "MethodBodySha256": "1ed7fe24359016f45c7fbc5d960c59e1dc9d8377feee9aa472bf340c838bc51f",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003CA2|il:1ed7fe24359016f45c7fbc5d960c59e1dc9d8377feee9aa472bf340c838bc51f",
+          "Effects": [
+            "reads_instance_field"
+          ],
+          "RootCandidates": [
+            "global_state_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Threading.Tasks.Task.m_stateFlags"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
           }
         },
         {
@@ -192,16 +680,833 @@
             "Classification": "impure",
             "Categories": [
               "caller_visible_memory_write",
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.Type.op_Equality(System.Type, System.Type)"
+              "System.Threading.Tasks.Task\u00601..ctor(!0)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task.FromCanceled(System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task.FromCanceled(System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+          "MetadataToken": "0x06003D21",
+          "RelativeVirtualAddress": 7622424,
+          "MethodBodySha256": "5c586da5debeb0058127b57a8423534fb88dd41979bcad0942a0ebf42868b34f",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D21|il:5c586da5debeb0058127b57a8423534fb88dd41979bcad0942a0ebf42868b34f",
+          "Effects": [
+            "allocates_object",
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Threading.CancellationToken.get_IsCancellationRequested()-\u003Ebool",
+            "System.Threading.Tasks.Task..ctor(bool, System.Threading.Tasks.TaskCreationOptions, System.Threading.CancellationToken)-\u003Evoid",
+            "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument)-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Threading.CancellationToken.get_IsCancellationRequested()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task..ctor(bool, System.Threading.Tasks.TaskCreationOptions, System.Threading.CancellationToken)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Threading.CancellationToken.get_IsCancellationRequested()",
+              "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task.Run(System.Action)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task.Run(System.Action)-\u003ESystem.Threading.Tasks.Task",
+          "MetadataToken": "0x06003D25",
+          "RelativeVirtualAddress": 7622572,
+          "MethodBodySha256": "c4a998cb0f3cb328351010c98397559aa931ee7b53763bdf4419f4752bfb3456",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D25|il:c4a998cb0f3cb328351010c98397559aa931ee7b53763bdf4419f4752bfb3456",
+          "Effects": [
+            "calls_method",
+            "writes_indirect_memory"
+          ],
+          "RootCandidates": [
+            "caller_visible_memory_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Threading.Tasks.Task.InternalStartNew(System.Threading.Tasks.Task, System.Delegate, object, System.Threading.CancellationToken, System.Threading.Tasks.TaskScheduler, System.Threading.Tasks.TaskCreationOptions, System.Threading.Tasks.InternalTaskOptions)-\u003ESystem.Threading.Tasks.Task",
+            "System.Threading.Tasks.TaskScheduler.get_Default()-\u003ESystem.Threading.Tasks.TaskScheduler"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.InternalStartNew(System.Threading.Tasks.Task, System.Delegate, object, System.Threading.CancellationToken, System.Threading.Tasks.TaskScheduler, System.Threading.Tasks.TaskCreationOptions, System.Threading.Tasks.InternalTaskOptions)-\u003ESystem.Threading.Tasks.Task",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.TaskScheduler.get_Default()-\u003ESystem.Threading.Tasks.TaskScheduler",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "caller_visible_memory_write"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task.Delay(System.TimeSpan)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(System.TimeSpan)-\u003ESystem.Threading.Tasks.Task",
+          "MetadataToken": "0x06003D2D",
+          "RelativeVirtualAddress": 7622880,
+          "MethodBodySha256": "ce4a518e24819e8122451f9bfe73436996b641b98c740b276ba32af1dced8e6a",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D2D|il:ce4a518e24819e8122451f9bfe73436996b641b98c740b276ba32af1dced8e6a",
+          "Effects": [
+            "calls_method",
+            "writes_indirect_memory"
+          ],
+          "RootCandidates": [
+            "caller_visible_memory_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+            "System.TimeProvider.get_System()-\u003ESystem.TimeProvider"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.TimeProvider.get_System()-\u003ESystem.TimeProvider",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "caller_visible_memory_write",
+              "global_state_read",
+              "global_state_write",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)",
+              "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)",
+              "System.Threading.CancellationToken.get_IsCancellationRequested()",
+              "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider)-\u003ESystem.Threading.Tasks.Task",
+          "MetadataToken": "0x06003D2E",
+          "RelativeVirtualAddress": 7622916,
+          "MethodBodySha256": "6e272547a8e0e57915ddca4c20cab1cc47932120e2181365c4aa83a79651ccc7",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D2E|il:6e272547a8e0e57915ddca4c20cab1cc47932120e2181365c4aa83a79651ccc7",
+          "Effects": [
+            "calls_method",
+            "writes_indirect_memory"
+          ],
+          "RootCandidates": [
+            "caller_visible_memory_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "caller_visible_memory_write",
+              "global_state_read",
+              "global_state_write",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)",
+              "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)",
+              "System.Threading.CancellationToken.get_IsCancellationRequested()",
+              "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+          "MetadataToken": "0x06003D2F",
+          "RelativeVirtualAddress": 7622948,
+          "MethodBodySha256": "ab63995ccb0892881debb45acd472c5d6c21e552037ad8a97359e0af8d79828a",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D2F|il:ab63995ccb0892881debb45acd472c5d6c21e552037ad8a97359e0af8d79828a",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+            "System.TimeProvider.get_System()-\u003ESystem.TimeProvider"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.TimeProvider.get_System()-\u003ESystem.TimeProvider",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "global_state_write",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)",
+              "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)",
+              "System.Threading.CancellationToken.get_IsCancellationRequested()",
+              "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+          "MetadataToken": "0x06003D30",
+          "RelativeVirtualAddress": 7622964,
+          "MethodBodySha256": "d6fb9e1721471de3dc798074e813f5d2fba8001ce54f39ffcb1f90b6cfd6273c",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D30|il:d6fb9e1721471de3dc798074e813f5d2fba8001ce54f39ffcb1f90b6cfd6273c",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+            "System.Threading.Tasks.Task.ValidateTimeout(System.TimeSpan, System.ExceptionArgument)-\u003Euint"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.ValidateTimeout(System.TimeSpan, System.ExceptionArgument)-\u003Euint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "global_state_write",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)",
+              "System.Threading.CancellationToken.get_IsCancellationRequested()",
+              "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task.Delay(int)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(int)-\u003ESystem.Threading.Tasks.Task",
+          "MetadataToken": "0x06003D31",
+          "RelativeVirtualAddress": 7622992,
+          "MethodBodySha256": "7d093884e2187784327551f0528dc5d3400289e827ba8313b11bab7cd89def20",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D31|il:7d093884e2187784327551f0528dc5d3400289e827ba8313b11bab7cd89def20",
+          "Effects": [
+            "calls_method",
+            "writes_indirect_memory"
+          ],
+          "RootCandidates": [
+            "caller_visible_memory_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Threading.Tasks.Task.Delay(int, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(int, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "caller_visible_memory_write",
+              "global_state_read",
+              "global_state_write",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Threading.Tasks.Task.Delay(int, System.Threading.CancellationToken)",
+              "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)",
+              "System.Threading.CancellationToken.get_IsCancellationRequested()",
+              "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task.Delay(int, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(int, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+          "MetadataToken": "0x06003D32",
+          "RelativeVirtualAddress": 7623020,
+          "MethodBodySha256": "e59e44fa60b4135a9e2cf61fb407f60178ed6b4e1dff7b44e2fe642f3eaea16c",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D32|il:e59e44fa60b4135a9e2cf61fb407f60178ed6b4e1dff7b44e2fe642f3eaea16c",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+            "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)-\u003Evoid",
+            "System.TimeProvider.get_System()-\u003ESystem.TimeProvider"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.TimeProvider.get_System()-\u003ESystem.TimeProvider",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "global_state_write",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)",
+              "System.Threading.CancellationToken.get_IsCancellationRequested()",
+              "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+          "MetadataToken": "0x06003D33",
+          "RelativeVirtualAddress": 7623048,
+          "MethodBodySha256": "a5c57171fb45ca8a6dfe619a9fdc6c5b54b8adaee16dc19d6ab74077bf504b41",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D33|il:a5c57171fb45ca8a6dfe619a9fdc6c5b54b8adaee16dc19d6ab74077bf504b41",
+          "Effects": [
+            "allocates_object",
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Threading.CancellationToken.get_CanBeCanceled()-\u003Ebool",
+            "System.Threading.CancellationToken.get_IsCancellationRequested()-\u003Ebool",
+            "System.Threading.Tasks.Task\u002BDelayPromise..ctor(uint, System.TimeProvider)-\u003Evoid",
+            "System.Threading.Tasks.Task\u002BDelayPromiseWithCancellation..ctor(uint, System.TimeProvider, System.Threading.CancellationToken)-\u003Evoid",
+            "System.Threading.Tasks.Task.FromCanceled(System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+            "System.Threading.Tasks.Task.get_CompletedTask()-\u003ESystem.Threading.Tasks.Task"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Threading.CancellationToken.get_CanBeCanceled()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.CancellationToken.get_IsCancellationRequested()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task\u002BDelayPromise..ctor(uint, System.TimeProvider)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task\u002BDelayPromiseWithCancellation..ctor(uint, System.TimeProvider, System.Threading.CancellationToken)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.FromCanceled(System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.get_CompletedTask()-\u003ESystem.Threading.Tasks.Task",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "global_state_write",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Threading.CancellationToken.get_IsCancellationRequested()",
+              "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task.ValidateTimeout(System.TimeSpan, System.ExceptionArgument)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task.ValidateTimeout(System.TimeSpan, System.ExceptionArgument)-\u003Euint",
+          "MetadataToken": "0x06003D34",
+          "RelativeVirtualAddress": 7623100,
+          "MethodBodySha256": "e3b4029c8c502777ec5a79a5da00f1108b3baa44397bc0f85e872af43ef37d0b",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D34|il:e3b4029c8c502777ec5a79a5da00f1108b3baa44397bc0f85e872af43ef37d0b",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)-\u003Evoid",
+            "System.TimeSpan.get_TotalMilliseconds()-\u003Edouble"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.TimeSpan.get_TotalMilliseconds()-\u003Edouble",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task\u002BDelayPromise..ctor(uint, System.TimeProvider)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task\u002BDelayPromise..ctor(uint, System.TimeProvider)-\u003Evoid",
+          "MetadataToken": "0x06003D5C",
+          "RelativeVirtualAddress": 7625520,
+          "MethodBodySha256": "d210b2a81d137a8992d5deb7b7d850caf32b6fa7d7c5213959b1210c92b1d00e",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D5C|il:d210b2a81d137a8992d5deb7b7d850caf32b6fa7d7c5213959b1210c92b1d00e",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "reads_instance_field",
+            "reads_static_field",
+            "virtual_call",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "global_state_read",
+            "object_state_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Diagnostics.Tracing.EventSource.IsEnabled()-\u003Ebool",
+            "System.IDisposable.Dispose()-\u003Evoid",
+            "System.Threading.ExecutionContext.SuppressFlow()-\u003ESystem.Threading.AsyncFlowControl",
+            "System.Threading.Tasks.Task..ctor()-\u003Evoid",
+            "System.Threading.Tasks.Task.AddToActiveTasks(System.Threading.Tasks.Task)-\u003Ebool",
+            "System.Threading.Tasks.Task.get_Id()-\u003Eint",
+            "System.Threading.Tasks.Task.get_IsCompleted()-\u003Ebool",
+            "System.Threading.Tasks.TplEventSource.TraceOperationBegin(int, string, long)-\u003Evoid",
+            "System.Threading.TimerQueueTimer..ctor(System.Threading.TimerCallback, object, uint, uint, bool)-\u003Evoid",
+            "System.TimeProvider.CreateTimer(System.Threading.TimerCallback, object, System.TimeSpan, System.TimeSpan)-\u003ESystem.Threading.ITimer",
+            "System.TimeProvider.get_System()-\u003ESystem.TimeProvider",
+            "System.TimeSpan.FromMilliseconds(double)-\u003ESystem.TimeSpan"
+          ],
+          "Fields": [
+            "System.Threading.Tasks.Task\u002BDelayPromise._timer",
+            "System.Threading.Tasks.Task\u002BDelayPromise.s_timerCallback",
+            "System.Threading.Tasks.Task.s_asyncDebuggingEnabled",
+            "System.Threading.Tasks.TplEventSource.Log",
+            "System.Threading.Timeout.InfiniteTimeSpan"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Diagnostics.Tracing.EventSource.IsEnabled()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.IDisposable.Dispose()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.IDisposable.Dispose()-\u003Evoid",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.ExecutionContext.SuppressFlow()-\u003ESystem.Threading.AsyncFlowControl",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.AddToActiveTasks(System.Threading.Tasks.Task)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.get_Id()-\u003Eint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.get_IsCompleted()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.TplEventSource.TraceOperationBegin(int, string, long)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.TimerQueueTimer..ctor(System.Threading.TimerCallback, object, uint, uint, bool)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.TimeProvider.CreateTimer(System.Threading.TimerCallback, object, System.TimeSpan, System.TimeSpan)-\u003ESystem.Threading.ITimer",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.TimeProvider.get_System()-\u003ESystem.TimeProvider",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.TimeSpan.FromMilliseconds(double)-\u003ESystem.TimeSpan",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "impure_callee",
+              "object_state_write"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Threading.Tasks.Task.get_IsCompleted()"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.Task\u002BDelayPromiseWithCancellation..ctor(uint, System.TimeProvider, System.Threading.CancellationToken)",
+          "ExactSymbolKey": "System.Threading.Tasks.Task\u002BDelayPromiseWithCancellation..ctor(uint, System.TimeProvider, System.Threading.CancellationToken)-\u003Evoid",
+          "MetadataToken": "0x06003D61",
+          "RelativeVirtualAddress": 7625828,
+          "MethodBodySha256": "e9a5d8a14eafb4915c3283218d9fd3f4f64bd3a6e1e126831cf52b544c9739d2",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D61|il:e9a5d8a14eafb4915c3283218d9fd3f4f64bd3a6e1e126831cf52b544c9739d2",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "loads_method_pointer",
+            "reads_instance_field",
+            "reads_static_field",
+            "writes_instance_field",
+            "writes_static_field"
+          ],
+          "RootCandidates": [
+            "global_state_read",
+            "global_state_write",
+            "object_state_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Action\u00602\u003Cobject, System.Threading.CancellationToken\u003E..ctor(object, nint)-\u003Evoid",
+            "System.Threading.CancellationToken.UnsafeRegister(System.Action\u00602\u003Cobject, System.Threading.CancellationToken\u003E, object)-\u003ESystem.Threading.CancellationTokenRegistration",
+            "System.Threading.CancellationTokenRegistration.Dispose()-\u003Evoid",
+            "System.Threading.Tasks.Task\u002BDelayPromise..ctor(uint, System.TimeProvider)-\u003Evoid",
+            "System.Threading.Tasks.Task\u002BDelayPromiseWithCancellation\u002B\u003C\u003Ec.\u003C.ctor\u003Eb__1_0(object, System.Threading.CancellationToken)-\u003Evoid",
+            "System.Threading.Tasks.Task.get_IsCompleted()-\u003Ebool"
+          ],
+          "Fields": [
+            "System.Threading.Tasks.Task\u002BDelayPromiseWithCancellation\u002B\u003C\u003Ec.\u003C\u003E9",
+            "System.Threading.Tasks.Task\u002BDelayPromiseWithCancellation\u002B\u003C\u003Ec.\u003C\u003E9__1_0",
+            "System.Threading.Tasks.Task\u002BDelayPromiseWithCancellation._registration"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Action\u00602\u003Cobject, System.Threading.CancellationToken\u003E..ctor(object, nint)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.CancellationToken.UnsafeRegister(System.Action\u00602\u003Cobject, System.Threading.CancellationToken\u003E, object)-\u003ESystem.Threading.CancellationTokenRegistration",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.CancellationTokenRegistration.Dispose()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task\u002BDelayPromise..ctor(uint, System.TimeProvider)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Threading.Tasks.Task.get_IsCompleted()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "global_state_write",
+              "impure_callee",
+              "object_state_write"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Threading.Tasks.Task\u002BDelayPromise..ctor(uint, System.TimeProvider)",
+              "System.Threading.Tasks.Task.get_IsCompleted()"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Threading.Tasks.TaskScheduler.get_Default()",
+          "ExactSymbolKey": "System.Threading.Tasks.TaskScheduler.get_Default()-\u003ESystem.Threading.Tasks.TaskScheduler",
+          "MetadataToken": "0x06003E72",
+          "RelativeVirtualAddress": 7638236,
+          "MethodBodySha256": "81dff7d7736e90efde1a42008345f606c12ff886106c7af42948e2bb01a38a9c",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003E72|il:81dff7d7736e90efde1a42008345f606c12ff886106c7af42948e2bb01a38a9c",
+          "Effects": [
+            "reads_static_field"
+          ],
+          "RootCandidates": [
+            "safe_static_cache_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Threading.Tasks.TaskScheduler.s_defaultTaskScheduler"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "internal_only"
           }
         },
         {
@@ -255,7 +1560,10 @@
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.Threading.Tasks.ValueTask.GetTaskForValueTaskSource(System.Threading.Tasks.Sources.IValueTaskSource)"
+              "System.Threading.Tasks.ValueTask.GetTaskForValueTaskSource(System.Threading.Tasks.Sources.IValueTaskSource)",
+              "System.Threading.Tasks.Task.FromCanceled(System.Threading.CancellationToken)",
+              "System.Threading.CancellationToken.get_IsCancellationRequested()",
+              "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -362,9 +1670,14 @@
             "Classification": "impure",
             "Categories": [
               "global_state_read",
-              "global_state_write"
+              "global_state_write",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Threading.Tasks.Task.FromCanceled(System.Threading.CancellationToken)",
+              "System.Threading.CancellationToken.get_IsCancellationRequested()",
+              "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
@@ -477,9 +1790,9 @@
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 8,
-    "PureCount": 3,
-    "ImpureCount": 4,
+    "MethodCount": 33,
+    "PureCount": 11,
+    "ImpureCount": 21,
     "ConservativeUnknownCount": 1,
     "CatalogComparison": {
       "KnownPureMembers": [],
@@ -490,6 +1803,26 @@
   "GeneratedPurityCatalog": {
     "SchemaVersion": 2,
     "Entries": [
+      {
+        "Symbol": "System.ArgumentNullException.ThrowIfNull(object, string)",
+        "ExactSymbolKey": "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000B7F|il:1e0ff4485c0ebfcab45ab6b433d535581e24e5b381f44026eaaa475025612b06",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06000B7F",
+        "MethodBodySha256": "1e0ff4485c0ebfcab45ab6b433d535581e24e5b381f44026eaaa475025612b06",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
       {
         "Symbol": "System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences()",
         "ExactSymbolKey": "System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences()-\u003Ebool",
@@ -533,6 +1866,355 @@
         "EffectVisibilityClassification": "none"
       },
       {
+        "Symbol": "System.Threading.CancellationToken.get_CanBeCanceled()",
+        "ExactSymbolKey": "System.Threading.CancellationToken.get_CanBeCanceled()-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600378E|il:a3dd3457018771cdc0dc45a784f3cfb6f83762d21e857be9800beb9e87b0bd2e",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x0600378E",
+        "MethodBodySha256": "a3dd3457018771cdc0dc45a784f3cfb6f83762d21e857be9800beb9e87b0bd2e",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Threading.CancellationToken.get_IsCancellationRequested()",
+        "ExactSymbolKey": "System.Threading.CancellationToken.get_IsCancellationRequested()-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600378D|il:8018a7e0d5dd405f3dd5164e79c6cbce3c10f41d306e2b290d7085c05209e519",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x0600378D",
+        "MethodBodySha256": "8018a7e0d5dd405f3dd5164e79c6cbce3c10f41d306e2b290d7085c05209e519",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
+        "Categories": [
+          "global_state_read",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.CancellationTokenSource.get_IsCancellationRequested()",
+        "ExactSymbolKey": "System.Threading.CancellationTokenSource.get_IsCancellationRequested()-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060037B1|il:a5cb71f691867eb8cabc26493332644eb0011573499338ee2bb22858c638cbba",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x060037B1",
+        "MethodBodySha256": "a5cb71f691867eb8cabc26493332644eb0011573499338ee2bb22858c638cbba",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
+        "Categories": [
+          "global_state_read"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task\u002BDelayPromise..ctor(uint, System.TimeProvider)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task\u002BDelayPromise..ctor(uint, System.TimeProvider)-\u003Evoid",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D5C|il:d210b2a81d137a8992d5deb7b7d850caf32b6fa7d7c5213959b1210c92b1d00e",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003D5C",
+        "MethodBodySha256": "d210b2a81d137a8992d5deb7b7d850caf32b6fa7d7c5213959b1210c92b1d00e",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
+        "Categories": [
+          "global_state_read",
+          "impure_callee",
+          "object_state_write"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Threading.Tasks.Task.get_IsCompleted()"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task\u002BDelayPromiseWithCancellation..ctor(uint, System.TimeProvider, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task\u002BDelayPromiseWithCancellation..ctor(uint, System.TimeProvider, System.Threading.CancellationToken)-\u003Evoid",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D61|il:e9a5d8a14eafb4915c3283218d9fd3f4f64bd3a6e1e126831cf52b544c9739d2",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003D61",
+        "MethodBodySha256": "e9a5d8a14eafb4915c3283218d9fd3f4f64bd3a6e1e126831cf52b544c9739d2",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_write",
+        "Categories": [
+          "global_state_read",
+          "global_state_write",
+          "impure_callee",
+          "object_state_write"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Threading.Tasks.Task\u002BDelayPromise..ctor(uint, System.TimeProvider)",
+          "System.Threading.Tasks.Task.get_IsCompleted()"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task.Delay(System.TimeSpan)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(System.TimeSpan)-\u003ESystem.Threading.Tasks.Task",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D2D|il:ce4a518e24819e8122451f9bfe73436996b641b98c740b276ba32af1dced8e6a",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003D2D",
+        "MethodBodySha256": "ce4a518e24819e8122451f9bfe73436996b641b98c740b276ba32af1dced8e6a",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_write",
+        "Categories": [
+          "caller_visible_memory_write",
+          "global_state_read",
+          "global_state_write",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)",
+          "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)",
+          "System.Threading.CancellationToken.get_IsCancellationRequested()",
+          "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D2F|il:ab63995ccb0892881debb45acd472c5d6c21e552037ad8a97359e0af8d79828a",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003D2F",
+        "MethodBodySha256": "ab63995ccb0892881debb45acd472c5d6c21e552037ad8a97359e0af8d79828a",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_write",
+        "Categories": [
+          "global_state_read",
+          "global_state_write",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)",
+          "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)",
+          "System.Threading.CancellationToken.get_IsCancellationRequested()",
+          "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider)-\u003ESystem.Threading.Tasks.Task",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D2E|il:6e272547a8e0e57915ddca4c20cab1cc47932120e2181365c4aa83a79651ccc7",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003D2E",
+        "MethodBodySha256": "6e272547a8e0e57915ddca4c20cab1cc47932120e2181365c4aa83a79651ccc7",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_write",
+        "Categories": [
+          "caller_visible_memory_write",
+          "global_state_read",
+          "global_state_write",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)",
+          "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)",
+          "System.Threading.CancellationToken.get_IsCancellationRequested()",
+          "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(System.TimeSpan, System.TimeProvider, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D30|il:d6fb9e1721471de3dc798074e813f5d2fba8001ce54f39ffcb1f90b6cfd6273c",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003D30",
+        "MethodBodySha256": "d6fb9e1721471de3dc798074e813f5d2fba8001ce54f39ffcb1f90b6cfd6273c",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_write",
+        "Categories": [
+          "global_state_read",
+          "global_state_write",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)",
+          "System.Threading.CancellationToken.get_IsCancellationRequested()",
+          "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task.Delay(int)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(int)-\u003ESystem.Threading.Tasks.Task",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D31|il:7d093884e2187784327551f0528dc5d3400289e827ba8313b11bab7cd89def20",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003D31",
+        "MethodBodySha256": "7d093884e2187784327551f0528dc5d3400289e827ba8313b11bab7cd89def20",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_write",
+        "Categories": [
+          "caller_visible_memory_write",
+          "global_state_read",
+          "global_state_write",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Threading.Tasks.Task.Delay(int, System.Threading.CancellationToken)",
+          "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)",
+          "System.Threading.CancellationToken.get_IsCancellationRequested()",
+          "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task.Delay(int, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(int, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D32|il:e59e44fa60b4135a9e2cf61fb407f60178ed6b4e1dff7b44e2fe642f3eaea16c",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003D32",
+        "MethodBodySha256": "e59e44fa60b4135a9e2cf61fb407f60178ed6b4e1dff7b44e2fe642f3eaea16c",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_write",
+        "Categories": [
+          "global_state_read",
+          "global_state_write",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)",
+          "System.Threading.CancellationToken.get_IsCancellationRequested()",
+          "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task.Delay(uint, System.TimeProvider, System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D33|il:a5c57171fb45ca8a6dfe619a9fdc6c5b54b8adaee16dc19d6ab74077bf504b41",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003D33",
+        "MethodBodySha256": "a5c57171fb45ca8a6dfe619a9fdc6c5b54b8adaee16dc19d6ab74077bf504b41",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_write",
+        "Categories": [
+          "global_state_read",
+          "global_state_write",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Threading.CancellationToken.get_IsCancellationRequested()",
+          "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task.FromCanceled(System.Threading.CancellationToken)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task.FromCanceled(System.Threading.CancellationToken)-\u003ESystem.Threading.Tasks.Task",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D21|il:5c586da5debeb0058127b57a8423534fb88dd41979bcad0942a0ebf42868b34f",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003D21",
+        "MethodBodySha256": "5c586da5debeb0058127b57a8423534fb88dd41979bcad0942a0ebf42868b34f",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
+        "Categories": [
+          "global_state_read",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Threading.CancellationToken.get_IsCancellationRequested()",
+          "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
         "Symbol": "System.Threading.Tasks.Task.FromResult(!!0)",
         "ExactSymbolKey": "System.Threading.Tasks.Task.FromResult(!!0)-\u003ESystem.Threading.Tasks.Task\u00601\u003C!!0\u003E",
         "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D1E|il:c7b094636ce59524bd4b3628e5fb95102ec4791888cf6380c4486860b661d2e7",
@@ -546,16 +2228,99 @@
         "PrimaryCategory": "caller_visible_memory_write",
         "Categories": [
           "caller_visible_memory_write",
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.Type.op_Equality(System.Type, System.Type)"
+          "System.Threading.Tasks.Task\u00601..ctor(!0)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task.InternalStartNew(System.Threading.Tasks.Task, System.Delegate, object, System.Threading.CancellationToken, System.Threading.Tasks.TaskScheduler, System.Threading.Tasks.TaskCreationOptions, System.Threading.Tasks.InternalTaskOptions)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task.InternalStartNew(System.Threading.Tasks.Task, System.Delegate, object, System.Threading.CancellationToken, System.Threading.Tasks.TaskScheduler, System.Threading.Tasks.TaskCreationOptions, System.Threading.Tasks.InternalTaskOptions)-\u003ESystem.Threading.Tasks.Task",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003C92|il:d66eeada65494a15cf3445347c97de354883f308a2e730e75805c16c715d7027",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003C92",
+        "MethodBodySha256": "d66eeada65494a15cf3445347c97de354883f308a2e730e75805c16c715d7027",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task.IsCompletedMethod(int)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task.IsCompletedMethod(int)-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003CA1|il:32acda1a9ac354dbd703322a156c6cbf46df77ad9df520655bb63a6dcf64ac3e",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003CA1",
+        "MethodBodySha256": "32acda1a9ac354dbd703322a156c6cbf46df77ad9df520655bb63a6dcf64ac3e",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task.Run(System.Action)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task.Run(System.Action)-\u003ESystem.Threading.Tasks.Task",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D25|il:c4a998cb0f3cb328351010c98397559aa931ee7b53763bdf4419f4752bfb3456",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003D25",
+        "MethodBodySha256": "c4a998cb0f3cb328351010c98397559aa931ee7b53763bdf4419f4752bfb3456",
+        "Classification": "impure",
+        "PrimaryCategory": "caller_visible_memory_write",
+        "Categories": [
+          "caller_visible_memory_write"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task.ValidateTimeout(System.TimeSpan, System.ExceptionArgument)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task.ValidateTimeout(System.TimeSpan, System.ExceptionArgument)-\u003Euint",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003D34|il:e3b4029c8c502777ec5a79a5da00f1108b3baa44397bc0f85e872af43ef37d0b",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003D34",
+        "MethodBodySha256": "e3b4029c8c502777ec5a79a5da00f1108b3baa44397bc0f85e872af43ef37d0b",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
       },
       {
         "Symbol": "System.Threading.Tasks.Task.get_CompletedTask()",
@@ -578,6 +2343,93 @@
         "EffectVisibilityClassification": "internal_only"
       },
       {
+        "Symbol": "System.Threading.Tasks.Task.get_IsCompleted()",
+        "ExactSymbolKey": "System.Threading.Tasks.Task.get_IsCompleted()-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003CA0|il:bd64f2610756a72754a7e4284586193480dbb74e8391906b2a4154ebd21e80b5",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003CA0",
+        "MethodBodySha256": "bd64f2610756a72754a7e4284586193480dbb74e8391906b2a4154ebd21e80b5",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
+        "Categories": [
+          "global_state_read"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task.get_IsCompletedSuccessfully()",
+        "ExactSymbolKey": "System.Threading.Tasks.Task.get_IsCompletedSuccessfully()-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003CA2|il:1ed7fe24359016f45c7fbc5d960c59e1dc9d8377feee9aa472bf340c838bc51f",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003CA2",
+        "MethodBodySha256": "1ed7fe24359016f45c7fbc5d960c59e1dc9d8377feee9aa472bf340c838bc51f",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
+        "Categories": [
+          "global_state_read"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.TaskScheduler.get_Default()",
+        "ExactSymbolKey": "System.Threading.Tasks.TaskScheduler.get_Default()-\u003ESystem.Threading.Tasks.TaskScheduler",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003E72|il:81dff7d7736e90efde1a42008345f606c12ff886106c7af42948e2bb01a38a9c",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003E72",
+        "MethodBodySha256": "81dff7d7736e90efde1a42008345f606c12ff886106c7af42948e2bb01a38a9c",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Threading.Tasks.Task\u00601..ctor(!0)",
+        "ExactSymbolKey": "System.Threading.Tasks.Task\u00601..ctor(!0)-\u003Evoid",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003BD0|il:c8b38b4a5e62aa72358e0ab05ee91e3e1c0e7fc4e996f767f5c7ff138af1da96",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06003BD0",
+        "MethodBodySha256": "c8b38b4a5e62aa72358e0ab05ee91e3e1c0e7fc4e996f767f5c7ff138af1da96",
+        "Classification": "impure",
+        "PrimaryCategory": "caller_visible_memory_write",
+        "Categories": [
+          "caller_visible_memory_write",
+          "object_state_write"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
         "Symbol": "System.Threading.Tasks.ValueTask.AsTask()",
         "ExactSymbolKey": "System.Threading.Tasks.ValueTask.AsTask()-\u003ESystem.Threading.Tasks.Task",
         "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06003ED2|il:ac1ca5c0734091bce8a1d9e92334888433431ecf3bccd348b7670c08b9821920",
@@ -595,7 +2447,10 @@
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.Threading.Tasks.ValueTask.GetTaskForValueTaskSource(System.Threading.Tasks.Sources.IValueTaskSource)"
+          "System.Threading.Tasks.ValueTask.GetTaskForValueTaskSource(System.Threading.Tasks.Sources.IValueTaskSource)",
+          "System.Threading.Tasks.Task.FromCanceled(System.Threading.CancellationToken)",
+          "System.Threading.CancellationToken.get_IsCancellationRequested()",
+          "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -617,14 +2472,81 @@
         "PrimaryCategory": "global_state_write",
         "Categories": [
           "global_state_read",
-          "global_state_write"
+          "global_state_write",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Threading.Tasks.Task.FromCanceled(System.Threading.CancellationToken)",
+          "System.Threading.CancellationToken.get_IsCancellationRequested()",
+          "System.Threading.CancellationTokenSource.get_IsCancellationRequested()"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)",
+        "ExactSymbolKey": "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)-\u003Evoid",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06002247|il:30b55478ce2cf09d1a605f9f4642e8bd4cc36516697388c632f9e98965ca56e8",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06002247",
+        "MethodBodySha256": "30b55478ce2cf09d1a605f9f4642e8bd4cc36516697388c632f9e98965ca56e8",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.TimeProvider.get_System()",
+        "ExactSymbolKey": "System.TimeProvider.get_System()-\u003ESystem.TimeProvider",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060028DB|il:651459a2ebfe0805391148c5985ef6a8e147a0ae3fc78a6bba9d67902390fb61",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x060028DB",
+        "MethodBodySha256": "651459a2ebfe0805391148c5985ef6a8e147a0ae3fc78a6bba9d67902390fb61",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)",
+        "ExactSymbolKey": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600096D|il:b2acfe61d667747d959e76c932b715aa36165cc356b1eddc87687a6e295e5310",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x0600096D",
+        "MethodBodySha256": "b2acfe61d667747d959e76c932b715aa36165cc356b1eddc87687a6e295e5310",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
       },
       {
         "Symbol": "System.Type.op_Equality(System.Type, System.Type)",
