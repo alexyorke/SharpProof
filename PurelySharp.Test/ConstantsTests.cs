@@ -2879,7 +2879,7 @@ public static class TypeMetadataCatalogSignatureSamples
         }
 
         [Test]
-        public void MemberInfoName_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        public void MemberInfoName_IsNotManualCataloged_AndRequiresConcreteImplementationEvidence()
         {
             const string source = @"
 using System.Reflection;
@@ -2909,9 +2909,9 @@ public static class MemberInfoNameCatalogSignatureSamples
 
             Assert.That(signature, Is.EqualTo("System.Reflection.MemberInfo.Name.get"));
             AssertNotInManualCatalogs(signature);
-            Assert.That(matched, Is.True,
-                "Generated purity catalog should resolve System.Reflection.MemberInfo.Name.get from runtime metadata evidence.");
-            Assert.That(classification, Is.EqualTo("pure"));
+            Assert.That(matched, Is.False,
+                "Generated purity catalog should not treat the abstract System.Reflection.MemberInfo.Name.get slot as reviewed runtime evidence without a concrete implementation body.");
+            Assert.That(classification, Is.Empty);
         }
 
         [Test]

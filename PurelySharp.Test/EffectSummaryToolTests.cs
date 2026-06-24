@@ -2010,8 +2010,7 @@ public static class StringComparisonFixture
                 "System.Exception.get_HResult",
                 "System.Exception.get_InnerException",
                 "System.Exception.get_Message",
-                "System.Object.GetType",
-                "System.Type.ToString");
+                "System.Object.GetType");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -2046,11 +2045,12 @@ public static class StringComparisonFixture
             AssertPurityClassification(
                 summary,
                 "System.Exception.get_Message()",
-                "pure");
+                "impure",
+                "impure_callee");
             AssertEffectVisibilityClassification(
                 summary,
                 "System.Exception.get_Message()",
-                "none");
+                "caller_visible");
             AssertPurityClassification(
                 summary,
                 "System.Object.GetType()",
@@ -2058,14 +2058,6 @@ public static class StringComparisonFixture
             AssertEffectVisibilityClassification(
                 summary,
                 "System.Object.GetType()",
-                "none");
-            AssertPurityClassification(
-                summary,
-                "System.Type.ToString()",
-                "pure");
-            AssertEffectVisibilityClassification(
-                summary,
-                "System.Type.ToString()",
                 "none");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
@@ -7286,7 +7278,6 @@ public static class DuplicateReviewedSeedFixture
                 "System.Private.CoreLib.dll",
                 20,
                 "System.Object.GetType",
-                "System.Type.ToString",
                 "System.Type.get_DeclaringMethod",
                 "System.Type.get_DeclaringType",
                 "System.Type.get_IsContextful",
@@ -7305,10 +7296,6 @@ public static class DuplicateReviewedSeedFixture
 
             AssertPurityClassification(summary, "System.Object.GetType()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Object.GetType()", "none");
-            AssertPurityClassification(summary, "System.Reflection.MemberInfo.get_Name()", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Reflection.MemberInfo.get_Name()", "none");
-            AssertPurityClassification(summary, "System.Type.ToString()", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Type.ToString()", "none");
             AssertPurityClassification(summary, "System.Type.get_DeclaringMethod()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Type.get_DeclaringMethod()", "none");
             AssertPurityClassification(summary, "System.Type.get_DeclaringType()", "pure");
@@ -7334,8 +7321,6 @@ public static class DuplicateReviewedSeedFixture
                 .Select(entry => entry.GetProperty("Symbol").GetString())
                 .Where(symbol =>
                     string.Equals(symbol, "System.Object.GetType()", StringComparison.Ordinal) ||
-                    string.Equals(symbol, "System.Reflection.MemberInfo.get_Name()", StringComparison.Ordinal) ||
-                    string.Equals(symbol, "System.Type.ToString()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Type.get_DeclaringMethod()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Type.get_DeclaringType()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Type.get_IsContextful()", StringComparison.Ordinal) ||
@@ -7351,8 +7336,6 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(generatedSymbols, Is.EqualTo(new[]
             {
                 "System.Object.GetType()",
-                "System.Reflection.MemberInfo.get_Name()",
-                "System.Type.ToString()",
                 "System.Type.get_DeclaringMethod()",
                 "System.Type.get_DeclaringType()",
                 "System.Type.get_IsContextful()",
@@ -7363,6 +7346,33 @@ public static class DuplicateReviewedSeedFixture
                 "System.Type.get_MemberType()",
                 "System.Type.get_ReflectedType()",
             }));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeMemberInfoName_RemainsConservativeWithoutConcreteImplementationEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                8,
+                "System.Reflection.MemberInfo.get_Name");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Reflection.MemberInfo.get_Name()", "conservative_unknown");
+            AssertEffectVisibilityClassification(summary, "System.Reflection.MemberInfo.get_Name()", "unknown");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Reflection.MemberInfo.get_Name()"));
         }
 
         [Test]

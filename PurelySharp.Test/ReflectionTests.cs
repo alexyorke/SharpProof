@@ -2102,6 +2102,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task MemberInfoName_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Reflection;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(MemberInfo member)
+    {
+        return member.Name;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task AttributeGetCustomAttributesOnMemberInfo_Diagnostic()
         {
             var test = @"
