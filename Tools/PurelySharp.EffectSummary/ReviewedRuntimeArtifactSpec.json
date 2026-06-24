@@ -547,6 +547,18 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/HashSet.Mutators.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "IncludeCallees": false,
+      "Limit": 80,
+      "SymbolPrefixes": [
+        "System.Collections.Generic.HashSet`1.Add",
+        "System.Collections.Generic.HashSet`1.Clear",
+        "System.Collections.Generic.HashSet`1.Remove",
+        "System.Collections.Generic.HashSet`1.UnionWith"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Queue.Mutators.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Private.CoreLib.dll",
       "Limit": 40,

@@ -491,6 +491,23 @@ public static class FileSystemPathGetterCatalogSignatureSamples
         }
 
         [Test]
+        public void HashSetMutators_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Collections.Generic.HashSet<T>.Add(T)",
+                "System.Collections.Generic.HashSet<T>.Clear()",
+                "System.Collections.Generic.HashSet<T>.Remove(T)",
+                "System.Collections.Generic.HashSet<T>.UnionWith(System.Collections.Generic.IEnumerable<T>)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void DelegateCombine_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.Delegate.Combine(System.Delegate, System.Delegate)");

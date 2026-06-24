@@ -523,6 +523,98 @@ public class TestClass
         }
 
         [Test]
+        public async Task MethodWithHashSetAdd_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(HashSet<int> values)
+    {
+        values.Add(1);
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                 .WithSpan(9, 17, 9, 27)
+                                 .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
+        public async Task MethodWithHashSetClear_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(HashSet<int> values)
+    {
+        values.Clear();
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                 .WithSpan(9, 17, 9, 27)
+                                 .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
+        public async Task MethodWithHashSetRemove_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(HashSet<int> values)
+    {
+        values.Remove(1);
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                 .WithSpan(9, 17, 9, 27)
+                                 .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
+        public async Task MethodWithHashSetUnionWith_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(HashSet<int> values, IEnumerable<int> other)
+    {
+        values.UnionWith(other);
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                 .WithSpan(9, 17, 9, 27)
+                                 .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
         public async Task PureMethodWithQueuePeek_NoDiagnostic()
         {
             var test = @"
