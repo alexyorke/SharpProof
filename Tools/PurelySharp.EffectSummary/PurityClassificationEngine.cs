@@ -1565,6 +1565,11 @@ internal static class PurityClassificationEngine
             return false;
         }
 
+        if (HasByRefParameter(summary.ExactSymbolKey))
+        {
+            return false;
+        }
+
         if (summary.Effects.Contains("allocates_array", StringComparer.Ordinal) &&
             summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal))
         {
@@ -2558,6 +2563,24 @@ internal static class PurityClassificationEngine
         return !string.IsNullOrWhiteSpace(returnType) &&
             !string.Equals(returnType, "void", StringComparison.Ordinal) &&
             !returnType.StartsWith("ref ", StringComparison.Ordinal);
+    }
+
+    private static bool HasByRefParameter(string exactSymbolKey)
+    {
+        if (string.IsNullOrWhiteSpace(exactSymbolKey))
+        {
+            return false;
+        }
+
+        var openParenIndex = exactSymbolKey.IndexOf('(');
+        var returnSeparatorIndex = exactSymbolKey.LastIndexOf(")->", StringComparison.Ordinal);
+        if (openParenIndex < 0 || returnSeparatorIndex <= openParenIndex)
+        {
+            return false;
+        }
+
+        var parameters = exactSymbolKey.Substring(openParenIndex + 1, returnSeparatorIndex - openParenIndex - 1);
+        return parameters.Contains("ref ", StringComparison.Ordinal);
     }
 
     private static bool IsPureArgumentGuardWrapper(string symbol)

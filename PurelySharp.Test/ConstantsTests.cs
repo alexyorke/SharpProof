@@ -563,6 +563,7 @@ public static class FileSystemPathGetterCatalogSignatureSamples
                 "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)",
                 "System.Array.Fill<T>(T[], T)",
                 "System.Array.Fill<T>(T[], T, int, int)",
+                "System.Array.Resize<T>(ref T[], int)",
                 "System.Span<T>.Clear()",
                 "System.Span<T>.Fill(T)",
             };

@@ -85,6 +85,25 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task ArrayResize_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(ref int[] values)
+    {
+        Array.Resize(ref values, values.Length + 1);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ArrayCopyRange_Diagnostic()
         {
             var test = @"

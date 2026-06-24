@@ -574,7 +574,6 @@ public static class Constants
         "System.Span<T>.CopyTo(System.Span<T>)",
         "System.Span<T>.TryCopyTo(System.Span<T>)",
         "System.MemoryExtensions.Reverse<T>(System.Span<T>)",
-        "System.Array.Resize<T>(ref T[], int)",
         "System.Array.Reverse<T>(T[])",
         "System.Array.Reverse<T>(T[], int, int)",
         "System.Array.Sort<T>(T[], System.Collections.Generic.IComparer<T>?)",

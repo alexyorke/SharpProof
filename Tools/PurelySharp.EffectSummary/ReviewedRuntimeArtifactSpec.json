@@ -45,6 +45,7 @@
         "System.Array.CopyTo(System.Array, int)",
         "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)",
         "System.Array.Fill(",
+        "System.Array.Resize(",
         "System.Span`1.Clear()",
         "System.Span`1.Fill(!0)"
       ]
