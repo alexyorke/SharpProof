@@ -1243,6 +1243,17 @@
       "SourceSummaryPath": "PurelySharp.Analyzer/String.Length.PurelySharp.EffectSummary.json"
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/String.Format.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/String.Format.PurelySharp.EffectSummary.json",
+      "Limit": 80,
+      "SymbolPrefixes": [
+        "System.String.Format(string, object)",
+        "System.String.Format(string, object, object)",
+        "System.String.Format(string, object, object, object)",
+        "System.String.Format(string, object[])"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/String.Replace.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/String.Replace.PurelySharp.EffectSummary.json"
     },

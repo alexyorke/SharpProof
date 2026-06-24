@@ -97,6 +97,30 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_StringFormat_UsesGeneratedPuritySummarySource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(int value)
+    {
+        return string.Format(""{0:D}"", value);
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("impure_callee"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("Format"));
+        }
+
+        [Test]
         public async Task Ps0002_ConfiguredKnownImpureMethod_IncludesConfigCatalogSource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

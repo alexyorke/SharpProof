@@ -3357,6 +3357,59 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeStringFormatSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                80,
+                "System.String.Format(string, object)",
+                "System.String.Format(string, object, object)",
+                "System.String.Format(string, object, object, object)",
+                "System.String.Format(string, object[])");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            foreach (var symbol in new[]
+            {
+                "System.String.Format(string, object)",
+                "System.String.Format(string, object, object)",
+                "System.String.Format(string, object, object, object)",
+                "System.String.Format(string, object[])",
+            })
+            {
+                AssertPurityClassification(summary, symbol, "impure", "impure_callee");
+                AssertEffectVisibilityClassification(summary, symbol, "caller_visible");
+                AssertPrimaryCategory(summary, symbol, "impure_callee");
+            }
+
+            var generatedSymbols = summary.RootElement
+                .GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.String.Format(string, object)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.String.Format(string, object, object)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.String.Format(string, object, object, object)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.String.Format(string, object[])", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(
+                generatedSymbols,
+                Is.EquivalentTo(new[]
+                {
+                    "System.String.Format(string, object)",
+                    "System.String.Format(string, object, object)",
+                    "System.String.Format(string, object, object, object)",
+                    "System.String.Format(string, object[])",
+                }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStringLengthSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.String.get_Length", limit: 10);

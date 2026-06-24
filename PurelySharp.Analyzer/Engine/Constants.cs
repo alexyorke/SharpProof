@@ -365,22 +365,6 @@ public static class Constants
         "System.IO.BufferedStream.Flush()",
 
 
-        "string.Format(string, object?)",
-        "string.Format(string, object?, object?)",
-        "string.Format(string, object?, object?, object?)",
-        "string.Format(string, params object?[])",
-
-
-
-
-
-
-
-
-
-
-
-
         "Microsoft.Extensions.Configuration.IConfiguration.GetConnectionString(string)",
         "Microsoft.Extensions.Configuration.IConfigurationRoot.Reload()",
         "System.Buffers.ArrayPool<T>.Shared.Rent(int)",

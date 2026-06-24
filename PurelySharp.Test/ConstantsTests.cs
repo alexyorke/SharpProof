@@ -1887,6 +1887,47 @@ public static class ExceptionAccessorCatalogSignatureSamples
         }
 
         [Test]
+        public void StringFormattingHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+
+public static class StringFormattingCatalogSignatureSamples
+{
+    public static string One(int value)
+    {
+        return string.Format(""{0:D}"", value);
+    }
+
+    public static string Two(int left, int right)
+    {
+        return string.Format(""{0} {1}"", left, right);
+    }
+
+    public static string Three(int first, int second, int third)
+    {
+        return string.Format(""{0} {1} {2}"", first, second, third);
+    }
+
+    public static string Params(int a, int b, int c, int d)
+    {
+        return string.Format(""{0} {1} {2} {3}"", a, b, c, d);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "StringFormattingCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "string.Format(\"{0:D}\", value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "string.Format(\"{0} {1}\", left, right)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "string.Format(\"{0} {1} {2}\", first, second, third)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "string.Format(\"{0} {1} {2} {3}\", a, b, c, d)"));
+        }
+
+        [Test]
         public void StringLengthAndTrimHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
