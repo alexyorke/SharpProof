@@ -8511,6 +8511,7 @@ public static class DuplicateReviewedSeedFixture
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
                 80,
+                "System.Collections.Generic.Queue`1.Clear",
                 "System.Collections.Generic.Queue`1.Enqueue",
                 "System.Collections.Generic.Queue`1.Dequeue",
                 "System.Collections.Generic.Queue`1.ToArray");
@@ -8521,6 +8522,13 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.Queue<T>.Clear()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Queue<T>.Clear() should no longer overlap the manual impure catalog.");
             Assert.That(
                 knownImpureRows.Any(row => string.Equals(
                     row.GetProperty("Symbol").GetString(),
@@ -8543,6 +8551,8 @@ public static class DuplicateReviewedSeedFixture
                 Is.False,
                 "Queue<T>.ToArray() should no longer overlap the manual impure catalog.");
 
+            AssertPurityClassification(summary, "System.Collections.Generic.Queue`1.Clear()", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Queue`1.Clear()", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.Queue`1.Enqueue(!0)", "impure", "caller_visible_memory_write");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Queue`1.Enqueue(!0)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.Queue`1.Dequeue()", "impure", "caller_visible_memory_write");
@@ -8558,6 +8568,7 @@ public static class DuplicateReviewedSeedFixture
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .ToArray();
 
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Queue`1.Clear()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Queue`1.Enqueue(!0)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Queue`1.Dequeue()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Queue`1.ToArray()"));
@@ -8569,6 +8580,7 @@ public static class DuplicateReviewedSeedFixture
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Collections.dll",
                 80,
+                "System.Collections.Generic.Stack`1.Clear",
                 "System.Collections.Generic.Stack`1.Push",
                 "System.Collections.Generic.Stack`1.Pop",
                 "System.Collections.Generic.Stack`1.ToArray");
@@ -8579,6 +8591,13 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
             var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.Stack<T>.Clear()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Stack<T>.Clear() should no longer overlap the manual impure catalog.");
             Assert.That(
                 knownImpureRows.Any(row => string.Equals(
                     row.GetProperty("Symbol").GetString(),
@@ -8601,6 +8620,8 @@ public static class DuplicateReviewedSeedFixture
                 Is.False,
                 "Stack<T>.ToArray() should no longer overlap the manual impure catalog.");
 
+            AssertPurityClassification(summary, "System.Collections.Generic.Stack`1.Clear()", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Stack`1.Clear()", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.Stack`1.Push(!0)", "impure", "caller_visible_memory_write");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Stack`1.Push(!0)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.Stack`1.Pop()", "impure", "caller_visible_memory_write");
@@ -8616,6 +8637,7 @@ public static class DuplicateReviewedSeedFixture
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .ToArray();
 
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Stack`1.Clear()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Stack`1.Push(!0)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Stack`1.Pop()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Stack`1.ToArray()"));

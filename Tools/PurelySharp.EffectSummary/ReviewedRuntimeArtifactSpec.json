@@ -589,6 +589,7 @@
       "RuntimeAssemblyName": "System.Private.CoreLib.dll",
       "Limit": 40,
       "SymbolPrefixes": [
+        "System.Collections.Generic.Queue`1.Clear",
         "System.Collections.Generic.Queue`1.Enqueue",
         "System.Collections.Generic.Queue`1.Dequeue",
         "System.Collections.Generic.Queue`1.ToArray"
@@ -599,6 +600,7 @@
       "RuntimeAssemblyName": "System.Collections.dll",
       "Limit": 40,
       "SymbolPrefixes": [
+        "System.Collections.Generic.Stack`1.Clear",
         "System.Collections.Generic.Stack`1.Push",
         "System.Collections.Generic.Stack`1.Pop",
         "System.Collections.Generic.Stack`1.ToArray"

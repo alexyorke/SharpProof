@@ -535,9 +535,11 @@ public static class FileSystemPathGetterCatalogSignatureSamples
         {
             var members = new[]
             {
+                "System.Collections.Generic.Queue<T>.Clear()",
                 "System.Collections.Generic.Queue<T>.ToArray()",
                 "System.Collections.Generic.Queue<T>.Dequeue()",
                 "System.Collections.Generic.Queue<T>.Enqueue(T)",
+                "System.Collections.Generic.Stack<T>.Clear()",
                 "System.Collections.Generic.Stack<T>.ToArray()",
                 "System.Collections.Generic.Stack<T>.Pop()",
                 "System.Collections.Generic.Stack<T>.Push(T)",
