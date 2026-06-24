@@ -7988,6 +7988,76 @@ public static class DuplicateReviewedSeedFixture
                     StringComparison.Ordinal)),
                 Is.False,
                 "List<T>.Remove(T) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.AddRange(System.Collections.Generic.IEnumerable<T>)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.AddRange(System.Collections.Generic.IEnumerable<T>) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.InsertRange(int, System.Collections.Generic.IEnumerable<T>)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.InsertRange(int, System.Collections.Generic.IEnumerable<T>) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.RemoveAll(System.Predicate<T>)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.RemoveAll(System.Predicate<T>) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.RemoveAt(int)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.RemoveAt(int) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.RemoveRange(int, int)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.RemoveRange(int, int) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.Reverse()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.Reverse() should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.Sort()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.Sort() should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.Sort(System.Comparison<T>)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.Sort(System.Comparison<T>) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.Sort(System.Collections.Generic.IComparer<T>?)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.Sort(System.Collections.Generic.IComparer<T>?) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.Sort(int, int, System.Collections.Generic.IComparer<T>?)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.Sort(int, int, System.Collections.Generic.IComparer<T>?) should no longer overlap the manual impure catalog.");
 
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Capacity()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.get_Capacity()", "none");
@@ -7996,6 +8066,8 @@ public static class DuplicateReviewedSeedFixture
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Count()", "pure");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.Add(!0)", "impure", "caller_visible_memory_write");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Add(!0)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.AddRange(System.Collections.Generic.IEnumerable`1<!0>)", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.AddRange(System.Collections.Generic.IEnumerable`1<!0>)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.Clear()", "impure", "object_state_write");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Clear()", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.Exists(System.Predicate`1<!0>)", "pure");
@@ -8009,8 +8081,26 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.ForEach(System.Action`1<!0>)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.Insert(int, !0)", "impure", "caller_visible_memory_write");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Insert(int, !0)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.InsertRange(int, System.Collections.Generic.IEnumerable`1<!0>)", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.InsertRange(int, System.Collections.Generic.IEnumerable`1<!0>)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.Remove(!0)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Remove(!0)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.RemoveAll(System.Predicate`1<!0>)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.RemoveAll(System.Predicate`1<!0>)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.RemoveAt(int)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.RemoveAt(int)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.RemoveRange(int, int)", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.RemoveRange(int, int)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.Reverse()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Reverse()", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.Sort()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Sort()", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.Sort(System.Comparison`1<!0>)", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Sort(System.Comparison`1<!0>)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.Sort(System.Collections.Generic.IComparer`1<!0>)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Sort(System.Collections.Generic.IComparer`1<!0>)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.Sort(int, int, System.Collections.Generic.IComparer`1<!0>)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Sort(int, int, System.Collections.Generic.IComparer`1<!0>)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)", "pure");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)", "none");
 
@@ -8025,6 +8115,7 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.set_Capacity(int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Count()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Add(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.AddRange(System.Collections.Generic.IEnumerable`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Clear()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Exists(System.Predicate`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.FindIndex(System.Predicate`1<!0>)"));
@@ -8032,7 +8123,16 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.FindLast(System.Predicate`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.ForEach(System.Action`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Insert(int, !0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.InsertRange(int, System.Collections.Generic.IEnumerable`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Remove(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.RemoveAll(System.Predicate`1<!0>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.RemoveAt(int)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.RemoveRange(int, int)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Reverse()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Sort()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Sort(System.Comparison`1<!0>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Sort(System.Collections.Generic.IComparer`1<!0>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Sort(int, int, System.Collections.Generic.IComparer`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)"));
         }
 

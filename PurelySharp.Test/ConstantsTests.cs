@@ -467,10 +467,20 @@ public static class FileSystemPathGetterCatalogSignatureSamples
             var members = new[]
             {
                 "System.Collections.Generic.List<T>.Add(T)",
+                "System.Collections.Generic.List<T>.AddRange(System.Collections.Generic.IEnumerable<T>)",
                 "System.Collections.Generic.List<T>.Clear()",
                 "System.Collections.Generic.List<T>.ForEach(System.Action<T>)",
                 "System.Collections.Generic.List<T>.Insert(int, T)",
+                "System.Collections.Generic.List<T>.InsertRange(int, System.Collections.Generic.IEnumerable<T>)",
                 "System.Collections.Generic.List<T>.Remove(T)",
+                "System.Collections.Generic.List<T>.RemoveAll(System.Predicate<T>)",
+                "System.Collections.Generic.List<T>.RemoveAt(int)",
+                "System.Collections.Generic.List<T>.RemoveRange(int, int)",
+                "System.Collections.Generic.List<T>.Reverse()",
+                "System.Collections.Generic.List<T>.Sort()",
+                "System.Collections.Generic.List<T>.Sort(System.Comparison<T>)",
+                "System.Collections.Generic.List<T>.Sort(System.Collections.Generic.IComparer<T>?)",
+                "System.Collections.Generic.List<T>.Sort(int, int, System.Collections.Generic.IComparer<T>?)",
                 "System.Runtime.InteropServices.CollectionsMarshal.AsSpan<T>(System.Collections.Generic.List<T>)",
             };
 
