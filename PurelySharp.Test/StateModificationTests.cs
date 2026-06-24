@@ -216,6 +216,44 @@ public class TestClass
         }
 
         [Test]
+        public async Task LinkedListAddFirst_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(LinkedList<int> list, int value)
+    {
+        list.AddFirst(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task LinkedListNodeValueSetter_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(LinkedListNode<int> node, int value)
+    {
+        node.Value = value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task MethodWithListClear_Diagnostic()
         {
             var test = @"

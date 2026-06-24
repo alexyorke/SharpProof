@@ -1618,6 +1618,52 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeLinkedListMutatorSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Collections.dll",
+                40,
+                "System.Collections.Generic.LinkedList`1.AddFirst",
+                "System.Collections.Generic.LinkedListNode`1.set_Value");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.LinkedList<T>.AddFirst(T)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "LinkedList<T>.AddFirst(T) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.LinkedListNode<T>.Value.set",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "LinkedListNode<T>.Value.set should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(summary, "System.Collections.Generic.LinkedList`1.AddFirst(!0)", "impure", "impure_callee", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.LinkedList`1.AddFirst(!0)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.LinkedListNode`1.set_Value(!0)", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.LinkedListNode`1.set_Value(!0)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.LinkedList`1.AddFirst(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.LinkedListNode`1.set_Value(!0)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeKeyValuePairCtorAndAccessorsSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

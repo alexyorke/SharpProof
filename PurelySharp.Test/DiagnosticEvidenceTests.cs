@@ -6842,6 +6842,94 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_LinkedListMutatorsAsGeneratedImpureEvidence()
+        {
+            const string source = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void AddFirstMethod(LinkedList<int> list, int value)
+    {
+        list.AddFirst(value);
+    }
+
+    [EnforcePure]
+    public void SetNodeValueMethod(LinkedListNode<int> node, int value)
+    {
+        node.Value = value;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics.Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId).ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var addFirst = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "list.AddFirst(value)"))
+                .Symbol!;
+            var assignment = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<AssignmentExpressionSyntax>()
+                .Single(node => node.ToString() == "node.Value = value");
+            var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(assignment.Left).Symbol!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
+            {
+                ("System.Collections.Generic.LinkedList<T>.AddFirst(T)", addFirst.OriginalDefinition),
+                ("System.Collections.Generic.LinkedListNode<T>.Value.set", propertySymbol.SetMethod!.OriginalDefinition),
+            };
+            var classifications = trackedMembers.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    var primaryCategory = (string)purityEntry.GetType().GetProperty("PrimaryCategory")!.GetValue(purityEntry)!;
+                    return (matched, classification, primaryCategory);
+                });
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(2));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "generated_purity_summary" }));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty]),
+                Has.Some.Contain("System.Collections.Generic.LinkedList<T>.AddFirst(T)"));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty]),
+                Has.Some.Contain("System.Collections.Generic.LinkedListNode<T>.Value.set"));
+
+            Assert.That(classifications["System.Collections.Generic.LinkedList<T>.AddFirst(T)"].matched, Is.True,
+                "Generated purity catalog should resolve LinkedList<T>.AddFirst(T).");
+            Assert.That(classifications["System.Collections.Generic.LinkedList<T>.AddFirst(T)"].classification, Is.EqualTo("impure"),
+                "Generated purity catalog should classify LinkedList<T>.AddFirst(T) as impure.");
+            Assert.That(classifications["System.Collections.Generic.LinkedList<T>.AddFirst(T)"].primaryCategory, Is.EqualTo("impure_callee"),
+                "LinkedList<T>.AddFirst(T) should remain generated impure because it delegates to mutating helper paths.");
+            Assert.That(classifications["System.Collections.Generic.LinkedListNode<T>.Value.set"].matched, Is.True,
+                "Generated purity catalog should resolve LinkedListNode<T>.Value.set.");
+            Assert.That(classifications["System.Collections.Generic.LinkedListNode<T>.Value.set"].classification, Is.EqualTo("impure"),
+                "Generated purity catalog should classify LinkedListNode<T>.Value.set as impure.");
+            Assert.That(classifications["System.Collections.Generic.LinkedListNode<T>.Value.set"].primaryCategory, Is.EqualTo("object_state_write"),
+                "LinkedListNode<T>.Value.set should remain a caller-visible object-state write.");
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_KeyValuePairCtorAndAccessors()
         {
             const string source = @"

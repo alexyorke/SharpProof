@@ -397,8 +397,6 @@ public static class Constants
         "System.Buffers.Binary.BinaryPrimitives.WriteUInt64BigEndian(System.Span<byte>, ulong)",
         "System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(System.Span<byte>, ulong)",
         "System.Buffers.Text.Base64.EncodeToUtf8(System.ReadOnlySpan<byte>, System.Span<byte>, out int, out int)",
-        "System.Collections.Generic.LinkedList<T>.AddFirst(T)",
-        "System.Collections.Generic.LinkedListNode<T>.Value.set",
         "System.Collections.Generic.SortedDictionary<TKey, TValue>.Add(TKey, TValue)",
 
 

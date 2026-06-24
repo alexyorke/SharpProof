@@ -821,6 +821,16 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/LinkedList.Mutators.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/LinkedList.Mutators.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Collections.dll",
+      "Limit": 40,
+      "SymbolPrefixes": [
+        "System.Collections.Generic.LinkedList`1.AddFirst",
+        "System.Collections.Generic.LinkedListNode`1.set_Value"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/SortedDictionary.Lookup.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/SortedDictionary.Lookup.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Collections.dll",

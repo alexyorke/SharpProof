@@ -526,6 +526,31 @@ public static class FileSystemPathGetterCatalogSignatureSamples
         }
 
         [Test]
+        public void LinkedListMutators_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System.Collections.Generic;
+
+public static class LinkedListMutatorCatalogSignatureSamples
+{
+    public static void Sample(LinkedList<int> list, LinkedListNode<int> node, int value)
+    {
+        list.AddFirst(value);
+        node.Value = value;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "LinkedListMutatorCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "list.AddFirst(value)"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "node.Value", preferSetter: true));
+        }
+
+        [Test]
         public void DelegateCombine_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.Delegate.Combine(System.Delegate, System.Delegate)");
@@ -4802,7 +4827,7 @@ public static class DecimalNegateCatalogSignatureSamples
             return symbol!.OriginalDefinition.ToDisplayString();
         }
 
-        private static string GetPropertySignature(Compilation compilation, SyntaxTree syntaxTree, string expressionText)
+        private static string GetPropertySignature(Compilation compilation, SyntaxTree syntaxTree, string expressionText, bool preferSetter = false)
         {
             var memberAccess = syntaxTree.GetRoot()
                 .DescendantNodes()
@@ -4810,6 +4835,14 @@ public static class DecimalNegateCatalogSignatureSamples
                 .Single(node => node.ToString() == expressionText);
             var symbol = compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(memberAccess).Symbol;
             Assert.That(symbol, Is.Not.Null, "Property should resolve: " + expressionText);
+
+            if (preferSetter && symbol is IPropertySymbol propertySymbol && propertySymbol.SetMethod != null)
+            {
+                var setterSignature = propertySymbol.SetMethod.OriginalDefinition.ToDisplayString();
+                return setterSignature.EndsWith(".set", StringComparison.Ordinal)
+                    ? setterSignature
+                    : setterSignature + ".set";
+            }
 
             var signature = symbol!.OriginalDefinition.ToDisplayString();
             return signature.EndsWith(".get", StringComparison.Ordinal) || signature.EndsWith(".set", StringComparison.Ordinal)
