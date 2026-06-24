@@ -254,6 +254,44 @@ public class TestClass
         }
 
         [Test]
+        public async Task PriorityQueueEnqueue_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(PriorityQueue<int, int> queue, int value, int priority)
+    {
+        queue.Enqueue(value, priority);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task PriorityQueueDequeue_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(PriorityQueue<int, int> queue)
+    {
+        return queue.Dequeue();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task MethodWithListClear_Diagnostic()
         {
             var test = @"

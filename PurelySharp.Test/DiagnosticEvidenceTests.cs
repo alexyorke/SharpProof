@@ -5619,6 +5619,7 @@ public class TestClass
         {
             const string source = @"
 using System.Collections.Immutable;
+using System.Collections.Generic;
 using PurelySharp.Attributes;
 
 public class TestClass
@@ -5657,6 +5658,18 @@ public class TestClass
     public ImmutableDictionary<int, string> CreateDictionary()
     {
         return ImmutableDictionary.Create<int, string>();
+    }
+
+    [EnforcePure]
+    public ImmutableDictionary<int, string> CreateDictionaryRange(IEnumerable<KeyValuePair<int, string>> pairs)
+    {
+        return ImmutableDictionary.CreateRange(pairs);
+    }
+
+    [EnforcePure]
+    public ImmutableHashSet<int> CreateSetRange(IEnumerable<int> values)
+    {
+        return ImmutableHashSet.CreateRange(values);
     }
 
     [EnforcePure]
@@ -5721,6 +5734,22 @@ public class TestClass
                             .DescendantNodes()
                             .OfType<InvocationExpressionSyntax>()
                             .Single(node => node.ToString() == "ImmutableDictionary.Create<int, string>()"))
+                        .Symbol!),
+                (
+                    "ImmutableDictionary.CreateRange(pairs)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "ImmutableDictionary.CreateRange(pairs)"))
+                        .Symbol!),
+                (
+                    "ImmutableHashSet.CreateRange(values)",
+                    (IMethodSymbol)semanticModel.GetSymbolInfo(
+                        syntaxTree.GetRoot()
+                            .DescendantNodes()
+                            .OfType<InvocationExpressionSyntax>()
+                            .Single(node => node.ToString() == "ImmutableHashSet.CreateRange(values)"))
                         .Symbol!),
                 (
                     "queue.Clear()",
@@ -5797,6 +5826,8 @@ public class TestClass
             Assert.That(resolutions["ImmutableList.Create<int>()"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["ImmutableHashSet.Create<int>()"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["ImmutableDictionary.Create<int, string>()"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["ImmutableDictionary.CreateRange(pairs)"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["ImmutableHashSet.CreateRange(values)"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["queue.Clear()"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["stack.Clear()"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["stack.IsEmpty"], Is.EqualTo((true, "pure")));
@@ -5804,6 +5835,83 @@ public class TestClass
             Assert.That(resolutions["set.Count"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["set.IsEmpty"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["set.KeyComparer"], Is.EqualTo((true, "pure")));
+        }
+
+        [Test]
+        public async Task GeneratedPurityCatalog_Resolves_PriorityQueueMutatorsAsGeneratedImpureEvidence()
+        {
+            const string source = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void EnqueueMethod(PriorityQueue<int, int> queue, int value, int priority)
+    {
+        queue.Enqueue(value, priority);
+    }
+
+    [EnforcePure]
+    public int DequeueMethod(PriorityQueue<int, int> queue)
+    {
+        return queue.Dequeue();
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics.Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId).ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var enqueue = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "queue.Enqueue(value, priority)"))
+                .Symbol!;
+            var dequeue = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "queue.Dequeue()"))
+                .Symbol!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
+            {
+                ("System.Collections.Generic.PriorityQueue<TElement, TPriority>.Enqueue(TElement, TPriority)", enqueue.OriginalDefinition),
+                ("System.Collections.Generic.PriorityQueue<TElement, TPriority>.Dequeue()", dequeue.OriginalDefinition),
+            };
+            var classifications = trackedMembers.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(2));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "generated_purity_summary" }));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty]),
+                Has.Some.Contain("System.Collections.Generic.PriorityQueue<TElement, TPriority>.Enqueue(TElement, TPriority)"));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty]),
+                Has.Some.Contain("System.Collections.Generic.PriorityQueue<TElement, TPriority>.Dequeue()"));
+            Assert.That(classifications["System.Collections.Generic.PriorityQueue<TElement, TPriority>.Enqueue(TElement, TPriority)"], Is.EqualTo((true, "impure")));
+            Assert.That(classifications["System.Collections.Generic.PriorityQueue<TElement, TPriority>.Dequeue()"], Is.EqualTo((true, "impure")));
         }
 
         [Test]

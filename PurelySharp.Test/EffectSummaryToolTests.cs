@@ -1664,6 +1664,52 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimePriorityQueueMutatorSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Collections.dll",
+                30,
+                "System.Collections.Generic.PriorityQueue`2.Enqueue",
+                "System.Collections.Generic.PriorityQueue`2.Dequeue");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.PriorityQueue<TElement, TPriority>.Enqueue(TElement, TPriority)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "PriorityQueue<TElement, TPriority>.Enqueue(TElement, TPriority) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.PriorityQueue<TElement, TPriority>.Dequeue()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "PriorityQueue<TElement, TPriority>.Dequeue() should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(summary, "System.Collections.Generic.PriorityQueue`2.Enqueue(!0, !1)", "impure");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.PriorityQueue`2.Enqueue(!0, !1)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.PriorityQueue`2.Dequeue()", "impure");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.PriorityQueue`2.Dequeue()", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.PriorityQueue`2.Enqueue(!0, !1)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.PriorityQueue`2.Dequeue()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeKeyValuePairCtorAndAccessorsSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
@@ -5053,6 +5099,8 @@ public static class StringComparisonFixture
                             {
                                 "System.Collections.Immutable.ImmutableList`1.get_Count",
                                 "System.Collections.Immutable.ImmutableList`1.get_Item",
+                                "System.Collections.Immutable.ImmutableDictionary.CreateRange",
+                                "System.Collections.Immutable.ImmutableHashSet.CreateRange",
                                 "System.Collections.Immutable.ImmutableQueue`1.Enqueue",
                                 "System.Collections.Immutable.ImmutableQueue`1.Dequeue",
                                 "System.Collections.Immutable.ImmutableStack`1.Push",
@@ -5083,6 +5131,16 @@ public static class StringComparisonFixture
             Assert.That(
                 methods.Any(method =>
                     string.Equals(method.GetProperty("Symbol").GetString(), "System.Collections.Immutable.ImmutableList`1.get_Item(int)", StringComparison.Ordinal) &&
+                    string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                methods.Any(method =>
+                    string.Equals(method.GetProperty("Symbol").GetString(), "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEnumerable`1<System.Collections.Generic.KeyValuePair`2<!!0, !!1>>)", StringComparison.Ordinal) &&
+                    string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                methods.Any(method =>
+                    string.Equals(method.GetProperty("Symbol").GetString(), "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEnumerable`1<!!0>)", StringComparison.Ordinal) &&
                     string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(

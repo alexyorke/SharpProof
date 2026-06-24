@@ -647,6 +647,16 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/PriorityQueue.Mutators.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/PriorityQueue.Mutators.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Collections.dll",
+      "Limit": 30,
+      "SymbolPrefixes": [
+        "System.Collections.Generic.PriorityQueue`2.Enqueue",
+        "System.Collections.Generic.PriorityQueue`2.Dequeue"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/ImmutableCollections.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/ImmutableCollections.PurelySharp.EffectSummary.json",
       "PackageId": "System.Collections.Immutable",
@@ -659,6 +669,8 @@
         "System.Collections.Immutable.ImmutableList`1.get_Count",
         "System.Collections.Immutable.ImmutableList`1.get_Item",
         "System.Collections.Immutable.ImmutableHashSet.Create()",
+        "System.Collections.Immutable.ImmutableDictionary.CreateRange",
+        "System.Collections.Immutable.ImmutableHashSet.CreateRange",
         "System.Collections.Immutable.ImmutableHashSet`1.get_Count",
         "System.Collections.Immutable.ImmutableHashSet`1.get_IsEmpty",
         "System.Collections.Immutable.ImmutableHashSet`1.get_KeyComparer",

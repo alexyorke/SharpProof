@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T13:33:18.375218+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:27:06.7875679+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Collections.Immutable",
@@ -8,7 +8,7 @@
       "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
       "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
       "MethodCount": 2208,
-      "EmittedMethodCount": 29,
+      "EmittedMethodCount": 39,
       "Methods": [
         {
           "Symbol": "System.SR.get_InvalidEmptyOperation()",
@@ -159,6 +159,112 @@
           }
         },
         {
+          "Symbol": "System.Collections.Immutable.ImmutableHashSet\u00601.Union(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E)",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet\u00601.Union(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E",
+          "MetadataToken": "0x060000CB",
+          "RelativeVirtualAddress": 12837,
+          "MethodBodySha256": "b8d647e5b50bd0f3773cf5d60426edf444b2a0bec127ba9807e187dc001da136",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x060000CB|il:b8d647e5b50bd0f3773cf5d60426edf444b2a0bec127ba9807e187dc001da136",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E.Union(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E, bool)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E",
+            "System.Collections.Immutable.Requires.NotNull(!!0, string)-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E.Union(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E, bool)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.Requires.NotNull(!!0, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableHashSet\u00601.WithComparer(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet\u00601.WithComparer(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E",
+          "MetadataToken": "0x060000DD",
+          "RelativeVirtualAddress": 13273,
+          "MethodBodySha256": "1928e654f40f70574618def091139e95391ea05b536662a08836fa7999cf76ff",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x060000DD|il:1928e654f40f70574618def091139e95391ea05b536662a08836fa7999cf76ff",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "reads_instance_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E.get_Default()-\u003ESystem.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E",
+            "System.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E..ctor(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003Evoid",
+            "System.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E.Union(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E, bool)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E"
+          ],
+          "Fields": [
+            "System.Collections.Immutable.ImmutableHashSet\u00601._equalityComparer"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E.get_Default()-\u003ESystem.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E..ctor(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E.Union(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E, bool)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "dynamic_dispatch",
+              "virtual_call"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
           "Symbol": "System.Collections.Immutable.ImmutableDictionary.Create()",
           "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary.Create()-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E",
           "MetadataToken": "0x06000244",
@@ -194,6 +300,366 @@
           }
         },
         {
+          "Symbol": "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!!0, !!1\u003E\u003E)",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!!0, !!1\u003E\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E",
+          "MetadataToken": "0x06000247",
+          "RelativeVirtualAddress": 30430,
+          "MethodBodySha256": "8c62a65749f1064bd204d0073af28e0181d214e19eaee06894c5ce40563efe77",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000247|il:8c62a65749f1064bd204d0073af28e0181d214e19eaee06894c5ce40563efe77",
+          "Effects": [
+            "calls_method",
+            "reads_static_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "safe_static_cache_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E.AddRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E"
+          ],
+          "Fields": [
+            "System.Collections.Immutable.ImmutableDictionary\u00602.Empty"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E.AddRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E, System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!!0, !!1\u003E\u003E)",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E, System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!!0, !!1\u003E\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E",
+          "MetadataToken": "0x06000248",
+          "RelativeVirtualAddress": 30443,
+          "MethodBodySha256": "99bb4395d67b65c1c47979a3af78467a84754580d447f8d511fdcb73e04c502c",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000248|il:99bb4395d67b65c1c47979a3af78467a84754580d447f8d511fdcb73e04c502c",
+          "Effects": [
+            "calls_method",
+            "reads_static_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "safe_static_cache_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E.AddRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E"
+          ],
+          "Fields": [
+            "System.Collections.Immutable.ImmutableDictionary\u00602.Empty"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E.AddRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "unknown_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)",
+              "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!!1\u003E, System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!!0, !!1\u003E\u003E)",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!!1\u003E, System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!!0, !!1\u003E\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E",
+          "MetadataToken": "0x06000249",
+          "RelativeVirtualAddress": 30462,
+          "MethodBodySha256": "c5e94bae9666eb21ad05aea52fc7ad15c9c7f0fc5e3d56347f78347a8427c96c",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000249|il:c5e94bae9666eb21ad05aea52fc7ad15c9c7f0fc5e3d56347f78347a8427c96c",
+          "Effects": [
+            "calls_method",
+            "reads_static_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "safe_static_cache_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E.AddRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E"
+          ],
+          "Fields": [
+            "System.Collections.Immutable.ImmutableDictionary\u00602.Empty"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E.AddRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "unknown_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableDictionary\u00602.AddRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E)",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602.AddRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+          "MetadataToken": "0x06000274",
+          "RelativeVirtualAddress": 31363,
+          "MethodBodySha256": "7c705c503b173847f1930a10d17ac380c7d96b22aaaf32f80c031a0d7a8302d9",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000274|il:7c705c503b173847f1930a10d17ac380c7d96b22aaaf32f80c031a0d7a8302d9",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E.AddRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E, bool)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+            "System.Collections.Immutable.Requires.NotNull(!!0, string)-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E.AddRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E, bool)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.Requires.NotNull(!!0, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+          "MetadataToken": "0x0600027D",
+          "RelativeVirtualAddress": 31800,
+          "MethodBodySha256": "313ca42685f70142390bebc29691e19b27d9e89a4eebc2120022a02c601f3b5b",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x0600027D|il:313ca42685f70142390bebc29691e19b27d9e89a4eebc2120022a02c601f3b5b",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "reads_instance_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E.get_Default()-\u003ESystem.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E",
+            "System.Collections.Generic.EqualityComparer\u00601\u003C!1\u003E.get_Default()-\u003ESystem.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E",
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u002BComparers\u003C!0, !1\u003E.Get(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u002BComparers\u003C!0, !1\u003E",
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u002BComparers\u003C!0, !1\u003E.WithValueComparer(System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u002BComparers\u003C!0, !1\u003E",
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E..ctor(System.Collections.Immutable.ImmutableDictionary\u00602\u002BComparers\u003C!0, !1\u003E)-\u003Evoid",
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E..ctor(System.Collections.Immutable.SortedInt32KeyNode\u00601\u003CSystem.Collections.Immutable.ImmutableDictionary\u00602\u002BHashBucket\u003C!0, !1\u003E\u003E, System.Collections.Immutable.ImmutableDictionary\u00602\u002BComparers\u003C!0, !1\u003E, int)-\u003Evoid",
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E.AddRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E, bool)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E.get_KeyComparer()-\u003ESystem.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E",
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E.get_ValueComparer()-\u003ESystem.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E"
+          ],
+          "Fields": [
+            "System.Collections.Immutable.ImmutableDictionary\u00602._comparers",
+            "System.Collections.Immutable.ImmutableDictionary\u00602._count",
+            "System.Collections.Immutable.ImmutableDictionary\u00602._root"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E.get_Default()-\u003ESystem.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Generic.EqualityComparer\u00601\u003C!1\u003E.get_Default()-\u003ESystem.Collections.Generic.EqualityComparer\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u002BComparers\u003C!0, !1\u003E.Get(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u002BComparers\u003C!0, !1\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u002BComparers\u003C!0, !1\u003E.WithValueComparer(System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u002BComparers\u003C!0, !1\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E..ctor(System.Collections.Immutable.ImmutableDictionary\u00602\u002BComparers\u003C!0, !1\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E..ctor(System.Collections.Immutable.SortedInt32KeyNode\u00601\u003CSystem.Collections.Immutable.ImmutableDictionary\u00602\u002BHashBucket\u003C!0, !1\u003E\u003E, System.Collections.Immutable.ImmutableDictionary\u00602\u002BComparers\u003C!0, !1\u003E, int)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E.AddRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E, bool)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E.get_KeyComparer()-\u003ESystem.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E.get_ValueComparer()-\u003ESystem.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "dynamic_dispatch",
+              "virtual_call"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+          "MetadataToken": "0x0600027E",
+          "RelativeVirtualAddress": 31904,
+          "MethodBodySha256": "e6c5963bd92009abad3e71c061724aaec6cd54e7d5fa216ff01d843cde9e13c2",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x0600027E|il:e6c5963bd92009abad3e71c061724aaec6cd54e7d5fa216ff01d843cde9e13c2",
+          "Effects": [
+            "calls_method",
+            "reads_instance_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u002BComparers\u003C!0, !1\u003E.get_ValueComparer()-\u003ESystem.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E",
+            "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E"
+          ],
+          "Fields": [
+            "System.Collections.Immutable.ImmutableDictionary\u00602._comparers"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u002BComparers\u003C!0, !1\u003E.get_ValueComparer()-\u003ESystem.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "dynamic_dispatch",
+              "unknown_callee",
+              "virtual_call"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
           "Symbol": "System.Collections.Immutable.ImmutableHashSet.Create()",
           "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet.Create()-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E",
           "MetadataToken": "0x06000355",
@@ -226,6 +692,108 @@
             "HasUnsupportedEffects": false,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E",
+          "MetadataToken": "0x06000359",
+          "RelativeVirtualAddress": 40274,
+          "MethodBodySha256": "3f0b63d56f7c1ece1ad50c8d449fdf09db17b61b19f38dd7be0a0f8dad8dd6c4",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000359|il:3f0b63d56f7c1ece1ad50c8d449fdf09db17b61b19f38dd7be0a0f8dad8dd6c4",
+          "Effects": [
+            "calls_method",
+            "reads_static_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "safe_static_cache_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E.Union(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E"
+          ],
+          "Fields": [
+            "System.Collections.Immutable.ImmutableHashSet\u00601.Empty"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E.Union(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E, System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)",
+          "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E, System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E",
+          "MetadataToken": "0x0600035A",
+          "RelativeVirtualAddress": 40287,
+          "MethodBodySha256": "4349872ca5efc65d34ea71cc8c871f4674f8a0234d1a00da850ea712e2ffd11d",
+          "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x0600035A|il:4349872ca5efc65d34ea71cc8c871f4674f8a0234d1a00da850ea712e2ffd11d",
+          "Effects": [
+            "calls_method",
+            "reads_static_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch",
+            "safe_static_cache_read"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E.Union(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E",
+            "System.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E.WithComparer(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E"
+          ],
+          "Fields": [
+            "System.Collections.Immutable.ImmutableHashSet\u00601.Empty"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E.Union(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E.WithComparer(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "unknown_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Immutable.ImmutableHashSet\u00601.WithComparer(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
           }
         },
         {
@@ -1408,12 +1976,39 @@
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 29,
-    "PureCount": 21,
+    "MethodCount": 39,
+    "PureCount": 25,
     "ImpureCount": 7,
-    "ConservativeUnknownCount": 1,
+    "ConservativeUnknownCount": 7,
     "CatalogComparison": {
-      "KnownPureMembers": [],
+      "KnownPureMembers": [
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableHashSet.CreateRange\u003CT\u003E(System.Collections.Generic.IEnumerable\u003CT\u003E)",
+          "Catalog": "known_pure",
+          "Classification": "pure",
+          "Categories": [],
+          "FirstBlockingCallChain": [],
+          "EffectVisibilityClassification": "internal_only",
+          "MatchedExactSymbolKeys": [
+            "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E"
+          ]
+        },
+        {
+          "Symbol": "System.Collections.Immutable.ImmutableHashSet.CreateRange\u003CT\u003E(System.Collections.Generic.IEqualityComparer\u003CT\u003E, System.Collections.Generic.IEnumerable\u003CT\u003E)",
+          "Catalog": "known_pure",
+          "Classification": "conservative_unknown",
+          "Categories": [
+            "unknown_callee"
+          ],
+          "FirstBlockingCallChain": [
+            "System.Collections.Immutable.ImmutableHashSet\u00601.WithComparer(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)"
+          ],
+          "EffectVisibilityClassification": "unknown",
+          "MatchedExactSymbolKeys": [
+            "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E, System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E"
+          ]
+        }
+      ],
       "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
@@ -1442,6 +2037,144 @@
         "EffectVisibilityClassification": "internal_only"
       },
       {
+        "Symbol": "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!!0, !!1\u003E\u003E)",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!!0, !!1\u003E\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000247|il:8c62a65749f1064bd204d0073af28e0181d214e19eaee06894c5ce40563efe77",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x06000247",
+        "MethodBodySha256": "8c62a65749f1064bd204d0073af28e0181d214e19eaee06894c5ce40563efe77",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E, System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!!0, !!1\u003E\u003E)",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E, System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!!0, !!1\u003E\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000248|il:99bb4395d67b65c1c47979a3af78467a84754580d447f8d511fdcb73e04c502c",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x06000248",
+        "MethodBodySha256": "99bb4395d67b65c1c47979a3af78467a84754580d447f8d511fdcb73e04c502c",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "unknown_callee",
+        "Categories": [
+          "unknown_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)",
+          "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!!1\u003E, System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!!0, !!1\u003E\u003E)",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!!1\u003E, System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!!0, !!1\u003E\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!!0, !!1\u003E",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000249|il:c5e94bae9666eb21ad05aea52fc7ad15c9c7f0fc5e3d56347f78347a8427c96c",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x06000249",
+        "MethodBodySha256": "c5e94bae9666eb21ad05aea52fc7ad15c9c7f0fc5e3d56347f78347a8427c96c",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "unknown_callee",
+        "Categories": [
+          "unknown_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableDictionary\u00602.AddRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E)",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602.AddRange(System.Collections.Generic.IEnumerable\u00601\u003CSystem.Collections.Generic.KeyValuePair\u00602\u003C!0, !1\u003E\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000274|il:7c705c503b173847f1930a10d17ac380c7d96b22aaaf32f80c031a0d7a8302d9",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x06000274",
+        "MethodBodySha256": "7c705c503b173847f1930a10d17ac380c7d96b22aaaf32f80c031a0d7a8302d9",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x0600027E|il:e6c5963bd92009abad3e71c061724aaec6cd54e7d5fa216ff01d843cde9e13c2",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x0600027E",
+        "MethodBodySha256": "e6c5963bd92009abad3e71c061724aaec6cd54e7d5fa216ff01d843cde9e13c2",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "dynamic_dispatch",
+        "Categories": [
+          "dynamic_dispatch",
+          "unknown_callee",
+          "virtual_call"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableDictionary\u00602.WithComparers(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E, System.Collections.Generic.IEqualityComparer\u00601\u003C!1\u003E)-\u003ESystem.Collections.Immutable.ImmutableDictionary\u00602\u003C!0, !1\u003E",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x0600027D|il:313ca42685f70142390bebc29691e19b27d9e89a4eebc2120022a02c601f3b5b",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x0600027D",
+        "MethodBodySha256": "313ca42685f70142390bebc29691e19b27d9e89a4eebc2120022a02c601f3b5b",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "dynamic_dispatch",
+        "Categories": [
+          "dynamic_dispatch",
+          "virtual_call"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
+      {
         "Symbol": "System.Collections.Immutable.ImmutableHashSet.Create()",
         "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet.Create()-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E",
         "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000355|il:d18b43add490e8d842e2ea790ef0bc5c72df1d755b172092c84d63a3087f208b",
@@ -1460,6 +2193,93 @@
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x06000359|il:3f0b63d56f7c1ece1ad50c8d449fdf09db17b61b19f38dd7be0a0f8dad8dd6c4",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x06000359",
+        "MethodBodySha256": "3f0b63d56f7c1ece1ad50c8d449fdf09db17b61b19f38dd7be0a0f8dad8dd6c4",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E, System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E, System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x0600035A|il:4349872ca5efc65d34ea71cc8c871f4674f8a0234d1a00da850ea712e2ffd11d",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x0600035A",
+        "MethodBodySha256": "4349872ca5efc65d34ea71cc8c871f4674f8a0234d1a00da850ea712e2ffd11d",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "unknown_callee",
+        "Categories": [
+          "unknown_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Immutable.ImmutableHashSet\u00601.WithComparer(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableHashSet\u00601.Union(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E)",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet\u00601.Union(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x060000CB|il:b8d647e5b50bd0f3773cf5d60426edf444b2a0bec127ba9807e187dc001da136",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x060000CB",
+        "MethodBodySha256": "b8d647e5b50bd0f3773cf5d60426edf444b2a0bec127ba9807e187dc001da136",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Immutable.ImmutableHashSet\u00601.WithComparer(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)",
+        "ExactSymbolKey": "System.Collections.Immutable.ImmutableHashSet\u00601.WithComparer(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!0\u003E",
+        "CacheKey": "mvid:d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f|token:0x060000DD|il:1928e654f40f70574618def091139e95391ea05b536662a08836fa7999cf76ff",
+        "AssemblyName": "System.Collections.Immutable",
+        "AssemblyPath": "C:\\Users\\yorke\\.nuget\\packages\\system.collections.immutable\\9.0.0\\lib\\net8.0\\System.Collections.Immutable.dll",
+        "AssemblySha256": "33d310036fec4d1a78f75c885ea091c0e054ad08d50c424cc8db8042544aab3c",
+        "ModuleVersionId": "d1a28d33-0f88-4b7b-86f7-bdac23bc6b2f",
+        "MetadataToken": "0x060000DD",
+        "MethodBodySha256": "1928e654f40f70574618def091139e95391ea05b536662a08836fa7999cf76ff",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "dynamic_dispatch",
+        "Categories": [
+          "dynamic_dispatch",
+          "virtual_call"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
       },
       {
         "Symbol": "System.Collections.Immutable.ImmutableHashSet\u00601.get_Count()",

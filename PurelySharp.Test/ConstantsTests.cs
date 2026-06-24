@@ -578,6 +578,31 @@ public static class LinkedListMutatorCatalogSignatureSamples
         }
 
         [Test]
+        public void PriorityQueueMutators_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System.Collections.Generic;
+
+public static class PriorityQueueMutatorCatalogSignatureSamples
+{
+    public static void Sample(PriorityQueue<int, int> queue, int value, int priority)
+    {
+        queue.Enqueue(value, priority);
+        _ = queue.Dequeue();
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "PriorityQueueMutatorCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "queue.Enqueue(value, priority)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "queue.Dequeue()"));
+        }
+
+        [Test]
         public void ArrayCopyWriteHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             var members = new[]
@@ -1275,6 +1300,8 @@ public static class KeyedCollectionCatalogSignatureSamples
                 "System.Collections.Immutable.ImmutableList<T>.Count.get",
                 "System.Collections.Immutable.ImmutableList<T>.this[int].get",
                 "System.Collections.Immutable.ImmutableHashSet.Create<T>()",
+                "System.Collections.Immutable.ImmutableDictionary.CreateRange<TKey, TValue>(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>>)",
+                "System.Collections.Immutable.ImmutableHashSet.CreateRange<T>(System.Collections.Generic.IEnumerable<T>)",
                 "System.Collections.Immutable.ImmutableHashSet<T>.Count.get",
                 "System.Collections.Immutable.ImmutableHashSet<T>.IsEmpty.get",
                 "System.Collections.Immutable.ImmutableHashSet<T>.KeyComparer.get",
@@ -1303,6 +1330,8 @@ public static class ImmutableConcreteCatalogSignatureSamples
 {
     public static int Count(ImmutableList<int> list) => list.Count;
     public static int First(ImmutableList<int> list) => list[0];
+    public static ImmutableDictionary<int, string> DictionaryRange(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<int, string>> items) => ImmutableDictionary.CreateRange(items);
+    public static ImmutableHashSet<int> SetRange(System.Collections.Generic.IEnumerable<int> values) => ImmutableHashSet.CreateRange(values);
     public static ImmutableQueue<int> Enqueue(ImmutableQueue<int> queue, int value) => queue.Enqueue(value);
 }";
 
@@ -1318,6 +1347,8 @@ public static class ImmutableConcreteCatalogSignatureSamples
             {
                 ("list.Count", "System.Collections.Immutable.ImmutableList<T>.Count.get", node => ((IPropertySymbol?)semanticModel.GetSymbolInfo((MemberAccessExpressionSyntax)node).Symbol)?.GetMethod),
                 ("list[0]", "System.Collections.Immutable.ImmutableList<T>.this[int].get", node => ((IPropertySymbol?)semanticModel.GetSymbolInfo((ElementAccessExpressionSyntax)node).Symbol)?.GetMethod),
+                ("ImmutableDictionary.CreateRange(items)", "System.Collections.Immutable.ImmutableDictionary.CreateRange<TKey, TValue>(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>>)", node => semanticModel.GetSymbolInfo((InvocationExpressionSyntax)node).Symbol as IMethodSymbol),
+                ("ImmutableHashSet.CreateRange(values)", "System.Collections.Immutable.ImmutableHashSet.CreateRange<T>(System.Collections.Generic.IEnumerable<T>)", node => semanticModel.GetSymbolInfo((InvocationExpressionSyntax)node).Symbol as IMethodSymbol),
                 ("queue.Enqueue(value)", "System.Collections.Immutable.ImmutableQueue<T>.Enqueue(T)", node => semanticModel.GetSymbolInfo((InvocationExpressionSyntax)node).Symbol as IMethodSymbol),
             };
 
