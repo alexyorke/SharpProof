@@ -330,6 +330,63 @@ public class TestClass
         }
 
         [Test]
+        public async Task SortedDictionaryAdd_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(SortedDictionary<int, string> values)
+    {
+        values.Add(1, ""one"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SortedSetAdd_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(SortedSet<int> values)
+    {
+        values.Add(1);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task BitArraySet_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(BitArray bits)
+    {
+        bits.Set(0, true);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task MethodWithListClear_Diagnostic()
         {
             var test = @"

@@ -678,6 +678,17 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Collections.AdditionalMutators.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Collections.AdditionalMutators.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Collections.dll",
+      "Limit": 40,
+      "SymbolPrefixes": [
+        "System.Collections.BitArray.Set",
+        "System.Collections.Generic.SortedDictionary`2.Add",
+        "System.Collections.Generic.SortedSet`1.Add"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/ImmutableCollections.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/ImmutableCollections.PurelySharp.EffectSummary.json",
       "PackageId": "System.Collections.Immutable",

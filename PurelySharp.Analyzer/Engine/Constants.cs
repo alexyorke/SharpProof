@@ -327,7 +327,6 @@ public static class Constants
         "System.Timers.Timer.Stop()",
         "System.Xml.Xsl.XslCompiledTransform.Load(string)",
         "System.Xml.Xsl.XslCompiledTransform.Transform(string, string)",
-        "System.Collections.BitArray.Set(int, bool)",
         "System.Collections.Specialized.NameValueCollection.Add(string, string)",
         "System.IO.DirectoryInfo.Exists.get",
         "System.IO.DirectoryInfo.EnumerateFiles()",
@@ -392,7 +391,6 @@ public static class Constants
         "System.Buffers.Binary.BinaryPrimitives.WriteUInt64BigEndian(System.Span<byte>, ulong)",
         "System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(System.Span<byte>, ulong)",
         "System.Buffers.Text.Base64.EncodeToUtf8(System.ReadOnlySpan<byte>, System.Span<byte>, out int, out int)",
-        "System.Collections.Generic.SortedDictionary<TKey, TValue>.Add(TKey, TValue)",
 
 
 
@@ -547,7 +545,6 @@ public static class Constants
         "System.Collections.Generic.ICollection<T>.Remove(T)",
         "System.Collections.Generic.IList<T>.Insert(int, T)",
         "System.Collections.Generic.IList<T>.RemoveAt(int)",
-        "System.Collections.Generic.SortedSet<T>.Add(T)",
         "System.ComponentModel.EventHandlerList.AddHandler(object, System.Delegate)",
         "System.HashCode.Add<T>(T)",
         "System.IO.DirectoryInfo.Create()",

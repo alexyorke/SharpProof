@@ -656,6 +656,34 @@ public static class StaticCustomAttributeCatalogSignatureSamples
         }
 
         [Test]
+        public void SortedCollectionAndBitArrayMutators_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System.Collections;
+using System.Collections.Generic;
+
+public static class SortedCollectionAndBitArrayMutatorCatalogSignatureSamples
+{
+    public static void Sample(SortedDictionary<int, string> dictionary, SortedSet<int> set, BitArray bits)
+    {
+        dictionary.Add(1, ""one"");
+        set.Add(1);
+        bits.Set(0, true);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "SortedCollectionAndBitArrayMutatorCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "dictionary.Add(1, \"one\")"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "set.Add(1)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "bits.Set(0, true)"));
+        }
+
+        [Test]
         public void ArrayCopyWriteHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             var members = new[]

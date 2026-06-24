@@ -1756,6 +1756,63 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeSortedCollectionAndBitArrayMutatorSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Collections.dll",
+                40,
+                "System.Collections.BitArray.Set",
+                "System.Collections.Generic.SortedDictionary`2.Add",
+                "System.Collections.Generic.SortedSet`1.Add");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.BitArray.Set(int, bool)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "BitArray.Set(int, bool) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.SortedDictionary<TKey, TValue>.Add(TKey, TValue)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "SortedDictionary<TKey, TValue>.Add(TKey, TValue) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.SortedSet<T>.Add(T)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "SortedSet<T>.Add(T) should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(summary, "System.Collections.BitArray.Set(int, bool)", "impure", "caller_visible_memory_write", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.BitArray.Set(int, bool)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.SortedDictionary`2.Add(!0, !1)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.SortedDictionary`2.Add(!0, !1)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.SortedSet`1.Add(!0)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.SortedSet`1.Add(!0)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.BitArray.Set(int, bool)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.SortedDictionary`2.Add(!0, !1)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.SortedSet`1.Add(!0)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStaticCustomAttributeHelperSlice_UsesGeneratedEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
