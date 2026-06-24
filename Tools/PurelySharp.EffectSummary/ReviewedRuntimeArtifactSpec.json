@@ -571,11 +571,17 @@
     {
       "OutputPath": "PurelySharp.Analyzer/Dictionary.Mutators.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Private.CoreLib.dll",
-      "IncludeCallees": false,
+      "IncludeCallees": true,
       "Limit": 80,
+      "ExcludedSymbolPrefixes": [
+        "System.Collections.Generic.Dictionary`2.AddRange",
+        "System.Object.GetHashCode"
+      ],
       "SymbolPrefixes": [
+        "System.Collections.Generic.Dictionary`2.Add",
         "System.Collections.Generic.Dictionary`2.Clear",
-        "System.Collections.Generic.Dictionary`2.Remove"
+        "System.Collections.Generic.Dictionary`2.Remove",
+        "System.Collections.Generic.Dictionary`2.TryAdd"
       ]
     },
     {

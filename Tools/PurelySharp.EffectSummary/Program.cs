@@ -6,6 +6,7 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -1817,16 +1818,18 @@ internal static class AssemblyEffectSummarizer
         while (queue.Count > 0)
         {
             var (exactSymbolKey, depth) = queue.Dequeue();
-            if ((maxDepth >= 0 && depth >= maxDepth) || !bySymbol.TryGetValue(exactSymbolKey, out var summary))
+            if ((maxDepth >= 0 && depth >= maxDepth) ||
+                !TryResolveSummaryExactSymbolKey(exactSymbolKey, bySymbol, out _, out var summary))
             {
                 continue;
             }
 
             foreach (var call in summary.Calls)
             {
-                if (bySymbol.ContainsKey(call) && included.Add(call))
+                if (TryResolveSummaryExactSymbolKey(call, bySymbol, out var resolvedCallKey, out _) &&
+                    included.Add(resolvedCallKey))
                 {
-                    queue.Enqueue((call, depth + 1));
+                    queue.Enqueue((resolvedCallKey, depth + 1));
                 }
             }
         }
@@ -2014,7 +2017,7 @@ internal static class AssemblyEffectSummarizer
             return cached;
         }
 
-        if (!bySymbol.TryGetValue(symbol, out var summary))
+        if (!TryResolveSummaryExactSymbolKey(symbol, bySymbol, out _, out var summary))
         {
             return Array.Empty<string>();
         }
@@ -2027,9 +2030,9 @@ internal static class AssemblyEffectSummarizer
 
         foreach (var call in summary.Calls)
         {
-            if (bySymbol.ContainsKey(call))
+            if (TryResolveSummaryExactSymbolKey(call, bySymbol, out var resolvedCallKey, out _))
             {
-                roots.UnionWith(VisitRootCandidates(call, bySymbol, memo, visiting));
+                roots.UnionWith(VisitRootCandidates(resolvedCallKey, bySymbol, memo, visiting));
             }
         }
 
@@ -2050,7 +2053,7 @@ internal static class AssemblyEffectSummarizer
             return cached;
         }
 
-        if (!bySymbol.TryGetValue(symbol, out var summary))
+        if (!TryResolveSummaryExactSymbolKey(symbol, bySymbol, out _, out var summary))
         {
             return Array.Empty<ThrownExceptionEdgeSummary>();
         }
@@ -2073,9 +2076,9 @@ internal static class AssemblyEffectSummarizer
 
         foreach (var propagationSite in summary.ExceptionPropagationSites)
         {
-            if (bySymbol.ContainsKey(propagationSite.ExactSymbolKey))
+            if (TryResolveSummaryExactSymbolKey(propagationSite.ExactSymbolKey, bySymbol, out var resolvedPropagationKey, out _))
             {
-                foreach (var nestedSource in VisitThrownExceptionEdges(propagationSite.ExactSymbolKey, bySymbol, memo, visiting))
+                foreach (var nestedSource in VisitThrownExceptionEdges(resolvedPropagationKey, bySymbol, memo, visiting))
                 {
                     if (!ExceptionEscapesPropagationSite(propagationSite, nestedSource.ExceptionType))
                     {
@@ -2122,6 +2125,35 @@ internal static class AssemblyEffectSummarizer
             .OrderBy(sourcePath => sourcePath.ExceptionType, StringComparer.Ordinal)
             .ThenBy(sourcePath => sourcePath.SourcePath, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    private static bool TryResolveSummaryExactSymbolKey(
+        string exactSymbolKey,
+        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
+        out string resolvedKey,
+        out MethodEffectSummary summary)
+    {
+        if (bySymbol.TryGetValue(exactSymbolKey, out var directSummary) &&
+            directSummary is not null)
+        {
+            resolvedKey = exactSymbolKey;
+            summary = directSummary;
+            return true;
+        }
+
+        var normalizedKey = NormalizeConstructedReceiverType(exactSymbolKey);
+        if (!string.Equals(normalizedKey, exactSymbolKey, StringComparison.Ordinal) &&
+            bySymbol.TryGetValue(normalizedKey, out var normalizedSummary) &&
+            normalizedSummary is not null)
+        {
+            resolvedKey = normalizedKey;
+            summary = normalizedSummary;
+            return true;
+        }
+
+        resolvedKey = string.Empty;
+        summary = default!;
+        return false;
     }
 
     private static string CreateThrownExceptionEdgeKey(ThrownExceptionEdgeSummary edge)
@@ -2926,19 +2958,40 @@ internal static class AssemblyEffectSummarizer
 
                 if (specification.Method.Kind == HandleKind.MemberReference)
                 {
-                    return methodDefinitionHandlesByExactKey.TryGetValue(
-                        GetMemberReferenceExactKey(reader, (MemberReferenceHandle)specification.Method),
+                    return TryResolveMethodDefinitionHandleFromMemberReference(
+                        reader,
+                        (MemberReferenceHandle)specification.Method,
+                        methodDefinitionHandlesByExactKey,
                         out handle);
                 }
 
                 return false;
             case HandleKind.MemberReference:
-                return methodDefinitionHandlesByExactKey.TryGetValue(
-                    GetMemberReferenceExactKey(reader, (MemberReferenceHandle)resolvedHandle),
+                return TryResolveMethodDefinitionHandleFromMemberReference(
+                    reader,
+                    (MemberReferenceHandle)resolvedHandle,
+                    methodDefinitionHandlesByExactKey,
                     out handle);
             default:
                 return false;
         }
+    }
+
+    private static bool TryResolveMethodDefinitionHandleFromMemberReference(
+        MetadataReader reader,
+        MemberReferenceHandle handle,
+        IReadOnlyDictionary<string, MethodDefinitionHandle> methodDefinitionHandlesByExactKey,
+        out MethodDefinitionHandle resolvedHandle)
+    {
+        var exactKey = GetMemberReferenceExactKey(reader, handle);
+        if (methodDefinitionHandlesByExactKey.TryGetValue(exactKey, out resolvedHandle))
+        {
+            return true;
+        }
+
+        var lookupKey = GetMemberReferenceMethodLookupExactKey(reader, handle);
+        return !string.Equals(lookupKey, exactKey, StringComparison.Ordinal) &&
+            methodDefinitionHandlesByExactKey.TryGetValue(lookupKey, out resolvedHandle);
     }
 
     private static bool TryGetKnownMethodReturnValue(
@@ -4959,6 +5012,15 @@ internal static class AssemblyEffectSummarizer
         return $"{parentName}.{name}{signature}";
     }
 
+    private static string GetMemberReferenceMethodLookupExactKey(MetadataReader reader, MemberReferenceHandle handle)
+    {
+        var memberReference = reader.GetMemberReference(handle);
+        var parentName = NormalizeExactTypeName(GetMemberReferenceMethodLookupParentName(reader, memberReference.Parent));
+        var name = reader.GetString(memberReference.Name);
+        var signature = DecodeMemberReferenceExactSignature(reader, memberReference);
+        return $"{parentName}.{name}{signature}";
+    }
+
     private static string GetMemberReferenceParentName(MetadataReader reader, EntityHandle handle)
     {
         return handle.Kind switch
@@ -4977,6 +5039,15 @@ internal static class AssemblyEffectSummarizer
         return handle.Kind switch
         {
             HandleKind.TypeSpecification => DecodeTypeSpecificationForFieldLookup(reader, (TypeSpecificationHandle)handle),
+            _ => GetMemberReferenceParentName(reader, handle),
+        };
+    }
+
+    private static string GetMemberReferenceMethodLookupParentName(MetadataReader reader, EntityHandle handle)
+    {
+        return handle.Kind switch
+        {
+            HandleKind.TypeSpecification => DecodeTypeSpecificationForMethodLookup(reader, (TypeSpecificationHandle)handle),
             _ => GetMemberReferenceParentName(reader, handle),
         };
     }
@@ -5122,6 +5193,110 @@ internal static class AssemblyEffectSummarizer
         {
             return DecodeTypeSpecification(reader, handle);
         }
+    }
+
+    private static string DecodeTypeSpecificationForMethodLookup(MetadataReader reader, TypeSpecificationHandle handle)
+    {
+        try
+        {
+            return reader.GetTypeSpecification(handle).DecodeSignature(
+                new TypeNameProvider(reader, eraseGenericInstantiationsForLookup: true),
+                genericContext: null);
+        }
+        catch (BadImageFormatException)
+        {
+            return DecodeTypeSpecification(reader, handle);
+        }
+        catch (InvalidOperationException)
+        {
+            return DecodeTypeSpecification(reader, handle);
+        }
+    }
+
+    private static string NormalizeConstructedReceiverType(string exactSymbolKey)
+    {
+        var signatureStart = exactSymbolKey.IndexOf('(');
+        if (signatureStart <= 0)
+        {
+            return exactSymbolKey;
+        }
+
+        var methodSeparator = -1;
+        var genericDepth = 0;
+        for (var i = 0; i < signatureStart; i++)
+        {
+            var current = exactSymbolKey[i];
+            if (current == '<')
+            {
+                genericDepth++;
+                continue;
+            }
+
+            if (current == '>')
+            {
+                if (genericDepth > 0)
+                {
+                    genericDepth--;
+                }
+
+                continue;
+            }
+
+            if (current == '.' && genericDepth == 0)
+            {
+                methodSeparator = i;
+            }
+        }
+
+        if (methodSeparator <= 0)
+        {
+            return exactSymbolKey;
+        }
+
+        var receiverType = exactSymbolKey[..methodSeparator];
+        var normalizedReceiverType = StripGenericInstantiations(receiverType);
+        if (string.Equals(receiverType, normalizedReceiverType, StringComparison.Ordinal))
+        {
+            return exactSymbolKey;
+        }
+
+        return normalizedReceiverType + exactSymbolKey[methodSeparator..];
+    }
+
+    private static string StripGenericInstantiations(string text)
+    {
+        if (text.IndexOf('<') < 0)
+        {
+            return text;
+        }
+
+        var builder = new StringBuilder(text.Length);
+        var genericDepth = 0;
+        foreach (var current in text)
+        {
+            if (current == '<')
+            {
+                genericDepth++;
+                continue;
+            }
+
+            if (current == '>')
+            {
+                if (genericDepth > 0)
+                {
+                    genericDepth--;
+                }
+
+                continue;
+            }
+
+            if (genericDepth == 0)
+            {
+                builder.Append(current);
+            }
+        }
+
+        return builder.ToString();
     }
 
     internal readonly record struct KnownThrownExceptionSite(int InstructionOffset, string ExceptionType);

@@ -437,6 +437,29 @@ public class TestClass
         }
 
         [Test]
+        public async Task MethodWithDictionaryTryAdd_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+using System.Collections.Generic;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(Dictionary<string, int> dict)
+    {
+        return dict.TryAdd(""newKey"", 100);
+    }
+}";
+
+            var expected = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedRule)
+                                 .WithSpan(9, 17, 9, 27)
+                                 .WithArguments("TestMethod");
+            await VerifyCS.VerifyAnalyzerAsync(test, expected);
+        }
+
+        [Test]
         public async Task MethodWithDictionaryClear_Diagnostic()
         {
             var test = @"

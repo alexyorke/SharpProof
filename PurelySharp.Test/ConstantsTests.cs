@@ -512,8 +512,10 @@ public static class FileSystemPathGetterCatalogSignatureSamples
         {
             var members = new[]
             {
+                "System.Collections.Generic.Dictionary<TKey, TValue>.Add(TKey, TValue)",
                 "System.Collections.Generic.Dictionary<TKey, TValue>.Clear()",
                 "System.Collections.Generic.Dictionary<TKey, TValue>.Remove(TKey)",
+                "System.Collections.Generic.Dictionary<TKey, TValue>.TryAdd(TKey, TValue)",
             };
 
             foreach (var member in members)

@@ -8210,8 +8210,10 @@ public static class DuplicateReviewedSeedFixture
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
                 80,
+                "System.Collections.Generic.Dictionary`2.Add",
                 "System.Collections.Generic.Dictionary`2.Clear",
-                "System.Collections.Generic.Dictionary`2.Remove");
+                "System.Collections.Generic.Dictionary`2.Remove",
+                "System.Collections.Generic.Dictionary`2.TryAdd");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -8219,6 +8221,13 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
             var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
 
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.Dictionary<TKey, TValue>.Add(TKey, TValue)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Dictionary<TKey, TValue>.Add(TKey, TValue) should no longer overlap the manual impure catalog.");
             Assert.That(
                 knownImpureRows.Any(row => string.Equals(
                     row.GetProperty("Symbol").GetString(),
@@ -8233,11 +8242,24 @@ public static class DuplicateReviewedSeedFixture
                     StringComparison.Ordinal)),
                 Is.False,
                 "Dictionary<TKey, TValue>.Remove(TKey) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.Dictionary<TKey, TValue>.TryAdd(TKey, TValue)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Dictionary<TKey, TValue>.TryAdd(TKey, TValue) should no longer overlap the manual impure catalog.");
 
+            AssertPurityClassification(summary, "System.Collections.Generic.Dictionary`2.Add(!0, !1)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Dictionary`2.Add(!0, !1)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.Dictionary`2.Clear()", "impure", "object_state_write");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Dictionary`2.Clear()", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.Dictionary`2.Remove(!0)", "impure", "caller_visible_memory_write", "object_state_write");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Dictionary`2.Remove(!0)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.Dictionary`2.TryAdd(!0, !1)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Dictionary`2.TryAdd(!0, !1)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.Dictionary`2.TryInsert(!0, !1, System.Collections.Generic.InsertionBehavior)", "impure", "caller_visible_memory_write", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Dictionary`2.TryInsert(!0, !1, System.Collections.Generic.InsertionBehavior)", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -8246,8 +8268,11 @@ public static class DuplicateReviewedSeedFixture
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .ToArray();
 
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Dictionary`2.Add(!0, !1)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Dictionary`2.Clear()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Dictionary`2.Remove(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Dictionary`2.TryAdd(!0, !1)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Dictionary`2.TryInsert(!0, !1, System.Collections.Generic.InsertionBehavior)"));
         }
 
         [Test]
