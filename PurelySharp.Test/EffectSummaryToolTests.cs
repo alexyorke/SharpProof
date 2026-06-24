@@ -8205,6 +8205,63 @@ public static class DuplicateReviewedSeedFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeArrayCopyWriteHelperSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                80,
+                "System.Array.Copy(System.Array, int, System.Array, int, int)",
+                "System.Array.CopyTo(System.Array, int)",
+                "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Array.Copy(System.Array, int, System.Array, int, int)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "System.Array.Copy(System.Array, int, System.Array, int, int) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Array.CopyTo(System.Array, int)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "System.Array.CopyTo(System.Array, int) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int) should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(summary, "System.Array.Copy(System.Array, int, System.Array, int, int)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Array.Copy(System.Array, int, System.Array, int, int)", "caller_visible");
+            AssertPurityClassification(summary, "System.Array.CopyTo(System.Array, int)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Array.CopyTo(System.Array, int)", "caller_visible");
+            AssertPurityClassification(summary, "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)", "impure", "impure_callee", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Array.Copy(System.Array, int, System.Array, int, int)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Array.CopyTo(System.Array, int)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeDataContractAttributeSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

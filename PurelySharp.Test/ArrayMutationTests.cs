@@ -122,6 +122,25 @@ public sealed class TestClass
     }
 
     [Test]
+    public async Task BufferBlockCopy_Diagnostic()
+    {
+        var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(int[] source, int[] destination)
+    {
+        Buffer.BlockCopy(source, 0, destination, 0, source.Length * sizeof(int));
+    }
+}";
+
+        await VerifyCS.VerifyAnalyzerAsync(test);
+    }
+
+    [Test]
     public async Task ArrayClearFullArray_Diagnostic()
     {
         var test = @"

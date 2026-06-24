@@ -533,6 +533,22 @@ public static class FileSystemPathGetterCatalogSignatureSamples
         }
 
         [Test]
+        public void ArrayCopyWriteHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Array.Copy(System.Array, int, System.Array, int, int)",
+                "System.Array.CopyTo(System.Array, int)",
+                "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void Utf8ParserAndCrc32Helpers_AreSourcedFromGeneratedEvidence_NotStaticCatalogs()
         {
             var source = @"
