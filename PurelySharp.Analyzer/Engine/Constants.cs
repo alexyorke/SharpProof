@@ -43,7 +43,6 @@ public static class Constants
         "System.Collections.Generic.IDictionary<TKey, TValue>.Keys.get",
         "System.Collections.Generic.IDictionary<TKey, TValue>.Values.get",
         "System.Collections.Queue.Synchronized(System.Collections.Queue)",
-        "System.ReadOnlySpan<T>.ToArray()",
         "System.Text.RegularExpressions.Regex.Split(string, string)",
         "System.Text.RegularExpressions.Regex.Split(string)",
         "System.ComponentModel.TypeDescriptor.GetConverter(System.Type)",
@@ -630,9 +629,7 @@ public static class Constants
 
 
         "System.Collections.Immutable.ImmutableList<T>.Add(T)",
-        "System.Collections.Immutable.ImmutableList<T>.Count.get",
         "System.Collections.Immutable.ImmutableList<T>.SetItem(int, T)",
-        "System.Collections.Immutable.ImmutableList<T>.this[int].get",
         "System.Collections.Immutable.ImmutableList.Create<T>(params T[])",
         "System.Collections.Immutable.ImmutableArray.Create<T>()",
         "System.Collections.Immutable.ImmutableArray.Create<T>(params T[])",
@@ -650,7 +647,6 @@ public static class Constants
         "System.Collections.Immutable.ImmutableHashSet<T>.System.Collections.Immutable.IImmutableSet<T>.Add(T)",
         "System.Collections.Immutable.ImmutableHashSet<T>.System.Collections.Immutable.IImmutableSet<T>.Clear()",
         "System.Collections.Immutable.ImmutableHashSet<T>.System.Collections.Immutable.IImmutableSet<T>.Remove(T)",
-        "System.Collections.Immutable.ImmutableQueue<T>.Enqueue(T)",
         "System.Collections.Immutable.ImmutableQueue<T>.System.Collections.Immutable.IImmutableQueue<T>.Clear()",
         "System.Collections.Immutable.ImmutableQueue<T>.System.Collections.Immutable.IImmutableQueue<T>.Enqueue(T)",
         "System.Collections.Immutable.ImmutableStack<T>.System.Collections.Immutable.IImmutableStack<T>.Clear()",

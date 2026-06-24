@@ -5005,6 +5005,8 @@ public static class StringComparisonFixture
                             Limit = 40,
                             SymbolPrefixes = new[]
                             {
+                                "System.Collections.Immutable.ImmutableList`1.get_Count",
+                                "System.Collections.Immutable.ImmutableList`1.get_Item",
                                 "System.Collections.Immutable.ImmutableQueue`1.Enqueue",
                                 "System.Collections.Immutable.ImmutableQueue`1.Dequeue",
                                 "System.Collections.Immutable.ImmutableStack`1.Push",
@@ -5029,7 +5031,22 @@ public static class StringComparisonFixture
                 Is.EqualTo("System.Collections.Immutable.dll"));
             Assert.That(
                 methods.Any(method =>
+                    string.Equals(method.GetProperty("Symbol").GetString(), "System.Collections.Immutable.ImmutableList`1.get_Count()", StringComparison.Ordinal) &&
+                    string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                methods.Any(method =>
+                    string.Equals(method.GetProperty("Symbol").GetString(), "System.Collections.Immutable.ImmutableList`1.get_Item(int)", StringComparison.Ordinal) &&
+                    string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                methods.Any(method =>
                     string.Equals(method.GetProperty("Symbol").GetString(), "System.Collections.Immutable.ImmutableQueue`1.Enqueue(!0)", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(
+                methods.Any(method =>
+                    string.Equals(method.GetProperty("Symbol").GetString(), "System.Collections.Immutable.ImmutableQueue`1.Enqueue(!0)", StringComparison.Ordinal) &&
+                    string.Equals(method.GetProperty("PurityClassification").GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal)),
                 Is.True);
             Assert.That(
                 methods.Any(method =>

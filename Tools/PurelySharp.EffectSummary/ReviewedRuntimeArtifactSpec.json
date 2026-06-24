@@ -621,10 +621,13 @@
       "SymbolPrefixes": [
         "System.Collections.Immutable.ImmutableDictionary.Create()",
         "System.Collections.Immutable.ImmutableList.Create()",
+        "System.Collections.Immutable.ImmutableList`1.get_Count",
+        "System.Collections.Immutable.ImmutableList`1.get_Item",
         "System.Collections.Immutable.ImmutableHashSet.Create()",
         "System.Collections.Immutable.ImmutableHashSet`1.get_Count",
         "System.Collections.Immutable.ImmutableHashSet`1.get_IsEmpty",
         "System.Collections.Immutable.ImmutableHashSet`1.get_KeyComparer",
+        "System.Collections.Immutable.ImmutableQueue`1.Enqueue",
         "System.Collections.Immutable.ImmutableQueue`1.Dequeue",
         "System.Collections.Immutable.ImmutableQueue`1.Clear",
         "System.Collections.Immutable.ImmutableStack`1.Clear",

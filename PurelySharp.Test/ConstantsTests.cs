@@ -1193,10 +1193,13 @@ public static class KeyedCollectionCatalogSignatureSamples
             {
                 "System.Collections.Immutable.ImmutableDictionary.Create<TKey, TValue>()",
                 "System.Collections.Immutable.ImmutableList.Create<T>()",
+                "System.Collections.Immutable.ImmutableList<T>.Count.get",
+                "System.Collections.Immutable.ImmutableList<T>.this[int].get",
                 "System.Collections.Immutable.ImmutableHashSet.Create<T>()",
                 "System.Collections.Immutable.ImmutableHashSet<T>.Count.get",
                 "System.Collections.Immutable.ImmutableHashSet<T>.IsEmpty.get",
                 "System.Collections.Immutable.ImmutableHashSet<T>.KeyComparer.get",
+                "System.Collections.Immutable.ImmutableQueue<T>.Enqueue(T)",
                 "System.Collections.Immutable.ImmutableQueue<T>.Dequeue()",
                 "System.Collections.Immutable.ImmutableQueue<T>.Clear()",
                 "System.Collections.Immutable.ImmutableStack<T>.Clear()",
@@ -1208,6 +1211,49 @@ public static class KeyedCollectionCatalogSignatureSamples
             foreach (var member in members)
             {
                 AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
+        public void ImmutableCollectionConcreteHelpers_AreDirectlyBackedByGeneratedCatalogRows()
+        {
+            const string source = @"
+using System.Collections.Immutable;
+
+public static class ImmutableConcreteCatalogSignatureSamples
+{
+    public static int Count(ImmutableList<int> list) => list.Count;
+    public static int First(ImmutableList<int> list) => list[0];
+    public static ImmutableQueue<int> Enqueue(ImmutableQueue<int> queue, int value) => queue.Enqueue(value);
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ImmutableConcreteCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+
+            var trackedMembers = new (string expressionText, string signature, Func<SyntaxNode, IMethodSymbol?> resolve)[]
+            {
+                ("list.Count", "System.Collections.Immutable.ImmutableList<T>.Count.get", node => ((IPropertySymbol?)semanticModel.GetSymbolInfo((MemberAccessExpressionSyntax)node).Symbol)?.GetMethod),
+                ("list[0]", "System.Collections.Immutable.ImmutableList<T>.this[int].get", node => ((IPropertySymbol?)semanticModel.GetSymbolInfo((ElementAccessExpressionSyntax)node).Symbol)?.GetMethod),
+                ("queue.Enqueue(value)", "System.Collections.Immutable.ImmutableQueue<T>.Enqueue(T)", node => semanticModel.GetSymbolInfo((InvocationExpressionSyntax)node).Symbol as IMethodSymbol),
+            };
+
+            foreach (var trackedMember in trackedMembers)
+            {
+                var node = syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .Single(candidate => candidate.ToString() == trackedMember.expressionText);
+                var methodSymbol = trackedMember.resolve(node);
+                Assert.That(methodSymbol, Is.Not.Null, trackedMember.signature);
+                var (matched, classification) = GetGeneratedPurityClassification(methodSymbol!, compilation);
+
+                AssertNotInManualCatalogs(trackedMember.signature);
+                Assert.That(matched, Is.True, trackedMember.signature);
+                Assert.That(classification, Is.EqualTo("pure"), trackedMember.signature);
             }
         }
 
