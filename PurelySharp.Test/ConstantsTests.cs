@@ -206,6 +206,7 @@ public static class EnvironmentCatalogSignatureSamples
                 "System.Environment.TickCount.get",
                 "System.Environment.TickCount64.get",
                 "System.Environment.StackTrace.get",
+                "System.Threading.Thread.CurrentThread.get",
             };
 
             foreach (var member in members)

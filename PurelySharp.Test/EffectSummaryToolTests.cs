@@ -6633,7 +6633,8 @@ public static class DuplicateReviewedSeedFixture
                 "System.Environment.Exit",
                 "System.Environment.get_TickCount",
                 "System.Environment.get_TickCount64",
-                "System.Environment.get_StackTrace");
+                "System.Environment.get_StackTrace",
+                "System.Threading.Thread.get_CurrentThread");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -6653,15 +6654,21 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Environment.get_TickCount64()", "unknown");
             AssertPurityClassification(summary, "System.Environment.get_StackTrace()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Environment.get_StackTrace()", "caller_visible");
+            AssertPurityClassification(summary, "System.Threading.Thread.get_CurrentThread()", "impure", "global_state_read");
+            AssertEffectVisibilityClassification(summary, "System.Threading.Thread.get_CurrentThread()", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
                 .EnumerateArray()
                 .Select(entry => entry.GetProperty("Symbol").GetString())
-                .Where(symbol => string.Equals(symbol, "System.Environment.get_StackTrace()", StringComparison.Ordinal))
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Environment.get_StackTrace()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Threading.Thread.get_CurrentThread()", StringComparison.Ordinal))
                 .ToArray();
 
-            Assert.That(generatedSymbols, Is.EqualTo(new[] { "System.Environment.get_StackTrace()" }));
+            Assert.That(
+                generatedSymbols,
+                Is.EqualTo(new[] { "System.Environment.get_StackTrace()", "System.Threading.Thread.get_CurrentThread()" }));
         }
 
         [Test]

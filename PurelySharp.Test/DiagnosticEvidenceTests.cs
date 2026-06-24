@@ -9235,6 +9235,30 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ThreadCurrentThread_UsesGeneratedPuritySummaryEvidence()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Threading;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Thread TestMethod()
+    {
+        return Thread.CurrentThread;
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Threading.Thread.CurrentThread"));
+        }
+
+        [Test]
         public async Task Ps0002_ReflectionCall_IncludesReflectionEnvironmentCategory()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

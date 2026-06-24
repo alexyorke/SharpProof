@@ -236,7 +236,8 @@
         "System.Environment.Exit",
         "System.Environment.get_TickCount",
         "System.Environment.get_TickCount64",
-        "System.Environment.get_StackTrace"
+        "System.Environment.get_StackTrace",
+        "System.Threading.Thread.get_CurrentThread"
       ]
     },
     {

@@ -280,7 +280,6 @@ public static class Constants
 
 
         "System.Threading.Tasks.Task.Yield()",
-        "System.Threading.Thread.CurrentThread.get",
         "System.Threading.Thread.ManagedThreadId.get",
         "System.Threading.Thread.Sleep(int)",
         "System.Threading.Thread.Sleep(System.TimeSpan)",
