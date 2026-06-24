@@ -871,6 +871,13 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Delegate.Combine.PurelySharp.EffectSummary.json",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Delegate.Combine(System.Delegate, System.Delegate)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Marshal.SizeOf.PurelySharp.EffectSummary.json",
       "Limit": 20,
       "SymbolPrefixes": [

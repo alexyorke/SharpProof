@@ -4154,6 +4154,32 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeDelegateCombineSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                20,
+                "System.Delegate.Combine(System.Delegate, System.Delegate)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Delegate.Combine(System.Delegate, System.Delegate)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Delegate.Combine(System.Delegate, System.Delegate)", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Delegate.Combine(System.Delegate, System.Delegate)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeMarshalSizeOfSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(
@@ -7927,12 +7953,51 @@ public static class DuplicateReviewedSeedFixture
                     StringComparison.Ordinal)),
                 Is.False,
                 "List<T>.Capacity.set should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.Add(T)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.Add(T) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.Clear()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.Clear() should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.ForEach(System.Action<T>)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.ForEach(System.Action<T>) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.Insert(int, T)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.Insert(int, T) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.List<T>.Remove(T)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "List<T>.Remove(T) should no longer overlap the manual impure catalog.");
 
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Capacity()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.get_Capacity()", "none");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.set_Capacity(int)", "impure", "global_state_read", "object_state_write");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.set_Capacity(int)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.get_Count()", "pure");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.Add(!0)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Add(!0)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.Clear()", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Clear()", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.Exists(System.Predicate`1<!0>)", "pure");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.FindIndex(System.Predicate`1<!0>)", "pure");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.FindIndex(System.Predicate`1<!0>)", "none");
@@ -7940,6 +8005,12 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Find(System.Predicate`1<!0>)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.FindLast(System.Predicate`1<!0>)", "impure", "caller_visible_memory_write");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.FindLast(System.Predicate`1<!0>)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.ForEach(System.Action`1<!0>)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.ForEach(System.Action`1<!0>)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.Insert(int, !0)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Insert(int, !0)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Generic.List`1.Remove(!0)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.Remove(!0)", "caller_visible");
             AssertPurityClassification(summary, "System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)", "pure");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)", "none");
 
@@ -7953,10 +8024,15 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Capacity()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.set_Capacity(int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.get_Count()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Add(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Clear()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Exists(System.Predicate`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.FindIndex(System.Predicate`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Find(System.Predicate`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.FindLast(System.Predicate`1<!0>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.ForEach(System.Action`1<!0>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Insert(int, !0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.Remove(!0)"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.List`1.TrueForAll(System.Predicate`1<!0>)"));
         }
 

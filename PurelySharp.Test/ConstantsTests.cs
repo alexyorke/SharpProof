@@ -462,6 +462,31 @@ public static class FileSystemPathGetterCatalogSignatureSamples
         }
 
         [Test]
+        public void ListMutatorsAndCollectionsMarshalAsSpan_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Collections.Generic.List<T>.Add(T)",
+                "System.Collections.Generic.List<T>.Clear()",
+                "System.Collections.Generic.List<T>.ForEach(System.Action<T>)",
+                "System.Collections.Generic.List<T>.Insert(int, T)",
+                "System.Collections.Generic.List<T>.Remove(T)",
+                "System.Runtime.InteropServices.CollectionsMarshal.AsSpan<T>(System.Collections.Generic.List<T>)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
+        public void DelegateCombine_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Delegate.Combine(System.Delegate, System.Delegate)");
+        }
+
+        [Test]
         public void Utf8ParserAndCrc32Helpers_AreSourcedFromGeneratedEvidence_NotStaticCatalogs()
         {
             var source = @"
@@ -3345,7 +3370,7 @@ public static class CatalogSignatureSamples
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             Assert.That(GetInvocationSignature(compilation, syntaxTree, "list.Add(1)"), Is.EqualTo("System.Collections.Generic.List<T>.Add(T)"));
-            Assert.That(Constants.KnownImpureMethods, Does.Contain(GetInvocationSignature(compilation, syntaxTree, "list.Add(1)")));
+            Assert.That(Constants.KnownImpureMethods, Does.Not.Contain(GetInvocationSignature(compilation, syntaxTree, "list.Add(1)")));
 
             Assert.That(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback"), Is.EqualTo("System.Net.IPAddress.Loopback.get"));
             Assert.That(Constants.KnownPureBCLMembers, Does.Not.Contain(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback")));
@@ -3461,7 +3486,7 @@ public static class CatalogConflictSamples
                 GetTrustedPlatformReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "list.Add(1)"), expectedPure: false, expectedImpure: true);
+            AssertCatalogMembership(GetInvocationSignature(compilation, syntaxTree, "list.Add(1)"), expectedPure: false, expectedImpure: false);
             AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "IPAddress.Loopback"), expectedPure: false, expectedImpure: false);
             AssertCatalogMembership(GetPropertySignature(compilation, syntaxTree, "list.Count"), expectedPure: false, expectedImpure: false);
         }
@@ -4064,6 +4089,7 @@ public static class ReviewedRuntimeHelperCatalogSignatureSamples
     public static int Sample(ReadOnlySpan<int> values, Delegate left, Delegate right)
     {
         _ = StringInfo.ParseCombiningCharacters(""text"");
+        _ = Delegate.Combine(left, right);
         _ = Delegate.Remove(left, right);
         _ = Marshal.SizeOf<int>();
         _ = new Pipe(PipeOptions.Default);
@@ -4085,6 +4111,7 @@ public static class ReviewedRuntimeHelperCatalogSignatureSamples
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "StringInfo.ParseCombiningCharacters(\"text\")"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Delegate.Combine(left, right)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Delegate.Remove(left, right)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Marshal.SizeOf<int>()"));
             AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new Pipe(PipeOptions.Default)"));

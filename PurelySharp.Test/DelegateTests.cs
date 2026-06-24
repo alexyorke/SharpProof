@@ -566,6 +566,37 @@ public class TestClass
         }
 
         [Test]
+        public async Task DelegateCombineWithPureTargets_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public static void FirstTarget()
+    {
+    }
+
+    [EnforcePure]
+    public static void SecondTarget()
+    {
+    }
+
+    [EnforcePure]
+    public void TestMethod()
+    {
+        Action first = FirstTarget;
+        Action second = SecondTarget;
+        _ = Delegate.Combine(first, second);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task DelegateMethodGroupFromVirtualReceiver_Diagnostic()
         {
             var test = @"
