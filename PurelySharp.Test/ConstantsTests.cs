@@ -684,6 +684,34 @@ public static class SortedCollectionAndBitArrayMutatorCatalogSignatureSamples
         }
 
         [Test]
+        public void ArrayConvertAllAndComparerSort_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System;
+using System.Collections.Generic;
+
+public static class ArrayConvertAllAndComparerSortCatalogSignatureSamples
+{
+    public static void Sample(int[] values, IComparer<int> comparer)
+    {
+        _ = Array.ConvertAll(values, static value => value + 1);
+        Array.Sort(values, comparer);
+        Array.Sort(values, 0, values.Length, comparer);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ArrayConvertAllAndComparerSortCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Array.ConvertAll(values, static value => value + 1)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Array.Sort(values, comparer)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Array.Sort(values, 0, values.Length, comparer)"));
+        }
+
+        [Test]
         public void ArrayCopyWriteHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             var members = new[]

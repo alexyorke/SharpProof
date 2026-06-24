@@ -1813,6 +1813,63 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeArrayConvertAllAndComparerSortSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                40,
+                "System.Array.ConvertAll(!!0[], System.Converter`2<!!0, !!1>)",
+                "System.Array.Sort(!!0[], System.Collections.Generic.IComparer`1<!!0>)",
+                "System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer`1<!!0>)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Array.ConvertAll<TInput, TOutput>(TInput[], System.Converter<TInput, TOutput>)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Array.ConvertAll<TInput, TOutput>(TInput[], System.Converter<TInput, TOutput>) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Array.Sort<T>(T[], System.Collections.Generic.IComparer<T>?)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Array.Sort<T>(T[], IComparer<T>?) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Array.Sort<T>(T[], int, int, System.Collections.Generic.IComparer<T>?)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Array.Sort<T>(T[], int, int, IComparer<T>?) should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(summary, "System.Array.ConvertAll(!!0[], System.Converter`2<!!0, !!1>)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Array.ConvertAll(!!0[], System.Converter`2<!!0, !!1>)", "caller_visible");
+            AssertPurityClassification(summary, "System.Array.Sort(!!0[], System.Collections.Generic.IComparer`1<!!0>)", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Array.Sort(!!0[], System.Collections.Generic.IComparer`1<!!0>)", "caller_visible");
+            AssertPurityClassification(summary, "System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer`1<!!0>)", "impure", "global_state_read", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer`1<!!0>)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Array.ConvertAll(!!0[], System.Converter`2<!!0, !!1>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Array.Sort(!!0[], System.Collections.Generic.IComparer`1<!!0>)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer`1<!!0>)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeStaticCustomAttributeHelperSlice_UsesGeneratedEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

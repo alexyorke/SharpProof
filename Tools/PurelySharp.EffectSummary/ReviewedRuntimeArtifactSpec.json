@@ -55,6 +55,17 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Array.ConvertAllComparerSort.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Array.ConvertAllComparerSort.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "Limit": 40,
+      "SymbolPrefixes": [
+        "System.Array.ConvertAll(!!0[], System.Converter`2<!!0, !!1>)",
+        "System.Array.Sort(!!0[], System.Collections.Generic.IComparer`1<!!0>)",
+        "System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer`1<!!0>)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/Array.IndexOfLength.PurelySharp.EffectSummary.json",
       "Limit": 40,
       "SymbolPrefixes": [

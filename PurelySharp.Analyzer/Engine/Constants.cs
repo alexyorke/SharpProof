@@ -32,7 +32,6 @@ public static class Constants
         "System.Activator.CreateInstance(System.Type)",
         "System.Activator.CreateInstance(System.Type, params object[])",
         "System.Array.AsReadOnly<T>(T[])",
-        "System.Array.ConvertAll<TInput, TOutput>(TInput[], System.Converter<TInput, TOutput>)",
         "System.Array.Reverse(System.Array)",
         "System.Array.Sort(System.Array)",
         "System.Collections.ArrayList.Adapter(System.Collections.IList)",
@@ -530,8 +529,6 @@ public static class Constants
         "System.MemoryExtensions.Reverse<T>(System.Span<T>)",
         "System.Array.Reverse<T>(T[])",
         "System.Array.Reverse<T>(T[], int, int)",
-        "System.Array.Sort<T>(T[], System.Collections.Generic.IComparer<T>?)",
-        "System.Array.Sort<T>(T[], int, int, System.Collections.Generic.IComparer<T>?)",
         "System.Exception.Source.set",
 
 
