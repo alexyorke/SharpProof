@@ -657,6 +657,27 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/ConcurrentQueue.Mutators.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/ConcurrentQueue.Mutators.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "Limit": 30,
+      "SymbolPrefixes": [
+        "System.Collections.Concurrent.ConcurrentQueue`1.Enqueue",
+        "System.Collections.Concurrent.ConcurrentQueue`1.TryDequeue"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/Reflection.StaticAttributeHelpers.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Reflection.StaticAttributeHelpers.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "Limit": 30,
+      "SymbolPrefixes": [
+        "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)",
+        "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)",
+        "System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/ImmutableCollections.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/ImmutableCollections.PurelySharp.EffectSummary.json",
       "PackageId": "System.Collections.Immutable",

@@ -292,6 +292,44 @@ public class TestClass
         }
 
         [Test]
+        public async Task ConcurrentQueueEnqueue_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Concurrent;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(ConcurrentQueue<int> queue, int value)
+    {
+        queue.Enqueue(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConcurrentQueueTryDequeue_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+using System.Collections.Concurrent;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool {|PS0002:TestMethod|}(ConcurrentQueue<int> queue)
+    {
+        return queue.TryDequeue(out _);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task MethodWithListClear_Diagnostic()
         {
             var test = @"

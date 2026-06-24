@@ -1710,6 +1710,109 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeConcurrentQueueMutatorSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                30,
+                "System.Collections.Concurrent.ConcurrentQueue`1.Enqueue",
+                "System.Collections.Concurrent.ConcurrentQueue`1.TryDequeue");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Concurrent.ConcurrentQueue<T>.Enqueue(T)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "ConcurrentQueue<T>.Enqueue(T) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Concurrent.ConcurrentQueue<T>.TryDequeue(out T)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "ConcurrentQueue<T>.TryDequeue(out T) should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(summary, "System.Collections.Concurrent.ConcurrentQueue`1.Enqueue(!0)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Concurrent.ConcurrentQueue`1.Enqueue(!0)", "caller_visible");
+            AssertPurityClassification(summary, "System.Collections.Concurrent.ConcurrentQueue`1.TryDequeue(ref !0)", "impure", "caller_visible_memory_write");
+            AssertEffectVisibilityClassification(summary, "System.Collections.Concurrent.ConcurrentQueue`1.TryDequeue(ref !0)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Concurrent.ConcurrentQueue`1.Enqueue(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Collections.Concurrent.ConcurrentQueue`1.TryDequeue(ref !0)"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeStaticCustomAttributeHelperSlice_UsesGeneratedEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                30,
+                "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)",
+                "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)",
+                "System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Attribute.GetCustomAttribute(MemberInfo, Type) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Attribute.IsDefined(MemberInfo, Type) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "CustomAttributeData.GetCustomAttributes(MemberInfo) should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(summary, "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)", "none");
+            AssertPurityClassification(summary, "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)", "caller_visible");
+            AssertPurityClassification(summary, "System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeKeyValuePairCtorAndAccessorsSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

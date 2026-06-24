@@ -2141,7 +2141,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task AttributeGetCustomAttributeOnMemberInfo_Diagnostic()
+        public async Task AttributeGetCustomAttributeOnMemberInfo_NoDiagnostic()
         {
             var test = @"
 #nullable enable
@@ -2152,7 +2152,7 @@ using System.Reflection;
 public class TestClass
 {
     [EnforcePure]
-    public Attribute? {|PS0002:TestMethod|}(MemberInfo member, Type attributeType)
+    public Attribute? TestMethod(MemberInfo member, Type attributeType)
     {
         return Attribute.GetCustomAttribute(member, attributeType);
     }
@@ -2162,7 +2162,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task CustomAttributeDataGetCustomAttributesOnMemberInfo_Diagnostic()
+        public async Task CustomAttributeDataGetCustomAttributesOnMemberInfo_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -2172,7 +2172,7 @@ using System.Reflection;
 public class TestClass
 {
     [EnforcePure]
-    public IList<CustomAttributeData> {|PS0002:TestMethod|}(MemberInfo member)
+    public IList<CustomAttributeData> TestMethod(MemberInfo member)
     {
         return CustomAttributeData.GetCustomAttributes(member);
     }

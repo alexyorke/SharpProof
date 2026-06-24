@@ -603,6 +603,59 @@ public static class PriorityQueueMutatorCatalogSignatureSamples
         }
 
         [Test]
+        public void ConcurrentQueueMutators_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System.Collections.Concurrent;
+
+public static class ConcurrentQueueMutatorCatalogSignatureSamples
+{
+    public static void Sample(ConcurrentQueue<int> queue, int value)
+    {
+        queue.Enqueue(value);
+        _ = queue.TryDequeue(out _);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ConcurrentQueueMutatorCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "queue.Enqueue(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "queue.TryDequeue(out _)"));
+        }
+
+        [Test]
+        public void StaticCustomAttributeHelpers_AreSourcedFromGeneratedEvidence_NotStaticCatalogs()
+        {
+            const string source = @"
+using System;
+using System.Reflection;
+
+public static class StaticCustomAttributeCatalogSignatureSamples
+{
+    public static void Sample(MemberInfo member, Type attributeType)
+    {
+        _ = Attribute.GetCustomAttribute(member, attributeType);
+        _ = Attribute.IsDefined(member, attributeType);
+        _ = CustomAttributeData.GetCustomAttributes(member);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "StaticCustomAttributeCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Attribute.GetCustomAttribute(member, attributeType)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Attribute.IsDefined(member, attributeType)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "CustomAttributeData.GetCustomAttributes(member)"));
+        }
+
+        [Test]
         public void ArrayCopyWriteHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             var members = new[]

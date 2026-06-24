@@ -5915,6 +5915,164 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_ConcurrentQueueMutatorsAsGeneratedImpureEvidence()
+        {
+            const string source = @"
+using System.Collections.Concurrent;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void EnqueueMethod(ConcurrentQueue<int> queue, int value)
+    {
+        queue.Enqueue(value);
+    }
+
+    [EnforcePure]
+    public bool TryDequeueMethod(ConcurrentQueue<int> queue)
+    {
+        return queue.TryDequeue(out _);
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics.Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId).ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var enqueue = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "queue.Enqueue(value)"))
+                .Symbol!;
+            var tryDequeue = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "queue.TryDequeue(out _)"))
+                .Symbol!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
+            {
+                ("System.Collections.Concurrent.ConcurrentQueue<T>.Enqueue(T)", enqueue.OriginalDefinition),
+                ("System.Collections.Concurrent.ConcurrentQueue<T>.TryDequeue(out T)", tryDequeue.OriginalDefinition),
+            };
+            var classifications = trackedMembers.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(2));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty]).Distinct().ToArray(),
+                Is.EqualTo(new[] { "generated_purity_summary" }));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty]),
+                Has.Some.Contain("System.Collections.Concurrent.ConcurrentQueue<T>.Enqueue"));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty]),
+                Has.Some.Contain("System.Collections.Concurrent.ConcurrentQueue<T>.TryDequeue"));
+            Assert.That(classifications["System.Collections.Concurrent.ConcurrentQueue<T>.Enqueue(T)"], Is.EqualTo((true, "impure")));
+            Assert.That(classifications["System.Collections.Concurrent.ConcurrentQueue<T>.TryDequeue(out T)"], Is.EqualTo((true, "impure")));
+        }
+
+        [Test]
+        public async Task GeneratedPurityCatalog_Resolves_StaticCustomAttributeHelpers()
+        {
+            const string source = @"
+using System;
+using System.Reflection;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int PureHelpers(MemberInfo member, Type attributeType)
+    {
+        _ = Attribute.GetCustomAttribute(member, attributeType);
+        _ = CustomAttributeData.GetCustomAttributes(member);
+        return 0;
+    }
+
+    [EnforcePure]
+    public bool ImpureHelper(MemberInfo member, Type attributeType)
+    {
+        return Attribute.IsDefined(member, attributeType);
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var purityDiagnostics = diagnostics.Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId).ToArray();
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var getCustomAttribute = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "Attribute.GetCustomAttribute(member, attributeType)"))
+                .Symbol!;
+            var isDefined = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "Attribute.IsDefined(member, attributeType)"))
+                .Symbol!;
+            var getCustomAttributesData = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "CustomAttributeData.GetCustomAttributes(member)"))
+                .Symbol!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
+            {
+                ("System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)", getCustomAttribute.OriginalDefinition),
+                ("System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)", isDefined.OriginalDefinition),
+                ("System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)", getCustomAttributesData.OriginalDefinition),
+            };
+            var classifications = trackedMembers.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var args = new object?[] { entry.Symbol, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(1));
+            Assert.That(purityDiagnostics[0].Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(purityDiagnostics[0].Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Attribute.IsDefined"));
+            Assert.That(classifications["System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)"], Is.EqualTo((true, "pure")));
+            Assert.That(classifications["System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)"], Is.EqualTo((true, "impure")));
+            Assert.That(classifications["System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)"], Is.EqualTo((true, "pure")));
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_EmailAddressAttributeConstructor()
         {
             const string source = @"
