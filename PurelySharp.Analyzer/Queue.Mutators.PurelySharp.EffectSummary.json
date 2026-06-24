@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T10:25:59.64738+00:00",
+  "GeneratedAtUtc": "2026-06-24T11:02:24.8546629+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -398,45 +398,6 @@
           "EffectVisibilityClassification": "caller_visible",
           "MatchedExactSymbolKeys": [
             "System.Array.Copy(System.Array, int, System.Array, int, int)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.Queue\u003CT\u003E.Dequeue()",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "caller_visible_memory_write",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.Queue\u00601.Dequeue()-\u003E!0"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.Queue\u003CT\u003E.Enqueue(T)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "caller_visible_memory_write",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.Queue\u00601.Enqueue(!0)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.Queue\u003CT\u003E.ToArray()",
-          "Catalog": "known_impure",
-          "Classification": "pure",
-          "Categories": [],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "internal_only",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.Queue\u00601.ToArray()-\u003E!0[]"
           ]
         }
       ],

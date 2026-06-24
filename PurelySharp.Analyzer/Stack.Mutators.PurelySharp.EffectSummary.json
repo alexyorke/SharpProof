@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T10:25:59.1309313+00:00",
+  "GeneratedAtUtc": "2026-06-24T11:02:24.9904575+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Collections",
@@ -235,52 +235,7 @@
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
       "KnownPureMembers": [],
-      "KnownImpureMembers": [
-        {
-          "Symbol": "System.Collections.Generic.Stack\u003CT\u003E.Pop()",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "caller_visible_memory_write",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.Stack\u00601.Pop()-\u003E!0"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.Stack\u003CT\u003E.Push(T)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "caller_visible_memory_write",
-            "impure_callee",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Generic.Stack\u00601.PushWithResize(!0)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.Stack\u00601.Push(!0)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.Stack\u003CT\u003E.ToArray()",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "caller_visible_memory_write"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.Stack\u00601.ToArray()-\u003E!0[]"
-          ]
-        }
-      ],
+      "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
   },
