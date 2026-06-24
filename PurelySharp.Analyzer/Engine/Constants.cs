@@ -540,8 +540,6 @@ public static class Constants
         "System.Threading.Tasks.Task<TResult>.Result.get",
 
 
-        "System.Array.ConstrainedCopy(System.Array, int, System.Array, int, int)",
-        "System.Array.Copy(System.Array, System.Array, int)",
         "System.Span<T>.CopyTo(System.Span<T>)",
         "System.Span<T>.TryCopyTo(System.Span<T>)",
         "System.MemoryExtensions.Reverse<T>(System.Span<T>)",

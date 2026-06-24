@@ -8463,6 +8463,8 @@ public static class DuplicateReviewedSeedFixture
                 80,
                 "System.Array.Clear(System.Array)",
                 "System.Array.Clear(System.Array, int, int)",
+                "System.Array.ConstrainedCopy(System.Array, int, System.Array, int, int)",
+                "System.Array.Copy(System.Array, System.Array, int)",
                 "System.Array.Copy(System.Array, int, System.Array, int, int)",
                 "System.Array.CopyTo(System.Array, int)",
                 "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)",
@@ -8492,6 +8494,20 @@ public static class DuplicateReviewedSeedFixture
                     StringComparison.Ordinal)),
                 Is.False,
                 "System.Array.Clear(System.Array, int, int) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Array.ConstrainedCopy(System.Array, int, System.Array, int, int)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "System.Array.ConstrainedCopy(System.Array, int, System.Array, int, int) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Array.Copy(System.Array, System.Array, int)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "System.Array.Copy(System.Array, System.Array, int) should no longer overlap the manual impure catalog.");
             Assert.That(
                 knownImpureRows.Any(row => string.Equals(
                     row.GetProperty("Symbol").GetString(),
@@ -8553,6 +8569,10 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Array.Clear(System.Array)", "caller_visible");
             AssertPurityClassification(summary, "System.Array.Clear(System.Array, int, int)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Array.Clear(System.Array, int, int)", "caller_visible");
+            AssertPurityClassification(summary, "System.Array.ConstrainedCopy(System.Array, int, System.Array, int, int)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Array.ConstrainedCopy(System.Array, int, System.Array, int, int)", "caller_visible");
+            AssertPurityClassification(summary, "System.Array.Copy(System.Array, System.Array, int)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Array.Copy(System.Array, System.Array, int)", "caller_visible");
             AssertPurityClassification(summary, "System.Array.Copy(System.Array, int, System.Array, int, int)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Array.Copy(System.Array, int, System.Array, int, int)", "caller_visible");
             AssertPurityClassification(summary, "System.Array.CopyTo(System.Array, int)", "impure", "impure_callee");
@@ -8580,6 +8600,8 @@ public static class DuplicateReviewedSeedFixture
 
             Assert.That(generatedSymbols, Does.Contain("System.Array.Clear(System.Array)"));
             Assert.That(generatedSymbols, Does.Contain("System.Array.Clear(System.Array, int, int)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Array.ConstrainedCopy(System.Array, int, System.Array, int, int)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Array.Copy(System.Array, System.Array, int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Array.Copy(System.Array, int, System.Array, int, int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Array.CopyTo(System.Array, int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)"));

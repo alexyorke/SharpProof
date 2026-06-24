@@ -559,6 +559,8 @@ public static class FileSystemPathGetterCatalogSignatureSamples
             {
                 "System.Array.Clear(System.Array)",
                 "System.Array.Clear(System.Array, int, int)",
+                "System.Array.ConstrainedCopy(System.Array, int, System.Array, int, int)",
+                "System.Array.Copy(System.Array, System.Array, int)",
                 "System.Array.Copy(System.Array, int, System.Array, int, int)",
                 "System.Array.CopyTo(System.Array, int)",
                 "System.Buffer.BlockCopy(System.Array, int, System.Array, int, int)",

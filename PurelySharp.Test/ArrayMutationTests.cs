@@ -110,22 +110,60 @@ public sealed class TestClass
 using System;
 using PurelySharp.Attributes;
 
-    public sealed class TestClass
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(int[] source, int[] destination)
     {
-        [EnforcePure]
-        public void {|PS0002:TestMethod|}(int[] source, int[] destination)
-        {
-            Array.Copy(source, 0, destination, 0, source.Length);
-        }
-    }";
-
-        await VerifyCS.VerifyAnalyzerAsync(test);
+        Array.Copy(source, 0, destination, 0, source.Length);
     }
+}";
 
-    [Test]
-    public async Task ArrayCopyTo_Diagnostic()
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ArrayCopyLengthOverload_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(Array source, Array destination, int length)
     {
-        var test = @"
+        Array.Copy(source, destination, length);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ArrayConstrainedCopy_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(Array source, Array destination, int length)
+    {
+        Array.ConstrainedCopy(source, 0, destination, 0, length);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ArrayCopyTo_Diagnostic()
+        {
+            var test = @"
 using PurelySharp.Attributes;
 
 public sealed class TestClass
@@ -137,13 +175,13 @@ public sealed class TestClass
     }
 }";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
 
-    [Test]
-    public async Task BufferBlockCopy_Diagnostic()
-    {
-        var test = @"
+        [Test]
+        public async Task BufferBlockCopy_Diagnostic()
+        {
+            var test = @"
 using System;
 using PurelySharp.Attributes;
 
@@ -156,13 +194,13 @@ public sealed class TestClass
     }
 }";
 
-        await VerifyCS.VerifyAnalyzerAsync(test);
-    }
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
 
-    [Test]
-    public async Task ArrayClearFullArray_Diagnostic()
-    {
-        var test = @"
+        [Test]
+        public async Task ArrayClearFullArray_Diagnostic()
+        {
+            var test = @"
 using System;
 using PurelySharp.Attributes;
 
