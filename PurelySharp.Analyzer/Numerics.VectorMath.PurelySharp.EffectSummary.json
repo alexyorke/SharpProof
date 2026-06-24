@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:38:52.7341608+00:00",
+  "GeneratedAtUtc": "2026-06-24T09:42:41.1957732+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -8,7 +8,7 @@
       "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
       "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
       "MethodCount": 34519,
-      "EmittedMethodCount": 4,
+      "EmittedMethodCount": 5,
       "Methods": [
         {
           "Symbol": "System.Numerics.Quaternion..ctor(float, float, float, float)",
@@ -183,14 +183,53 @@
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "none"
           }
+        },
+        {
+          "Symbol": "System.Runtime.Intrinsics.X86.Sse.Add(System.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E, System.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E)",
+          "ExactSymbolKey": "System.Runtime.Intrinsics.X86.Sse.Add(System.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E, System.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E)-\u003ESystem.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E",
+          "MetadataToken": "0x06005CB7",
+          "RelativeVirtualAddress": 7854192,
+          "MethodBodySha256": "0e64acd83f70db55b6c80d66a130a8e8c21e8da37e40b2bf11807f387e74c849",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06005CB7|il:0e64acd83f70db55b6c80d66a130a8e8c21e8da37e40b2bf11807f387e74c849",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Runtime.Intrinsics.X86.Sse.Add(System.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E, System.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E)-\u003ESystem.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Runtime.Intrinsics.X86.Sse.Add(System.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E, System.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E)-\u003ESystem.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
         }
       ]
     }
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 4,
-    "PureCount": 4,
+    "MethodCount": 5,
+    "PureCount": 5,
     "ImpureCount": 0,
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
@@ -278,6 +317,26 @@
         "FirstBlockingCallChain": [],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Runtime.Intrinsics.X86.Sse.Add(System.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E, System.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E)",
+        "ExactSymbolKey": "System.Runtime.Intrinsics.X86.Sse.Add(System.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E, System.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E)-\u003ESystem.Runtime.Intrinsics.Vector128\u00601\u003Cfloat\u003E",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06005CB7|il:0e64acd83f70db55b6c80d66a130a8e8c21e8da37e40b2bf11807f387e74c849",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06005CB7",
+        "MethodBodySha256": "0e64acd83f70db55b6c80d66a130a8e8c21e8da37e40b2bf11807f387e74c849",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "none"

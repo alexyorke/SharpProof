@@ -1561,6 +1561,7 @@ public static class ExceptionAccessorCatalogSignatureSamples
                 "System.Range.Range(System.Index, System.Index)",
                 "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute.CallerArgumentExpressionAttribute(string)",
                 "System.Runtime.CompilerServices.MethodImplAttribute.MethodImplAttribute(System.Runtime.CompilerServices.MethodImplOptions)",
+                "System.Security.AllowPartiallyTrustedCallersAttribute.AllowPartiallyTrustedCallersAttribute()",
                 "System.SerializableAttribute.SerializableAttribute()",
                 "System.UIntPtr.UIntPtr(uint)",
             };
@@ -2803,6 +2804,7 @@ public static class IPEndPointCatalogSignatureSamples
             {
                 "System.Numerics.Quaternion.Quaternion(float, float, float, float)",
                 "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)",
+                "System.Runtime.Intrinsics.X86.Sse.Add(System.Runtime.Intrinsics.Vector128<float>, System.Runtime.Intrinsics.Vector128<float>)",
             };
 
             foreach (var member in members)
@@ -4045,6 +4047,26 @@ public static class ReviewedRuntimeHelperCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Delegate.Remove(left, right)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Marshal.SizeOf<int>()"));
             AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new Pipe(PipeOptions.Default)"));
+        }
+
+        [Test]
+        public void MetadataExpressionAndDeadReviewedRuntimeRows_AreNotBackedByManualCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Reflection.Metadata.MetadataReader.GetString(System.Reflection.Metadata.StringHandle)",
+                "System.Diagnostics.CounterSample.Calculate(System.Diagnostics.CounterSample, System.Diagnostics.CounterSample)",
+                "System.Linq.Expressions.Expression.Constant(object)",
+                "System.Linq.Expressions.Expression.Call(System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])",
+                "System.Runtime.Intrinsics.X86.Avx2.Multiply(System.Runtime.Intrinsics.Vector256<double>, System.Runtime.Intrinsics.Vector256<double>)",
+                "System.Reflection.Emit.OpCodes.Ldarg_0.get",
+                "System.Runtime.CompilerServices.IsExternalInit",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
         }
 
         [Test]

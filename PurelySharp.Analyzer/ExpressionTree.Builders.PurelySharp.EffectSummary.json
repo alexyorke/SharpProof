@@ -1,0 +1,274 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-24T09:42:41.4302861+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.Linq.Expressions",
+      "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.Expressions.dll",
+      "AssemblySha256": "4ac5e32afad15a081a34c24d438373d9160c088fdafad2705e520328b3b62acb",
+      "ModuleVersionId": "1b45945d-8a88-4d6f-bbae-a6133731a946",
+      "MethodCount": 4761,
+      "EmittedMethodCount": 4,
+      "Methods": [
+        {
+          "Symbol": "System.Linq.Expressions.Expression.Constant(object)",
+          "ExactSymbolKey": "System.Linq.Expressions.Expression.Constant(object)-\u003ESystem.Linq.Expressions.ConstantExpression",
+          "MetadataToken": "0x0600023B",
+          "RelativeVirtualAddress": 2484968,
+          "MethodBodySha256": "9ae6ffebf284a8cec395808e9d8541e0790d810d89c533125151ce9aba7036aa",
+          "CacheKey": "mvid:1b45945d-8a88-4d6f-bbae-a6133731a946|token:0x0600023B|il:9ae6ffebf284a8cec395808e9d8541e0790d810d89c533125151ce9aba7036aa",
+          "Effects": [
+            "allocates_object"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Linq.Expressions.ConstantExpression..ctor(object)-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Expressions.ConstantExpression..ctor(object)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Linq.Expressions.Expression.Call(System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])",
+          "ExactSymbolKey": "System.Linq.Expressions.Expression.Call(System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])-\u003ESystem.Linq.Expressions.MethodCallExpression",
+          "MetadataToken": "0x060002D1",
+          "RelativeVirtualAddress": 2494520,
+          "MethodBodySha256": "d2644449a21fbbfec5738a13fc4c8e7f3e9bbaf6b9533bc44210dea1946d3f8f",
+          "CacheKey": "mvid:1b45945d-8a88-4d6f-bbae-a6133731a946|token:0x060002D1|il:d2644449a21fbbfec5738a13fc4c8e7f3e9bbaf6b9533bc44210dea1946d3f8f",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Linq.Expressions.Expression.Call(System.Linq.Expressions.Expression, System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])-\u003ESystem.Linq.Expressions.MethodCallExpression"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Expressions.Expression.Call(System.Linq.Expressions.Expression, System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])-\u003ESystem.Linq.Expressions.MethodCallExpression",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Linq.Expressions.Expression.Call(System.Linq.Expressions.Expression, System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])",
+          "ExactSymbolKey": "System.Linq.Expressions.Expression.Call(System.Linq.Expressions.Expression, System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])-\u003ESystem.Linq.Expressions.MethodCallExpression",
+          "MetadataToken": "0x060002D4",
+          "RelativeVirtualAddress": 2494604,
+          "MethodBodySha256": "21d995768f15fb29527f9016ccf87d82788ae67313bb263c23055c648334dbe8",
+          "CacheKey": "mvid:1b45945d-8a88-4d6f-bbae-a6133731a946|token:0x060002D4|il:21d995768f15fb29527f9016ccf87d82788ae67313bb263c23055c648334dbe8",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Linq.Expressions.Expression.Call(System.Linq.Expressions.Expression, System.Reflection.MethodInfo, System.Collections.Generic.IEnumerable\u00601\u003CSystem.Linq.Expressions.Expression\u003E)-\u003ESystem.Linq.Expressions.MethodCallExpression"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Expressions.Expression.Call(System.Linq.Expressions.Expression, System.Reflection.MethodInfo, System.Collections.Generic.IEnumerable\u00601\u003CSystem.Linq.Expressions.Expression\u003E)-\u003ESystem.Linq.Expressions.MethodCallExpression",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Linq.Expressions.ConstantExpression..ctor(object)",
+          "ExactSymbolKey": "System.Linq.Expressions.ConstantExpression..ctor(object)-\u003Evoid",
+          "MetadataToken": "0x06000477",
+          "RelativeVirtualAddress": 2509528,
+          "MethodBodySha256": "5de01dfef8cd1cb85fdca26c7e21cf0bd5a3cfd62452bf044a5acc03e67d0f9f",
+          "CacheKey": "mvid:1b45945d-8a88-4d6f-bbae-a6133731a946|token:0x06000477|il:5de01dfef8cd1cb85fdca26c7e21cf0bd5a3cfd62452bf044a5acc03e67d0f9f",
+          "Effects": [
+            "calls_method",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "fresh_owned_object_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Linq.Expressions.Expression..ctor()-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Linq.Expressions.ConstantExpression.\u003CValue\u003Ek__BackingField"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Linq.Expressions.Expression..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 4,
+    "PureCount": 4,
+    "ImpureCount": 0,
+    "ConservativeUnknownCount": 0,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.Linq.Expressions.ConstantExpression..ctor(object)",
+        "ExactSymbolKey": "System.Linq.Expressions.ConstantExpression..ctor(object)-\u003Evoid",
+        "CacheKey": "mvid:1b45945d-8a88-4d6f-bbae-a6133731a946|token:0x06000477|il:5de01dfef8cd1cb85fdca26c7e21cf0bd5a3cfd62452bf044a5acc03e67d0f9f",
+        "AssemblyName": "System.Linq.Expressions",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.Expressions.dll",
+        "AssemblySha256": "4ac5e32afad15a081a34c24d438373d9160c088fdafad2705e520328b3b62acb",
+        "ModuleVersionId": "1b45945d-8a88-4d6f-bbae-a6133731a946",
+        "MetadataToken": "0x06000477",
+        "MethodBodySha256": "5de01dfef8cd1cb85fdca26c7e21cf0bd5a3cfd62452bf044a5acc03e67d0f9f",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Linq.Expressions.Expression.Call(System.Linq.Expressions.Expression, System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])",
+        "ExactSymbolKey": "System.Linq.Expressions.Expression.Call(System.Linq.Expressions.Expression, System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])-\u003ESystem.Linq.Expressions.MethodCallExpression",
+        "CacheKey": "mvid:1b45945d-8a88-4d6f-bbae-a6133731a946|token:0x060002D4|il:21d995768f15fb29527f9016ccf87d82788ae67313bb263c23055c648334dbe8",
+        "AssemblyName": "System.Linq.Expressions",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.Expressions.dll",
+        "AssemblySha256": "4ac5e32afad15a081a34c24d438373d9160c088fdafad2705e520328b3b62acb",
+        "ModuleVersionId": "1b45945d-8a88-4d6f-bbae-a6133731a946",
+        "MetadataToken": "0x060002D4",
+        "MethodBodySha256": "21d995768f15fb29527f9016ccf87d82788ae67313bb263c23055c648334dbe8",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Linq.Expressions.Expression.Call(System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])",
+        "ExactSymbolKey": "System.Linq.Expressions.Expression.Call(System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])-\u003ESystem.Linq.Expressions.MethodCallExpression",
+        "CacheKey": "mvid:1b45945d-8a88-4d6f-bbae-a6133731a946|token:0x060002D1|il:d2644449a21fbbfec5738a13fc4c8e7f3e9bbaf6b9533bc44210dea1946d3f8f",
+        "AssemblyName": "System.Linq.Expressions",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.Expressions.dll",
+        "AssemblySha256": "4ac5e32afad15a081a34c24d438373d9160c088fdafad2705e520328b3b62acb",
+        "ModuleVersionId": "1b45945d-8a88-4d6f-bbae-a6133731a946",
+        "MetadataToken": "0x060002D1",
+        "MethodBodySha256": "d2644449a21fbbfec5738a13fc4c8e7f3e9bbaf6b9533bc44210dea1946d3f8f",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Linq.Expressions.Expression.Constant(object)",
+        "ExactSymbolKey": "System.Linq.Expressions.Expression.Constant(object)-\u003ESystem.Linq.Expressions.ConstantExpression",
+        "CacheKey": "mvid:1b45945d-8a88-4d6f-bbae-a6133731a946|token:0x0600023B|il:9ae6ffebf284a8cec395808e9d8541e0790d810d89c533125151ce9aba7036aa",
+        "AssemblyName": "System.Linq.Expressions",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Linq.Expressions.dll",
+        "AssemblySha256": "4ac5e32afad15a081a34c24d438373d9160c088fdafad2705e520328b3b62acb",
+        "ModuleVersionId": "1b45945d-8a88-4d6f-bbae-a6133731a946",
+        "MetadataToken": "0x0600023B",
+        "MethodBodySha256": "9ae6ffebf284a8cec395808e9d8541e0790d810d89c533125151ce9aba7036aa",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      }
+    ]
+  }
+}

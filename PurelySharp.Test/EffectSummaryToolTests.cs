@@ -977,9 +977,10 @@ public static class StringComparisonFixture
         public async Task EffectSummaryTool_RuntimeVectorMathPureHelpersSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(
-                12,
+                24,
                 "System.Numerics.Quaternion..ctor(float, float, float, float)",
-                "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)");
+                "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)",
+                "System.Runtime.Intrinsics.X86.Sse.Add(System.Runtime.Intrinsics.Vector128`1<float>, System.Runtime.Intrinsics.Vector128`1<float>)");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
@@ -990,6 +991,105 @@ public static class StringComparisonFixture
 
             AssertPurityClassification(summary, "System.Numerics.Quaternion..ctor(float, float, float, float)", "pure");
             AssertPurityClassification(summary, "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)", "pure");
+            AssertPurityClassification(summary, "System.Runtime.Intrinsics.X86.Sse.Add(System.Runtime.Intrinsics.Vector128`1<float>, System.Runtime.Intrinsics.Vector128`1<float>)", "pure");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeMetadataReaderStringSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Reflection.Metadata.dll",
+                20,
+                "System.Reflection.Metadata.MetadataReader.GetString(System.Reflection.Metadata.StringHandle)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Reflection.Metadata.MetadataReader.GetString(System.Reflection.Metadata.StringHandle)", "pure");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeExpressionBuilderSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Linq.Expressions.dll",
+                24,
+                "System.Linq.Expressions.Expression.Constant(object)",
+                "System.Linq.Expressions.Expression.Call(System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Linq.Expressions.Expression.Constant(object)", "pure");
+            AssertPurityClassification(summary, "System.Linq.Expressions.Expression.Call(System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])", "pure");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_CounterSampleSlice_UsesGeneratedImpureCatalogEntry()
+        {
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-countersample-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var outputPath = Path.Combine(workingDirectory, "CounterSample.Calculate.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Defaults = new
+                    {
+                        Framework = "net8.0",
+                        IncludeCallees = true,
+                        IncludePurityClassification = true,
+                        CompareManualCatalogs = true,
+                    },
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = outputPath,
+                            PackageId = "System.Diagnostics.PerformanceCounter",
+                            PackageVersion = "8.0.0",
+                            PackageAssemblyRelativePath = "lib/net8.0/System.Diagnostics.PerformanceCounter.dll",
+                            Limit = 20,
+                            SymbolPrefixes = new[]
+                            {
+                                "System.Diagnostics.CounterSample.Calculate(System.Diagnostics.CounterSample, System.Diagnostics.CounterSample)",
+                            },
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
+
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Diagnostics.CounterSample.Calculate(System.Diagnostics.CounterSample, System.Diagnostics.CounterSample)", "impure", "throw");
+            AssertEffectVisibilityClassification(summary, "System.Diagnostics.CounterSample.Calculate(System.Diagnostics.CounterSample, System.Diagnostics.CounterSample)", "caller_visible");
         }
 
         [Test]
@@ -8251,6 +8351,7 @@ public static class DuplicateReviewedSeedFixture
                 "System.Range..ctor(System.Index, System.Index)",
                 "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute..ctor(string)",
                 "System.Runtime.CompilerServices.MethodImplAttribute..ctor(System.Runtime.CompilerServices.MethodImplOptions)",
+                "System.Security.AllowPartiallyTrustedCallersAttribute..ctor()",
                 "System.SerializableAttribute..ctor()",
                 "System.Threading.Tasks.ValueTask`1..ctor(!0)",
                 "System.UIntPtr..ctor(uint)");
@@ -8266,6 +8367,7 @@ public static class DuplicateReviewedSeedFixture
                 "System.InvalidOperationException..ctor(string)",
                 "System.ObsoleteAttribute..ctor(string)",
                 "System.Runtime.CompilerServices.MethodImplAttribute..ctor(System.Runtime.CompilerServices.MethodImplOptions)",
+                "System.Security.AllowPartiallyTrustedCallersAttribute..ctor()",
                 "System.Index..ctor(int, bool)",
                 "System.Range..ctor(System.Index, System.Index)",
                 "System.Threading.Tasks.ValueTask`1..ctor(!0)",

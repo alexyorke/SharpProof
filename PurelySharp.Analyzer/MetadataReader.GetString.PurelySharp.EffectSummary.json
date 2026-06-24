@@ -1,0 +1,225 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-24T09:42:41.2622885+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.Reflection.Metadata",
+      "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Reflection.Metadata.dll",
+      "AssemblySha256": "43a726a2f631336922982352f7691cb4aa14224c8ba8805f88f3d0868d97a10f",
+      "ModuleVersionId": "62f7d5b4-a8a9-459d-a41f-08af13e2fdd5",
+      "MethodCount": 3390,
+      "EmittedMethodCount": 3,
+      "Methods": [
+        {
+          "Symbol": "System.Reflection.Metadata.MetadataReader.get_UTF8Decoder()",
+          "ExactSymbolKey": "System.Reflection.Metadata.MetadataReader.get_UTF8Decoder()-\u003ESystem.Reflection.Metadata.MetadataStringDecoder",
+          "MetadataToken": "0x060006AA",
+          "RelativeVirtualAddress": 545984,
+          "MethodBodySha256": "618cd5f4a6151b94444a848fce312162d0f5753dd20fb1cd6979c879e8ffa902",
+          "CacheKey": "mvid:62f7d5b4-a8a9-459d-a41f-08af13e2fdd5|token:0x060006AA|il:618cd5f4a6151b94444a848fce312162d0f5753dd20fb1cd6979c879e8ffa902",
+          "Effects": [
+            "reads_instance_field"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Reflection.Metadata.MetadataReader.\u003CUTF8Decoder\u003Ek__BackingField"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Reflection.Metadata.MetadataReader.GetString(System.Reflection.Metadata.StringHandle)",
+          "ExactSymbolKey": "System.Reflection.Metadata.MetadataReader.GetString(System.Reflection.Metadata.StringHandle)-\u003Estring",
+          "MetadataToken": "0x060006C1",
+          "RelativeVirtualAddress": 546312,
+          "MethodBodySha256": "68f99ce58c97dd81cbd59fb6569ee53472e4663358ee9c6e5099a6acf88d8725",
+          "CacheKey": "mvid:62f7d5b4-a8a9-459d-a41f-08af13e2fdd5|token:0x060006C1|il:68f99ce58c97dd81cbd59fb6569ee53472e4663358ee9c6e5099a6acf88d8725",
+          "Effects": [
+            "calls_method",
+            "reads_instance_field"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Reflection.Metadata.Ecma335.StringHeap.GetString(System.Reflection.Metadata.StringHandle, System.Reflection.Metadata.MetadataStringDecoder)-\u003Estring",
+            "System.Reflection.Metadata.MetadataReader.get_UTF8Decoder()-\u003ESystem.Reflection.Metadata.MetadataStringDecoder"
+          ],
+          "Fields": [
+            "System.Reflection.Metadata.MetadataReader.StringHeap"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Reflection.Metadata.Ecma335.StringHeap.GetString(System.Reflection.Metadata.StringHandle, System.Reflection.Metadata.MetadataStringDecoder)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Reflection.Metadata.MetadataReader.get_UTF8Decoder()-\u003ESystem.Reflection.Metadata.MetadataStringDecoder",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Reflection.Metadata.Ecma335.StringHeap.GetString(System.Reflection.Metadata.StringHandle, System.Reflection.Metadata.MetadataStringDecoder)",
+          "ExactSymbolKey": "System.Reflection.Metadata.Ecma335.StringHeap.GetString(System.Reflection.Metadata.StringHandle, System.Reflection.Metadata.MetadataStringDecoder)-\u003Estring",
+          "MetadataToken": "0x06000994",
+          "RelativeVirtualAddress": 587628,
+          "MethodBodySha256": "6e7e46dba6783f738f726c7aeca44948b37a15c60ff00c39527b923134831304",
+          "CacheKey": "mvid:62f7d5b4-a8a9-459d-a41f-08af13e2fdd5|token:0x06000994|il:6e7e46dba6783f738f726c7aeca44948b37a15c60ff00c39527b923134831304",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Reflection.Metadata.Ecma335.StringHeap.GetNonVirtualString(System.Reflection.Metadata.StringHandle, System.Reflection.Metadata.MetadataStringDecoder, byte[])-\u003Estring",
+            "System.Reflection.Metadata.Ecma335.StringHeap.GetVirtualHandleString(System.Reflection.Metadata.StringHandle, System.Reflection.Metadata.MetadataStringDecoder)-\u003Estring",
+            "System.Reflection.Metadata.StringHandle.get_IsVirtual()-\u003Ebool"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Reflection.Metadata.Ecma335.StringHeap.GetNonVirtualString(System.Reflection.Metadata.StringHandle, System.Reflection.Metadata.MetadataStringDecoder, byte[])-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Reflection.Metadata.Ecma335.StringHeap.GetVirtualHandleString(System.Reflection.Metadata.StringHandle, System.Reflection.Metadata.MetadataStringDecoder)-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Reflection.Metadata.StringHandle.get_IsVirtual()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 3,
+    "PureCount": 3,
+    "ImpureCount": 0,
+    "ConservativeUnknownCount": 0,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.Reflection.Metadata.Ecma335.StringHeap.GetString(System.Reflection.Metadata.StringHandle, System.Reflection.Metadata.MetadataStringDecoder)",
+        "ExactSymbolKey": "System.Reflection.Metadata.Ecma335.StringHeap.GetString(System.Reflection.Metadata.StringHandle, System.Reflection.Metadata.MetadataStringDecoder)-\u003Estring",
+        "CacheKey": "mvid:62f7d5b4-a8a9-459d-a41f-08af13e2fdd5|token:0x06000994|il:6e7e46dba6783f738f726c7aeca44948b37a15c60ff00c39527b923134831304",
+        "AssemblyName": "System.Reflection.Metadata",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Reflection.Metadata.dll",
+        "AssemblySha256": "43a726a2f631336922982352f7691cb4aa14224c8ba8805f88f3d0868d97a10f",
+        "ModuleVersionId": "62f7d5b4-a8a9-459d-a41f-08af13e2fdd5",
+        "MetadataToken": "0x06000994",
+        "MethodBodySha256": "6e7e46dba6783f738f726c7aeca44948b37a15c60ff00c39527b923134831304",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Reflection.Metadata.MetadataReader.GetString(System.Reflection.Metadata.StringHandle)",
+        "ExactSymbolKey": "System.Reflection.Metadata.MetadataReader.GetString(System.Reflection.Metadata.StringHandle)-\u003Estring",
+        "CacheKey": "mvid:62f7d5b4-a8a9-459d-a41f-08af13e2fdd5|token:0x060006C1|il:68f99ce58c97dd81cbd59fb6569ee53472e4663358ee9c6e5099a6acf88d8725",
+        "AssemblyName": "System.Reflection.Metadata",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Reflection.Metadata.dll",
+        "AssemblySha256": "43a726a2f631336922982352f7691cb4aa14224c8ba8805f88f3d0868d97a10f",
+        "ModuleVersionId": "62f7d5b4-a8a9-459d-a41f-08af13e2fdd5",
+        "MetadataToken": "0x060006C1",
+        "MethodBodySha256": "68f99ce58c97dd81cbd59fb6569ee53472e4663358ee9c6e5099a6acf88d8725",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Reflection.Metadata.MetadataReader.get_UTF8Decoder()",
+        "ExactSymbolKey": "System.Reflection.Metadata.MetadataReader.get_UTF8Decoder()-\u003ESystem.Reflection.Metadata.MetadataStringDecoder",
+        "CacheKey": "mvid:62f7d5b4-a8a9-459d-a41f-08af13e2fdd5|token:0x060006AA|il:618cd5f4a6151b94444a848fce312162d0f5753dd20fb1cd6979c879e8ffa902",
+        "AssemblyName": "System.Reflection.Metadata",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Reflection.Metadata.dll",
+        "AssemblySha256": "43a726a2f631336922982352f7691cb4aa14224c8ba8805f88f3d0868d97a10f",
+        "ModuleVersionId": "62f7d5b4-a8a9-459d-a41f-08af13e2fdd5",
+        "MetadataToken": "0x060006AA",
+        "MethodBodySha256": "618cd5f4a6151b94444a848fce312162d0f5753dd20fb1cd6979c879e8ffa902",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      }
+    ]
+  }
+}

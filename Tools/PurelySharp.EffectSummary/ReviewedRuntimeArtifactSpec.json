@@ -580,10 +580,38 @@
     },
     {
       "OutputPath": "PurelySharp.Analyzer/Numerics.VectorMath.PurelySharp.EffectSummary.json",
-      "Limit": 12,
+      "Limit": 24,
       "SymbolPrefixes": [
         "System.Numerics.Quaternion..ctor(float, float, float, float)",
-        "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)"
+        "System.Numerics.Vector3.Normalize(System.Numerics.Vector3)",
+        "System.Runtime.Intrinsics.X86.Sse.Add(System.Runtime.Intrinsics.Vector128`1<float>, System.Runtime.Intrinsics.Vector128`1<float>)"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/MetadataReader.GetString.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Reflection.Metadata.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Reflection.Metadata.MetadataReader.GetString(System.Reflection.Metadata.StringHandle)"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/CounterSample.Calculate.PurelySharp.EffectSummary.json",
+      "PackageId": "System.Diagnostics.PerformanceCounter",
+      "PackageVersion": "8.0.0",
+      "PackageAssemblyRelativePath": "lib/net8.0/System.Diagnostics.PerformanceCounter.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Diagnostics.CounterSample.Calculate(System.Diagnostics.CounterSample, System.Diagnostics.CounterSample)"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/ExpressionTree.Builders.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Linq.Expressions.dll",
+      "Limit": 24,
+      "SymbolPrefixes": [
+        "System.Linq.Expressions.Expression.Constant(object)",
+        "System.Linq.Expressions.Expression.Call(System.Reflection.MethodInfo, System.Linq.Expressions.Expression[])"
       ]
     },
     {
@@ -1026,6 +1054,7 @@
         "System.Range..ctor(System.Index, System.Index)",
         "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute..ctor(string)",
         "System.Runtime.CompilerServices.MethodImplAttribute..ctor(System.Runtime.CompilerServices.MethodImplOptions)",
+        "System.Security.AllowPartiallyTrustedCallersAttribute..ctor()",
         "System.SerializableAttribute..ctor()",
         "System.Threading.Tasks.ValueTask`1..ctor(!0)",
         "System.UIntPtr..ctor(uint)"
