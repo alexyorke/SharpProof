@@ -1,0 +1,311 @@
+{
+  "SchemaVersion": 3,
+  "GeneratedAtUtc": "2026-06-24T13:47:45.1197645+00:00",
+  "Assemblies": [
+    {
+      "AssemblyName": "System.Collections",
+      "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.dll",
+      "AssemblySha256": "f0fe3fc9cecf713d5c29a2fecdf6aafc50b41efb8130a56af54b8c9330c1ffc1",
+      "ModuleVersionId": "3dc059c5-7601-466b-9b9d-ad8601df8f36",
+      "MethodCount": 623,
+      "EmittedMethodCount": 4,
+      "Methods": [
+        {
+          "Symbol": "System.Collections.Generic.SortedDictionary\u00602.get_Keys()",
+          "ExactSymbolKey": "System.Collections.Generic.SortedDictionary\u00602.get_Keys()-\u003ESystem.Collections.Generic.SortedDictionary\u00602\u002BKeyCollection\u003C!0, !1\u003E",
+          "MetadataToken": "0x060000D3",
+          "RelativeVirtualAddress": 131636,
+          "MethodBodySha256": "3715a90c2685cabc4e5812b3d1cb4b49e9355fbb13a36832f0d2c73a830e321e",
+          "CacheKey": "mvid:3dc059c5-7601-466b-9b9d-ad8601df8f36|token:0x060000D3|il:3715a90c2685cabc4e5812b3d1cb4b49e9355fbb13a36832f0d2c73a830e321e",
+          "Effects": [
+            "allocates_object",
+            "reads_instance_field",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "object_state_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Generic.SortedDictionary\u00602\u002BKeyCollection\u003C!0, !1\u003E..ctor(System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E)-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Collections.Generic.SortedDictionary\u00602._keys"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Generic.SortedDictionary\u00602\u002BKeyCollection\u003C!0, !1\u003E..ctor(System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "object_state_write"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Generic.SortedDictionary\u00602.get_Values()",
+          "ExactSymbolKey": "System.Collections.Generic.SortedDictionary\u00602.get_Values()-\u003ESystem.Collections.Generic.SortedDictionary\u00602\u002BValueCollection\u003C!0, !1\u003E",
+          "MetadataToken": "0x060000D6",
+          "RelativeVirtualAddress": 131692,
+          "MethodBodySha256": "34768d769da428acc08293f41e6b3cd87fa1f922a1c06efee89b651f5718d314",
+          "CacheKey": "mvid:3dc059c5-7601-466b-9b9d-ad8601df8f36|token:0x060000D6|il:34768d769da428acc08293f41e6b3cd87fa1f922a1c06efee89b651f5718d314",
+          "Effects": [
+            "allocates_object",
+            "reads_instance_field",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "object_state_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Generic.SortedDictionary\u00602\u002BValueCollection\u003C!0, !1\u003E..ctor(System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E)-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Collections.Generic.SortedDictionary\u00602._values"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Generic.SortedDictionary\u00602\u002BValueCollection\u003C!0, !1\u003E..ctor(System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "object_state_write"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Generic.SortedDictionary\u00602\u002BKeyCollection..ctor(System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E)",
+          "ExactSymbolKey": "System.Collections.Generic.SortedDictionary\u00602\u002BKeyCollection..ctor(System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E)-\u003Evoid",
+          "MetadataToken": "0x060000FC",
+          "RelativeVirtualAddress": 133184,
+          "MethodBodySha256": "517399ef61560d74fb73595e070ae9e6d1fad0237d3e10d7d6c02a5bb2216e13",
+          "CacheKey": "mvid:3dc059c5-7601-466b-9b9d-ad8601df8f36|token:0x060000FC|il:517399ef61560d74fb73595e070ae9e6d1fad0237d3e10d7d6c02a5bb2216e13",
+          "Effects": [
+            "calls_method",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "object_state_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "object..ctor()-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Collections.Generic.SortedDictionary\u00602\u002BKeyCollection._dictionary"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "object..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Collections.Generic.SortedDictionary\u00602\u002BValueCollection..ctor(System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E)",
+          "ExactSymbolKey": "System.Collections.Generic.SortedDictionary\u00602\u002BValueCollection..ctor(System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E)-\u003Evoid",
+          "MetadataToken": "0x06000114",
+          "RelativeVirtualAddress": 134008,
+          "MethodBodySha256": "a6315cb3a43810006d58e0abd3414a237fa7077e390e86fcd770aaf4a7dc01c8",
+          "CacheKey": "mvid:3dc059c5-7601-466b-9b9d-ad8601df8f36|token:0x06000114|il:a6315cb3a43810006d58e0abd3414a237fa7077e390e86fcd770aaf4a7dc01c8",
+          "Effects": [
+            "calls_method",
+            "writes_instance_field"
+          ],
+          "RootCandidates": [
+            "object_state_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+            "object..ctor()-\u003Evoid"
+          ],
+          "Fields": [
+            "System.Collections.Generic.SortedDictionary\u00602\u002BValueCollection._dictionary"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.ArgumentNullException.ThrowIfNull(object, string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "object..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        }
+      ]
+    }
+  ],
+  "PurityReport": {
+    "SchemaVersion": 3,
+    "MethodCount": 4,
+    "PureCount": 2,
+    "ImpureCount": 2,
+    "ConservativeUnknownCount": 0,
+    "CatalogComparison": {
+      "KnownPureMembers": [],
+      "KnownImpureMembers": [],
+      "KnownFreshOwnedArrayReturningMembers": []
+    }
+  },
+  "GeneratedPurityCatalog": {
+    "SchemaVersion": 2,
+    "Entries": [
+      {
+        "Symbol": "System.Collections.Generic.SortedDictionary\u00602\u002BKeyCollection..ctor(System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E)",
+        "ExactSymbolKey": "System.Collections.Generic.SortedDictionary\u00602\u002BKeyCollection..ctor(System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E)-\u003Evoid",
+        "CacheKey": "mvid:3dc059c5-7601-466b-9b9d-ad8601df8f36|token:0x060000FC|il:517399ef61560d74fb73595e070ae9e6d1fad0237d3e10d7d6c02a5bb2216e13",
+        "AssemblyName": "System.Collections",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.dll",
+        "AssemblySha256": "f0fe3fc9cecf713d5c29a2fecdf6aafc50b41efb8130a56af54b8c9330c1ffc1",
+        "ModuleVersionId": "3dc059c5-7601-466b-9b9d-ad8601df8f36",
+        "MetadataToken": "0x060000FC",
+        "MethodBodySha256": "517399ef61560d74fb73595e070ae9e6d1fad0237d3e10d7d6c02a5bb2216e13",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Collections.Generic.SortedDictionary\u00602\u002BValueCollection..ctor(System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E)",
+        "ExactSymbolKey": "System.Collections.Generic.SortedDictionary\u00602\u002BValueCollection..ctor(System.Collections.Generic.SortedDictionary\u00602\u003C!0, !1\u003E)-\u003Evoid",
+        "CacheKey": "mvid:3dc059c5-7601-466b-9b9d-ad8601df8f36|token:0x06000114|il:a6315cb3a43810006d58e0abd3414a237fa7077e390e86fcd770aaf4a7dc01c8",
+        "AssemblyName": "System.Collections",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.dll",
+        "AssemblySha256": "f0fe3fc9cecf713d5c29a2fecdf6aafc50b41efb8130a56af54b8c9330c1ffc1",
+        "ModuleVersionId": "3dc059c5-7601-466b-9b9d-ad8601df8f36",
+        "MetadataToken": "0x06000114",
+        "MethodBodySha256": "a6315cb3a43810006d58e0abd3414a237fa7077e390e86fcd770aaf4a7dc01c8",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Collections.Generic.SortedDictionary\u00602.get_Keys()",
+        "ExactSymbolKey": "System.Collections.Generic.SortedDictionary\u00602.get_Keys()-\u003ESystem.Collections.Generic.SortedDictionary\u00602\u002BKeyCollection\u003C!0, !1\u003E",
+        "CacheKey": "mvid:3dc059c5-7601-466b-9b9d-ad8601df8f36|token:0x060000D3|il:3715a90c2685cabc4e5812b3d1cb4b49e9355fbb13a36832f0d2c73a830e321e",
+        "AssemblyName": "System.Collections",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.dll",
+        "AssemblySha256": "f0fe3fc9cecf713d5c29a2fecdf6aafc50b41efb8130a56af54b8c9330c1ffc1",
+        "ModuleVersionId": "3dc059c5-7601-466b-9b9d-ad8601df8f36",
+        "MetadataToken": "0x060000D3",
+        "MethodBodySha256": "3715a90c2685cabc4e5812b3d1cb4b49e9355fbb13a36832f0d2c73a830e321e",
+        "Classification": "impure",
+        "PrimaryCategory": "object_state_write",
+        "Categories": [
+          "object_state_write"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      },
+      {
+        "Symbol": "System.Collections.Generic.SortedDictionary\u00602.get_Values()",
+        "ExactSymbolKey": "System.Collections.Generic.SortedDictionary\u00602.get_Values()-\u003ESystem.Collections.Generic.SortedDictionary\u00602\u002BValueCollection\u003C!0, !1\u003E",
+        "CacheKey": "mvid:3dc059c5-7601-466b-9b9d-ad8601df8f36|token:0x060000D6|il:34768d769da428acc08293f41e6b3cd87fa1f922a1c06efee89b651f5718d314",
+        "AssemblyName": "System.Collections",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.dll",
+        "AssemblySha256": "f0fe3fc9cecf713d5c29a2fecdf6aafc50b41efb8130a56af54b8c9330c1ffc1",
+        "ModuleVersionId": "3dc059c5-7601-466b-9b9d-ad8601df8f36",
+        "MetadataToken": "0x060000D6",
+        "MethodBodySha256": "34768d769da428acc08293f41e6b3cd87fa1f922a1c06efee89b651f5718d314",
+        "Classification": "impure",
+        "PrimaryCategory": "object_state_write",
+        "Categories": [
+          "object_state_write"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
+      }
+    ]
+  }
+}

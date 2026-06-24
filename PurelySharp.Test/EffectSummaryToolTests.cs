@@ -8353,6 +8353,91 @@ public static class DuplicateReviewedSeedFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeDictionaryViewGetterSlices_UseGeneratedPurityCatalogEntries()
+        {
+            using var dictionarySummary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.Collections.Generic.Dictionary`2.get_Keys",
+                "System.Collections.Generic.Dictionary`2.get_Values");
+            using var sortedDictionarySummary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Collections.dll",
+                20,
+                "System.Collections.Generic.SortedDictionary`2.get_Keys",
+                "System.Collections.Generic.SortedDictionary`2.get_Values");
+
+            var dictionaryReport = dictionarySummary.RootElement.GetProperty("PurityReport");
+            var dictionaryCatalogComparison = dictionaryReport.GetProperty("CatalogComparison");
+            Assert.That(dictionaryCatalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(dictionaryCatalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var dictionaryKnownImpureRows = dictionaryCatalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                dictionaryKnownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.Dictionary<TKey, TValue>.Keys.get",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Dictionary<TKey, TValue>.Keys.get should no longer overlap the manual impure catalog.");
+            Assert.That(
+                dictionaryKnownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.Dictionary<TKey, TValue>.Values.get",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Dictionary<TKey, TValue>.Values.get should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(dictionarySummary, "System.Collections.Generic.Dictionary`2.get_Keys()", "impure", "impure_callee", "object_state_write");
+            AssertEffectVisibilityClassification(dictionarySummary, "System.Collections.Generic.Dictionary`2.get_Keys()", "caller_visible");
+            AssertPurityClassification(dictionarySummary, "System.Collections.Generic.Dictionary`2.get_Values()", "impure", "impure_callee", "object_state_write");
+            AssertEffectVisibilityClassification(dictionarySummary, "System.Collections.Generic.Dictionary`2.get_Values()", "caller_visible");
+
+            var sortedDictionaryReport = sortedDictionarySummary.RootElement.GetProperty("PurityReport");
+            var sortedDictionaryCatalogComparison = sortedDictionaryReport.GetProperty("CatalogComparison");
+            Assert.That(sortedDictionaryCatalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(sortedDictionaryCatalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+            var sortedDictionaryKnownImpureRows = sortedDictionaryCatalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+
+            Assert.That(
+                sortedDictionaryKnownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.SortedDictionary<TKey, TValue>.Keys.get",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "SortedDictionary<TKey, TValue>.Keys.get should no longer overlap the manual impure catalog.");
+            Assert.That(
+                sortedDictionaryKnownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Collections.Generic.SortedDictionary<TKey, TValue>.Values.get",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "SortedDictionary<TKey, TValue>.Values.get should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(sortedDictionarySummary, "System.Collections.Generic.SortedDictionary`2.get_Keys()", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(sortedDictionarySummary, "System.Collections.Generic.SortedDictionary`2.get_Keys()", "caller_visible");
+            AssertPurityClassification(sortedDictionarySummary, "System.Collections.Generic.SortedDictionary`2.get_Values()", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(sortedDictionarySummary, "System.Collections.Generic.SortedDictionary`2.get_Values()", "caller_visible");
+
+            var dictionaryGeneratedSymbols = dictionarySummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+            var sortedDictionaryGeneratedSymbols = sortedDictionarySummary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(dictionaryGeneratedSymbols, Does.Contain("System.Collections.Generic.Dictionary`2.get_Keys()"));
+            Assert.That(dictionaryGeneratedSymbols, Does.Contain("System.Collections.Generic.Dictionary`2.get_Values()"));
+            Assert.That(sortedDictionaryGeneratedSymbols, Does.Contain("System.Collections.Generic.SortedDictionary`2.get_Keys()"));
+            Assert.That(sortedDictionaryGeneratedSymbols, Does.Contain("System.Collections.Generic.SortedDictionary`2.get_Values()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeArrayCopyWriteHelperSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

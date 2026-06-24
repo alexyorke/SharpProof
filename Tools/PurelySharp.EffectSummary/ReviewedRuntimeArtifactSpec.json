@@ -562,6 +562,26 @@
       ]
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/Dictionary.KeysValues.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/Dictionary.KeysValues.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Collections.Generic.Dictionary`2.get_Keys",
+        "System.Collections.Generic.Dictionary`2.get_Values"
+      ]
+    },
+    {
+      "OutputPath": "PurelySharp.Analyzer/SortedDictionary.KeysValues.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/SortedDictionary.KeysValues.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Collections.dll",
+      "Limit": 20,
+      "SymbolPrefixes": [
+        "System.Collections.Generic.SortedDictionary`2.get_Keys",
+        "System.Collections.Generic.SortedDictionary`2.get_Values"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/HashSet.Mutators.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Private.CoreLib.dll",
       "IncludeCallees": false,

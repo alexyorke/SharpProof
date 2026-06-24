@@ -6919,6 +6919,105 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_DictionaryAndSortedDictionaryViewGetters()
+        {
+            const string source = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Dictionary<int, string>.KeyCollection DictionaryKeys(Dictionary<int, string> values)
+    {
+        return values.Keys;
+    }
+
+    [EnforcePure]
+    public Dictionary<int, string>.ValueCollection DictionaryValues(Dictionary<int, string> values)
+    {
+        return values.Values;
+    }
+
+    [EnforcePure]
+    public SortedDictionary<int, string>.KeyCollection SortedKeys(SortedDictionary<int, string> values)
+    {
+        return values.Keys;
+    }
+
+    [EnforcePure]
+    public SortedDictionary<int, string>.ValueCollection SortedValues(SortedDictionary<int, string> values)
+    {
+        return values.Values;
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMembers = new (string Label, string MethodName, string ExpressionText)[]
+            {
+                (
+                    "System.Collections.Generic.Dictionary<TKey, TValue>.Keys.get",
+                    "DictionaryKeys",
+                    "values.Keys"),
+                (
+                    "System.Collections.Generic.Dictionary<TKey, TValue>.Values.get",
+                    "DictionaryValues",
+                    "values.Values"),
+                (
+                    "System.Collections.Generic.SortedDictionary<TKey, TValue>.Keys.get",
+                    "SortedKeys",
+                    "values.Keys"),
+                (
+                    "System.Collections.Generic.SortedDictionary<TKey, TValue>.Values.get",
+                    "SortedValues",
+                    "values.Values"),
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty), CancellationToken.None })!;
+            var classifications = trackedMembers.ToDictionary(
+                entry => entry.Label,
+                entry =>
+                {
+                    var memberAccess = syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<MemberAccessExpressionSyntax>()
+                        .Single(node =>
+                            node.ToString() == entry.ExpressionText &&
+                            string.Equals(
+                                node.Ancestors().OfType<MethodDeclarationSyntax>().First().Identifier.ValueText,
+                                entry.MethodName,
+                                StringComparison.Ordinal));
+                    var symbol = ((IPropertySymbol)semanticModel.GetSymbolInfo(memberAccess).Symbol!).GetMethod!;
+                    var args = new object?[] { symbol.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2]!;
+                    var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+                    return (matched, classification);
+                });
+
+            Assert.That(
+                diagnostics.Count(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.EqualTo(4),
+                "Concrete Dictionary/SortedDictionary view getters should still report diagnostics after moving off the static impure catalog.");
+            foreach (var label in classifications.Keys)
+            {
+                Assert.That(classifications[label].matched, Is.True,
+                    "Generated purity catalog should resolve " + label + ".");
+                Assert.That(classifications[label].classification, Is.EqualTo("impure"),
+                    "Generated purity catalog should classify " + label + " as impure.");
+            }
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_InterfaceCollectionLookupHelpers()
         {
             const string source = @"

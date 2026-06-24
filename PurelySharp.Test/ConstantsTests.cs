@@ -966,6 +966,58 @@ public static class SortedDictionaryCatalogSignatureSamples
         }
 
         [Test]
+        public void DictionaryAndSortedDictionaryViewGetters_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Collections.Generic;
+
+public static class CollectionViewCatalogSignatureSamples
+{
+    public static Dictionary<int, string>.KeyCollection DictionaryKeys(Dictionary<int, string> values) => values.Keys;
+    public static Dictionary<int, string>.ValueCollection DictionaryValues(Dictionary<int, string> values) => values.Values;
+    public static SortedDictionary<int, string>.KeyCollection SortedKeys(SortedDictionary<int, string> values) => values.Keys;
+    public static SortedDictionary<int, string>.ValueCollection SortedValues(SortedDictionary<int, string> values) => values.Values;
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "CollectionViewCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+
+            var trackedMembers = new (string methodName, string expressionText, string signature)[]
+            {
+                ("DictionaryKeys", "values.Keys", "System.Collections.Generic.Dictionary<TKey, TValue>.Keys.get"),
+                ("DictionaryValues", "values.Values", "System.Collections.Generic.Dictionary<TKey, TValue>.Values.get"),
+                ("SortedKeys", "values.Keys", "System.Collections.Generic.SortedDictionary<TKey, TValue>.Keys.get"),
+                ("SortedValues", "values.Values", "System.Collections.Generic.SortedDictionary<TKey, TValue>.Values.get"),
+            };
+
+            foreach (var trackedMember in trackedMembers)
+            {
+                var memberAccess = syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<MemberAccessExpressionSyntax>()
+                    .Single(node =>
+                        node.ToString() == trackedMember.expressionText &&
+                        string.Equals(
+                            node.Ancestors().OfType<MethodDeclarationSyntax>().First().Identifier.ValueText,
+                            trackedMember.methodName,
+                            StringComparison.Ordinal));
+                var propertySymbol = (IPropertySymbol?)semanticModel.GetSymbolInfo(memberAccess).Symbol;
+                Assert.That(propertySymbol, Is.Not.Null, trackedMember.signature);
+                var getter = propertySymbol!.GetMethod;
+                Assert.That(getter, Is.Not.Null, trackedMember.signature);
+                var (matched, classification) = GetGeneratedPurityClassification(getter!, compilation);
+
+                AssertNotInManualCatalogs(trackedMember.signature);
+                Assert.That(matched, Is.True, trackedMember.signature);
+                Assert.That(classification, Is.EqualTo("impure"), trackedMember.signature);
+            }
+        }
+
+        [Test]
         public void InterfaceCollectionLookupHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"
