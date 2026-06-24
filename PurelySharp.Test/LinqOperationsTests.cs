@@ -1210,6 +1210,27 @@ public class TestClass
         }
 
         [Test]
+        public async Task LinqOrderByWithStringComparerOrdinal_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public IOrderedEnumerable<string> TestMethod(IEnumerable<string> values)
+    {
+        return values.OrderBy(value => value, StringComparer.Ordinal);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task LinqMinDefaultComparisonDispatchToImpureComparable_Diagnostic()
         {
             var test = @"

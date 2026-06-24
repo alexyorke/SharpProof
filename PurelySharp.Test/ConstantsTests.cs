@@ -1593,6 +1593,7 @@ public static class MutableCollectionCatalogSignatureSamples
         public void StaticCacheGetterHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
@@ -1604,6 +1605,8 @@ public static class StaticCacheGetterCatalogSignatureSamples
     {
         _ = Comparer<int>.Default;
         _ = EqualityComparer<int>.Default;
+        _ = StringComparer.Ordinal;
+        _ = StringComparer.OrdinalIgnoreCase;
         _ = Task.CompletedTask;
         _ = Encoding.ASCII;
         return CultureInfo.InvariantCulture;
@@ -1618,6 +1621,8 @@ public static class StaticCacheGetterCatalogSignatureSamples
 
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Comparer<int>.Default"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "EqualityComparer<int>.Default"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "StringComparer.Ordinal"));
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "StringComparer.OrdinalIgnoreCase"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Task.CompletedTask"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "Encoding.ASCII"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "CultureInfo.InvariantCulture"));

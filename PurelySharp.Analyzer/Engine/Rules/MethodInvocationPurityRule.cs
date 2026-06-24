@@ -3775,7 +3775,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     Property:
                     {
                         IsStatic: true,
-                        Name: "Ordinal" or "OrdinalIgnoreCase",
                         ContainingType: { } containingType,
                         GetMethod: { } getterSymbol
                     }

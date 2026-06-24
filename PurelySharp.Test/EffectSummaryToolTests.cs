@@ -2499,6 +2499,8 @@ public static class StringComparisonFixture
                 40,
                 "System.Collections.Generic.Comparer`1.get_Default",
                 "System.Collections.Generic.EqualityComparer`1.get_Default",
+                "System.StringComparer.get_Ordinal",
+                "System.StringComparer.get_OrdinalIgnoreCase",
                 "System.Globalization.CultureInfo.get_InvariantCulture",
                 "System.Text.Encoding.get_ASCII",
                 "System.Threading.Tasks.Task.get_CompletedTask");
@@ -2513,6 +2515,10 @@ public static class StringComparisonFixture
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.Comparer`1.get_Default()", "internal_only");
             AssertPurityClassification(summary, "System.Collections.Generic.EqualityComparer`1.get_Default()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Collections.Generic.EqualityComparer`1.get_Default()", "internal_only");
+            AssertPurityClassification(summary, "System.StringComparer.get_Ordinal()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.StringComparer.get_Ordinal()", "internal_only");
+            AssertPurityClassification(summary, "System.StringComparer.get_OrdinalIgnoreCase()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.StringComparer.get_OrdinalIgnoreCase()", "internal_only");
             AssertPurityClassification(summary, "System.Globalization.CultureInfo.get_InvariantCulture()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Globalization.CultureInfo.get_InvariantCulture()", "internal_only");
             AssertPurityClassification(summary, "System.Text.Encoding.get_ASCII()", "pure");
@@ -2529,6 +2535,8 @@ public static class StringComparisonFixture
 
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.Comparer`1.get_Default()"));
             Assert.That(generatedSymbols, Does.Contain("System.Collections.Generic.EqualityComparer`1.get_Default()"));
+            Assert.That(generatedSymbols, Does.Contain("System.StringComparer.get_Ordinal()"));
+            Assert.That(generatedSymbols, Does.Contain("System.StringComparer.get_OrdinalIgnoreCase()"));
             Assert.That(generatedSymbols, Does.Contain("System.Globalization.CultureInfo.get_InvariantCulture()"));
             Assert.That(generatedSymbols, Does.Contain("System.Text.Encoding.get_ASCII()"));
             Assert.That(generatedSymbols, Does.Contain("System.Threading.Tasks.Task.get_CompletedTask()"));

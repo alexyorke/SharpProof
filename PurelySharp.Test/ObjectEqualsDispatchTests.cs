@@ -1068,6 +1068,27 @@ public class TestClass
         }
 
         [Test]
+        public async Task LinqSequenceEqualWithStringComparerOrdinalIgnoreCase_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(IEnumerable<string> left, IEnumerable<string> right)
+    {
+        return left.SequenceEqual(right, StringComparer.OrdinalIgnoreCase);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task LinqContainsNullComparerDispatchesToImpureEquatableImplementation_Diagnostic()
         {
             var test = @"

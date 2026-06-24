@@ -658,6 +658,7 @@ public class TestClass
         public async Task GeneratedPurityCatalog_Resolves_StaticCachePureGetters()
         {
             const string source = @"
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
@@ -671,6 +672,8 @@ public class TestClass
     {
         _ = Comparer<int>.Default;
         _ = EqualityComparer<int>.Default;
+        _ = StringComparer.Ordinal;
+        _ = StringComparer.OrdinalIgnoreCase;
         _ = Task.CompletedTask;
         _ = Encoding.ASCII;
         _ = CultureInfo.InvariantCulture;
@@ -692,6 +695,8 @@ public class TestClass
                 .Where(node =>
                     node.ToString() == "Comparer<int>.Default" ||
                     node.ToString() == "EqualityComparer<int>.Default" ||
+                    node.ToString() == "StringComparer.Ordinal" ||
+                    node.ToString() == "StringComparer.OrdinalIgnoreCase" ||
                     node.ToString() == "Task.CompletedTask" ||
                     node.ToString() == "Encoding.ASCII" ||
                     node.ToString() == "CultureInfo.InvariantCulture")
@@ -714,10 +719,15 @@ public class TestClass
                     return (matched, classification);
                 });
 
+            Assert.That(diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
             Assert.That(classifications["Comparer<int>.Default"].matched, Is.True);
             Assert.That(classifications["Comparer<int>.Default"].classification, Is.EqualTo("pure"));
             Assert.That(classifications["EqualityComparer<int>.Default"].matched, Is.True);
             Assert.That(classifications["EqualityComparer<int>.Default"].classification, Is.EqualTo("pure"));
+            Assert.That(classifications["StringComparer.Ordinal"].matched, Is.True);
+            Assert.That(classifications["StringComparer.Ordinal"].classification, Is.EqualTo("pure"));
+            Assert.That(classifications["StringComparer.OrdinalIgnoreCase"].matched, Is.True);
+            Assert.That(classifications["StringComparer.OrdinalIgnoreCase"].classification, Is.EqualTo("pure"));
             Assert.That(classifications["Task.CompletedTask"].matched, Is.True);
             Assert.That(classifications["Task.CompletedTask"].classification, Is.EqualTo("pure"));
             Assert.That(classifications["Encoding.ASCII"].matched, Is.True);
