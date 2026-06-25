@@ -637,5 +637,8 @@ public static class Constants
         "System.FormattableString.Invariant(System.FormattableString)",
         "System.FormattableString.ToString(System.IFormatProvider)",
 
+        "System.Enum.HasFlag(System.Enum)",
+        "System.Enum.ToString()",
+
     };
 }
