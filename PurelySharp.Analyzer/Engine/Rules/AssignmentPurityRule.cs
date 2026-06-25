@@ -291,6 +291,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            if (IsValueTypeWithInitializerAssignment(propertyReference, context))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             if (IsSourceAutoPropertySetter(propertyReference.Property))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;

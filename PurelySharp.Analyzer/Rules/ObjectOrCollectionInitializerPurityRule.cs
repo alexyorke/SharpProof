@@ -1,8 +1,10 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Analyzer.Engine.Rules;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 
 namespace PurelySharp.Analyzer.Engine.Rules
 {
@@ -105,6 +107,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     return targetExpressionResult;
                 }
 
+                // Synthesized record struct positional setters have no source body and are incorrectly
+                // classified as impure. Inside a value-type 'with' expression (fresh copy), they are trivially pure.
+                if (IsInsideValueTypeWithExpression(assignment) &&
+                    IsSynthesizedFromPrimaryConstructorParameter(propertyReference.Property))
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                }
+
                 var setterPurity = PurityAnalysisEngine.GetCalleePurity(setter.OriginalDefinition, context);
                 return setterPurity.IsPure
                     ? PurityAnalysisEngine.PurityAnalysisResult.Pure
@@ -112,6 +122,18 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        }
+
+        private static bool IsInsideValueTypeWithExpression(ISimpleAssignmentOperation assignment)
+        {
+            return assignment.Parent is IObjectOrCollectionInitializerOperation initializer &&
+                   initializer.Parent is IWithOperation withOp &&
+                   withOp.Type?.IsValueType == true;
+        }
+
+        private static bool IsSynthesizedFromPrimaryConstructorParameter(IPropertySymbol property)
+        {
+            return property.DeclaringSyntaxReferences.Any(r => r.GetSyntax() is ParameterSyntax);
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckPropertyReferenceTargetPurity(
