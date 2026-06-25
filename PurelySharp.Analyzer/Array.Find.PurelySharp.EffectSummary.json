@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:38:37.9459443+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:21:03.5008359+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -8,7 +8,7 @@
       "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
       "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
       "MethodCount": 34519,
-      "EmittedMethodCount": 9,
+      "EmittedMethodCount": 10,
       "Methods": [
         {
           "Symbol": "System.Array.Exists(!!0[], System.Predicate\u00601\u003C!!0\u003E)",
@@ -300,6 +300,45 @@
           }
         },
         {
+          "Symbol": "System.Predicate\u00601.Invoke(!0)",
+          "ExactSymbolKey": "System.Predicate\u00601.Invoke(!0)-\u003Ebool",
+          "MetadataToken": "0x06000AC7",
+          "RelativeVirtualAddress": 0,
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000AC7|il:no-il",
+          "Effects": [
+            "native_or_internal_call",
+            "no_il_body"
+          ],
+          "RootCandidates": [
+            "metadata_only_or_external",
+            "runtime_native_or_internal"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "metadata_only_or_external",
+              "native_or_internal_call",
+              "no_il_body",
+              "runtime_native_or_internal"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
           "Symbol": "System.ThrowHelper.ThrowStartIndexArgumentOutOfRange_ArgumentOutOfRange_IndexMustBeLessOrEqual()",
           "ExactSymbolKey": "System.ThrowHelper.ThrowStartIndexArgumentOutOfRange_ArgumentOutOfRange_IndexMustBeLessOrEqual()-\u003Evoid",
           "MetadataToken": "0x0600222E",
@@ -464,10 +503,10 @@
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 9,
+    "MethodCount": 10,
     "PureCount": 5,
     "ImpureCount": 4,
-    "ConservativeUnknownCount": 0,
+    "ConservativeUnknownCount": 1,
     "CatalogComparison": {
       "KnownPureMembers": [],
       "KnownImpureMembers": [],
@@ -598,6 +637,30 @@
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Predicate\u00601.Invoke(!0)",
+        "ExactSymbolKey": "System.Predicate\u00601.Invoke(!0)-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000AC7|il:no-il",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06000AC7",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "metadata_only_or_external",
+        "Categories": [
+          "metadata_only_or_external",
+          "native_or_internal_call",
+          "no_il_body",
+          "runtime_native_or_internal"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
       },
       {
         "Symbol": "System.ThrowHelper.ThrowArgumentNullException(System.ExceptionArgument)",

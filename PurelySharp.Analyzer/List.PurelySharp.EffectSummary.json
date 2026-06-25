@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T09:02:49.0353038+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:22:03.411359+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -107,11 +107,14 @@
             "Classification": "impure",
             "Categories": [
               "global_state_read",
+              "impure_callee",
               "object_state_write"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)"
+            ],
             "HasFreshArrayAllocationEvidence": true,
-            "HasFreshObjectAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
             "FreshnessClassification": "fresh_array_candidate_requires_non_pure_resolution",
             "EffectVisibilityClassification": "caller_visible"
@@ -308,9 +311,15 @@
             "Classification": "impure",
             "Categories": [
               "global_state_read",
+              "impure_callee",
               "object_state_write"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Array.Copy(System.Array, System.Array, int)",
+              "System.Array.CopyImpl(System.Array, int, System.Array, int, int, bool)",
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
+            ],
             "HasFreshArrayAllocationEvidence": true,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -1251,9 +1260,13 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "impure_callee",
               "object_state_write"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Array.Clear(System.Array, int, int)",
+              "System.Runtime.CompilerServices.Unsafe.AddByteOffset(ref !!0, nuint)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -3383,9 +3396,13 @@
             "Classification": "impure",
             "Categories": [
               "caller_visible_memory_write",
+              "impure_callee",
               "object_state_write"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Array.Copy(System.Array, int, System.Array, int, int)",
+              "System.Buffer.Memmove(ref byte, ref byte, nuint)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -3867,9 +3884,15 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Array.Copy(System.Array, System.Array, int)",
+              "System.Array.CopyImpl(System.Array, int, System.Array, int, int, bool)",
+              "System.ArgumentException..ctor(string, string)",
+              "System.Exception.set_HResult(int)"
+            ],
             "HasFreshArrayAllocationEvidence": true,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -4349,217 +4372,7 @@
     "ConservativeUnknownCount": 1,
     "CatalogComparison": {
       "KnownPureMembers": [],
-      "KnownImpureMembers": [
-        {
-          "Symbol": "System.Collections.Generic.List\u003CT\u003E.Add(T)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "caller_visible_memory_write",
-            "global_state_read",
-            "impure_callee",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Generic.List\u00601.AddWithResize(!0)",
-            "System.Collections.Generic.List\u00601.Grow(int)",
-            "System.Collections.Generic.List\u00601.set_Capacity(int)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.List\u00601.Add(!0)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.List\u003CT\u003E.AddRange(System.Collections.Generic.IEnumerable\u003CT\u003E)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "global_state_read",
-            "impure_callee",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Generic.ICollection\u00601.get_Count()"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.List\u00601.AddRange(System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.List\u003CT\u003E.Clear()",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.List\u00601.Clear()-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.List\u003CT\u003E.ForEach(System.Action\u003CT\u003E)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.ThrowHelper.ThrowArgumentNullException(System.ExceptionArgument)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.List\u00601.ForEach(System.Action\u00601\u003C!0\u003E)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.List\u003CT\u003E.Insert(int, T)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "caller_visible_memory_write",
-            "global_state_read",
-            "impure_callee",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Generic.List\u00601.Grow(int)",
-            "System.Collections.Generic.List\u00601.set_Capacity(int)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.List\u00601.Insert(int, !0)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.List\u003CT\u003E.InsertRange(int, System.Collections.Generic.IEnumerable\u003CT\u003E)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "global_state_read",
-            "impure_callee",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Generic.ICollection\u00601.get_Count()"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.List\u00601.InsertRange(int, System.Collections.Generic.IEnumerable\u00601\u003C!0\u003E)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.List\u003CT\u003E.Remove(T)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Generic.List\u00601.RemoveAt(int)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.List\u00601.Remove(!0)-\u003Ebool"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.List\u003CT\u003E.RemoveAll(System.Predicate\u003CT\u003E)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "caller_visible_memory_write",
-            "impure_callee",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [
-            "System.ThrowHelper.ThrowArgumentNullException(System.ExceptionArgument)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.List\u00601.RemoveAll(System.Predicate\u00601\u003C!0\u003E)-\u003Eint"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.List\u003CT\u003E.RemoveAt(int)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "caller_visible_memory_write",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.List\u00601.RemoveAt(int)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.List\u003CT\u003E.RemoveRange(int, int)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [
-            "System.ThrowHelper.ThrowArgumentException(System.ExceptionResource)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.List\u00601.RemoveRange(int, int)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.List\u003CT\u003E.Reverse()",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Generic.List\u00601.Reverse(int, int)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.List\u00601.Reverse()-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.List\u003CT\u003E.Sort()",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Generic.List\u00601.Sort(int, int, System.Collections.Generic.IComparer\u00601\u003C!0\u003E)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.List\u00601.Sort()-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.List\u003CT\u003E.Sort(System.Comparison\u003CT\u003E)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [
-            "System.ThrowHelper.ThrowArgumentNullException(System.ExceptionArgument)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.List\u00601.Sort(System.Comparison\u00601\u003C!0\u003E)-\u003Evoid"
-          ]
-        }
-      ],
+      "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
   },
@@ -4808,11 +4621,14 @@
         "PrimaryCategory": "global_state_read",
         "Categories": [
           "global_state_read",
+          "impure_callee",
           "object_state_write"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument, System.ExceptionResource)"
+        ],
         "HasFreshArrayAllocationEvidence": true,
-        "HasFreshObjectAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,
         "FreshnessClassification": "fresh_array_candidate_requires_non_pure_resolution",
         "EffectVisibilityClassification": "caller_visible"
@@ -4991,11 +4807,15 @@
         "MetadataToken": "0x060085E4",
         "MethodBodySha256": "87642058469b5b272b83c778334c3fcd0346c41bf5ca47f73cd8dd4d7b391f97",
         "Classification": "impure",
-        "PrimaryCategory": "object_state_write",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
+          "impure_callee",
           "object_state_write"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Array.Clear(System.Array, int, int)",
+          "System.Runtime.CompilerServices.Unsafe.AddByteOffset(ref !!0, nuint)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
@@ -5703,9 +5523,13 @@
         "PrimaryCategory": "caller_visible_memory_write",
         "Categories": [
           "caller_visible_memory_write",
+          "impure_callee",
           "object_state_write"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Array.Copy(System.Array, int, System.Array, int, int)",
+          "System.Buffer.Memmove(ref byte, ref byte, nuint)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
@@ -6265,9 +6089,15 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_read",
         "Categories": [
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Array.Copy(System.Array, System.Array, int)",
+          "System.Array.CopyImpl(System.Array, int, System.Array, int, int, bool)",
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
+        ],
         "HasFreshArrayAllocationEvidence": true,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
@@ -6393,9 +6223,15 @@
         "PrimaryCategory": "global_state_read",
         "Categories": [
           "global_state_read",
+          "impure_callee",
           "object_state_write"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Array.Copy(System.Array, System.Array, int)",
+          "System.Array.CopyImpl(System.Array, int, System.Array, int, int, bool)",
+          "System.ArgumentException..ctor(string, string)",
+          "System.Exception.set_HResult(int)"
+        ],
         "HasFreshArrayAllocationEvidence": true,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T11:37:26.6033619+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:21:33.4620389+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -1795,37 +1795,6 @@
     "CatalogComparison": {
       "KnownPureMembers": [],
       "KnownImpureMembers": [
-        {
-          "Symbol": "System.Array.Clear(System.Array)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Runtime.InteropServices.MemoryMarshal.GetArrayDataReference(System.Array)",
-            "System.Runtime.CompilerServices.Unsafe.AddByteOffset(ref !!0, nuint)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Array.Clear(System.Array)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Array.Clear(System.Array, int, int)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Runtime.CompilerServices.Unsafe.AddByteOffset(ref !!0, nuint)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Array.Clear(System.Array, int, int)-\u003Evoid"
-          ]
-        },
         {
           "Symbol": "System.Type.IsValueType.get",
           "Catalog": "known_impure",

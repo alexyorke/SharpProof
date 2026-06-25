@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T15:01:09.7499416+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:21:15.0699989+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -264,60 +264,7 @@
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
       "KnownPureMembers": [],
-      "KnownImpureMembers": [
-        {
-          "Symbol": "System.Reflection.Assembly.Location.get",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "throw"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Reflection.Assembly.get_Location()-\u003Estring"
-          ]
-        },
-        {
-          "Symbol": "System.Reflection.Module.FullyQualifiedName.get",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "throw"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Reflection.Module.get_FullyQualifiedName()-\u003Estring"
-          ]
-        },
-        {
-          "Symbol": "System.Reflection.Module.Name.get",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "throw"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Reflection.Module.get_Name()-\u003Estring"
-          ]
-        },
-        {
-          "Symbol": "System.Reflection.Module.ScopeName.get",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "throw"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Reflection.Module.get_ScopeName()-\u003Estring"
-          ]
-        }
-      ],
+      "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
   },

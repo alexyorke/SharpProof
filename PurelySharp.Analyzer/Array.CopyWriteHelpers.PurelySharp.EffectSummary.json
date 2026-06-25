@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T14:51:19.9116578+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:21:04.1071494+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -3592,40 +3592,6 @@
     "CatalogComparison": {
       "KnownPureMembers": [],
       "KnownImpureMembers": [
-        {
-          "Symbol": "System.Array.ConstrainedCopy(System.Array, int, System.Array, int, int)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Array.CopyImpl(System.Array, int, System.Array, int, int, bool)",
-            "System.ArgumentException..ctor(string, string)",
-            "System.Exception.set_HResult(int)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Array.ConstrainedCopy(System.Array, int, System.Array, int, int)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Array.Copy(System.Array, System.Array, int)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Array.CopyImpl(System.Array, int, System.Array, int, int, bool)",
-            "System.ArgumentException..ctor(string, string)",
-            "System.Exception.set_HResult(int)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Array.Copy(System.Array, System.Array, int)-\u003Evoid"
-          ]
-        },
         {
           "Symbol": "System.Type.IsValueType.get",
           "Catalog": "known_impure",

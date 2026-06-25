@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:38:49.4881339+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:21:27.4213088+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Console",
@@ -126,14 +126,15 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "Interop\u002BKernel32.\u003CFillConsoleOutputAttribute\u003Eg____PInvoke|23_0(nint, short, int, Interop\u002BKernel32\u002BCOORD, int*)-\u003Eint"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
+            "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "caller_visible"
           }
@@ -193,14 +194,15 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "Interop\u002BKernel32.\u003CFillConsoleOutputCharacter\u003Eg____PInvoke|24_0(nint, char, int, Interop\u002BKernel32\u002BCOORD, int*)-\u003Eint"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
+            "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "caller_visible"
           }
@@ -260,14 +262,15 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "Interop\u002BKernel32.\u003CPeekConsoleInput\u003Eg____PInvoke|42_0(nint, Interop\u002BINPUT_RECORD*, int, int*)-\u003Eint"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
+            "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "caller_visible"
           }
@@ -327,14 +330,15 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "Interop\u002BKernel32.\u003CReadConsoleInput\u003Eg____PInvoke|45_0(nint, Interop\u002BINPUT_RECORD*, int, int*)-\u003Eint"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
+            "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "caller_visible"
           }
@@ -3123,14 +3127,15 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_read",
         "Categories": [
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "Interop\u002BKernel32.\u003CFillConsoleOutputAttribute\u003Eg____PInvoke|23_0(nint, short, int, Interop\u002BKernel32\u002BCOORD, int*)-\u003Eint"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
+        "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "caller_visible"
       },
@@ -3147,14 +3152,15 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_read",
         "Categories": [
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "Interop\u002BKernel32.\u003CFillConsoleOutputCharacter\u003Eg____PInvoke|24_0(nint, char, int, Interop\u002BKernel32\u002BCOORD, int*)-\u003Eint"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
+        "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "caller_visible"
       },
@@ -3171,14 +3177,15 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_read",
         "Categories": [
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "Interop\u002BKernel32.\u003CPeekConsoleInput\u003Eg____PInvoke|42_0(nint, Interop\u002BINPUT_RECORD*, int, int*)-\u003Eint"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
+        "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "caller_visible"
       },
@@ -3195,14 +3202,15 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_read",
         "Categories": [
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "Interop\u002BKernel32.\u003CReadConsoleInput\u003Eg____PInvoke|45_0(nint, Interop\u002BINPUT_RECORD*, int, int*)-\u003Eint"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
+        "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "caller_visible"
       },

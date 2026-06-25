@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:39:12.0212731+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:22:07.9170125+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -282,9 +282,13 @@
             "Classification": "impure",
             "Categories": [
               "caller_visible_memory_write",
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.ReadOnlySpan\u00601.Slice(int)",
+              "System.ThrowHelper.ThrowArgumentOutOfRangeException()"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -1633,9 +1637,13 @@
         "PrimaryCategory": "caller_visible_memory_write",
         "Categories": [
           "caller_visible_memory_write",
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.ReadOnlySpan\u00601.Slice(int)",
+          "System.ThrowHelper.ThrowArgumentOutOfRangeException()"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,

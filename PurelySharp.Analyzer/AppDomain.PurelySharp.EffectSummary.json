@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:38:40.2154809+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:21:07.5092492+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -8,7 +8,7 @@
       "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
       "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
       "MethodCount": 34519,
-      "EmittedMethodCount": 9,
+      "EmittedMethodCount": 10,
       "Methods": [
         {
           "Symbol": "System.AppContext.get_BaseDirectory()",
@@ -125,10 +125,11 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.Threading.Monitor.Exit(object)"
+              "System.Collections.Generic.Dictionary\u00602.TryGetValue(!0, ref !1)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -445,15 +446,69 @@
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "unknown"
           }
+        },
+        {
+          "Symbol": "System.Collections.Generic.Dictionary\u00602.TryGetValue(!0, ref !1)",
+          "ExactSymbolKey": "System.Collections.Generic.Dictionary\u00602.TryGetValue(!0, ref !1)-\u003Ebool",
+          "MetadataToken": "0x060084F2",
+          "RelativeVirtualAddress": 8315968,
+          "MethodBodySha256": "7a304592e32a0893e14565fe83186fd65cb0567c5cafae0cd5c1c5f8a774206a",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060084F2|il:7a304592e32a0893e14565fe83186fd65cb0567c5cafae0cd5c1c5f8a774206a",
+          "Effects": [
+            "calls_method",
+            "writes_indirect_memory"
+          ],
+          "RootCandidates": [
+            "caller_visible_memory_write"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Collections.Generic.Dictionary\u00602\u003C!0, !1\u003E.FindValue(!0)-\u003Eref !1",
+            "System.Runtime.CompilerServices.Unsafe.IsNullRef(ref !!0)-\u003Ebool"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Collections.Generic.Dictionary\u00602\u003C!0, !1\u003E.FindValue(!0)-\u003Eref !1",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Runtime.CompilerServices.Unsafe.IsNullRef(ref !!0)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "caller_visible_memory_write",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Collections.Generic.Dictionary\u00602.FindValue(!0)",
+              "System.Collections.Generic.EqualityComparer\u00601.Equals(!0, !0)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
         }
       ]
     }
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 9,
+    "MethodCount": 10,
     "PureCount": 4,
-    "ImpureCount": 4,
+    "ImpureCount": 5,
     "ConservativeUnknownCount": 1,
     "CatalogComparison": {
       "KnownPureMembers": [],
@@ -502,10 +557,11 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_read",
         "Categories": [
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.Threading.Monitor.Exit(object)"
+          "System.Collections.Generic.Dictionary\u00602.TryGetValue(!0, ref !1)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -627,6 +683,32 @@
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Generic.Dictionary\u00602.TryGetValue(!0, ref !1)",
+        "ExactSymbolKey": "System.Collections.Generic.Dictionary\u00602.TryGetValue(!0, ref !1)-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060084F2|il:7a304592e32a0893e14565fe83186fd65cb0567c5cafae0cd5c1c5f8a774206a",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x060084F2",
+        "MethodBodySha256": "7a304592e32a0893e14565fe83186fd65cb0567c5cafae0cd5c1c5f8a774206a",
+        "Classification": "impure",
+        "PrimaryCategory": "caller_visible_memory_write",
+        "Categories": [
+          "caller_visible_memory_write",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Collections.Generic.Dictionary\u00602.FindValue(!0)",
+          "System.Collections.Generic.EqualityComparer\u00601.Equals(!0, !0)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.Threading.Monitor.Enter(object, ref bool)",

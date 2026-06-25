@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T09:56:46.8029419+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:21:44.7318401+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -174,9 +174,13 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "caller_visible_memory_write"
+              "caller_visible_memory_write",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.ReadOnlySpan\u00601.get_Item(int)",
+              "System.ThrowHelper.ThrowIndexOutOfRangeException()"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -230,9 +234,13 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "caller_visible_memory_write"
+              "caller_visible_memory_write",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.ReadOnlySpan\u00601.get_Item(int)",
+              "System.ThrowHelper.ThrowIndexOutOfRangeException()"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -286,9 +294,13 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "caller_visible_memory_write"
+              "caller_visible_memory_write",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.ReadOnlySpan\u00601.get_Item(int)",
+              "System.ThrowHelper.ThrowIndexOutOfRangeException()"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -471,9 +483,13 @@
         "Classification": "impure",
         "PrimaryCategory": "caller_visible_memory_write",
         "Categories": [
-          "caller_visible_memory_write"
+          "caller_visible_memory_write",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.ReadOnlySpan\u00601.get_Item(int)",
+          "System.ThrowHelper.ThrowIndexOutOfRangeException()"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
@@ -493,9 +509,13 @@
         "Classification": "impure",
         "PrimaryCategory": "caller_visible_memory_write",
         "Categories": [
-          "caller_visible_memory_write"
+          "caller_visible_memory_write",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.ReadOnlySpan\u00601.get_Item(int)",
+          "System.ThrowHelper.ThrowIndexOutOfRangeException()"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
@@ -515,9 +535,13 @@
         "Classification": "impure",
         "PrimaryCategory": "caller_visible_memory_write",
         "Categories": [
-          "caller_visible_memory_write"
+          "caller_visible_memory_write",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.ReadOnlySpan\u00601.get_Item(int)",
+          "System.ThrowHelper.ThrowIndexOutOfRangeException()"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,

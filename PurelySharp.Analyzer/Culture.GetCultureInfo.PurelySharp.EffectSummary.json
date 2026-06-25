@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:38:43.2316368+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:21:12.1360722+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -114,11 +114,12 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "impure_callee",
               "object_state_write",
               "throw"
             ],
             "FirstBlockingCallChain": [
-              "System.Threading.Monitor.Exit(object)"
+              "System.Collections.Generic.Dictionary\u00602.TryGetValue(!0, ref !1)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
@@ -156,13 +157,14 @@
         "MetadataToken": "0x06002F11",
         "MethodBodySha256": "49519b669d72dcb9abb174b267b1d4451cea07ba7e1b781fa4d48cda252ddc1e",
         "Classification": "impure",
-        "PrimaryCategory": "object_state_write",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
+          "impure_callee",
           "object_state_write",
           "throw"
         ],
         "FirstBlockingCallChain": [
-          "System.Threading.Monitor.Exit(object)"
+          "System.Collections.Generic.Dictionary\u00602.TryGetValue(!0, ref !1)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,

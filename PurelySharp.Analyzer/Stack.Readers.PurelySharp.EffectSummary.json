@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:38:55.2679486+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:21:39.5078196+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Collections",
@@ -8,7 +8,7 @@
       "AssemblySha256": "f0fe3fc9cecf713d5c29a2fecdf6aafc50b41efb8130a56af54b8c9330c1ffc1",
       "ModuleVersionId": "3dc059c5-7601-466b-9b9d-ad8601df8f36",
       "MethodCount": 623,
-      "EmittedMethodCount": 2,
+      "EmittedMethodCount": 3,
       "Methods": [
         {
           "Symbol": "System.Collections.Generic.Stack\u00601.Contains(!0)",
@@ -95,15 +95,73 @@
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "none"
           }
+        },
+        {
+          "Symbol": "System.Collections.Generic.Stack\u00601.ThrowForEmptyStack()",
+          "ExactSymbolKey": "System.Collections.Generic.Stack\u00601.ThrowForEmptyStack()-\u003Evoid",
+          "MetadataToken": "0x06000260",
+          "RelativeVirtualAddress": 152520,
+          "MethodBodySha256": "e06fcbbed5bca7cf68073bea91eedb295317c92533f400e754fbc19e063ac8bf",
+          "CacheKey": "mvid:3dc059c5-7601-466b-9b9d-ad8601df8f36|token:0x06000260|il:e06fcbbed5bca7cf68073bea91eedb295317c92533f400e754fbc19e063ac8bf",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "throws"
+          ],
+          "RootCandidates": [
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.InvalidOperationException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.InvalidOperationException",
+              "SourcePath": "System.Collections.Generic.Stack\u00601.ThrowForEmptyStack()"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.InvalidOperationException..ctor(string)-\u003Evoid",
+            "System.SR.get_InvalidOperation_EmptyStack()-\u003Estring"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.InvalidOperationException..ctor(string)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.SR.get_InvalidOperation_EmptyStack()-\u003Estring",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
         }
       ]
     }
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 2,
+    "MethodCount": 3,
     "PureCount": 2,
-    "ImpureCount": 0,
+    "ImpureCount": 1,
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
       "KnownPureMembers": [],
@@ -153,6 +211,28 @@
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Collections.Generic.Stack\u00601.ThrowForEmptyStack()",
+        "ExactSymbolKey": "System.Collections.Generic.Stack\u00601.ThrowForEmptyStack()-\u003Evoid",
+        "CacheKey": "mvid:3dc059c5-7601-466b-9b9d-ad8601df8f36|token:0x06000260|il:e06fcbbed5bca7cf68073bea91eedb295317c92533f400e754fbc19e063ac8bf",
+        "AssemblyName": "System.Collections",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Collections.dll",
+        "AssemblySha256": "f0fe3fc9cecf713d5c29a2fecdf6aafc50b41efb8130a56af54b8c9330c1ffc1",
+        "ModuleVersionId": "3dc059c5-7601-466b-9b9d-ad8601df8f36",
+        "MetadataToken": "0x06000260",
+        "MethodBodySha256": "e06fcbbed5bca7cf68073bea91eedb295317c92533f400e754fbc19e063ac8bf",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
       }
     ]
   }

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:38:48.8719336+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:21:26.3901773+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -1789,9 +1789,8 @@
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.String.Join(string, object[])",
-              "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
-              "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
+              "System.String.Format(string, object, object)",
+              "System.TwoObjects..ctor(object, object)"
             ],
             "HasFreshArrayAllocationEvidence": true,
             "HasFreshObjectAllocationEvidence": false,
@@ -2661,9 +2660,8 @@
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.String.Join(string, object[])",
-          "System.String.JoinCore(System.ReadOnlySpan\u00601\u003Cchar\u003E, object[])",
-          "System.Text.ValueStringBuilder.Append(System.ReadOnlySpan\u00601\u003Cchar\u003E)"
+          "System.String.Format(string, object, object)",
+          "System.TwoObjects..ctor(object, object)"
         ],
         "HasFreshArrayAllocationEvidence": true,
         "HasFreshObjectAllocationEvidence": false,

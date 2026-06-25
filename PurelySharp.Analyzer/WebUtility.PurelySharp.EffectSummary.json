@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:39:28.2483388+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:22:31.3634294+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -1294,9 +1294,13 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "caller_visible_memory_write"
+              "caller_visible_memory_write",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.ReadOnlySpan\u00601.get_Item(int)",
+              "System.ThrowHelper.ThrowIndexOutOfRangeException()"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -1726,9 +1730,13 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Collections.Generic.Dictionary\u00602.set_Item(!0, !1)",
+              "System.Collections.Generic.Dictionary\u00602.TryInsert(!0, !1, System.Collections.Generic.InsertionBehavior)",
+              "System.Collections.Generic.EqualityComparer\u00601.Equals(!0, !0)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
@@ -1786,9 +1794,14 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
-            "FirstBlockingCallChain": [],
+            "FirstBlockingCallChain": [
+              "System.Collections.Generic.Dictionary\u00602.TryGetValue(!0, ref !1)",
+              "System.Collections.Generic.Dictionary\u00602.FindValue(!0)",
+              "System.Collections.Generic.EqualityComparer\u00601.Equals(!0, !0)"
+            ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
             "HasUnsupportedEffects": true,
@@ -1877,12 +1890,14 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read",
               "global_state_write",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.Net.WebUtility\u002BHtmlEntities.InitializeLookupTable()"
+              "System.Net.WebUtility\u002BHtmlEntities.InitializeLookupTable()",
+              "System.Collections.Generic.Dictionary\u00602.set_Item(!0, !1)",
+              "System.Collections.Generic.Dictionary\u00602.TryInsert(!0, !1, System.Collections.Generic.InsertionBehavior)",
+              "System.Collections.Generic.EqualityComparer\u00601.Equals(!0, !0)"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -1922,12 +1937,14 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_write",
         "Categories": [
-          "global_state_read",
           "global_state_write",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.Net.WebUtility\u002BHtmlEntities.InitializeLookupTable()"
+          "System.Net.WebUtility\u002BHtmlEntities.InitializeLookupTable()",
+          "System.Collections.Generic.Dictionary\u00602.set_Item(!0, !1)",
+          "System.Collections.Generic.Dictionary\u00602.TryInsert(!0, !1, System.Collections.Generic.InsertionBehavior)",
+          "System.Collections.Generic.EqualityComparer\u00601.Equals(!0, !0)"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -1946,11 +1963,15 @@
         "MetadataToken": "0x06002CD0",
         "MethodBodySha256": "ffcf103b6c375a22355c8f03d4bae6b5b365c69ba3c4633a2ed4577a5a4d6545",
         "Classification": "impure",
-        "PrimaryCategory": "global_state_read",
+        "PrimaryCategory": "impure_callee",
         "Categories": [
-          "global_state_read"
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Collections.Generic.Dictionary\u00602.set_Item(!0, !1)",
+          "System.Collections.Generic.Dictionary\u00602.TryInsert(!0, !1, System.Collections.Generic.InsertionBehavior)",
+          "System.Collections.Generic.EqualityComparer\u00601.Equals(!0, !0)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,
@@ -1970,9 +1991,14 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_read",
         "Categories": [
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.Collections.Generic.Dictionary\u00602.TryGetValue(!0, ref !1)",
+          "System.Collections.Generic.Dictionary\u00602.FindValue(!0)",
+          "System.Collections.Generic.EqualityComparer\u00601.Equals(!0, !0)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
@@ -2171,9 +2197,13 @@
         "Classification": "impure",
         "PrimaryCategory": "caller_visible_memory_write",
         "Categories": [
-          "caller_visible_memory_write"
+          "caller_visible_memory_write",
+          "impure_callee"
         ],
-        "FirstBlockingCallChain": [],
+        "FirstBlockingCallChain": [
+          "System.ReadOnlySpan\u00601.get_Item(int)",
+          "System.ThrowHelper.ThrowIndexOutOfRangeException()"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,

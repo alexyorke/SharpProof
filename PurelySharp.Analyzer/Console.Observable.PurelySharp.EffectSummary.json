@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T08:38:49.4078898+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:21:27.2551483+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Console",
@@ -65,14 +65,15 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "Interop\u002BKernel32.\u003CGetConsoleCursorInfo\u003Eg____PInvoke|17_0(nint, Interop\u002BKernel32\u002BCONSOLE_CURSOR_INFO*)-\u003Eint"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
+            "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "caller_visible"
           }
@@ -193,14 +194,15 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
-              "global_state_read"
+              "global_state_read",
+              "impure_callee"
             ],
             "FirstBlockingCallChain": [
               "Interop\u002BKernel32.\u003CGetConsoleMode\u003Eg____PInvoke|29_0(nint, int*)-\u003Eint"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
+            "HasUnsupportedEffects": true,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "caller_visible"
           }
@@ -3039,14 +3041,15 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_read",
         "Categories": [
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "Interop\u002BKernel32.\u003CGetConsoleCursorInfo\u003Eg____PInvoke|17_0(nint, Interop\u002BKernel32\u002BCONSOLE_CURSOR_INFO*)-\u003Eint"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
+        "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "caller_visible"
       },
@@ -3063,14 +3066,15 @@
         "Classification": "impure",
         "PrimaryCategory": "global_state_read",
         "Categories": [
-          "global_state_read"
+          "global_state_read",
+          "impure_callee"
         ],
         "FirstBlockingCallChain": [
           "Interop\u002BKernel32.\u003CGetConsoleMode\u003Eg____PInvoke|29_0(nint, int*)-\u003Eint"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
+        "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "caller_visible"
       },

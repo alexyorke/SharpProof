@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T15:11:04.0149276+00:00",
+  "GeneratedAtUtc": "2026-06-24T15:21:37.9986137+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Collections",
@@ -379,37 +379,7 @@
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
       "KnownPureMembers": [],
-      "KnownImpureMembers": [
-        {
-          "Symbol": "System.Collections.Generic.LinkedList\u003CT\u003E.AddFirst(T)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Generic.LinkedList\u00601.InternalInsertNodeBefore(System.Collections.Generic.LinkedListNode\u00601\u003C!0\u003E, System.Collections.Generic.LinkedListNode\u00601\u003C!0\u003E)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.LinkedList\u00601.AddFirst(!0)-\u003ESystem.Collections.Generic.LinkedListNode\u00601\u003C!0\u003E"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.LinkedListNode\u003CT\u003E.Value.set",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.LinkedListNode\u00601.set_Value(!0)-\u003Evoid"
-          ]
-        }
-      ],
+      "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
   },
