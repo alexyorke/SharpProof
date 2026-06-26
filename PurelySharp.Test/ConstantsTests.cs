@@ -2837,6 +2837,19 @@ public static class KeyValuePairCatalogSignatureSamples<TKey, TValue>
         }
 
         [Test]
+        public void EnumValueHelpers_AreHandledSemantically_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Enum.HasFlag(System.Enum)");
+            AssertNotInManualCatalogs("System.Enum.ToString()");
+        }
+
+        [Test]
+        public void HashSetRelationHelpers_AreHandledSemantically_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Collections.Generic.HashSet<T>.IsSubsetOf(System.Collections.Generic.IEnumerable<T>)");
+        }
+
+        [Test]
         public void UriIsWellFormedUriString_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.Uri.IsWellFormedUriString(string, System.UriKind)");

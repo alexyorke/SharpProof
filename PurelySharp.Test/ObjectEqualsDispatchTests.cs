@@ -654,6 +654,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task HashSetIsSubsetOfForBuiltinValueEquality_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(HashSet<int> values, HashSet<int> other)
+    {
+        return values.IsSubsetOf(other);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task DictionaryContainsKeyDispatchToImpureGetHashCode_Diagnostic()
         {
             var test = @"

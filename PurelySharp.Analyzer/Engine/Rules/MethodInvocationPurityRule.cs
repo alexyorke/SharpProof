@@ -50,6 +50,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return stringComparerResult;
             }
 
+            if (TryCheckEnumMemberPurity(invocationOperation, context, currentState, out var enumResult))
+            {
+                return enumResult;
+            }
+
             if (TryCheckFormattableStringPurity(invocationOperation, context, currentState, out var formattableStringResult))
             {
                 return formattableStringResult;
@@ -2021,6 +2026,40 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
+        }
+
+        private static bool TryCheckEnumMemberPurity(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            var methodSymbol = invocationOperation.TargetMethod;
+            if (methodSymbol.Name is not ("HasFlag" or "ToString"))
+            {
+                return false;
+            }
+
+            var enumType = context.SemanticModel.Compilation.GetTypeByMetadataName("System.Enum");
+            if (enumType == null ||
+                !SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, enumType))
+            {
+                return false;
+            }
+
+            if (methodSymbol.Name == "HasFlag" && methodSymbol.Parameters.Length == 1)
+            {
+                return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
+            }
+
+            if (methodSymbol.Name == "ToString" && methodSymbol.Parameters.Length == 0)
+            {
+                return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
+            }
+
+            return false;
         }
 
         private static bool TryCheckFormattableStringPurity(

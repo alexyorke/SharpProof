@@ -555,8 +555,6 @@ public static class Constants
 
     public static readonly HashSet<string> KnownPureBCLMembers = new HashSet<string>(StringComparer.Ordinal)
     {
-        "System.Collections.Generic.HashSet<T>.IsSubsetOf(System.Collections.Generic.IEnumerable<T>)",
-
         "System.Collections.Immutable.ImmutableList<T>.Add(T)",
         "System.Collections.Immutable.ImmutableList<T>.SetItem(int, T)",
         "System.Collections.Immutable.ImmutableList.Create<T>(params T[])",
@@ -573,14 +571,10 @@ public static class Constants
         "System.Security.Cryptography.MD5.ComputeHash(byte[])",
         "System.Security.Cryptography.SHA256.ComputeHash(byte[])",
 
-        "System.Linq.IQueryable<T>.Expression.get",
         "System.Linq.Queryable.Where<TSource>(System.Linq.IQueryable<TSource>, System.Linq.Expressions.Expression<System.Func<TSource, bool>>)",
         "System.Memory<T>.Span.get",
         "System.Numerics.Matrix4x4.CreateRotationX(float)",
         "System.Numerics.Plane.Normalize(System.Numerics.Plane)",
-
-        "System.Enum.HasFlag(System.Enum)",
-        "System.Enum.ToString()",
 
     };
 }
