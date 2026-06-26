@@ -553,15 +553,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: knownImpureMemberSource));
             }
 
-            // KnownPureBCLMembers acts as an explicit override that takes priority over the
-            // generated JSON catalog (which can incorrectly classify pure methods as impure
-            // when they call ThrowHelper argument-validation helpers).
-            if (PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol))
-            {
-                PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (Known Pure BCL override before generated purity)");
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
             if (hasTrustedGeneratedPurity &&
                 !ShouldDeferToSpecializedDispatchPurity(invokedMethodSymbol))
             {

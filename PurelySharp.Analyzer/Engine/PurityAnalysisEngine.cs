@@ -952,17 +952,6 @@ namespace PurelySharp.Analyzer.Engine
                     return configuredImpureResult;
                 }
 
-                // KnownPureBCLMembers is an explicit whitelist that takes priority over the generated
-                // JSON catalog, which can incorrectly classify pure methods as impure when they
-                // call ThrowHelper argument-validation helpers.
-                if (IsKnownPureBCLMember(methodSymbol))
-                {
-                    LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is in KnownPureBCLMembers (explicit override).");
-                    purityCache[methodSymbol] = PurityAnalysisResult.Pure;
-                    LogDebug($"{indent}<< Exit DeterminePurity (Known Pure BCL Override): {methodSymbol.ToDisplayString()}");
-                    return PurityAnalysisResult.Pure;
-                }
-
                 var trustedMetadataPurity = GetTrustedMethodPurityMetadata(methodSymbol, semanticModel.Compilation);
                 var knownImpureMemberSource = trustedMetadataPurity.KnownImpureMemberSource;
                 var hasConfiguredKnownImpureMember = trustedMetadataPurity.HasConfiguredKnownImpureMember;
