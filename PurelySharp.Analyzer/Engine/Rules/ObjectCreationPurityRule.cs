@@ -44,11 +44,17 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
 
+            bool freshArrayForImmutableWrapper = false;
+            bool isReadOnlyCollectionConstructor = false;
+            bool isReadOnlyMemoryOrMemoryConstructor = false;
             if (objectCreationOperation.Arguments.Length > 0)
             {
+                isReadOnlyCollectionConstructor = IsReadOnlyCollectionConstructor(objectCreationOperation);
+                isReadOnlyMemoryOrMemoryConstructor = IsReadOnlyMemoryOrMemoryConstructor(objectCreationOperation);
                 PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Checking {objectCreationOperation.Arguments.Length} constructor arguments...");
-                foreach (var argument in objectCreationOperation.Arguments)
+                for (var argumentIndex = 0; argumentIndex < objectCreationOperation.Arguments.Length; argumentIndex++)
                 {
+                    var argument = objectCreationOperation.Arguments[argumentIndex];
                     PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] Checking Argument: {argument.Syntax} ({argument.Value?.Kind})");
                     if (argument.Value == null)
                     {
@@ -61,11 +67,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         continue;
                     }
 
-                    if (IsReadOnlyCollectionConstructor(objectCreationOperation))
+                    if (isReadOnlyCollectionConstructor)
                     {
                         if (IsPureReadOnlyCollectionArrayConstructorArgument(objectCreationOperation, argument, currentState))
                         {
                             PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] Treating fresh array as PURE for ReadOnlyCollection construction.");
+                            freshArrayForImmutableWrapper = true;
                             continue;
                         }
 
@@ -85,6 +92,38 @@ namespace PurelySharp.Analyzer.Engine.Rules
                                 syntaxNode: objectCreationOperation.Syntax,
                                 symbol: objectCreationOperation.Constructor,
                                 catalogSource: "read_only_collection_external_source"));
+                    }
+
+                    if (isReadOnlyMemoryOrMemoryConstructor)
+                    {
+                        if (argumentIndex == 0 && IsPureOwnedArrayConstructorArgument(objectCreationOperation, argument, currentState))
+                        {
+                            PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] Treating locally owned array as PURE for ReadOnlyMemory/Memory construction.");
+                            freshArrayForImmutableWrapper = true;
+                            continue;
+                        }
+
+                        var readOnlyMemoryArgumentResult = PurityAnalysisEngine.CheckSingleOperation(argument.Value, context, currentState);
+                        if (!readOnlyMemoryArgumentResult.IsPure)
+                        {
+                            return readOnlyMemoryArgumentResult;
+                        }
+
+                        if (argumentIndex == 0)
+                        {
+                            PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] ReadOnlyMemory/Memory source is not analyzer-owned. Treating wrapper construction as IMPURE.");
+                            return PurityAnalysisResult.Impure(
+                                objectCreationOperation.Syntax,
+                                PurityAnalysisEngine.PurityEvidence.Create(
+                                    "mutable_state_read",
+                                    ruleName: nameof(ObjectCreationPurityRule),
+                                    operation: objectCreationOperation,
+                                    syntaxNode: objectCreationOperation.Syntax,
+                                    symbol: objectCreationOperation.Constructor,
+                                    catalogSource: "read_only_memory_external_source"));
+                        }
+
+                        continue;
                     }
 
                     var argumentResult = PurityAnalysisEngine.CheckSingleOperation(argument.Value, context, currentState);
@@ -112,6 +151,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 }
             }
 
+
+            if (freshArrayForImmutableWrapper)
+            {
+                PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Immutable wrapper (ReadOnlyCollection/ReadOnlyMemory) with owned array argument is PURE.");
+                return PurityAnalysisResult.Pure;
+            }
 
             IMethodSymbol? constructorSymbol = objectCreationOperation.Constructor;
             if (constructorSymbol != null)
@@ -143,6 +188,29 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             syntaxNode: objectCreationOperation.Syntax,
                             symbol: constructorSymbol,
                             catalogSource: trustedMetadataPurity.KnownImpureMemberSource));
+                }
+
+                // Check known mutable collection types before trusting the generated purity catalog:
+                // e.g. Dictionary..ctor() appears internal-only-pure in the catalog but creates mutable state.
+                string? mutableTypeName = objectCreationOperation.Type?.OriginalDefinition.ToDisplayString();
+                if (mutableTypeName != null && (
+                    mutableTypeName.StartsWith("System.Collections.Generic.List<") ||
+                    mutableTypeName.StartsWith("System.Collections.Generic.Dictionary<") ||
+                    mutableTypeName.StartsWith("System.Collections.Generic.HashSet<") ||
+                    mutableTypeName.StartsWith("System.Collections.Generic.Queue<") ||
+                    mutableTypeName.StartsWith("System.Collections.Generic.Stack<")
+                ))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor creates known mutable collection type '{mutableTypeName}'. IMPURE.");
+                    return PurityAnalysisResult.Impure(
+                        objectCreationOperation.Syntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            "catalog_hit",
+                            ruleName: nameof(ObjectCreationPurityRule),
+                            operation: objectCreationOperation,
+                            syntaxNode: objectCreationOperation.Syntax,
+                            symbol: constructorSymbol ?? (ISymbol?)objectCreationOperation.Type,
+                            catalogSource: "known_mutable_collection"));
                 }
 
                 if (hasTrustedGeneratedPurity)
@@ -219,26 +287,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
 
-            string? typeName = objectCreationOperation.Type?.OriginalDefinition.ToDisplayString();
-            if (typeName != null && (
-                typeName.StartsWith("System.Collections.Generic.List<") ||
-                typeName.StartsWith("System.Collections.Generic.Dictionary<") ||
-                typeName.StartsWith("System.Collections.Generic.HashSet<") ||
-                typeName.StartsWith("System.Collections.Generic.Queue<") ||
-                typeName.StartsWith("System.Collections.Generic.Stack<")
-            ))
-            {
-                PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Object creation '{objectCreationOperation.Syntax}' is IMPURE because it creates a known mutable collection type '{typeName}'. StringBuilder is handled separately or by usage.");
-                return PurityAnalysisResult.Impure(
-                    objectCreationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "catalog_hit",
-                        ruleName: nameof(ObjectCreationPurityRule),
-                        operation: objectCreationOperation,
-                        syntaxNode: objectCreationOperation.Syntax,
-                        symbol: constructorSymbol ?? (ISymbol?)objectCreationOperation.Type,
-                        catalogSource: "known_mutable_collection"));
-            }
+
 
 
             if (objectCreationOperation.Type != null && PurityAnalysisEngine.IsInImpureNamespaceOrType(objectCreationOperation.Type))
@@ -332,6 +381,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var constructorSymbol = objectCreationOperation.Constructor?.OriginalDefinition;
             return constructorSymbol?.ContainingType?.OriginalDefinition.ToDisplayString() == "System.Collections.ObjectModel.ReadOnlyCollection<T>" &&
                 constructorSymbol.Parameters.Length == 1;
+        }
+
+        private static bool IsReadOnlyMemoryOrMemoryConstructor(IObjectCreationOperation objectCreationOperation)
+        {
+            var typeName = objectCreationOperation.Constructor?.ContainingType?.OriginalDefinition.ToDisplayString();
+            return (typeName == "System.ReadOnlyMemory<T>" || typeName == "System.Memory<T>") &&
+                (objectCreationOperation.Arguments.Length == 1 || objectCreationOperation.Arguments.Length == 3);
+        }
+
+        private static bool IsPureOwnedArrayConstructorArgument(
+            IObjectCreationOperation objectCreationOperation,
+            IArgumentOperation argument,
+            PurityAnalysisEngine.PurityAnalysisState currentState)
+        {
+            var argumentValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(argument.Value);
+            return argumentValue is IArrayCreationOperation ||
+                argumentValue is ILocalReferenceOperation localReference &&
+                currentState.IsOwnedLocalArraySymbol(localReference.Local);
         }
 
     }

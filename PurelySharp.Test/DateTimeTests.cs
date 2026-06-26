@@ -110,6 +110,7 @@ public class TestClass
         [TestCase("value.AddMilliseconds(2)")]
         [TestCase("value.AddMinutes(3)")]
         [TestCase("value.AddSeconds(5)")]
+        [TestCase("value.Subtract(offset)")]
         public async Task DateTimeDeterministicAddMethods_NoDiagnostic(string expression)
         {
             var test = @"
@@ -184,6 +185,25 @@ public class TestClass
     {
         return DateTime.Compare(left, right) == 0 ||
             DateTime.Equals(left, right);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task DateTimeEqualsObject_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(DateTime value)
+    {
+        return value.Equals((object)value);
     }
 }";
 

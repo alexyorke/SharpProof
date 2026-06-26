@@ -261,6 +261,20 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 }
 
                 PurityAnalysisEngine.LogDebug("  [MIR] LINQ source and all remaining arguments determined to be pure.");
+                var linqMethodName = invokedMethodSymbol.Name;
+                if (linqMethodName is "ToList" or "ToDictionary" or "ToHashSet")
+                {
+                    PurityAnalysisEngine.LogDebug($"  [MIR] --> IMPURE (LINQ materializer '{linqMethodName}' creates a mutable collection)");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        invocationOperation.Syntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            "mutable_state_write",
+                            nameof(MethodInvocationPurityRule),
+                            invocationOperation,
+                            symbol: invokedMethodSymbol,
+                            catalogSource: "linq_materializer"));
+                }
+
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
@@ -315,20 +329,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             }
 
-            if (invokedMethodSymbol.IsStatic && invokedMethodSymbol.ContainingType != null)
-            {
-                var cctorResult = PurityAnalysisEngine.CheckStaticConstructorPurity(invokedMethodSymbol.ContainingType, context, currentState);
-                if (!cctorResult.IsPure)
-                {
-                    PurityAnalysisEngine.LogDebug($"  [MIR] Static method call '{invokedMethodSymbol.Name}' IMPURE due to impure static constructor in {invokedMethodSymbol.ContainingType.Name}.");
-
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        cctorResult.ImpureSyntaxNode ?? invocationOperation.Syntax,
-                        cctorResult.Evidence);
-                }
-            }
-
-
             if (invocationOperation.Instance != null
                 && !IsBaseReference(invocationOperation.Instance)
                 && invocationOperation.Instance is not IConditionalAccessInstanceOperation)
@@ -366,6 +366,22 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var hasTrustedGeneratedPurity = trustedMetadataPurity.HasTrustedGeneratedPurity;
             var generatedPurity = trustedMetadataPurity.GeneratedPurity;
             var allowsKnownPureFallback = trustedMetadataPurity.AllowsKnownPureFallback;
+
+            // Skip cctor check only when the generated runtime summary already classifies the method as pure,
+            // or when a known-pure override has already taken precedence.
+            if (invokedMethodSymbol.IsStatic && invokedMethodSymbol.ContainingType != null
+                && !(hasTrustedGeneratedPurity && generatedPurity.IsPure)
+                && !PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol))
+            {
+                var cctorResult = PurityAnalysisEngine.CheckStaticConstructorPurity(invokedMethodSymbol.ContainingType, context, currentState);
+                if (!cctorResult.IsPure)
+                {
+                    PurityAnalysisEngine.LogDebug($"  [MIR] Static method call '{invokedMethodSymbol.Name}' IMPURE due to impure static constructor in {invokedMethodSymbol.ContainingType.Name}.");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        cctorResult.ImpureSyntaxNode ?? invocationOperation.Syntax,
+                        cctorResult.Evidence);
+                }
+            }
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Checking purity of {invocationOperation.Arguments.Length} arguments for {originalDefinitionSymbol.Name}.");
             foreach (var argument in invocationOperation.Arguments)
@@ -535,6 +551,15 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         invocationOperation,
                         symbol: originalDefinitionSymbol,
                         catalogSource: knownImpureMemberSource));
+            }
+
+            // KnownPureBCLMembers acts as an explicit override that takes priority over the
+            // generated JSON catalog (which can incorrectly classify pure methods as impure
+            // when they call ThrowHelper argument-validation helpers).
+            if (PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol))
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (Known Pure BCL override before generated purity)");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
             if (hasTrustedGeneratedPurity &&

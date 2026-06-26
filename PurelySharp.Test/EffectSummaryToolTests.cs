@@ -3253,7 +3253,10 @@ public static class StringComparisonFixture
                 "System.DateTime.Compare(System.DateTime, System.DateTime)",
                 "System.DateTime.CompareTo(System.DateTime)",
                 "System.DateTime.Equals(System.DateTime)",
+                "System.DateTime.Equals(System.DateTime, System.DateTime)",
+                "System.DateTime.Equals(object)",
                 "System.DateTime.Subtract(System.DateTime)",
+                "System.DateTime.Subtract(System.TimeSpan)",
                 "System.DateTime.DaysInMonth(int, int)");
 
             AssertPurityClassification(summary, "System.DateTime.Add(System.TimeSpan)", "pure");
@@ -3272,7 +3275,10 @@ public static class StringComparisonFixture
             AssertPurityClassification(summary, "System.DateTime.Compare(System.DateTime, System.DateTime)", "pure");
             AssertPurityClassification(summary, "System.DateTime.CompareTo(System.DateTime)", "pure");
             AssertPurityClassification(summary, "System.DateTime.Equals(System.DateTime)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.Equals(System.DateTime, System.DateTime)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.Equals(object)", "pure");
             AssertPurityClassification(summary, "System.DateTime.Subtract(System.DateTime)", "pure");
+            AssertPurityClassification(summary, "System.DateTime.Subtract(System.TimeSpan)", "pure");
             AssertPurityClassification(summary, "System.DateTime.DaysInMonth(int, int)", "pure");
         }
 

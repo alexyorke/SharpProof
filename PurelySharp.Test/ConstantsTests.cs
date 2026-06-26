@@ -4403,6 +4403,7 @@ public static class DateTimeCatalogSignatureSamples
         _ = DateTime.Compare(value, value);
         _ = value.CompareTo(value);
         _ = value.Equals(value);
+        _ = value.Equals((object)value);
         _ = DateTime.Equals(value, value);
         _ = DateTime.DaysInMonth(2000, 2);
         _ = value.Day;
@@ -4417,6 +4418,7 @@ public static class DateTimeCatalogSignatureSamples
         _ = value.Ticks;
         _ = value.TimeOfDay;
         _ = value.Subtract(value);
+        _ = value.Subtract(offset);
         _ = value.ToBinary();
         return value;
     }
@@ -4442,6 +4444,7 @@ public static class DateTimeCatalogSignatureSamples
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTime.Compare(value, value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.CompareTo(value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.Equals(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.Equals((object)value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTime.Equals(value, value)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "DateTime.DaysInMonth(2000, 2)"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Day"));
@@ -4456,6 +4459,7 @@ public static class DateTimeCatalogSignatureSamples
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.Ticks"));
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "value.TimeOfDay"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.Subtract(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.Subtract(offset)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "value.ToBinary()"));
         }
 

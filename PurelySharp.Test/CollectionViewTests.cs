@@ -378,6 +378,47 @@ public class TestClass
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
 
+        [TestCase("ReadOnlyMemory<int>", "new ReadOnlyMemory<int>(values, 0, values.Length)")]
+        [TestCase("Memory<int>", "new Memory<int>(values, 0, values.Length)")]
+        public async Task ReadOnlyMemoryAndMemorySliceCtorCallerOwnedArray_Diagnostic(string returnType, string ctorExpression)
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public " + returnType + @" {|PS0002:TestMethod|}(int[] values)
+    {
+        return " + ctorExpression + @";
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [TestCase("ReadOnlyMemory<int>", "new ReadOnlyMemory<int>(values, 0, values.Length)")]
+        [TestCase("Memory<int>", "new Memory<int>(values, 0, values.Length)")]
+        public async Task ReadOnlyMemoryAndMemorySliceCtorOwnedArray_NoDiagnostic(string returnType, string ctorExpression)
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public " + returnType + @" TestMethod()
+    {
+        var values = new[] { 1, 2, 3 };
+        return " + ctorExpression + @";
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
         [Test]
         public async Task CollectionsMarshalAsSpan_Diagnostic()
         {
