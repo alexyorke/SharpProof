@@ -553,28 +553,5 @@ public static class Constants
     {
     };
 
-    public static readonly HashSet<string> KnownPureBCLMembers = new HashSet<string>(StringComparer.Ordinal)
-    {
-        "System.Collections.Immutable.ImmutableList<T>.Add(T)",
-        "System.Collections.Immutable.ImmutableList<T>.SetItem(int, T)",
-        "System.Collections.Immutable.ImmutableList.Create<T>(params T[])",
-        "System.Collections.Immutable.ImmutableArray.Create<T>()",
-        "System.Collections.Immutable.ImmutableArray.Create<T>(params T[])",
-        "System.Collections.Immutable.ImmutableArray.CreateRange<T>(System.Collections.Generic.IEnumerable<T>)",
-        "System.Collections.Immutable.ImmutableArray.CreateRange<TSource, TResult>(System.Collections.Immutable.ImmutableArray<TSource>, System.Func<TSource, TResult>)",
-        "System.Collections.Immutable.ImmutableArray.CreateRange<TSource, TArg, TResult>(System.Collections.Immutable.ImmutableArray<TSource>, System.Func<TSource, TArg, TResult>, TArg)",
-        "System.Collections.Immutable.ImmutableArray.CreateRange<TSource, TResult>(System.Collections.Immutable.ImmutableArray<TSource>, int, int, System.Func<TSource, TResult>)",
-        "System.Collections.Immutable.ImmutableArray.CreateRange<TSource, TArg, TResult>(System.Collections.Immutable.ImmutableArray<TSource>, int, int, System.Func<TSource, TArg, TResult>, TArg)",
-        "System.Collections.Immutable.ImmutableList.CreateRange<T>(System.Collections.Generic.IEnumerable<T>)",
-        "System.Security.Cryptography.Aes.DecryptCbc(byte[], byte[], byte[], System.Security.Cryptography.PaddingMode)",
-        "System.Security.Cryptography.Aes.EncryptCbc(byte[], byte[], byte[], System.Security.Cryptography.PaddingMode)",
-        "System.Security.Cryptography.MD5.ComputeHash(byte[])",
-        "System.Security.Cryptography.SHA256.ComputeHash(byte[])",
-
-        "System.Linq.Queryable.Where<TSource>(System.Linq.IQueryable<TSource>, System.Linq.Expressions.Expression<System.Func<TSource, bool>>)",
-        "System.Memory<T>.Span.get",
-        "System.Numerics.Matrix4x4.CreateRotationX(float)",
-        "System.Numerics.Plane.Normalize(System.Numerics.Plane)",
-
-    };
+    public static readonly HashSet<string> KnownPureBCLMembers = new HashSet<string>(StringComparer.Ordinal);
 }

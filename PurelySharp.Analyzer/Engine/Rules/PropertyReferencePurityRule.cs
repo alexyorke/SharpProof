@@ -238,7 +238,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
 
                 string staticPureSig = propertySymbol.OriginalDefinition.ToDisplayString();
-                bool staticKnownPure = allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol);
+                bool staticKnownPure = allowsKnownPureFallback &&
+                    PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol, context.SemanticModel.Compilation);
                 PurityAnalysisEngine.LogDebug($"      [PropRefRule] Checking IsKnownPureBCLMember for static property: '{staticPureSig}' -> {staticKnownPure}");
 
                 if (staticKnownPure)
@@ -367,7 +368,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     }
 
                     string instancePureSig = propertySymbol.OriginalDefinition.ToDisplayString();
-                    bool instanceKnownPure = allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol);
+                    bool instanceKnownPure = allowsKnownPureFallback &&
+                        PurityAnalysisEngine.IsKnownPureBCLMember(propertySymbol, context.SemanticModel.Compilation);
                     PurityAnalysisEngine.LogDebug($"      [PropRefRule] Checking IsKnownPureBCLMember for instance property: '{instancePureSig}' -> {instanceKnownPure}");
 
                     if (instanceKnownPure)

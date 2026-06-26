@@ -395,10 +395,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             // Skip cctor check only when the generated runtime summary already classifies the method as pure,
             // or when a known-pure override has already taken precedence.
-            if (invokedMethodSymbol.IsStatic && invokedMethodSymbol.ContainingType != null
-                && !(hasTrustedGeneratedPurity && generatedPurity.IsPure)
-                && !isImmutableHashSetCreateRangeWithComparer
-                && !PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol))
+                    if (invokedMethodSymbol.IsStatic && invokedMethodSymbol.ContainingType != null
+                        && !(hasTrustedGeneratedPurity && generatedPurity.IsPure)
+                        && !isImmutableHashSetCreateRangeWithComparer
+                        && !PurityAnalysisEngine.IsKnownPureBCLMember(
+                            originalDefinitionSymbol,
+                            context.SemanticModel.Compilation))
             {
                 var cctorResult = PurityAnalysisEngine.CheckStaticConstructorPurity(invokedMethodSymbol.ContainingType, context, currentState);
                 if (!cctorResult.IsPure)
@@ -441,7 +443,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
                     if (argument.Parameter.RefKind == RefKind.Out &&
                         (hasTrustedGeneratedPurity ||
-                         (allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol)) ||
+                         (allowsKnownPureFallback &&
+                          PurityAnalysisEngine.IsKnownPureBCLMember(
+                              originalDefinitionSymbol,
+                              context.SemanticModel.Compilation)) ||
                          IsSemanticallyPureOutArgumentMethod(originalDefinitionSymbol) ||
                          IsDispatchAnalyzedOutArgumentMethod(invokedMethodSymbol)))
                     {
@@ -638,7 +643,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Checking IsKnownPureBCLMember with signature: '{originalDefinitionSymbol.ToDisplayString()}'");
-            if (allowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol))
+            if (allowsKnownPureFallback &&
+                PurityAnalysisEngine.IsKnownPureBCLMember(
+                    originalDefinitionSymbol,
+                    context.SemanticModel.Compilation))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (Known Pure BCL)");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;

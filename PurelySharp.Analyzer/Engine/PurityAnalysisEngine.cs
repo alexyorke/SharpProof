@@ -1018,7 +1018,7 @@ namespace PurelySharp.Analyzer.Engine
                 }
 
 
-                if (!hasTrustedGeneratedPurity && IsKnownPureBCLMember(methodSymbol))
+                if (!hasTrustedGeneratedPurity && IsKnownPureBCLMember(methodSymbol, semanticModel.Compilation))
                 {
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is known pure BCL member.");
                     purityCache[methodSymbol] = PurityAnalysisResult.Pure;
@@ -2771,7 +2771,7 @@ namespace PurelySharp.Analyzer.Engine
                         }
                     }
 
-                    if (!hasTrustedGeneratedPurity && IsKnownPureBCLMember(operatorMethod))
+                if (!hasTrustedGeneratedPurity && IsKnownPureBCLMember(operatorMethod, context.SemanticModel.Compilation))
                     {
                         LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is known pure BCL member.");
                         return PurityAnalysisResult.Pure;
@@ -2886,9 +2886,9 @@ namespace PurelySharp.Analyzer.Engine
 
 
 
-        internal static bool IsKnownPureBCLMember(ISymbol symbol) =>
+        internal static bool IsKnownPureBCLMember(ISymbol symbol, Compilation? compilation) =>
             IsTriviallyPureObjectConstructor(symbol) ||
-            ImpurityCatalog.IsKnownPureBCLMember(symbol);
+            ImpurityCatalog.IsKnownPureBCLMember(symbol, compilation);
 
         private static bool IsTriviallyPureObjectConstructor(ISymbol symbol)
         {

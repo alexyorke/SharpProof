@@ -784,16 +784,22 @@ internal static class PurityClassificationEngine
             PureCount: pureCount,
             ImpureCount: impureCount,
             ConservativeUnknownCount: unknownCount,
-            CatalogComparison: includeCatalogComparison ? BuildCatalogComparison(methods) : null);
+            CatalogComparison: includeCatalogComparison
+                ? BuildCatalogComparison(methods)
+                : null);
     }
 
-    private static CatalogComparisonReport BuildCatalogComparison(IReadOnlyList<MethodEffectSummary> methods)
+    private static CatalogComparisonReport BuildCatalogComparison(
+        IReadOnlyList<MethodEffectSummary> methods)
     {
         var bySymbol = methods
             .GroupBy(method => NormalizeCatalogComparisonKey(method.Symbol), StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+
+        var knownPureSymbols = Constants.KnownPureBCLMembers;
+
         return new CatalogComparisonReport(
-            KnownPureMembers: BuildRows(Constants.KnownPureBCLMembers, bySymbol, "known_pure"),
+            KnownPureMembers: BuildRows(knownPureSymbols, bySymbol, "known_pure"),
             KnownImpureMembers: BuildRows(Constants.KnownImpureMethods, bySymbol, "known_impure"),
             KnownFreshOwnedArrayReturningMembers: BuildRows(Constants.KnownFreshOwnedArrayReturningMembers, bySymbol, "known_fresh_owned_array"));
     }

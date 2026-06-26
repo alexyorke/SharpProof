@@ -27,9 +27,6 @@ namespace PurelySharp.Analyzer.Engine
 		internal static bool IsStrictPurityProfile =>
 			string.Equals(_configuredOverrides.Value?.PurityProfile, "strict", StringComparison.OrdinalIgnoreCase);
 
-		private static readonly Lazy<ImmutableHashSet<string>> KnownPureNormalizedSignatures =
-			new(() => NormalizeSignatures(Constants.KnownPureBCLMembers));
-
 		internal static IDisposable UseConfiguredOverrides(AnalyzerConfiguration config)
 		{
 			var previous = _configuredOverrides.Value;
@@ -59,7 +56,7 @@ namespace PurelySharp.Analyzer.Engine
 			}
 		}
 
-		public static bool IsKnownPureBCLMember(ISymbol symbol)
+		public static bool IsKnownPureBCLMember(ISymbol symbol, Compilation? compilation)
 		{
 			if (symbol == null) return false;
 
@@ -79,6 +76,14 @@ namespace PurelySharp.Analyzer.Engine
 			{
 				PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Skipping ImmutableInterlocked member: {symbol.ToDisplayString()}");
 				return false;
+			}
+
+			var methodSymbol = symbol as IMethodSymbol ??
+				(symbol is IPropertySymbol propertySymbol ? propertySymbol.GetMethod : null);
+			if (TryGetGeneratedPureMethod(methodSymbol, compilation, out var generatedSignature, out _))
+			{
+				PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Known pure based on generated catalog match '{generatedSignature}' for {symbol.ToDisplayString()}");
+				return true;
 			}
 
 			if (IsSemanticallyPureMathMember(symbol))
@@ -101,20 +106,20 @@ namespace PurelySharp.Analyzer.Engine
 			bool isKnownPure = MatchesKnownPureSignature(signature);
 			PurityAnalysisEngine.LogDebug($"    [IsKnownPure] HashSet.Contains result: {isKnownPure}");
 
-			if (!isKnownPure && symbol is IMethodSymbol methodSymbol && methodSymbol.IsGenericMethod)
+			if (!isKnownPure && symbol is IMethodSymbol genericMethod && genericMethod.IsGenericMethod)
 			{
-				signature = methodSymbol.ConstructedFrom.ToDisplayString();
+				signature = genericMethod.ConstructedFrom.ToDisplayString();
 				isKnownPure = MatchesKnownPureSignature(signature);
 			}
-			else if (!isKnownPure && symbol is IPropertySymbol propertySymbol && propertySymbol.ContainingType.IsGenericType)
+			else if (!isKnownPure && symbol is IPropertySymbol genericProperty && genericProperty.ContainingType.IsGenericType)
 			{
-				if (propertySymbol.IsIndexer)
+				if (genericProperty.IsIndexer)
 				{
-					signature = propertySymbol.OriginalDefinition.ToDisplayString();
+					signature = genericProperty.OriginalDefinition.ToDisplayString();
 				}
 				else
 				{
-					signature = $"{propertySymbol.ContainingType.ConstructedFrom.ToDisplayString()}.{propertySymbol.Name}.get";
+					signature = $"{genericProperty.ContainingType.ConstructedFrom.ToDisplayString()}.{genericProperty.Name}.get";
 				}
 				isKnownPure = MatchesKnownPureSignature(signature);
 			}
@@ -222,13 +227,39 @@ namespace PurelySharp.Analyzer.Engine
 
 		private static bool MatchesKnownPureSignature(string signature)
 		{
-			return MatchesSignature(Constants.KnownPureBCLMembers, KnownPureNormalizedSignatures.Value, signature) ||
-				MatchesSignature(ExtraPureMethods, NormalizeSignatures(ExtraPureMethods), signature);
+			return MatchesSignature(ExtraPureMethods, NormalizeSignatures(ExtraPureMethods), signature);
 		}
 
 		private static bool MatchesConfiguredKnownPureSignature(string signature)
 		{
 			return MatchesSignature(ExtraPureMethods, NormalizeSignatures(ExtraPureMethods), signature);
+		}
+
+		private static bool TryGetGeneratedPureMethod(
+			IMethodSymbol? methodSymbol,
+			Compilation? compilation,
+			out string signature,
+			out GeneratedPurityCatalog.PurityEntry classification)
+		{
+			signature = methodSymbol?.ToDisplayString() ?? string.Empty;
+			classification = default;
+			if (compilation == null || methodSymbol == null)
+			{
+				return false;
+			}
+
+			if (!GeneratedPurityCatalog.Current.TryGetPurity(methodSymbol, compilation, out classification))
+			{
+				return false;
+			}
+
+			if (!classification.IsPure)
+			{
+				return false;
+			}
+
+			signature = methodSymbol.OriginalDefinition.ToDisplayString();
+			return true;
 		}
 
 		private static bool MatchesSignature(

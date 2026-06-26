@@ -216,7 +216,9 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
 
                     string fieldPureSig = fieldSymbol.OriginalDefinition.ToDisplayString();
-                    bool fieldKnownPure = PurityAnalysisEngine.IsKnownPureBCLMember(fieldSymbol);
+                bool fieldKnownPure = PurityAnalysisEngine.IsKnownPureBCLMember(
+                    fieldSymbol,
+                    context.SemanticModel.Compilation);
                     PurityAnalysisEngine.LogDebug($"      [FieldRefRule] Checking IsKnownPureBCLMember for instance field accessed via {instanceOperation.Kind}: '{fieldPureSig}' -> {fieldKnownPure}");
 
                     if (fieldKnownPure)

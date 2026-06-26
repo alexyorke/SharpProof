@@ -258,7 +258,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 }
             }
 
-            if ((!hasTrustedGeneratedPurity && PurityAnalysisEngine.IsKnownPureBCLMember(operatorMethod)) ||
+            if ((!hasTrustedGeneratedPurity &&
+                PurityAnalysisEngine.IsKnownPureBCLMember(operatorMethod, context.SemanticModel.Compilation)) ||
                 PurityAnalysisEngine.HasPureExternalAttribute(operatorMethod))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;

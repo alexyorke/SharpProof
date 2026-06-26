@@ -236,7 +236,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     }
                 }
 
-                if (trustedMetadataPurity.AllowsKnownPureFallback && PurityAnalysisEngine.IsKnownPureBCLMember(constructorSymbol))
+                if (trustedMetadataPurity.AllowsKnownPureFallback &&
+                    PurityAnalysisEngine.IsKnownPureBCLMember(
+                        constructorSymbol,
+                        context.SemanticModel.Compilation))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a known-pure BCL member; skipping recursive callee analysis.");
                     return PurityAnalysisResult.Pure;
