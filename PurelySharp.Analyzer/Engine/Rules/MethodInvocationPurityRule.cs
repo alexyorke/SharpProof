@@ -366,11 +366,13 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var hasTrustedGeneratedPurity = trustedMetadataPurity.HasTrustedGeneratedPurity;
             var generatedPurity = trustedMetadataPurity.GeneratedPurity;
             var allowsKnownPureFallback = trustedMetadataPurity.AllowsKnownPureFallback;
+            var isImmutableHashSetCreateRangeWithComparer = IsImmutableHashSetCreateRangeWithComparer(originalDefinitionSymbol);
 
             // Skip cctor check only when the generated runtime summary already classifies the method as pure,
             // or when a known-pure override has already taken precedence.
             if (invokedMethodSymbol.IsStatic && invokedMethodSymbol.ContainingType != null
                 && !(hasTrustedGeneratedPurity && generatedPurity.IsPure)
+                && !isImmutableHashSetCreateRangeWithComparer
                 && !PurityAnalysisEngine.IsKnownPureBCLMember(originalDefinitionSymbol))
             {
                 var cctorResult = PurityAnalysisEngine.CheckStaticConstructorPurity(invokedMethodSymbol.ContainingType, context, currentState);
@@ -434,6 +436,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         argumentResult.ImpureSyntaxNode ?? argument.Value.Syntax,
                         argumentResult.Evidence);
                 }
+            }
+
+            if (isImmutableHashSetCreateRangeWithComparer)
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
             if (IsKnownDelegateInvokingBclMethod(originalDefinitionSymbol))
@@ -915,6 +922,13 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return methodSymbol.Parameters[1].Type is INamedTypeSymbol enumerableType &&
                 enumerableType.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T &&
                 enumerableType.TypeArguments[0].SpecialType == SpecialType.System_String;
+        }
+
+        private static bool IsImmutableHashSetCreateRangeWithComparer(IMethodSymbol methodSymbol)
+        {
+            return methodSymbol.Name == "CreateRange" &&
+                methodSymbol.ContainingType?.OriginalDefinition.Name == "ImmutableHashSet" &&
+                methodSymbol.ContainingType?.ContainingNamespace.ToDisplayString() == "System.Collections.Immutable";
         }
 
         private static INamedTypeSymbol? GetTrackedLocalReceiverType(
