@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T15:27:06.7875679+00:00",
+  "GeneratedAtUtc": "2026-06-26T06:27:23.6548286+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Collections.Immutable",
@@ -1981,34 +1981,7 @@
     "ImpureCount": 7,
     "ConservativeUnknownCount": 7,
     "CatalogComparison": {
-      "KnownPureMembers": [
-        {
-          "Symbol": "System.Collections.Immutable.ImmutableHashSet.CreateRange\u003CT\u003E(System.Collections.Generic.IEnumerable\u003CT\u003E)",
-          "Catalog": "known_pure",
-          "Classification": "pure",
-          "Categories": [],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "internal_only",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Immutable.ImmutableHashSet.CreateRange\u003CT\u003E(System.Collections.Generic.IEqualityComparer\u003CT\u003E, System.Collections.Generic.IEnumerable\u003CT\u003E)",
-          "Catalog": "known_pure",
-          "Classification": "conservative_unknown",
-          "Categories": [
-            "unknown_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Immutable.ImmutableHashSet\u00601.WithComparer(System.Collections.Generic.IEqualityComparer\u00601\u003C!0\u003E)"
-          ],
-          "EffectVisibilityClassification": "unknown",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEqualityComparer\u00601\u003C!!0\u003E, System.Collections.Generic.IEnumerable\u00601\u003C!!0\u003E)-\u003ESystem.Collections.Immutable.ImmutableHashSet\u00601\u003C!!0\u003E"
-          ]
-        }
-      ],
+      "KnownPureMembers": [],
       "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }

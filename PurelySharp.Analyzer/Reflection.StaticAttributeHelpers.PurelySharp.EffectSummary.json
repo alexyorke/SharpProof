@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T15:36:11.2117527+00:00",
+  "GeneratedAtUtc": "2026-06-26T06:27:23.4325742+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -411,47 +411,7 @@
     "ConservativeUnknownCount": 0,
     "CatalogComparison": {
       "KnownPureMembers": [],
-      "KnownImpureMembers": [
-        {
-          "Symbol": "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)",
-          "Catalog": "known_impure",
-          "Classification": "pure",
-          "Categories": [],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "none",
-          "MatchedExactSymbolKeys": [
-            "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)-\u003ESystem.Attribute"
-          ]
-        },
-        {
-          "Symbol": "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type, bool)",
-            "System.Type.op_Inequality(System.Type, System.Type)",
-            "System.Type.op_Equality(System.Type, System.Type)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)-\u003Ebool"
-          ]
-        },
-        {
-          "Symbol": "System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)",
-          "Catalog": "known_impure",
-          "Classification": "pure",
-          "Categories": [],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "none",
-          "MatchedExactSymbolKeys": [
-            "System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)-\u003ESystem.Collections.Generic.IList\u00601\u003CSystem.Reflection.CustomAttributeData\u003E"
-          ]
-        }
-      ],
+      "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
   },

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T15:43:45.8038664+00:00",
+  "GeneratedAtUtc": "2026-06-26T06:27:23.5136415+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Collections",
@@ -1236,55 +1236,7 @@
     "ConservativeUnknownCount": 2,
     "CatalogComparison": {
       "KnownPureMembers": [],
-      "KnownImpureMembers": [
-        {
-          "Symbol": "System.Collections.BitArray.Set(int, bool)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "caller_visible_memory_write",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.BitArray.Set(int, bool)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.SortedDictionary\u003CTKey, TValue\u003E.Add(TKey, TValue)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Generic.SortedSet\u00601.Add(!0)",
-            "System.Collections.Generic.SortedSet\u00601.AddIfNotPresent(!0)",
-            "System.Collections.Generic.SortedSet\u00601\u002BNode.Split4Node()"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.SortedDictionary\u00602.Add(!0, !1)-\u003Evoid"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.SortedSet\u003CT\u003E.Add(T)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Generic.SortedSet\u00601.AddIfNotPresent(!0)",
-            "System.Collections.Generic.SortedSet\u00601\u002BNode.Split4Node()"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.SortedSet\u00601.Add(!0)-\u003Ebool"
-          ]
-        }
-      ],
+      "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
   },

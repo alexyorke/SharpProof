@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T15:36:10.4172298+00:00",
+  "GeneratedAtUtc": "2026-06-26T06:27:22.3785802+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -700,23 +700,7 @@
     "ConservativeUnknownCount": 1,
     "CatalogComparison": {
       "KnownPureMembers": [],
-      "KnownImpureMembers": [
-        {
-          "Symbol": "System.Collections.Concurrent.ConcurrentQueue\u003CT\u003E.Enqueue(T)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Concurrent.ConcurrentQueueSegment\u00601.TryEnqueue(!0)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Concurrent.ConcurrentQueue\u00601.Enqueue(!0)-\u003Evoid"
-          ]
-        }
-      ],
+      "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
   },

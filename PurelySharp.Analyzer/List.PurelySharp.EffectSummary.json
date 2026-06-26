@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T15:22:03.411359+00:00",
+  "GeneratedAtUtc": "2026-06-26T06:27:45.0174291+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -3648,10 +3648,13 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.Collections.Generic.List\u00601.Sort(int, int, System.Collections.Generic.IComparer\u00601\u003C!0\u003E)"
+              "System.Collections.Generic.List\u00601.Sort(int, int, System.Collections.Generic.IComparer\u00601\u003C!0\u003E)",
+              "System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer\u00601\u003C!!0\u003E)",
+              "System.Collections.Generic.ArraySortHelper\u00601.get_Default()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -3697,10 +3700,13 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.Collections.Generic.List\u00601.Sort(int, int, System.Collections.Generic.IComparer\u00601\u003C!0\u003E)"
+              "System.Collections.Generic.List\u00601.Sort(int, int, System.Collections.Generic.IComparer\u00601\u003C!0\u003E)",
+              "System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer\u00601\u003C!!0\u003E)",
+              "System.Collections.Generic.ArraySortHelper\u00601.get_Default()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -3766,11 +3772,13 @@
           "PurityClassification": {
             "Classification": "impure",
             "Categories": [
+              "global_state_read",
               "impure_callee",
               "object_state_write"
             ],
             "FirstBlockingCallChain": [
-              "System.ThrowHelper.ThrowArgumentException(System.ExceptionResource)"
+              "System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer\u00601\u003C!!0\u003E)",
+              "System.Collections.Generic.ArraySortHelper\u00601.get_Default()"
             ],
             "HasFreshArrayAllocationEvidence": false,
             "HasFreshObjectAllocationEvidence": false,
@@ -5647,12 +5655,15 @@
         "MetadataToken": "0x0600860F",
         "MethodBodySha256": "8f964f12026af25e28e3fe156ae95df66a62e8b22b7ba943b9707c4697e601e3",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.Collections.Generic.List\u00601.Sort(int, int, System.Collections.Generic.IComparer\u00601\u003C!0\u003E)"
+          "System.Collections.Generic.List\u00601.Sort(int, int, System.Collections.Generic.IComparer\u00601\u003C!0\u003E)",
+          "System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer\u00601\u003C!!0\u003E)",
+          "System.Collections.Generic.ArraySortHelper\u00601.get_Default()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -5671,12 +5682,15 @@
         "MetadataToken": "0x06008610",
         "MethodBodySha256": "78886919cf0713f3823919d3c47547d3fe3d634da99c15cdb30bc90ab3d6aa37",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.Collections.Generic.List\u00601.Sort(int, int, System.Collections.Generic.IComparer\u00601\u003C!0\u003E)"
+          "System.Collections.Generic.List\u00601.Sort(int, int, System.Collections.Generic.IComparer\u00601\u003C!0\u003E)",
+          "System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer\u00601\u003C!!0\u003E)",
+          "System.Collections.Generic.ArraySortHelper\u00601.get_Default()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
@@ -5720,13 +5734,15 @@
         "MetadataToken": "0x06008611",
         "MethodBodySha256": "4a7c0b9c1bdb63015e33b74132142b7e9f54e1fea891c766e1cf7b09519aaadf",
         "Classification": "impure",
-        "PrimaryCategory": "impure_callee",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
+          "global_state_read",
           "impure_callee",
           "object_state_write"
         ],
         "FirstBlockingCallChain": [
-          "System.ThrowHelper.ThrowArgumentException(System.ExceptionResource)"
+          "System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer\u00601\u003C!!0\u003E)",
+          "System.Collections.Generic.ArraySortHelper\u00601.get_Default()"
         ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T15:27:06.5224785+00:00",
+  "GeneratedAtUtc": "2026-06-26T06:27:21.9532985+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Collections",
@@ -1084,41 +1084,7 @@
     "ConservativeUnknownCount": 1,
     "CatalogComparison": {
       "KnownPureMembers": [],
-      "KnownImpureMembers": [
-        {
-          "Symbol": "System.Collections.Generic.PriorityQueue\u003CTElement, TPriority\u003E.Dequeue()",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee",
-            "throw"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Generic.PriorityQueue\u00602.RemoveRootNode()",
-            "System.Collections.Generic.PriorityQueue\u00602.MoveDownCustomComparer(System.ValueTuple\u00602\u003C!0, !1\u003E, int)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.PriorityQueue\u00602.Dequeue()-\u003E!0"
-          ]
-        },
-        {
-          "Symbol": "System.Collections.Generic.PriorityQueue\u003CTElement, TPriority\u003E.Enqueue(TElement, TPriority)",
-          "Catalog": "known_impure",
-          "Classification": "impure",
-          "Categories": [
-            "impure_callee",
-            "object_state_write"
-          ],
-          "FirstBlockingCallChain": [
-            "System.Collections.Generic.PriorityQueue\u00602.MoveUpCustomComparer(System.ValueTuple\u00602\u003C!0, !1\u003E, int)"
-          ],
-          "EffectVisibilityClassification": "caller_visible",
-          "MatchedExactSymbolKeys": [
-            "System.Collections.Generic.PriorityQueue\u00602.Enqueue(!0, !1)-\u003Evoid"
-          ]
-        }
-      ],
+      "KnownImpureMembers": [],
       "KnownFreshOwnedArrayReturningMembers": []
     }
   },

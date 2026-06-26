@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T15:21:27.527028+00:00",
+  "GeneratedAtUtc": "2026-06-26T06:27:17.1741077+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Diagnostics.Process",
@@ -5137,20 +5137,21 @@
           ],
           "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "conservative_unknown",
+            "Classification": "impure",
             "Categories": [
-              "dynamic_dispatch",
-              "unknown_callee",
-              "virtual_call"
+              "global_state_read",
+              "impure_callee"
             ],
             "FirstBlockingCallChain": [
-              "System.Collections.Generic.ICollection\u00601.get_Count()"
+              "System.Array.Sort(!!0[], System.Collections.Generic.IComparer\u00601\u003C!!0\u003E)",
+              "System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer\u00601\u003C!!0\u003E)",
+              "System.Collections.Generic.ArraySortHelper\u00601.get_Default()"
             ],
             "HasFreshArrayAllocationEvidence": true,
             "HasFreshObjectAllocationEvidence": true,
             "HasUnsupportedEffects": true,
             "FreshnessClassification": "fresh_array_candidate_requires_non_pure_resolution",
-            "EffectVisibilityClassification": "unknown"
+            "EffectVisibilityClassification": "caller_visible"
           }
         },
         {
@@ -8085,8 +8086,8 @@
     "SchemaVersion": 3,
     "MethodCount": 138,
     "PureCount": 44,
-    "ImpureCount": 57,
-    "ConservativeUnknownCount": 37,
+    "ImpureCount": 58,
+    "ConservativeUnknownCount": 36,
     "CatalogComparison": {
       "KnownPureMembers": [],
       "KnownImpureMembers": [],
@@ -8985,21 +8986,22 @@
         "ModuleVersionId": "dd21ef4e-46d2-46af-aa0d-b42950e79183",
         "MetadataToken": "0x0600019E",
         "MethodBodySha256": "dffe4af3e2c92432ff1549b7b168791ff24e5067a0065016c8f66405d9972cf8",
-        "Classification": "conservative_unknown",
-        "PrimaryCategory": "dynamic_dispatch",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_read",
         "Categories": [
-          "dynamic_dispatch",
-          "unknown_callee",
-          "virtual_call"
+          "global_state_read",
+          "impure_callee"
         ],
         "FirstBlockingCallChain": [
-          "System.Collections.Generic.ICollection\u00601.get_Count()"
+          "System.Array.Sort(!!0[], System.Collections.Generic.IComparer\u00601\u003C!!0\u003E)",
+          "System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer\u00601\u003C!!0\u003E)",
+          "System.Collections.Generic.ArraySortHelper\u00601.get_Default()"
         ],
         "HasFreshArrayAllocationEvidence": true,
         "HasFreshObjectAllocationEvidence": true,
         "HasUnsupportedEffects": true,
         "FreshnessClassification": "fresh_array_candidate_requires_non_pure_resolution",
-        "EffectVisibilityClassification": "unknown"
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.Diagnostics.Process.GetErrorMessage(int)",
