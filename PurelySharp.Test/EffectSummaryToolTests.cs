@@ -670,6 +670,108 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeBinaryPrimitivesWriteAndTryWriteSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                80,
+                "System.Buffers.Binary.BinaryPrimitives.Write",
+                "System.Buffers.Binary.BinaryPrimitives.TryWrite");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            Assert.That(report.GetProperty("MethodCount").GetInt32(), Is.GreaterThan(0));
+
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var expectedSymbols = new[]
+            {
+                "System.Buffers.Binary.BinaryPrimitives.WriteDoubleBigEndian(System.Span`1<byte>, double)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteDoubleLittleEndian(System.Span`1<byte>, double)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteHalfBigEndian(System.Span`1<byte>, System.Half)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteHalfLittleEndian(System.Span`1<byte>, System.Half)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteInt128BigEndian(System.Span`1<byte>, System.Int128)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteInt128LittleEndian(System.Span`1<byte>, System.Int128)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteInt16BigEndian(System.Span`1<byte>, short)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(System.Span`1<byte>, short)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(System.Span`1<byte>, int)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(System.Span`1<byte>, int)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteInt64BigEndian(System.Span`1<byte>, long)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(System.Span`1<byte>, long)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteIntPtrBigEndian(System.Span`1<byte>, nint)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteIntPtrLittleEndian(System.Span`1<byte>, nint)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteSingleBigEndian(System.Span`1<byte>, float)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteSingleLittleEndian(System.Span`1<byte>, float)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteUInt128BigEndian(System.Span`1<byte>, System.UInt128)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteUInt128LittleEndian(System.Span`1<byte>, System.UInt128)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(System.Span`1<byte>, ushort)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(System.Span`1<byte>, ushort)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(System.Span`1<byte>, uint)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(System.Span`1<byte>, uint)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteUInt64BigEndian(System.Span`1<byte>, ulong)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(System.Span`1<byte>, ulong)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteUIntPtrBigEndian(System.Span`1<byte>, nuint)",
+                "System.Buffers.Binary.BinaryPrimitives.WriteUIntPtrLittleEndian(System.Span`1<byte>, nuint)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteDoubleBigEndian(System.Span`1<byte>, double)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteDoubleLittleEndian(System.Span`1<byte>, double)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteHalfBigEndian(System.Span`1<byte>, System.Half)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteHalfLittleEndian(System.Span`1<byte>, System.Half)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteInt128BigEndian(System.Span`1<byte>, System.Int128)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteInt128LittleEndian(System.Span`1<byte>, System.Int128)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteInt16BigEndian(System.Span`1<byte>, short)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteInt16LittleEndian(System.Span`1<byte>, short)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteInt32BigEndian(System.Span`1<byte>, int)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteInt32LittleEndian(System.Span`1<byte>, int)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteInt64BigEndian(System.Span`1<byte>, long)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteInt64LittleEndian(System.Span`1<byte>, long)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteIntPtrBigEndian(System.Span`1<byte>, nint)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteIntPtrLittleEndian(System.Span`1<byte>, nint)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteSingleBigEndian(System.Span`1<byte>, float)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteSingleLittleEndian(System.Span`1<byte>, float)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteUInt128BigEndian(System.Span`1<byte>, System.UInt128)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteUInt128LittleEndian(System.Span`1<byte>, System.UInt128)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteUInt16BigEndian(System.Span`1<byte>, ushort)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteUInt16LittleEndian(System.Span`1<byte>, ushort)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteUInt32BigEndian(System.Span`1<byte>, uint)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteUInt32LittleEndian(System.Span`1<byte>, uint)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteUInt64BigEndian(System.Span`1<byte>, ulong)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteUInt64LittleEndian(System.Span`1<byte>, ulong)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteUIntPtrBigEndian(System.Span`1<byte>, nuint)",
+                "System.Buffers.Binary.BinaryPrimitives.TryWriteUIntPtrLittleEndian(System.Span`1<byte>, nuint)",
+            };
+
+            var generatedRows = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Where(row =>
+                {
+                    var symbol = row.GetProperty("Symbol").GetString();
+                    return !string.IsNullOrWhiteSpace(symbol) &&
+                        (symbol.StartsWith("System.Buffers.Binary.BinaryPrimitives.Write", StringComparison.Ordinal) ||
+                         symbol.StartsWith("System.Buffers.Binary.BinaryPrimitives.TryWrite", StringComparison.Ordinal));
+                })
+                .ToArray();
+
+            Assert.That(generatedRows, Has.Length.EqualTo(expectedSymbols.Length));
+            Assert.That(
+                generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
+                Is.EquivalentTo(expectedSymbols));
+
+            foreach (var symbol in expectedSymbols)
+            {
+                AssertPurityClassification(summary, symbol, "pure");
+                AssertEffectVisibilityClassification(summary, symbol, "internal_only");
+            }
+
+            foreach (var row in generatedRows)
+            {
+                Assert.That(row.GetProperty("Classification").GetString(), Is.EqualTo("pure"));
+                Assert.That(row.GetProperty("FreshnessClassification").GetString(), Is.EqualTo("none"));
+                Assert.That(row.GetProperty("HasUnsupportedEffects").GetBoolean(), Is.False);
+            }
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeBinaryPrimitivesReverseEndiannessSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.Buffers.Binary.BinaryPrimitives.ReverseEndianness", limit: 40);

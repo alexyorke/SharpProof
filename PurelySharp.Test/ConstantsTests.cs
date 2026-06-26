@@ -4357,6 +4357,137 @@ public static class RecentCatalogSignatureSamples
         }
 
         [Test]
+        public void BinaryPrimitivesWriteFamily_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System;
+using System.Buffers.Binary;
+
+public static class BinaryPrimitivesWriteCatalogSignatureSamples
+{
+    public static void Sample(Span<byte> destination)
+    {
+        BinaryPrimitives.WriteInt16BigEndian(destination, 1);
+        BinaryPrimitives.WriteInt16LittleEndian(destination, 1);
+        BinaryPrimitives.WriteInt32BigEndian(destination, 1);
+        BinaryPrimitives.WriteInt32LittleEndian(destination, 1);
+        BinaryPrimitives.WriteInt64BigEndian(destination, 1L);
+        BinaryPrimitives.WriteInt64LittleEndian(destination, 1L);
+        BinaryPrimitives.WriteInt128BigEndian(destination, (Int128)1);
+        BinaryPrimitives.WriteInt128LittleEndian(destination, (Int128)1);
+        BinaryPrimitives.WriteIntPtrBigEndian(destination, (nint)1);
+        BinaryPrimitives.WriteIntPtrLittleEndian(destination, (nint)1);
+        BinaryPrimitives.WriteUInt16BigEndian(destination, 1);
+        BinaryPrimitives.WriteUInt16LittleEndian(destination, 1);
+        BinaryPrimitives.WriteUInt32BigEndian(destination, 1U);
+        BinaryPrimitives.WriteUInt32LittleEndian(destination, 1U);
+        BinaryPrimitives.WriteSingleBigEndian(destination, 1.0f);
+        BinaryPrimitives.WriteSingleLittleEndian(destination, 1.0f);
+        BinaryPrimitives.WriteDoubleBigEndian(destination, 1.0);
+        BinaryPrimitives.WriteDoubleLittleEndian(destination, 1.0);
+        BinaryPrimitives.WriteHalfBigEndian(destination, (Half)1);
+        BinaryPrimitives.WriteHalfLittleEndian(destination, (Half)1);
+        BinaryPrimitives.WriteUInt128BigEndian(destination, (UInt128)1);
+        BinaryPrimitives.WriteUInt128LittleEndian(destination, (UInt128)1);
+        BinaryPrimitives.WriteUIntPtrBigEndian(destination, (nuint)1);
+        BinaryPrimitives.WriteUIntPtrLittleEndian(destination, (nuint)1);
+        _ = BinaryPrimitives.TryWriteInt16BigEndian(destination, 1);
+        _ = BinaryPrimitives.TryWriteInt16LittleEndian(destination, 1);
+        _ = BinaryPrimitives.TryWriteInt32BigEndian(destination, 1);
+        _ = BinaryPrimitives.TryWriteInt32LittleEndian(destination, 1);
+        _ = BinaryPrimitives.TryWriteInt64BigEndian(destination, 1L);
+        _ = BinaryPrimitives.TryWriteInt64LittleEndian(destination, 1L);
+        _ = BinaryPrimitives.TryWriteInt128BigEndian(destination, (Int128)1);
+        _ = BinaryPrimitives.TryWriteInt128LittleEndian(destination, (Int128)1);
+        _ = BinaryPrimitives.TryWriteIntPtrBigEndian(destination, (nint)1);
+        _ = BinaryPrimitives.TryWriteIntPtrLittleEndian(destination, (nint)1);
+        _ = BinaryPrimitives.TryWriteUInt16BigEndian(destination, 1);
+        _ = BinaryPrimitives.TryWriteUInt16LittleEndian(destination, 1);
+        _ = BinaryPrimitives.TryWriteUInt32BigEndian(destination, 1U);
+        _ = BinaryPrimitives.TryWriteUInt32LittleEndian(destination, 1U);
+        _ = BinaryPrimitives.TryWriteUInt64BigEndian(destination, 1UL);
+        _ = BinaryPrimitives.TryWriteUInt64LittleEndian(destination, 1UL);
+        _ = BinaryPrimitives.TryWriteUInt128BigEndian(destination, (UInt128)1);
+        _ = BinaryPrimitives.TryWriteUInt128LittleEndian(destination, (UInt128)1);
+        _ = BinaryPrimitives.TryWriteUIntPtrBigEndian(destination, (nuint)1);
+        _ = BinaryPrimitives.TryWriteUIntPtrLittleEndian(destination, (nuint)1);
+        _ = BinaryPrimitives.TryWriteSingleBigEndian(destination, 1.0f);
+        _ = BinaryPrimitives.TryWriteSingleLittleEndian(destination, 1.0f);
+        _ = BinaryPrimitives.TryWriteDoubleBigEndian(destination, 1.0);
+        _ = BinaryPrimitives.TryWriteDoubleLittleEndian(destination, 1.0);
+        _ = BinaryPrimitives.TryWriteHalfBigEndian(destination, (Half)1);
+        _ = BinaryPrimitives.TryWriteHalfLittleEndian(destination, (Half)1);
+    }
+}";
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "BinaryPrimitivesWriteCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            var members = new[]
+            {
+                "BinaryPrimitives.WriteInt16BigEndian(destination, 1)",
+                "BinaryPrimitives.WriteInt16LittleEndian(destination, 1)",
+                "BinaryPrimitives.WriteInt32BigEndian(destination, 1)",
+                "BinaryPrimitives.WriteInt32LittleEndian(destination, 1)",
+                "BinaryPrimitives.WriteInt64BigEndian(destination, 1L)",
+                "BinaryPrimitives.WriteInt64LittleEndian(destination, 1L)",
+                "BinaryPrimitives.WriteInt128BigEndian(destination, (Int128)1)",
+                "BinaryPrimitives.WriteInt128LittleEndian(destination, (Int128)1)",
+                "BinaryPrimitives.WriteIntPtrBigEndian(destination, (nint)1)",
+                "BinaryPrimitives.WriteIntPtrLittleEndian(destination, (nint)1)",
+                "BinaryPrimitives.WriteUInt16BigEndian(destination, 1)",
+                "BinaryPrimitives.WriteUInt16LittleEndian(destination, 1)",
+                "BinaryPrimitives.WriteUInt32BigEndian(destination, 1U)",
+                "BinaryPrimitives.WriteUInt32LittleEndian(destination, 1U)",
+                "BinaryPrimitives.WriteSingleBigEndian(destination, 1.0f)",
+                "BinaryPrimitives.WriteSingleLittleEndian(destination, 1.0f)",
+                "BinaryPrimitives.WriteDoubleBigEndian(destination, 1.0)",
+                "BinaryPrimitives.WriteDoubleLittleEndian(destination, 1.0)",
+                "BinaryPrimitives.WriteHalfBigEndian(destination, (Half)1)",
+                "BinaryPrimitives.WriteHalfLittleEndian(destination, (Half)1)",
+                "BinaryPrimitives.WriteUInt128BigEndian(destination, (UInt128)1)",
+                "BinaryPrimitives.WriteUInt128LittleEndian(destination, (UInt128)1)",
+                "BinaryPrimitives.WriteUIntPtrBigEndian(destination, (nuint)1)",
+                "BinaryPrimitives.WriteUIntPtrLittleEndian(destination, (nuint)1)",
+                "BinaryPrimitives.TryWriteInt16BigEndian(destination, 1)",
+                "BinaryPrimitives.TryWriteInt16LittleEndian(destination, 1)",
+                "BinaryPrimitives.TryWriteInt32BigEndian(destination, 1)",
+                "BinaryPrimitives.TryWriteInt32LittleEndian(destination, 1)",
+                "BinaryPrimitives.TryWriteInt64BigEndian(destination, 1L)",
+                "BinaryPrimitives.TryWriteInt64LittleEndian(destination, 1L)",
+                "BinaryPrimitives.TryWriteInt128BigEndian(destination, (Int128)1)",
+                "BinaryPrimitives.TryWriteInt128LittleEndian(destination, (Int128)1)",
+                "BinaryPrimitives.TryWriteIntPtrBigEndian(destination, (nint)1)",
+                "BinaryPrimitives.TryWriteIntPtrLittleEndian(destination, (nint)1)",
+                "BinaryPrimitives.TryWriteUInt16BigEndian(destination, 1)",
+                "BinaryPrimitives.TryWriteUInt16LittleEndian(destination, 1)",
+                "BinaryPrimitives.TryWriteUInt32BigEndian(destination, 1U)",
+                "BinaryPrimitives.TryWriteUInt32LittleEndian(destination, 1U)",
+                "BinaryPrimitives.TryWriteUInt64BigEndian(destination, 1UL)",
+                "BinaryPrimitives.TryWriteUInt64LittleEndian(destination, 1UL)",
+                "BinaryPrimitives.TryWriteUInt128BigEndian(destination, (UInt128)1)",
+                "BinaryPrimitives.TryWriteUInt128LittleEndian(destination, (UInt128)1)",
+                "BinaryPrimitives.TryWriteUIntPtrBigEndian(destination, (nuint)1)",
+                "BinaryPrimitives.TryWriteUIntPtrLittleEndian(destination, (nuint)1)",
+                "BinaryPrimitives.TryWriteSingleBigEndian(destination, 1.0f)",
+                "BinaryPrimitives.TryWriteSingleLittleEndian(destination, 1.0f)",
+                "BinaryPrimitives.TryWriteDoubleBigEndian(destination, 1.0)",
+                "BinaryPrimitives.TryWriteDoubleLittleEndian(destination, 1.0)",
+                "BinaryPrimitives.TryWriteHalfBigEndian(destination, (Half)1)",
+                "BinaryPrimitives.TryWriteHalfLittleEndian(destination, (Half)1)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, member));
+            }
+        }
+
+        [Test]
         public void IPAddressIsLoopbackGeneratedPurityEntriesResolveAgainstNet80References()
         {
             var source = @"

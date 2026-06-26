@@ -997,6 +997,15 @@
       "SourceSummaryPath": "PurelySharp.Analyzer/BooleanChar.ToString.PurelySharp.EffectSummary.json"
     },
     {
+      "OutputPath": "PurelySharp.Analyzer/BinaryPrimitives.Writes.PurelySharp.EffectSummary.json",
+      "SourceSummaryPath": "PurelySharp.Analyzer/BinaryPrimitives.Writes.PurelySharp.EffectSummary.json",
+      "Limit": 80,
+      "SymbolPrefixes": [
+        "System.Buffers.Binary.BinaryPrimitives.Write",
+        "System.Buffers.Binary.BinaryPrimitives.TryWrite"
+      ]
+    },
+    {
       "OutputPath": "PurelySharp.Analyzer/BooleanChar.Helpers.PurelySharp.EffectSummary.json",
       "SourceSummaryPath": "PurelySharp.Analyzer/BooleanChar.Helpers.PurelySharp.EffectSummary.json",
       "SymbolPrefixes": [
