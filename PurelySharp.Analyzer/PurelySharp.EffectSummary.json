@@ -1,6 +1,6 @@
-﻿{
+{
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-24T15:21:02.29378+00:00",
+  "GeneratedAtUtc": "2026-06-26T06:26:57.4841482+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -2826,7 +2826,7 @@
           ],
           "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "pure",
+            "Classification": "impure",
             "Categories": [
               "impure_callee"
             ],
@@ -2932,7 +2932,7 @@
           ],
           "TransitiveThrownExceptionEdges": [],
           "PurityClassification": {
-            "Classification": "pure",
+            "Classification": "impure",
             "Categories": [
               "impure_callee"
             ],
@@ -10024,15 +10024,19 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x06000C20",
         "MethodBodySha256": "4229db96f5c154a8df66ba709a35aec019883d514def08208428177f65236151",
-        "Classification": "pure",
-        "PrimaryCategory": "generated_purity_summary",
-        "Categories": [],
-        "FirstBlockingCallChain": [],
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "none"
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.BitConverter.ToDouble(byte[], int)",
@@ -10064,15 +10068,19 @@
         "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
         "MetadataToken": "0x06000C12",
         "MethodBodySha256": "3efa63e6bc6abaf287d79f011880e01036ba522233cac6be499a274fc27aebb3",
-        "Classification": "pure",
-        "PrimaryCategory": "generated_purity_summary",
-        "Categories": [],
-        "FirstBlockingCallChain": [],
+        "Classification": "impure",
+        "PrimaryCategory": "impure_callee",
+        "Categories": [
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.ThrowHelper.ThrowArgumentOutOfRangeException(System.ExceptionArgument)"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
-        "EffectVisibilityClassification": "none"
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.BitConverter.ToInt32(byte[], int)",
