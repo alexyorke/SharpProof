@@ -9382,6 +9382,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_TypeGetHashCode_IsPure()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(Type value)
+    {
+        return value.GetHashCode();
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_ImmutableStackPop_UsesGeneratedPurityCatalogSource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

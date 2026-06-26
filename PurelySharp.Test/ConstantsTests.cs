@@ -3108,6 +3108,26 @@ public static class StopwatchCatalogSignatureSamples
         }
 
         [Test]
+        public void TypeGetHashCode_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Type.GetHashCode()");
+        }
+
+        [Test]
+        public void StringComparerInvocationMethods_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.StringComparer.InvariantCultureIgnoreCase.Compare(string, string)");
+            AssertNotInManualCatalogs("System.StringComparer.Ordinal.Equals(string, string)");
+        }
+
+        [Test]
+        public void FormattableStringInvocationMethods_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.FormattableString.Invariant(System.FormattableString)");
+            AssertNotInManualCatalogs("System.FormattableString.ToString(System.IFormatProvider)");
+        }
+
+        [Test]
         public void ObjectTypeMetadataHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("object.GetType()");

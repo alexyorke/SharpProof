@@ -573,21 +573,12 @@ public static class Constants
         "System.Security.Cryptography.MD5.ComputeHash(byte[])",
         "System.Security.Cryptography.SHA256.ComputeHash(byte[])",
 
-        "System.StringComparer.InvariantCultureIgnoreCase.Compare(string, string)",
-        "System.StringComparer.Ordinal.Equals(string, string)",
-
-
-        "System.Type.GetHashCode()",
-
-
         "System.Linq.IQueryable<T>.Expression.get",
         "System.Linq.Queryable.Where<TSource>(System.Linq.IQueryable<TSource>, System.Linq.Expressions.Expression<System.Func<TSource, bool>>)",
         "System.Memory<T>.Span.get",
         "System.Numerics.Matrix4x4.CreateRotationX(float)",
         "System.Numerics.Plane.Normalize(System.Numerics.Plane)",
         "System.FormattableString.Format.get",
-        "System.FormattableString.Invariant(System.FormattableString)",
-        "System.FormattableString.ToString(System.IFormatProvider)",
 
         "System.Enum.HasFlag(System.Enum)",
         "System.Enum.ToString()",

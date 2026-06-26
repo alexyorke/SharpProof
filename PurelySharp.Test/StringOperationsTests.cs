@@ -630,6 +630,26 @@ public class TestClass
         }
 
         [Test]
+        public async Task FormattableStringToString_WithInvariantCulture_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using System.Globalization;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(double value)
+    {
+        return FormattableString.Invariant($""{value,10:N2}"").ToString(CultureInfo.InvariantCulture);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task FormattableStringInvariant_WithImpureInterpolationExpression_Diagnostic()
         {
             var test = @"

@@ -35,9 +35,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         invocationOperation));
             }
 
-            if (TryCheckTypeEqualityPurity(invocationOperation, context, out var earlyTypeEqualityResult))
+            if (TryCheckTypeEqualityPurity(invocationOperation, context, currentState, out var earlyTypeEqualityResult))
             {
                 return earlyTypeEqualityResult;
+            }
+
+            if (TryCheckTypeGetHashCodePurity(invocationOperation, context, currentState, out var typeHashCodeResult))
+            {
+                return typeHashCodeResult;
+            }
+
+            if (TryCheckStringComparerInvocationPurity(invocationOperation, context, currentState, out var stringComparerResult))
+            {
+                return stringComparerResult;
+            }
+
+            if (TryCheckFormattableStringPurity(invocationOperation, context, currentState, out var formattableStringResult))
+            {
+                return formattableStringResult;
             }
 
             if (IsCompilerGeneratedArrayForeachInvocation(invocationOperation, context))
@@ -1922,6 +1937,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static bool TryCheckTypeEqualityPurity(
             IInvocationOperation invocationOperation,
             PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
             out PurityAnalysisEngine.PurityAnalysisResult result)
         {
             result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -1939,7 +1955,135 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return false;
             }
 
-            return SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, systemType);
+            if (!SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, systemType))
+            {
+                return false;
+            }
+
+            return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
+        }
+
+        private static bool TryCheckTypeGetHashCodePurity(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            var methodSymbol = invocationOperation.TargetMethod;
+            if (methodSymbol.Name != nameof(object.GetHashCode) ||
+                methodSymbol.Parameters.Length != 0)
+            {
+                return false;
+            }
+
+            var systemType = context.SemanticModel.Compilation.GetTypeByMetadataName("System.Type");
+            if (systemType == null)
+            {
+                return false;
+            }
+
+            if (!SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, systemType))
+            {
+                return false;
+            }
+
+            return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
+        }
+
+        private static bool TryCheckStringComparerInvocationPurity(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            var methodSymbol = invocationOperation.TargetMethod;
+            if (methodSymbol.Name is not ("Compare" or "Equals") ||
+                methodSymbol.Parameters.Length != 2)
+            {
+                return false;
+            }
+
+            var stringComparerType = context.SemanticModel.Compilation.GetTypeByMetadataName("System.StringComparer");
+            if (stringComparerType == null ||
+                !SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, stringComparerType))
+            {
+                return false;
+            }
+
+            if (invocationOperation.Instance == null ||
+                !IsTrustedGeneratedPureStringComparerSingleton(invocationOperation.Instance, context))
+            {
+                return false;
+            }
+
+            return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
+        }
+
+        private static bool TryCheckFormattableStringPurity(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            var methodSymbol = invocationOperation.TargetMethod;
+            var formattableStringType = context.SemanticModel.Compilation.GetTypeByMetadataName("System.FormattableString");
+            if (formattableStringType == null ||
+                !SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, formattableStringType))
+            {
+                return false;
+            }
+
+            if (methodSymbol.IsStatic &&
+                methodSymbol.Name == "Invariant" &&
+                methodSymbol.Parameters.Length == 1)
+            {
+                return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
+            }
+
+            if (!methodSymbol.IsStatic &&
+                methodSymbol.Name == "ToString" &&
+                methodSymbol.Parameters.Length == 1)
+            {
+                return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
+            }
+
+            return false;
+        }
+
+        private static bool EnsureInvocationOperandsArePure(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            if (invocationOperation.Instance != null)
+            {
+                var instanceResult = PurityAnalysisEngine.CheckSingleOperation(invocationOperation.Instance, context, currentState);
+                if (!instanceResult.IsPure)
+                {
+                    result = instanceResult;
+                    return true;
+                }
+            }
+
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                var argumentResult = PurityAnalysisEngine.CheckSingleOperation(argument.Value, context, currentState);
+                if (!argumentResult.IsPure)
+                {
+                    result = argumentResult;
+                    return true;
+                }
+            }
+
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            return true;
         }
 
         private static bool TryCheckSemanticallyPureParsePurity(
