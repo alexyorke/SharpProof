@@ -35,6 +35,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         invocationOperation));
             }
 
+            if (TryCheckTypeEqualityPurity(invocationOperation, context, out var earlyTypeEqualityResult))
+            {
+                return earlyTypeEqualityResult;
+            }
+
             if (IsCompilerGeneratedArrayForeachInvocation(invocationOperation, context))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] Compiler-generated array foreach member is treated as pure.");
@@ -1912,6 +1917,29 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return false;
+        }
+
+        private static bool TryCheckTypeEqualityPurity(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            var methodSymbol = invocationOperation.TargetMethod;
+            if (methodSymbol.Name != nameof(object.Equals) ||
+                methodSymbol.Parameters.Length != 1)
+            {
+                return false;
+            }
+
+            var systemType = context.SemanticModel.Compilation.GetTypeByMetadataName("System.Type");
+            if (systemType == null)
+            {
+                return false;
+            }
+
+            return SymbolEqualityComparer.Default.Equals(methodSymbol.ContainingType?.OriginalDefinition, systemType);
         }
 
         private static bool TryCheckSemanticallyPureParsePurity(

@@ -3096,6 +3096,18 @@ public static class StopwatchCatalogSignatureSamples
         }
 
         [Test]
+        public void TypeEqualsType_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Type.Equals(System.Type)");
+        }
+
+        [Test]
+        public void TypeEqualsObject_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Type.Equals(object)");
+        }
+
+        [Test]
         public void ObjectTypeMetadataHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("object.GetType()");

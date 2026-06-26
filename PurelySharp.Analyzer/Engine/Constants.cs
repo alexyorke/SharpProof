@@ -577,8 +577,6 @@ public static class Constants
         "System.StringComparer.Ordinal.Equals(string, string)",
 
 
-        "System.Type.Equals(object)",
-        "System.Type.Equals(System.Type)",
         "System.Type.GetHashCode()",
 
 
