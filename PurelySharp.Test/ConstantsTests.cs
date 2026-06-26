@@ -1475,6 +1475,7 @@ public static class KeyedCollectionCatalogSignatureSamples
                 "System.Collections.Immutable.ImmutableHashSet.Create<T>()",
                 "System.Collections.Immutable.ImmutableDictionary.CreateRange<TKey, TValue>(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>>)",
                 "System.Collections.Immutable.ImmutableHashSet.CreateRange<T>(System.Collections.Generic.IEnumerable<T>)",
+                "System.Collections.Immutable.ImmutableHashSet.CreateRange<T>(System.Collections.Generic.IEqualityComparer<T>, System.Collections.Generic.IEnumerable<T>)",
                 "System.Collections.Immutable.ImmutableHashSet<T>.Count.get",
                 "System.Collections.Immutable.ImmutableHashSet<T>.IsEmpty.get",
                 "System.Collections.Immutable.ImmutableHashSet<T>.KeyComparer.get",

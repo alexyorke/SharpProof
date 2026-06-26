@@ -9324,6 +9324,26 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ImmutableHashSetCreateRangeWithComparer_IsPure()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ImmutableHashSet<int> TestMethod(IEnumerable<int> values, IEqualityComparer<int> comparer)
+    {
+        return ImmutableHashSet.CreateRange(comparer, values);
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_ImmutableStackPop_UsesGeneratedPurityCatalogSource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
