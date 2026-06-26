@@ -578,7 +578,6 @@ public static class Constants
         "System.Memory<T>.Span.get",
         "System.Numerics.Matrix4x4.CreateRotationX(float)",
         "System.Numerics.Plane.Normalize(System.Numerics.Plane)",
-        "System.FormattableString.Format.get",
 
         "System.Enum.HasFlag(System.Enum)",
         "System.Enum.ToString()",

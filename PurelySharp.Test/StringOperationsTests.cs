@@ -650,6 +650,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task FormattableStringFormatProperty_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(FormattableString formatted)
+    {
+        return formatted.Format;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task FormattableStringInvariant_WithImpureInterpolationExpression_Diagnostic()
         {
             var test = @"

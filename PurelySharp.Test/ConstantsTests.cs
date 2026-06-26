@@ -3124,6 +3124,7 @@ public static class StopwatchCatalogSignatureSamples
         public void FormattableStringInvocationMethods_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.FormattableString.Invariant(System.FormattableString)");
+            AssertNotInManualCatalogs("System.FormattableString.Format.get");
             AssertNotInManualCatalogs("System.FormattableString.ToString(System.IFormatProvider)");
         }
 

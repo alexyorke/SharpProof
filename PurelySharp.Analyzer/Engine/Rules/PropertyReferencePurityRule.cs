@@ -52,6 +52,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return sortedDictionaryIndexerResult;
             }
 
+            if (TryCheckFormattableStringFormatPurity(propertyReferenceOperation, context, out var formattableStringResult))
+            {
+                return formattableStringResult;
+            }
+
             var isPureEnforcedProperty = PurityAnalysisEngine.IsPureEnforced(
                 propertySymbol,
                 context.EnforcePureAttributeSymbol,
@@ -478,6 +483,30 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return true;
             }
             return false;
+        }
+
+        private static bool TryCheckFormattableStringFormatPurity(
+            IPropertyReferenceOperation propertyReferenceOperation,
+            PurityAnalysisContext context,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            var propertySymbol = propertyReferenceOperation.Property;
+            if (propertySymbol.Name != "Format" ||
+                propertySymbol.IsIndexer)
+            {
+                return false;
+            }
+
+            var formattableStringType = context.SemanticModel.Compilation.GetTypeByMetadataName("System.FormattableString");
+            if (formattableStringType == null ||
+                !SymbolEqualityComparer.Default.Equals(propertySymbol.ContainingType?.OriginalDefinition, formattableStringType))
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private static bool TryCheckDictionaryIndexerKeyDispatchPurity(
