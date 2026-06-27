@@ -172,6 +172,54 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ArrayReverse_UsesArrayMutationSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int[] values)
+    {
+        Array.Reverse(values);
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("array_mutation_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Array.Reverse"));
+        }
+
+        [Test]
+        public async Task Ps0002_ArraySortWithComparison_UsesArrayMutationSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int[] values, Comparison<int> comparison)
+    {
+        Array.Sort(values, comparison);
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("array_mutation_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Array.Sort"));
+        }
+
+        [Test]
         public async Task Ps0002_StringFormat_UsesGeneratedPuritySummarySource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

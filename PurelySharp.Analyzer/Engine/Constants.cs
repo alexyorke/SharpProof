@@ -31,8 +31,6 @@ public static class Constants
         "System.Activator.CreateInstance(System.Type)",
         "System.Activator.CreateInstance(System.Type, params object[])",
         "System.Array.AsReadOnly<T>(T[])",
-        "System.Array.Reverse(System.Array)",
-        "System.Array.Sort(System.Array)",
         "System.Collections.ArrayList.Adapter(System.Collections.IList)",
         "System.Collections.Generic.IDictionary<TKey, TValue>.Keys.get",
         "System.Collections.Generic.IDictionary<TKey, TValue>.Values.get",
@@ -427,13 +425,10 @@ public static class Constants
         "System.Span<T>.CopyTo(System.Span<T>)",
         "System.Span<T>.TryCopyTo(System.Span<T>)",
         "System.MemoryExtensions.Reverse<T>(System.Span<T>)",
-        "System.Array.Reverse<T>(T[])",
-        "System.Array.Reverse<T>(T[], int, int)",
         "System.Exception.Source.set",
 
 
         "System.Activator.CreateInstanceFrom(string, string)",
-        "System.Array.Sort<T>(T[], System.Comparison<T>)",
         "System.Collections.Generic.Dictionary<TKey, TValue>.Values.CopyTo(TValue[], int)",
         "System.Collections.Generic.ICollection<T>.Add(T)",
         "System.Collections.Generic.ICollection<T>.Clear()",

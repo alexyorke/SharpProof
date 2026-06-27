@@ -47,5 +47,24 @@ public sealed class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task ArraySortWithComparison_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(int[] values, Comparison<int> comparison)
+    {
+        Array.Sort(values, comparison);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

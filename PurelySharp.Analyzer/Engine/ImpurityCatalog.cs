@@ -376,6 +376,12 @@ namespace PurelySharp.Analyzer.Engine
 				return "string_builder_semantic_rule";
 			}
 
+			if (IsArrayMutationSemanticImpure(symbol))
+			{
+				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Array mutation semantic rule matched: {symbol.ToDisplayString()}");
+				return "array_mutation_semantic_rule";
+			}
+
 			if (IsAssemblyLoadContextSemanticImpure(symbol))
 			{
 				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: AssemblyLoadContext semantic rule matched: {symbol.ToDisplayString()}");
@@ -535,6 +541,53 @@ namespace PurelySharp.Analyzer.Engine
 		{
 			return typeSymbol != null &&
 				string.Equals(typeSymbol.OriginalDefinition.ToDisplayString(), "System.Text.StringBuilder", StringComparison.Ordinal);
+		}
+
+		private static bool IsArrayMutationSemanticImpure(ISymbol symbol)
+		{
+			if (symbol is not IMethodSymbol methodSymbol ||
+				!methodSymbol.IsStatic ||
+				!IsExactArrayType(methodSymbol.ContainingType))
+			{
+				return false;
+			}
+
+			if (methodSymbol.Name == "Reverse")
+			{
+				return methodSymbol.Parameters.Length >= 1 &&
+					methodSymbol.Parameters[0].Type is IArrayTypeSymbol or INamedTypeSymbol;
+			}
+
+			if (methodSymbol.Name != "Sort")
+			{
+				return false;
+			}
+
+			if (methodSymbol.Parameters.Length == 1)
+			{
+				return methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_Array;
+			}
+
+			if (methodSymbol.Parameters.Length == 2 &&
+				methodSymbol.Parameters[0].Type is IArrayTypeSymbol)
+			{
+				return IsComparisonDelegate(methodSymbol.Parameters[1].Type);
+			}
+
+			return false;
+		}
+
+		private static bool IsExactArrayType(INamedTypeSymbol? typeSymbol)
+		{
+			return typeSymbol != null &&
+				typeSymbol.SpecialType == SpecialType.System_Array;
+		}
+
+		private static bool IsComparisonDelegate(ITypeSymbol typeSymbol)
+		{
+			return typeSymbol is INamedTypeSymbol namedType &&
+				namedType.TypeKind == TypeKind.Delegate &&
+				string.Equals(namedType.OriginalDefinition.ToDisplayString(), "System.Comparison<T>", StringComparison.Ordinal);
 		}
 
 		private static bool IsAssemblyLoadContextSemanticImpure(ISymbol symbol)

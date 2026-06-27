@@ -98,6 +98,16 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ArrayReverseAndManualSortRemainder_AreSourcedFromSemanticRules_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Array.Reverse(System.Array)");
+            AssertNotInManualCatalogs("System.Array.Reverse<T>(T[])");
+            AssertNotInManualCatalogs("System.Array.Reverse<T>(T[], int, int)");
+            AssertNotInManualCatalogs("System.Array.Sort(System.Array)");
+            AssertNotInManualCatalogs("System.Array.Sort<T>(T[], System.Comparison<T>)");
+        }
+
+        [Test]
         public void GeneratedPathHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
