@@ -382,6 +382,12 @@ namespace PurelySharp.Analyzer.Engine
 				return "array_mutation_semantic_rule";
 			}
 
+			if (IsThreadingSemanticImpure(symbol))
+			{
+				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Threading semantic rule matched: {symbol.ToDisplayString()}");
+				return "threading_semantic_rule";
+			}
+
 			if (IsAssemblyLoadContextSemanticImpure(symbol))
 			{
 				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: AssemblyLoadContext semantic rule matched: {symbol.ToDisplayString()}");
@@ -444,18 +450,6 @@ namespace PurelySharp.Analyzer.Engine
 					PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Generic match found for {symbol.ToDisplayString()} using signature '{signature}'");
 					return "known_impure";
 				}
-			}
-
-			if (symbol.ContainingType?.ToString().Equals("System.Threading.Interlocked", StringComparison.Ordinal) ?? false)
-			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Member {symbol.ToDisplayString()} belongs to System.Threading.Interlocked.");
-				return "known_impure";
-			}
-
-			if (symbol.ContainingType?.ToString().Equals("System.Threading.Volatile", StringComparison.Ordinal) ?? false)
-			{
-				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Member {symbol.ToDisplayString()} belongs to System.Threading.Volatile and is considered impure.");
-				return "known_impure";
 			}
 
 			return null;
@@ -588,6 +582,70 @@ namespace PurelySharp.Analyzer.Engine
 			return typeSymbol is INamedTypeSymbol namedType &&
 				namedType.TypeKind == TypeKind.Delegate &&
 				string.Equals(namedType.OriginalDefinition.ToDisplayString(), "System.Comparison<T>", StringComparison.Ordinal);
+		}
+
+		private static bool IsThreadingSemanticImpure(ISymbol symbol)
+		{
+			if (symbol.ContainingType is not INamedTypeSymbol containingType)
+			{
+				return false;
+			}
+
+			var exactTypeName = containingType.OriginalDefinition.ToDisplayString();
+			return exactTypeName switch
+			{
+				"System.Threading.Interlocked" or
+				"System.Threading.Volatile" or
+				"System.Threading.Monitor" => IsImpureThreadingUtilityMember(symbol),
+				"System.Threading.SemaphoreSlim" or
+				"System.Threading.ReaderWriterLockSlim" or
+				"System.Threading.SpinWait" or
+				"System.Threading.Timer" or
+				"System.Threading.Barrier" or
+				"System.Threading.CountdownEvent" => IsImpureThreadingPrimitiveMember(symbol),
+				"System.Threading.Thread" => IsImpureThreadMember(symbol),
+				_ => false,
+			};
+		}
+
+		private static bool IsImpureThreadingUtilityMember(ISymbol symbol)
+		{
+			return symbol is IMethodSymbol methodSymbol &&
+				!methodSymbol.IsImplicitlyDeclared &&
+				(methodSymbol.MethodKind == MethodKind.Ordinary ||
+				 methodSymbol.MethodKind == MethodKind.PropertyGet ||
+				 methodSymbol.MethodKind == MethodKind.PropertySet);
+		}
+
+		private static bool IsImpureThreadingPrimitiveMember(ISymbol symbol)
+		{
+			if (symbol is not IMethodSymbol methodSymbol ||
+				methodSymbol.IsImplicitlyDeclared)
+			{
+				return false;
+			}
+
+			return methodSymbol.MethodKind == MethodKind.Constructor ||
+				methodSymbol.MethodKind == MethodKind.Ordinary;
+		}
+
+		private static bool IsImpureThreadMember(ISymbol symbol)
+		{
+			if (symbol is IPropertySymbol propertySymbol)
+			{
+				return !propertySymbol.IsImplicitlyDeclared;
+			}
+
+			if (symbol is not IMethodSymbol methodSymbol ||
+				methodSymbol.IsImplicitlyDeclared)
+			{
+				return false;
+			}
+
+			return methodSymbol.MethodKind == MethodKind.Constructor ||
+				methodSymbol.MethodKind == MethodKind.Ordinary ||
+				methodSymbol.MethodKind == MethodKind.PropertyGet ||
+				methodSymbol.MethodKind == MethodKind.PropertySet;
 		}
 
 		private static bool IsAssemblyLoadContextSemanticImpure(ISymbol symbol)
@@ -771,4 +829,3 @@ namespace PurelySharp.Analyzer.Engine
 		}
 	}
 }
-

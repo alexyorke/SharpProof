@@ -108,6 +108,36 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ThreadingSynchronizationMembers_AreSourcedFromSemanticRules_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Threading.Monitor.Enter(object)",
+                "System.Threading.Monitor.Pulse(object)",
+                "System.Threading.Monitor.Wait(object)",
+                "System.Threading.Monitor.TryEnter(object)",
+                "System.Threading.SemaphoreSlim.Release()",
+                "System.Threading.SemaphoreSlim.Wait()",
+                "System.Threading.Thread.ManagedThreadId.get",
+                "System.Threading.Thread.Sleep(int)",
+                "System.Threading.Thread.Sleep(System.TimeSpan)",
+                "System.Threading.ReaderWriterLockSlim.EnterReadLock()",
+                "System.Threading.ReaderWriterLockSlim.ExitReadLock()",
+                "System.Threading.SpinWait.SpinOnce()",
+                "System.Threading.Timer.Timer(System.Threading.TimerCallback)",
+                "System.Threading.Timer.Change(int, int)",
+                "System.Threading.Barrier.SignalAndWait()",
+                "System.Threading.CountdownEvent.Signal()",
+                "System.Threading.CountdownEvent.Wait()",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void GeneratedPathHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
@@ -3236,7 +3266,7 @@ public static class StopwatchCatalogSignatureSamples
         }
 
         [Test]
-        public void InterlockedAndVolatileMembers_AreSourcedFromNamespaceFallback_NotStaticCatalogs()
+        public void InterlockedAndVolatileMembers_AreSourcedFromSemanticRules_NotStaticCatalogs()
         {
             var members = new[]
             {
