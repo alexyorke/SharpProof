@@ -38,7 +38,6 @@ public static class Constants
         "System.ComponentModel.TypeDescriptor.GetConverter(System.Type)",
         "System.ComponentModel.TypeDescriptor.GetProperties(object)",
         "object.GetHashCode()",
-        "System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)",
         "System.Enum.GetName(System.Type, object)",
         "System.Enum.IsDefined(System.Type, object)",
         "System.Enum.GetValues(System.Type)",

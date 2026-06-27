@@ -7115,13 +7115,46 @@ public class TestClass
     }
 
     [EnforcePure]
+    public object[] UnknownHelper(MemberInfo member)
+    {
+        return Attribute.GetCustomAttributes(member);
+    }
+
+    [EnforcePure]
     public bool ImpureHelper(MemberInfo member, Type attributeType)
     {
         return Attribute.IsDefined(member, attributeType);
     }
 }";
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
+                typeof(Attribute).Assembly.Location,
+                (
+                    "Synthetic.StaticCustomAttribute.GetCustomAttribute.PurelySharp.EffectSummary.json",
+                    "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)",
+                    "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    "Synthetic.StaticCustomAttribute.GetCustomAttributes.PurelySharp.EffectSummary.json",
+                    "System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)",
+                    "System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)",
+                    "conservative_unknown",
+                    FormatJsonArray("unknown_callee")),
+                (
+                    "Synthetic.StaticCustomAttribute.IsDefined.PurelySharp.EffectSummary.json",
+                    "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)",
+                    "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)",
+                    "impure",
+                    FormatJsonArray("impure_callee")),
+                (
+                    "Synthetic.StaticCustomAttribute.CustomAttributeData.GetCustomAttributes.PurelySharp.EffectSummary.json",
+                    "System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)",
+                    "System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)",
+                    "pure",
+                    FormatJsonArray()));
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source, additionalFiles: additionalFiles);
             var purityDiagnostics = diagnostics.Where(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId).ToArray();
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var compilation = CSharpCompilation.Create(
@@ -7135,6 +7168,12 @@ public class TestClass
                     .DescendantNodes()
                     .OfType<InvocationExpressionSyntax>()
                     .Single(node => node.ToString() == "Attribute.GetCustomAttribute(member, attributeType)"))
+                .Symbol!;
+            var getCustomAttributes = (IMethodSymbol)semanticModel.GetSymbolInfo(
+                syntaxTree.GetRoot()
+                    .DescendantNodes()
+                    .OfType<InvocationExpressionSyntax>()
+                    .Single(node => node.ToString() == "Attribute.GetCustomAttributes(member)"))
                 .Symbol!;
             var isDefined = (IMethodSymbol)semanticModel.GetSymbolInfo(
                 syntaxTree.GetRoot()
@@ -7151,10 +7190,11 @@ public class TestClass
             var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
             var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
             var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-            var catalog = fromOptions.Invoke(null, new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
+            var catalog = fromOptions.Invoke(null, new object[] { CreateAnalyzerOptions(additionalFiles: additionalFiles), CancellationToken.None })!;
             var trackedMembers = new (string Label, IMethodSymbol Symbol)[]
             {
                 ("System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)", getCustomAttribute.OriginalDefinition),
+                ("System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)", getCustomAttributes.OriginalDefinition),
                 ("System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)", isDefined.OriginalDefinition),
                 ("System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)", getCustomAttributesData.OriginalDefinition),
             };
@@ -7169,10 +7209,16 @@ public class TestClass
                     return (matched, classification);
                 });
 
-            Assert.That(purityDiagnostics, Has.Length.EqualTo(1));
-            Assert.That(purityDiagnostics[0].Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
-            Assert.That(purityDiagnostics[0].Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Attribute.IsDefined"));
+            Assert.That(purityDiagnostics, Has.Length.EqualTo(2));
+            Assert.That(
+                purityDiagnostics.Select(diagnostic => diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty]).OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray(),
+                Is.EqualTo(new[]
+                {
+                    "static System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)",
+                    "static System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)"
+                }));
             Assert.That(classifications["System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)"], Is.EqualTo((true, "pure")));
+            Assert.That(classifications["System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)"], Is.EqualTo((true, "conservative_unknown")));
             Assert.That(classifications["System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)"], Is.EqualTo((true, "impure")));
             Assert.That(classifications["System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)"], Is.EqualTo((true, "pure")));
         }

@@ -2265,6 +2265,7 @@ public static class StringComparisonFixture
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
                 30,
+                "System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)",
                 "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)",
                 "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)",
                 "System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)");
@@ -2275,6 +2276,13 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
             var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
 
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "Attribute.GetCustomAttributes(MemberInfo) should no longer overlap the manual impure catalog.");
             Assert.That(
                 knownImpureRows.Any(row => string.Equals(
                     row.GetProperty("Symbol").GetString(),
@@ -2297,6 +2305,8 @@ public static class StringComparisonFixture
                 Is.False,
                 "CustomAttributeData.GetCustomAttributes(MemberInfo) should no longer overlap the manual impure catalog.");
 
+            AssertPurityClassification(summary, "System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)", "conservative_unknown", "unknown_callee");
+            AssertEffectVisibilityClassification(summary, "System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)", "unknown");
             AssertPurityClassification(summary, "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)", "pure");
             AssertEffectVisibilityClassification(summary, "System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)", "none");
             AssertPurityClassification(summary, "System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)", "impure", "impure_callee");
@@ -2311,6 +2321,7 @@ public static class StringComparisonFixture
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .ToArray();
 
+            Assert.That(generatedSymbols, Does.Contain("System.Attribute.GetCustomAttributes(System.Reflection.MemberInfo)"));
             Assert.That(generatedSymbols, Does.Contain("System.Attribute.GetCustomAttribute(System.Reflection.MemberInfo, System.Type)"));
             Assert.That(generatedSymbols, Does.Contain("System.Attribute.IsDefined(System.Reflection.MemberInfo, System.Type)"));
             Assert.That(generatedSymbols, Does.Contain("System.Reflection.CustomAttributeData.GetCustomAttributes(System.Reflection.MemberInfo)"));

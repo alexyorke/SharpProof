@@ -915,6 +915,7 @@ public static class StaticCustomAttributeCatalogSignatureSamples
     public static void Sample(MemberInfo member, Type attributeType)
     {
         _ = Attribute.GetCustomAttribute(member, attributeType);
+        _ = Attribute.GetCustomAttributes(member);
         _ = Attribute.IsDefined(member, attributeType);
         _ = CustomAttributeData.GetCustomAttributes(member);
     }
@@ -927,6 +928,7 @@ public static class StaticCustomAttributeCatalogSignatureSamples
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Attribute.GetCustomAttribute(member, attributeType)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Attribute.GetCustomAttributes(member)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "Attribute.IsDefined(member, attributeType)"));
             AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "CustomAttributeData.GetCustomAttributes(member)"));
         }
