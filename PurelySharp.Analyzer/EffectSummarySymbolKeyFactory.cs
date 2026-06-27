@@ -64,6 +64,11 @@ namespace PurelySharp.Analyzer
             return keys;
         }
 
+        internal static string GetMetadataDefinitionExactMethodKey(IMethodSymbol methodSymbol)
+        {
+            return CreateMetadataDefinitionExactSummaryKey(methodSymbol);
+        }
+
         private static void AddSymbolKey(ImmutableHashSet<string>.Builder keys, string? value)
         {
             if (!string.IsNullOrWhiteSpace(value))

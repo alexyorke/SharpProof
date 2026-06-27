@@ -24,10 +24,6 @@ namespace PurelySharp.Analyzer
         private static readonly AsyncLocal<GeneratedPurityCatalog?> CurrentCatalog = new AsyncLocal<GeneratedPurityCatalog?>();
         private static readonly Lazy<GeneratedPurityCatalog> BuiltInCatalog =
             new Lazy<GeneratedPurityCatalog>(CreateBuiltInCatalog, LazyThreadSafetyMode.ExecutionAndPublication);
-        private static readonly SymbolDisplayFormat EffectSummaryContainingTypeFormat = new SymbolDisplayFormat(
-            typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
-            genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
-            miscellaneousOptions: SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
         private static readonly SymbolDisplayFormat EffectSummaryNonGenericContainingTypeFormat = new SymbolDisplayFormat(
             typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
             genericsOptions: SymbolDisplayGenericsOptions.None,
@@ -510,182 +506,6 @@ namespace PurelySharp.Analyzer
             {
                 yield return key.Replace("ref ", "out ");
             }
-        }
-
-        private static string CreateEffectSummaryKey(IMethodSymbol methodSymbol)
-        {
-            var containingTypeName = methodSymbol.ContainingType.ToDisplayString(EffectSummaryContainingTypeFormat);
-            var methodName = methodSymbol.MethodKind == MethodKind.Constructor
-                ? ".ctor"
-                : methodSymbol.Name;
-            var parameterList = string.Join(
-                ", ",
-                methodSymbol.Parameters.Select(parameter => parameter.Type.ToDisplayString(EffectSummaryParameterTypeFormat)));
-            return containingTypeName + "." + methodName + "(" + parameterList + ")";
-        }
-
-        private static string CreateExactSummaryKey(IMethodSymbol methodSymbol)
-        {
-            var containingTypeName = methodSymbol.ContainingType.ToDisplayString(EffectSummaryContainingTypeFormat);
-            var methodName = methodSymbol.MethodKind == MethodKind.Constructor
-                ? ".ctor"
-                : methodSymbol.Name;
-            var parameterList = string.Join(
-                ", ",
-                methodSymbol.Parameters.Select(parameter => parameter.Type.ToDisplayString(EffectSummaryParameterTypeFormat)));
-            var returnType = methodSymbol.MethodKind == MethodKind.Constructor
-                ? "void"
-                : methodSymbol.ReturnType.ToDisplayString(EffectSummaryParameterTypeFormat);
-            return containingTypeName + "." + methodName + "(" + parameterList + ")->" + returnType;
-        }
-
-        private static string CreateMetadataEffectSummaryKey(IMethodSymbol methodSymbol)
-        {
-            return CreateMetadataSummaryKey(methodSymbol, includeReturnType: false, useOrdinalGenericParameters: false);
-        }
-
-        private static string CreateMetadataExactSummaryKey(IMethodSymbol methodSymbol)
-        {
-            return CreateMetadataSummaryKey(methodSymbol, includeReturnType: true, useOrdinalGenericParameters: false);
-        }
-
-        private static string CreatePositionalEffectSummaryKey(IMethodSymbol methodSymbol)
-        {
-            return CreatePositionalSummaryKey(methodSymbol, includeReturnType: false);
-        }
-
-        private static string CreatePositionalExactSummaryKey(IMethodSymbol methodSymbol)
-        {
-            return CreatePositionalSummaryKey(methodSymbol, includeReturnType: true);
-        }
-
-        private static string CreateMetadataPositionalEffectSummaryKey(IMethodSymbol methodSymbol)
-        {
-            return CreateMetadataSummaryKey(methodSymbol, includeReturnType: false, useOrdinalGenericParameters: true);
-        }
-
-        private static string CreateMetadataPositionalExactSummaryKey(IMethodSymbol methodSymbol)
-        {
-            return CreateMetadataSummaryKey(methodSymbol, includeReturnType: true, useOrdinalGenericParameters: true);
-        }
-
-        private static string CreateMetadataDefinitionEffectSummaryKey(IMethodSymbol methodSymbol)
-        {
-            return CreateMetadataDefinitionSummaryKey(methodSymbol, includeReturnType: false);
-        }
-
-        private static string CreateMetadataDefinitionExactSummaryKey(IMethodSymbol methodSymbol)
-        {
-            return CreateMetadataDefinitionSummaryKey(methodSymbol, includeReturnType: true);
-        }
-
-        private static string CreatePositionalSummaryKey(IMethodSymbol methodSymbol, bool includeReturnType)
-        {
-            var containingTypeName = FormatSummaryType(methodSymbol.ContainingType, useOrdinalGenericParameters: true);
-            var methodName = methodSymbol.MethodKind == MethodKind.Constructor
-                ? ".ctor"
-                : methodSymbol.Name;
-            var parameterList = string.Join(
-                ", ",
-                methodSymbol.Parameters.Select(parameter => FormatSummaryParameter(parameter, useOrdinalGenericParameters: true)));
-            if (!includeReturnType)
-            {
-                return containingTypeName + "." + methodName + "(" + parameterList + ")";
-            }
-
-            var returnType = methodSymbol.MethodKind == MethodKind.Constructor
-                ? "void"
-                : FormatSummaryReturnType(methodSymbol, useOrdinalGenericParameters: true);
-            return containingTypeName + "." + methodName + "(" + parameterList + ")->" + returnType;
-        }
-
-        private static string CreateMetadataSummaryKey(
-            IMethodSymbol methodSymbol,
-            bool includeReturnType,
-            bool useOrdinalGenericParameters)
-        {
-            var containingTypeName = FormatSummaryType(
-                methodSymbol.ContainingType,
-                useOrdinalGenericParameters,
-                useMetadataTypeNames: true);
-            var methodName = methodSymbol.MethodKind == MethodKind.Constructor
-                ? ".ctor"
-                : methodSymbol.Name;
-            var parameterList = string.Join(
-                ", ",
-                methodSymbol.Parameters.Select(parameter => FormatSummaryParameter(
-                    parameter,
-                    useOrdinalGenericParameters,
-                    useMetadataTypeNames: true)));
-            if (!includeReturnType)
-            {
-                return containingTypeName + "." + methodName + "(" + parameterList + ")";
-            }
-
-            var returnType = methodSymbol.MethodKind == MethodKind.Constructor
-                ? "void"
-                : FormatSummaryReturnType(
-                    methodSymbol,
-                    useOrdinalGenericParameters,
-                    useMetadataTypeNames: true);
-            return containingTypeName + "." + methodName + "(" + parameterList + ")->" + returnType;
-        }
-
-        private static string CreateMetadataDefinitionSummaryKey(IMethodSymbol methodSymbol, bool includeReturnType)
-        {
-            var containingTypeName = GetMetadataGenericDefinitionName(methodSymbol.ContainingType);
-            var methodName = methodSymbol.MethodKind == MethodKind.Constructor
-                ? ".ctor"
-                : methodSymbol.Name;
-            var parameterList = string.Join(
-                ", ",
-                methodSymbol.Parameters.Select(parameter => FormatSummaryParameter(
-                    parameter,
-                    useOrdinalGenericParameters: true,
-                    useMetadataTypeNames: true)));
-            if (!includeReturnType)
-            {
-                return containingTypeName + "." + methodName + "(" + parameterList + ")";
-            }
-
-            var returnType = methodSymbol.MethodKind == MethodKind.Constructor
-                ? "void"
-                : FormatSummaryReturnType(
-                    methodSymbol,
-                    useOrdinalGenericParameters: true,
-                    useMetadataTypeNames: true);
-            return containingTypeName + "." + methodName + "(" + parameterList + ")->" + returnType;
-        }
-
-        private static string FormatSummaryReturnType(
-            IMethodSymbol methodSymbol,
-            bool useOrdinalGenericParameters,
-            bool useMetadataTypeNames = false)
-        {
-            var returnType = FormatSummaryType(methodSymbol.ReturnType, useOrdinalGenericParameters, useMetadataTypeNames);
-            return PrefixRefKind(methodSymbol.ReturnsByRefReadonly ? RefKind.RefReadOnlyParameter :
-                methodSymbol.ReturnsByRef ? RefKind.Ref : RefKind.None) + returnType;
-        }
-
-        private static string FormatSummaryParameter(
-            IParameterSymbol parameter,
-            bool useOrdinalGenericParameters,
-            bool useMetadataTypeNames = false)
-        {
-            return PrefixRefKind(parameter.RefKind) +
-                FormatSummaryType(parameter.Type, useOrdinalGenericParameters, useMetadataTypeNames);
-        }
-
-        private static string PrefixRefKind(RefKind refKind)
-        {
-            return refKind switch
-            {
-                RefKind.Ref => "ref ",
-                RefKind.Out => "out ",
-                RefKind.In => "in ",
-                RefKind.RefReadOnlyParameter => "ref readonly ",
-                _ => string.Empty,
-            };
         }
 
         private static string FormatSummaryType(
@@ -1343,7 +1163,7 @@ namespace PurelySharp.Analyzer
 
         private static string? TryResolveRuntimeImplementationAssemblyPath(IMethodSymbol methodSymbol)
         {
-            var cacheKey = CreateMetadataDefinitionExactSummaryKey(methodSymbol.OriginalDefinition);
+            var cacheKey = EffectSummarySymbolKeyFactory.GetMetadataDefinitionExactMethodKey(methodSymbol.OriginalDefinition);
             return RuntimeImplementationAssemblyPathCache.GetOrAdd(cacheKey, _ => ResolveRuntimeImplementationAssemblyPath(GetSymbolKeys(methodSymbol), methodSymbol.ContainingAssembly));
         }
 
