@@ -16,18 +16,7 @@ namespace PurelySharp.Test
             ImmutableArray<AdditionalText> additionalFiles,
             ImmutableDictionary<string, string>? globalOptions = null)
         {
-            var analyzerGlobalOptions = globalOptions ?? ImmutableDictionary<string, string>.Empty;
-            if (!additionalFiles.IsDefaultOrEmpty &&
-                !analyzerGlobalOptions.ContainsKey("purelysharp_enable_effect_summary_json"))
-            {
-                analyzerGlobalOptions = analyzerGlobalOptions.Add(
-                    "purelysharp_enable_effect_summary_json",
-                    "true");
-            }
-
-            return new AnalyzerOptions(
-                additionalFiles,
-                new TestAnalyzerConfigOptionsProvider(analyzerGlobalOptions));
+            return AnalyzerTestHost.CreateAnalyzerOptions(globalOptions, additionalFiles);
         }
 
         public static ImmutableArray<AdditionalText> CreateSyntheticGeneratedPurityAdditionalFiles(
@@ -397,41 +386,5 @@ namespace PurelySharp.Test
                 => reader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
         }
 
-        private sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
-        {
-            private readonly AnalyzerConfigOptions _globalOptions;
-            private readonly AnalyzerConfigOptions _emptyOptions = new TestAnalyzerConfigOptions(ImmutableDictionary<string, string>.Empty);
-
-            public TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string> globalOptions)
-            {
-                _globalOptions = new TestAnalyzerConfigOptions(globalOptions);
-            }
-
-            public override AnalyzerConfigOptions GlobalOptions => _globalOptions;
-            public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => _emptyOptions;
-            public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => _emptyOptions;
-        }
-
-        private sealed class TestAnalyzerConfigOptions : AnalyzerConfigOptions
-        {
-            private readonly ImmutableDictionary<string, string> _values;
-
-            public TestAnalyzerConfigOptions(ImmutableDictionary<string, string> values)
-            {
-                _values = values;
-            }
-
-            public override bool TryGetValue(string key, out string value)
-            {
-                if (_values.TryGetValue(key, out var found))
-                {
-                    value = found;
-                    return true;
-                }
-
-                value = string.Empty;
-                return false;
-            }
-        }
     }
 }

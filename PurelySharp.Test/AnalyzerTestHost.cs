@@ -26,19 +26,38 @@ namespace PurelySharp.Test
             bool allowUnsafe = false,
             ImmutableArray<AdditionalText>? additionalFiles = null)
         {
+            return await GetDiagnosticsAsync(
+                source,
+                globalOptions,
+                allowUnsafe,
+                additionalFiles,
+                additionalMetadataReferences: null,
+                compilationName: "AnalyzerTestHost");
+        }
+
+        public static async Task<ImmutableArray<Diagnostic>> GetDiagnosticsAsync(
+            string source,
+            ImmutableDictionary<string, string>? globalOptions,
+            bool allowUnsafe,
+            ImmutableArray<AdditionalText>? additionalFiles,
+            ImmutableArray<MetadataReference>? additionalMetadataReferences,
+            string compilationName)
+        {
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var references = GetTrustedPlatformReferences()
                 .Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
+            if (additionalMetadataReferences.HasValue)
+            {
+                references = references.AddRange(additionalMetadataReferences.Value);
+            }
 
             var compilation = CSharpCompilation.Create(
-                "AnalyzerTestHost",
+                compilationName,
                 new[] { syntaxTree },
                 references,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: allowUnsafe));
 
-            var analyzerOptions = new AnalyzerOptions(
-                additionalFiles ?? ImmutableArray<AdditionalText>.Empty,
-                new TestAnalyzerConfigOptionsProvider(globalOptions ?? ImmutableDictionary<string, string>.Empty));
+            var analyzerOptions = CreateAnalyzerOptions(globalOptions, additionalFiles);
 
             var compilationWithAnalyzers = compilation.WithAnalyzers(
                 ImmutableArray.Create<DiagnosticAnalyzer>(new PurelySharpAnalyzer()),
@@ -50,6 +69,25 @@ namespace PurelySharp.Test
                     reportSuppressedDiagnostics: false));
 
             return await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
+        }
+
+        public static AnalyzerOptions CreateAnalyzerOptions(
+            ImmutableDictionary<string, string>? globalOptions = null,
+            ImmutableArray<AdditionalText>? additionalFiles = null)
+        {
+            var analyzerAdditionalFiles = additionalFiles ?? ImmutableArray<AdditionalText>.Empty;
+            var analyzerGlobalOptions = globalOptions ?? ImmutableDictionary<string, string>.Empty;
+            if (analyzerAdditionalFiles.Length > 0 &&
+                !analyzerGlobalOptions.ContainsKey("purelysharp_enable_effect_summary_json"))
+            {
+                analyzerGlobalOptions = analyzerGlobalOptions.Add(
+                    "purelysharp_enable_effect_summary_json",
+                    "true");
+            }
+
+            return new AnalyzerOptions(
+                analyzerAdditionalFiles,
+                new TestAnalyzerConfigOptionsProvider(analyzerGlobalOptions));
         }
 
         public static Diagnostic SingleDiagnostic(
@@ -122,7 +160,7 @@ public static class ConditionHost
             return new ConditionImplicationContext(semanticModel, variables[0], variables[1]);
         }
 
-        private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
+        internal static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
         {
             var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
             if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
@@ -154,6 +192,21 @@ public static class ConditionHost
             public override SourceText GetText(CancellationToken cancellationToken = default)
             {
                 return SourceText.From(_text);
+            }
+        }
+
+        internal sealed class DiskAdditionalText : AdditionalText
+        {
+            public DiskAdditionalText(string path)
+            {
+                Path = path;
+            }
+
+            public override string Path { get; }
+
+            public override SourceText GetText(CancellationToken cancellationToken = default)
+            {
+                return SourceText.From(File.ReadAllText(Path));
             }
         }
 

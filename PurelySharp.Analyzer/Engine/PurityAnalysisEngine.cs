@@ -4120,62 +4120,21 @@ namespace PurelySharp.Analyzer.Engine
                     if (targetSymbol is ILocalSymbol coalesceLocalSymbol &&
                         currentState.IsDefinitelyNullLocalSymbol(coalesceLocalSymbol))
                     {
-                        foreach (var assignedLocalSymbol in writtenLocalSymbols)
-                        {
-                            if (TryResolveKnownConcreteType(valueOperation, currentState, context.SemanticModel.Compilation, out var concreteType))
-                            {
-                                nextState = nextState.WithLocalConcreteType(assignedLocalSymbol, concreteType);
-                            }
-                            else
-                            {
-                                nextState = nextState.WithoutLocalConcreteType(assignedLocalSymbol);
-                            }
-                        }
-
-                        foreach (var localSymbol in writtenLocalSymbols)
-                        {
-                            if (IsOwnedLocalArrayValue(valueOperation, currentState, context.SemanticModel.Compilation))
-                            {
-                                nextState = nextState.WithOwnedLocalArray(localSymbol);
-                            }
-                            else
-                            {
-                                nextState = nextState.WithoutOwnedLocalArray(localSymbol);
-                            }
-                        }
-
-                        foreach (var localSymbol in writtenLocalSymbols)
-                        {
-                            if (IsDefinitelyNullValue(valueOperation, currentState))
-                            {
-                                nextState = nextState.WithDefinitelyNullLocal(localSymbol);
-                            }
-                            else
-                            {
-                                nextState = nextState.WithoutDefinitelyNullLocal(localSymbol);
-                            }
-                        }
-
-                        if (valueOperation != null && targetSymbol != null && targetOperation.Type?.TypeKind == TypeKind.Delegate)
-                        {
-                            PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(valueOperation, currentState);
-                            if (valueTargets != null)
-                            {
-                                foreach (var writtenTargetSymbol in GetAssignmentTargetSymbols(targetSymbol, writtenLocalSymbols))
-                                {
-                                    nextState = nextState.WithDelegateTarget(writtenTargetSymbol, valueTargets.Value);
-                                    LogDebug($"    [ATF-DEL-COALESCE] Updated map for {writtenTargetSymbol.Name} with {valueTargets.Value.MethodSymbols.Count} targets. New Map Count: {nextState.DelegateTargetMap.Count}");
-                                }
-                            }
-                            else
-                            {
-                                foreach (var writtenTargetSymbol in GetAssignmentTargetSymbols(targetSymbol, writtenLocalSymbols))
-                                {
-                                    nextState = nextState.WithDelegateTarget(writtenTargetSymbol, PotentialTargets.Unresolved);
-                                    LogDebug($"    [ATF-DEL-COALESCE] Marked map for {writtenTargetSymbol.Name} unresolved because coalesce-assigned value targets are unresolved. New Map Count: {nextState.DelegateTargetMap.Count}");
-                                }
-                            }
-                        }
+                        nextState = ApplyWrittenLocalStateUpdates(
+                            nextState,
+                            writtenLocalSymbols,
+                            valueOperation,
+                            currentState,
+                            context.SemanticModel.Compilation);
+                        nextState = ApplyAssignedDelegateTargets(
+                            nextState,
+                            targetSymbol,
+                            targetOperation.Type,
+                            valueOperation,
+                            writtenLocalSymbols,
+                            currentState,
+                            "[ATF-DEL-COALESCE]",
+                            "coalesce-assigned value targets are unresolved");
                     }
                 }
 
@@ -4188,62 +4147,21 @@ namespace PurelySharp.Analyzer.Engine
                         ? EnumerateWrittenLocalSymbols(targetLocalSymbol, context).ToArray()
                         : Array.Empty<ILocalSymbol>();
 
-                    foreach (var assignedLocalSymbol in writtenLocalSymbols)
-                    {
-                        if (TryResolveKnownConcreteType(valueOperation, currentState, context.SemanticModel.Compilation, out var concreteType))
-                        {
-                            nextState = nextState.WithLocalConcreteType(assignedLocalSymbol, concreteType);
-                        }
-                        else
-                        {
-                            nextState = nextState.WithoutLocalConcreteType(assignedLocalSymbol);
-                        }
-                    }
-
-                    foreach (var localSymbol in writtenLocalSymbols)
-                    {
-                        if (IsOwnedLocalArrayValue(valueOperation, currentState, context.SemanticModel.Compilation))
-                        {
-                            nextState = nextState.WithOwnedLocalArray(localSymbol);
-                        }
-                        else
-                        {
-                            nextState = nextState.WithoutOwnedLocalArray(localSymbol);
-                        }
-                    }
-
-                    foreach (var localSymbol in writtenLocalSymbols)
-                    {
-                        if (IsDefinitelyNullValue(valueOperation, currentState))
-                        {
-                            nextState = nextState.WithDefinitelyNullLocal(localSymbol);
-                        }
-                        else
-                        {
-                            nextState = nextState.WithoutDefinitelyNullLocal(localSymbol);
-                        }
-                    }
-
-                    if (valueOperation != null && targetSymbol != null && targetOperation.Type?.TypeKind == TypeKind.Delegate)
-                    {
-                        PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(valueOperation, currentState);
-                        if (valueTargets != null)
-                        {
-                            foreach (var writtenTargetSymbol in GetAssignmentTargetSymbols(targetSymbol, writtenLocalSymbols))
-                            {
-                                nextState = nextState.WithDelegateTarget(writtenTargetSymbol, valueTargets.Value);
-                                LogDebug($"    [ATF-DEL-ASSIGN] Updated map for {writtenTargetSymbol.Name} with {valueTargets.Value.MethodSymbols.Count} targets. New Map Count: {nextState.DelegateTargetMap.Count}");
-                            }
-                        }
-                        else
-                        {
-                            foreach (var writtenTargetSymbol in GetAssignmentTargetSymbols(targetSymbol, writtenLocalSymbols))
-                            {
-                                nextState = nextState.WithDelegateTarget(writtenTargetSymbol, PotentialTargets.Unresolved);
-                                LogDebug($"    [ATF-DEL-ASSIGN] Marked map for {writtenTargetSymbol.Name} unresolved because assigned value targets are unresolved. New Map Count: {nextState.DelegateTargetMap.Count}");
-                            }
-                        }
-                    }
+                    nextState = ApplyWrittenLocalStateUpdates(
+                        nextState,
+                        writtenLocalSymbols,
+                        valueOperation,
+                        currentState,
+                        context.SemanticModel.Compilation);
+                    nextState = ApplyAssignedDelegateTargets(
+                        nextState,
+                        targetSymbol,
+                        targetOperation.Type,
+                        valueOperation,
+                        writtenLocalSymbols,
+                        currentState,
+                        "[ATF-DEL-ASSIGN]",
+                        "assigned value targets are unresolved");
                 }
 
                   else if (operationToTrack is IInvocationOperation invocationOperation)
@@ -4353,6 +4271,91 @@ namespace PurelySharp.Analyzer.Engine
                     }
                 }
 
+
+            return nextState;
+        }
+
+        private static PurityAnalysisState ApplyWrittenLocalStateUpdates(
+            PurityAnalysisState currentState,
+            ILocalSymbol[] writtenLocalSymbols,
+            IOperation valueOperation,
+            PurityAnalysisState valueState,
+            Compilation compilation)
+        {
+            var nextState = currentState;
+
+            foreach (var writtenLocalSymbol in writtenLocalSymbols)
+            {
+                if (TryResolveKnownConcreteType(valueOperation, valueState, compilation, out var concreteType))
+                {
+                    nextState = nextState.WithLocalConcreteType(writtenLocalSymbol, concreteType);
+                }
+                else
+                {
+                    nextState = nextState.WithoutLocalConcreteType(writtenLocalSymbol);
+                }
+            }
+
+            foreach (var writtenLocalSymbol in writtenLocalSymbols)
+            {
+                if (IsOwnedLocalArrayValue(valueOperation, valueState, compilation))
+                {
+                    nextState = nextState.WithOwnedLocalArray(writtenLocalSymbol);
+                }
+                else
+                {
+                    nextState = nextState.WithoutOwnedLocalArray(writtenLocalSymbol);
+                }
+            }
+
+            foreach (var writtenLocalSymbol in writtenLocalSymbols)
+            {
+                if (IsDefinitelyNullValue(valueOperation, valueState))
+                {
+                    nextState = nextState.WithDefinitelyNullLocal(writtenLocalSymbol);
+                }
+                else
+                {
+                    nextState = nextState.WithoutDefinitelyNullLocal(writtenLocalSymbol);
+                }
+            }
+
+            return nextState;
+        }
+
+        private static PurityAnalysisState ApplyAssignedDelegateTargets(
+            PurityAnalysisState currentState,
+            ISymbol? targetSymbol,
+            ITypeSymbol? targetType,
+            IOperation? valueOperation,
+            ILocalSymbol[] writtenLocalSymbols,
+            PurityAnalysisState valueState,
+            string logScope,
+            string unresolvedReason)
+        {
+            if (valueOperation == null || targetSymbol == null || targetType?.TypeKind != TypeKind.Delegate)
+            {
+                return currentState;
+            }
+
+            var nextState = currentState;
+            PurityAnalysisEngine.PotentialTargets? valueTargets = ResolvePotentialTargets(valueOperation, valueState);
+            if (valueTargets != null)
+            {
+                foreach (var writtenTargetSymbol in GetAssignmentTargetSymbols(targetSymbol, writtenLocalSymbols))
+                {
+                    nextState = nextState.WithDelegateTarget(writtenTargetSymbol, valueTargets.Value);
+                    LogDebug($"    {logScope} Updated map for {writtenTargetSymbol.Name} with {valueTargets.Value.MethodSymbols.Count} targets. New Map Count: {nextState.DelegateTargetMap.Count}");
+                }
+            }
+            else
+            {
+                foreach (var writtenTargetSymbol in GetAssignmentTargetSymbols(targetSymbol, writtenLocalSymbols))
+                {
+                    nextState = nextState.WithDelegateTarget(writtenTargetSymbol, PotentialTargets.Unresolved);
+                    LogDebug($"    {logScope} Marked map for {writtenTargetSymbol.Name} unresolved because {unresolvedReason}. New Map Count: {nextState.DelegateTargetMap.Count}");
+                }
+            }
 
             return nextState;
         }

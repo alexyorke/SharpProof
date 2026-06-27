@@ -20,6 +20,9 @@ using Microsoft.CodeAnalysis.Operations;
 using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using PurelySharp.Analyzer;
+using static PurelySharp.Test.AnalyzerTestHost;
+using DiskAdditionalText = PurelySharp.Test.AnalyzerTestHost.DiskAdditionalText;
+using InMemoryAdditionalText = PurelySharp.Test.AnalyzerTestHost.InMemoryAdditionalText;
 
 namespace PurelySharp.Test
 {
@@ -14252,11 +14255,6 @@ public class TestClass
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
 
-        private static Diagnostic SingleDiagnostic(ImmutableArray<Diagnostic> diagnostics, string diagnosticId)
-        {
-            return diagnostics.Single(d => d.Id == diagnosticId);
-        }
-
         private static ImmutableDictionary<string, string> ReportExceptionsOptions()
         {
             return ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true");
@@ -14532,24 +14530,7 @@ public class TestClass
                 Assert.Ignore("Effect summary JSON analysis is dormant during active analyzer development.");
             }
 
-            var analyzerAdditionalFiles = includeCheckedInEffectSummaries
-                ? additionalFiles.HasValue
-                    ? CheckedInEffectSummaryAdditionalFiles.Value.AddRange(additionalFiles.Value)
-                    : CheckedInEffectSummaryAdditionalFiles.Value
-                : additionalFiles ?? ImmutableArray<AdditionalText>.Empty;
-
-            var analyzerGlobalOptions = globalOptions ?? ImmutableDictionary<string, string>.Empty;
-            if (analyzerAdditionalFiles.Length > 0 &&
-                !analyzerGlobalOptions.ContainsKey("purelysharp_enable_effect_summary_json"))
-            {
-                analyzerGlobalOptions = analyzerGlobalOptions.Add(
-                    "purelysharp_enable_effect_summary_json",
-                    "true");
-            }
-
-            return new AnalyzerOptions(
-                analyzerAdditionalFiles,
-                new TestAnalyzerConfigOptionsProvider(analyzerGlobalOptions));
+            return AnalyzerTestHost.CreateAnalyzerOptions(globalOptions, additionalFiles);
         }
 
         private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
@@ -14560,35 +14541,18 @@ public class TestClass
             ImmutableArray<MetadataReference>? additionalMetadataReferences = null,
             bool includeCheckedInEffectSummaries = false)
         {
-            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
-            var references = GetTrustedPlatformReferences()
-                .Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
-            if (additionalMetadataReferences.HasValue)
+            if (includeCheckedInEffectSummaries || !additionalFiles.HasValue)
             {
-                references = references.AddRange(additionalMetadataReferences.Value);
+                Assert.Ignore("Effect summary JSON analysis is dormant during active analyzer development.");
             }
 
-            var compilation = CSharpCompilation.Create(
-                "DiagnosticEvidenceTests",
-                new[] { syntaxTree },
-                references,
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: allowUnsafe));
-
-            var analyzerOptions = CreateAnalyzerOptions(
+            return await AnalyzerTestHost.GetDiagnosticsAsync(
+                source,
                 globalOptions,
+                allowUnsafe,
                 additionalFiles,
-                includeCheckedInEffectSummaries: includeCheckedInEffectSummaries || !additionalFiles.HasValue);
-
-            var compilationWithAnalyzers = compilation.WithAnalyzers(
-                ImmutableArray.Create<DiagnosticAnalyzer>(new PurelySharpAnalyzer()),
-                new CompilationWithAnalyzersOptions(
-                    analyzerOptions,
-                    onAnalyzerException: null,
-                    concurrentAnalysis: false,
-                    logAnalyzerExecutionTime: false,
-                    reportSuppressedDiagnostics: false));
-
-            return await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
+                additionalMetadataReferences,
+                "DiagnosticEvidenceTests");
         }
 
         private static AnalyzerOptions CreateGeneratedPurityAnalyzerOptions()
@@ -14610,22 +14574,8 @@ public class TestClass
                     entry.CategoriesJson)).ToArray());
         }
 
-        private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-        {
-            var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-            if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-            {
-                return ImmutableArray.Create<MetadataReference>(
-                    MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                    MetadataReference.CreateFromFile(typeof(Console).Assembly.Location));
-            }
-
-            return trustedPlatformAssemblies
-                .Split(Path.PathSeparator)
-                .Select(path => MetadataReference.CreateFromFile(path))
-                .Cast<MetadataReference>()
-                .ToImmutableArray();
-        }
+        private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences() =>
+            AnalyzerTestHost.GetTrustedPlatformReferences();
 
         private static ImmutableArray<AdditionalText> CreateCheckedInEffectSummaryAdditionalFiles()
         {
@@ -14656,78 +14606,6 @@ public class TestClass
             }
 
             throw new DirectoryNotFoundException("Could not locate repository root from test directory.");
-        }
-
-        private sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
-        {
-            private readonly AnalyzerConfigOptions _globalOptions;
-            private readonly AnalyzerConfigOptions _emptyOptions = new TestAnalyzerConfigOptions(ImmutableDictionary<string, string>.Empty);
-
-            public TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string> globalOptions)
-            {
-                _globalOptions = new TestAnalyzerConfigOptions(globalOptions);
-            }
-
-            public override AnalyzerConfigOptions GlobalOptions => _globalOptions;
-
-            public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => _emptyOptions;
-
-            public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => _emptyOptions;
-        }
-
-        private sealed class TestAnalyzerConfigOptions : AnalyzerConfigOptions
-        {
-            private readonly ImmutableDictionary<string, string> _values;
-
-            public TestAnalyzerConfigOptions(ImmutableDictionary<string, string> values)
-            {
-                _values = values;
-            }
-
-            public override bool TryGetValue(string key, out string value)
-            {
-                if (_values.TryGetValue(key, out var found))
-                {
-                    value = found;
-                    return true;
-                }
-
-                value = string.Empty;
-                return false;
-            }
-        }
-
-        private sealed class InMemoryAdditionalText : AdditionalText
-        {
-            private readonly string _text;
-
-            public InMemoryAdditionalText(string path, string text)
-            {
-                Path = path;
-                _text = text;
-            }
-
-            public override string Path { get; }
-
-            public override SourceText GetText(CancellationToken cancellationToken = default)
-            {
-                return SourceText.From(_text);
-            }
-        }
-
-        private sealed class DiskAdditionalText : AdditionalText
-        {
-            public DiskAdditionalText(string path)
-            {
-                Path = path;
-            }
-
-            public override string Path { get; }
-
-            public override SourceText GetText(CancellationToken cancellationToken = default)
-            {
-                return SourceText.From(File.ReadAllText(Path));
-            }
         }
 
         private sealed record AssemblyIdentity(string AssemblyName, string AssemblySha256, string ModuleVersionId);
