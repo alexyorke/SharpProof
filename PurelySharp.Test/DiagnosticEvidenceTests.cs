@@ -4745,11 +4745,37 @@ public class TestClass
     {
         _ = type.DeclaringMethod;
         _ = type.DeclaringType;
+        _ = type.IsAbstract;
+        _ = type.IsAnsiClass;
+        _ = type.IsArray;
+        _ = type.IsAutoClass;
+        _ = type.IsAutoLayout;
+        _ = type.IsByRef;
+        _ = type.IsClass;
+        _ = type.IsCOMObject;
         _ = type.IsContextful;
+        _ = type.IsExplicitLayout;
         _ = type.IsGenericType;
         _ = type.IsGenericTypeDefinition;
         _ = type.IsGenericParameter;
+        _ = type.IsImport;
+        _ = type.IsInterface;
+        _ = type.IsLayoutSequential;
         _ = type.IsMarshalByRef;
+        _ = type.IsNestedAssembly;
+        _ = type.IsNestedFamANDAssem;
+        _ = type.IsNestedFamORAssem;
+        _ = type.IsNestedFamily;
+        _ = type.IsNestedPrivate;
+        _ = type.IsNestedPublic;
+        _ = type.IsNotPublic;
+        _ = type.IsPointer;
+        _ = type.IsPrimitive;
+        _ = type.IsPublic;
+        _ = type.IsSealed;
+        _ = type.IsSpecialName;
+        _ = type.IsUnicodeClass;
+        _ = type.IsValueType;
         _ = type.MemberType;
         return type.ReflectedType;
     }
@@ -4773,11 +4799,37 @@ public class TestClass
                 .Where(node =>
                     node.ToString() == "type.DeclaringMethod" ||
                     node.ToString() == "type.DeclaringType" ||
+                    node.ToString() == "type.IsAbstract" ||
+                    node.ToString() == "type.IsAnsiClass" ||
+                    node.ToString() == "type.IsArray" ||
+                    node.ToString() == "type.IsAutoClass" ||
+                    node.ToString() == "type.IsAutoLayout" ||
+                    node.ToString() == "type.IsByRef" ||
+                    node.ToString() == "type.IsClass" ||
+                    node.ToString() == "type.IsCOMObject" ||
                     node.ToString() == "type.IsContextful" ||
+                    node.ToString() == "type.IsExplicitLayout" ||
                     node.ToString() == "type.IsGenericType" ||
                     node.ToString() == "type.IsGenericTypeDefinition" ||
                     node.ToString() == "type.IsGenericParameter" ||
+                    node.ToString() == "type.IsImport" ||
+                    node.ToString() == "type.IsInterface" ||
+                    node.ToString() == "type.IsLayoutSequential" ||
                     node.ToString() == "type.IsMarshalByRef" ||
+                    node.ToString() == "type.IsNestedAssembly" ||
+                    node.ToString() == "type.IsNestedFamANDAssem" ||
+                    node.ToString() == "type.IsNestedFamORAssem" ||
+                    node.ToString() == "type.IsNestedFamily" ||
+                    node.ToString() == "type.IsNestedPrivate" ||
+                    node.ToString() == "type.IsNestedPublic" ||
+                    node.ToString() == "type.IsNotPublic" ||
+                    node.ToString() == "type.IsPointer" ||
+                    node.ToString() == "type.IsPrimitive" ||
+                    node.ToString() == "type.IsPublic" ||
+                    node.ToString() == "type.IsSealed" ||
+                    node.ToString() == "type.IsSpecialName" ||
+                    node.ToString() == "type.IsUnicodeClass" ||
+                    node.ToString() == "type.IsValueType" ||
                     node.ToString() == "type.MemberType" ||
                     node.ToString() == "type.ReflectedType")
                 .Select(node => (node.ToString(), (IPropertySymbol)semanticModel.GetSymbolInfo(node).Symbol!))
@@ -4802,11 +4854,37 @@ public class TestClass
                 "Trusted generated purity should allow the reviewed System.Type metadata getters.");
             Assert.That(resolutions["type.DeclaringMethod"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.DeclaringType"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsAbstract"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsAnsiClass"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsArray"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsAutoClass"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsAutoLayout"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsByRef"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsClass"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsCOMObject"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsContextful"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsExplicitLayout"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsGenericType"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsGenericTypeDefinition"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsGenericParameter"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsImport"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsInterface"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsLayoutSequential"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsMarshalByRef"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsNestedAssembly"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsNestedFamANDAssem"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsNestedFamORAssem"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsNestedFamily"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsNestedPrivate"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsNestedPublic"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsNotPublic"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsPointer"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsPrimitive"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsPublic"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsSealed"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsSpecialName"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsUnicodeClass"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsValueType"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.MemberType"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.ReflectedType"], Is.EqualTo((true, "pure")));
         }

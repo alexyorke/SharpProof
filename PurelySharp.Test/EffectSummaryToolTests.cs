@@ -8218,6 +8218,80 @@ public static class DuplicateReviewedSeedFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeAdditionalTypeScalarMetadataSlice_UsesGeneratedPurityEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                80,
+                "System.Type.get_IsAnsiClass",
+                "System.Type.get_IsAutoClass",
+                "System.Type.get_IsAutoLayout",
+                "System.Type.get_IsByRef",
+                "System.Type.get_IsCOMObject",
+                "System.Type.get_IsExplicitLayout",
+                "System.Type.get_IsImport",
+                "System.Type.get_IsLayoutSequential",
+                "System.Type.get_IsNestedAssembly",
+                "System.Type.get_IsNestedFamANDAssem",
+                "System.Type.get_IsNestedFamORAssem",
+                "System.Type.get_IsNestedFamily",
+                "System.Type.get_IsNestedPrivate",
+                "System.Type.get_IsNestedPublic",
+                "System.Type.get_IsNotPublic",
+                "System.Type.get_IsPointer",
+                "System.Type.get_IsPrimitive",
+                "System.Type.get_IsPublic",
+                "System.Type.get_IsSpecialName",
+                "System.Type.get_IsUnicodeClass");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var symbols = new[]
+            {
+                "System.Type.get_IsAnsiClass()",
+                "System.Type.get_IsAutoClass()",
+                "System.Type.get_IsAutoLayout()",
+                "System.Type.get_IsByRef()",
+                "System.Type.get_IsCOMObject()",
+                "System.Type.get_IsExplicitLayout()",
+                "System.Type.get_IsImport()",
+                "System.Type.get_IsLayoutSequential()",
+                "System.Type.get_IsNestedAssembly()",
+                "System.Type.get_IsNestedFamANDAssem()",
+                "System.Type.get_IsNestedFamORAssem()",
+                "System.Type.get_IsNestedFamily()",
+                "System.Type.get_IsNestedPrivate()",
+                "System.Type.get_IsNestedPublic()",
+                "System.Type.get_IsNotPublic()",
+                "System.Type.get_IsPointer()",
+                "System.Type.get_IsPrimitive()",
+                "System.Type.get_IsPublic()",
+                "System.Type.get_IsSpecialName()",
+                "System.Type.get_IsUnicodeClass()",
+            };
+
+            foreach (var symbol in symbols)
+            {
+                AssertPurityClassification(summary, symbol, "pure");
+                AssertEffectVisibilityClassification(summary, symbol, "none");
+            }
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbols.Contains(symbol, StringComparer.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(symbols.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray()));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeTypeIdentitySlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

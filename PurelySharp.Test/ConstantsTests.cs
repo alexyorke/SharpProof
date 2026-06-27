@@ -3824,15 +3824,35 @@ public static class TypeMetadataCatalogSignatureSamples
     public static MethodBase? DeclaringMethod(Type type) => type.DeclaringMethod;
     public static Type? DeclaringType(Type type) => type.DeclaringType;
     public static bool IsAbstract(Type type) => type.IsAbstract;
+    public static bool IsAnsiClass(Type type) => type.IsAnsiClass;
     public static bool IsArray(Type type) => type.IsArray;
+    public static bool IsAutoClass(Type type) => type.IsAutoClass;
+    public static bool IsAutoLayout(Type type) => type.IsAutoLayout;
+    public static bool IsByRef(Type type) => type.IsByRef;
     public static bool IsClass(Type type) => type.IsClass;
+    public static bool IsCOMObject(Type type) => type.IsCOMObject;
     public static bool IsContextful(Type type) => type.IsContextful;
+    public static bool IsExplicitLayout(Type type) => type.IsExplicitLayout;
+    public static bool IsImport(Type type) => type.IsImport;
     public static bool IsInterface(Type type) => type.IsInterface;
+    public static bool IsLayoutSequential(Type type) => type.IsLayoutSequential;
     public static bool IsGenericType(Type type) => type.IsGenericType;
     public static bool IsGenericTypeDefinition(Type type) => type.IsGenericTypeDefinition;
     public static bool IsGenericParameter(Type type) => type.IsGenericParameter;
     public static bool IsMarshalByRef(Type type) => type.IsMarshalByRef;
+    public static bool IsNestedAssembly(Type type) => type.IsNestedAssembly;
+    public static bool IsNestedFamANDAssem(Type type) => type.IsNestedFamANDAssem;
+    public static bool IsNestedFamORAssem(Type type) => type.IsNestedFamORAssem;
+    public static bool IsNestedFamily(Type type) => type.IsNestedFamily;
+    public static bool IsNestedPrivate(Type type) => type.IsNestedPrivate;
+    public static bool IsNestedPublic(Type type) => type.IsNestedPublic;
+    public static bool IsNotPublic(Type type) => type.IsNotPublic;
+    public static bool IsPointer(Type type) => type.IsPointer;
+    public static bool IsPrimitive(Type type) => type.IsPrimitive;
+    public static bool IsPublic(Type type) => type.IsPublic;
     public static bool IsSealed(Type type) => type.IsSealed;
+    public static bool IsSpecialName(Type type) => type.IsSpecialName;
+    public static bool IsUnicodeClass(Type type) => type.IsUnicodeClass;
     public static bool IsValueType(Type type) => type.IsValueType;
     public static MemberTypes MemberType(Type type) => type.MemberType;
     public static Type? ReflectedType(Type type) => type.ReflectedType;
@@ -3869,9 +3889,37 @@ public static class TypeMetadataCatalogSignatureSamples
                     FormatJsonArray()),
                 (
                     typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsAnsiClass.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsAnsiClass()",
+                    "System.Type.IsAnsiClass.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
                     "Synthetic.Type.IsArray.PurelySharp.EffectSummary.json",
                     "System.Type.get_IsArray()",
                     "System.Type.IsArray.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsAutoClass.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsAutoClass()",
+                    "System.Type.IsAutoClass.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsAutoLayout.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsAutoLayout()",
+                    "System.Type.IsAutoLayout.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsByRef.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsByRef()",
+                    "System.Type.IsByRef.get",
                     "pure",
                     FormatJsonArray()),
                 (
@@ -3883,6 +3931,13 @@ public static class TypeMetadataCatalogSignatureSamples
                     FormatJsonArray()),
                 (
                     typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsCOMObject.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsCOMObject()",
+                    "System.Type.IsCOMObject.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
                     "Synthetic.Type.IsContextful.PurelySharp.EffectSummary.json",
                     "System.Type.get_IsContextful()",
                     "System.Type.IsContextful.get",
@@ -3890,9 +3945,30 @@ public static class TypeMetadataCatalogSignatureSamples
                     FormatJsonArray()),
                 (
                     typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsExplicitLayout.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsExplicitLayout()",
+                    "System.Type.IsExplicitLayout.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsImport.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsImport()",
+                    "System.Type.IsImport.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
                     "Synthetic.Type.IsInterface.PurelySharp.EffectSummary.json",
                     "System.Type.get_IsInterface()",
                     "System.Type.IsInterface.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsLayoutSequential.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsLayoutSequential()",
+                    "System.Type.IsLayoutSequential.get",
                     "pure",
                     FormatJsonArray()),
                 (
@@ -3925,9 +4001,93 @@ public static class TypeMetadataCatalogSignatureSamples
                     FormatJsonArray()),
                 (
                     typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsNestedAssembly.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsNestedAssembly()",
+                    "System.Type.IsNestedAssembly.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsNestedFamANDAssem.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsNestedFamANDAssem()",
+                    "System.Type.IsNestedFamANDAssem.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsNestedFamORAssem.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsNestedFamORAssem()",
+                    "System.Type.IsNestedFamORAssem.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsNestedFamily.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsNestedFamily()",
+                    "System.Type.IsNestedFamily.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsNestedPrivate.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsNestedPrivate()",
+                    "System.Type.IsNestedPrivate.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsNestedPublic.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsNestedPublic()",
+                    "System.Type.IsNestedPublic.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsNotPublic.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsNotPublic()",
+                    "System.Type.IsNotPublic.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsPointer.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsPointer()",
+                    "System.Type.IsPointer.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsPrimitive.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsPrimitive()",
+                    "System.Type.IsPrimitive.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsPublic.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsPublic()",
+                    "System.Type.IsPublic.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
                     "Synthetic.Type.IsSealed.PurelySharp.EffectSummary.json",
                     "System.Type.get_IsSealed()",
                     "System.Type.IsSealed.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsSpecialName.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsSpecialName()",
+                    "System.Type.IsSpecialName.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsUnicodeClass.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsUnicodeClass()",
+                    "System.Type.IsUnicodeClass.get",
                     "pure",
                     FormatJsonArray()),
                 (
@@ -3956,15 +4116,35 @@ public static class TypeMetadataCatalogSignatureSamples
                 ("type.DeclaringMethod", "System.Type.DeclaringMethod.get"),
                 ("type.DeclaringType", "System.Type.DeclaringType.get"),
                 ("type.IsAbstract", "System.Type.IsAbstract.get"),
+                ("type.IsAnsiClass", "System.Type.IsAnsiClass.get"),
                 ("type.IsArray", "System.Type.IsArray.get"),
+                ("type.IsAutoClass", "System.Type.IsAutoClass.get"),
+                ("type.IsAutoLayout", "System.Type.IsAutoLayout.get"),
+                ("type.IsByRef", "System.Type.IsByRef.get"),
                 ("type.IsClass", "System.Type.IsClass.get"),
+                ("type.IsCOMObject", "System.Type.IsCOMObject.get"),
                 ("type.IsContextful", "System.Type.IsContextful.get"),
+                ("type.IsExplicitLayout", "System.Type.IsExplicitLayout.get"),
+                ("type.IsImport", "System.Type.IsImport.get"),
                 ("type.IsInterface", "System.Type.IsInterface.get"),
+                ("type.IsLayoutSequential", "System.Type.IsLayoutSequential.get"),
                 ("type.IsGenericType", "System.Type.IsGenericType.get"),
                 ("type.IsGenericTypeDefinition", "System.Type.IsGenericTypeDefinition.get"),
                 ("type.IsGenericParameter", "System.Type.IsGenericParameter.get"),
                 ("type.IsMarshalByRef", "System.Type.IsMarshalByRef.get"),
+                ("type.IsNestedAssembly", "System.Type.IsNestedAssembly.get"),
+                ("type.IsNestedFamANDAssem", "System.Type.IsNestedFamANDAssem.get"),
+                ("type.IsNestedFamORAssem", "System.Type.IsNestedFamORAssem.get"),
+                ("type.IsNestedFamily", "System.Type.IsNestedFamily.get"),
+                ("type.IsNestedPrivate", "System.Type.IsNestedPrivate.get"),
+                ("type.IsNestedPublic", "System.Type.IsNestedPublic.get"),
+                ("type.IsNotPublic", "System.Type.IsNotPublic.get"),
+                ("type.IsPointer", "System.Type.IsPointer.get"),
+                ("type.IsPrimitive", "System.Type.IsPrimitive.get"),
+                ("type.IsPublic", "System.Type.IsPublic.get"),
                 ("type.IsSealed", "System.Type.IsSealed.get"),
+                ("type.IsSpecialName", "System.Type.IsSpecialName.get"),
+                ("type.IsUnicodeClass", "System.Type.IsUnicodeClass.get"),
                 ("type.IsValueType", "System.Type.IsValueType.get"),
                 ("type.MemberType", "System.Type.MemberType.get"),
                 ("type.ReflectedType", "System.Type.ReflectedType.get"),
@@ -4024,29 +4204,9 @@ public static class TypeMetadataCatalogSignatureSamples
                 "System.Type.FullName.get",
                 "System.Type.GUID.get",
                 "System.Type.HasElementType.get",
-                "System.Type.IsCOMObject.get",
-                "System.Type.IsAnsiClass.get",
-                "System.Type.IsAutoClass.get",
-                "System.Type.IsAutoLayout.get",
-                "System.Type.IsByRef.get",
                 "System.Type.IsEnum.get",
-                "System.Type.IsExplicitLayout.get",
-                "System.Type.IsImport.get",
-                "System.Type.IsLayoutSequential.get",
                 "System.Type.IsNested.get",
-                "System.Type.IsNestedAssembly.get",
-                "System.Type.IsNestedFamANDAssem.get",
-                "System.Type.IsNestedFamORAssem.get",
-                "System.Type.IsNestedFamily.get",
-                "System.Type.IsNestedPrivate.get",
-                "System.Type.IsNestedPublic.get",
-                "System.Type.IsNotPublic.get",
-                "System.Type.IsPointer.get",
-                "System.Type.IsPrimitive.get",
-                "System.Type.IsPublic.get",
                 "System.Type.IsSerializable.get",
-                "System.Type.IsSpecialName.get",
-                "System.Type.IsUnicodeClass.get",
                 "System.Type.IsVariableBoundArray.get",
                 "System.Type.IsVisible.get",
                 "System.Type.Module.get",

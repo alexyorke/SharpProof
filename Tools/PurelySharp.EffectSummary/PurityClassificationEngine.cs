@@ -996,14 +996,22 @@ internal static class PurityClassificationEngine
         }
 
         var callSites = EnumerateCallSites(summary).ToArray();
+        if (IsPureTypeAttributeFlagsWrapperMethod(summary.Symbol))
+        {
+            return CallSitesMatch(
+                callSites,
+                ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true));
+        }
+
+        if (TryGetPureTypeSingleImplWrapperCall(summary.Symbol, out var implCall))
+        {
+            return CallSitesMatch(
+                callSites,
+                (implCall, true));
+        }
+
         return summary.Symbol switch
         {
-            "System.Type.get_IsAbstract()" => CallSitesMatch(
-                callSites,
-                ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true)),
-            "System.Type.get_IsArray()" => CallSitesMatch(
-                callSites,
-                ("System.Type.IsArrayImpl()->bool", true)),
             "System.Type.get_IsClass()" => CallSitesMatch(
                 callSites,
                 ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true),
@@ -1012,12 +1020,6 @@ internal static class PurityClassificationEngine
                 callSites,
                 ("System.RuntimeTypeHandle.IsInterface(System.RuntimeType)->bool", false),
                 ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true)),
-            "System.Type.get_IsSealed()" => CallSitesMatch(
-                callSites,
-                ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true)),
-            "System.Type.get_IsValueType()" => CallSitesMatch(
-                callSites,
-                ("System.Type.IsValueTypeImpl()->bool", true)),
             _ => false,
         };
     }
@@ -1290,6 +1292,44 @@ internal static class PurityClassificationEngine
         }
 
         return true;
+    }
+
+    private static bool IsPureTypeAttributeFlagsWrapperMethod(string symbol)
+    {
+        return string.Equals(symbol, "System.Type.get_IsAbstract()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsAnsiClass()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsAutoClass()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsAutoLayout()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsExplicitLayout()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsImport()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsLayoutSequential()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsNestedAssembly()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsNestedFamANDAssem()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsNestedFamily()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsNestedFamORAssem()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsNestedPrivate()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsNestedPublic()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsNotPublic()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsPublic()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsSealed()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsSpecialName()", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.get_IsUnicodeClass()", StringComparison.Ordinal);
+    }
+
+    private static bool TryGetPureTypeSingleImplWrapperCall(string symbol, out string implCall)
+    {
+        implCall = symbol switch
+        {
+            "System.Type.get_IsArray()" => "System.Type.IsArrayImpl()->bool",
+            "System.Type.get_IsByRef()" => "System.Type.IsByRefImpl()->bool",
+            "System.Type.get_IsCOMObject()" => "System.Type.IsCOMObjectImpl()->bool",
+            "System.Type.get_IsPointer()" => "System.Type.IsPointerImpl()->bool",
+            "System.Type.get_IsPrimitive()" => "System.Type.IsPrimitiveImpl()->bool",
+            "System.Type.get_IsValueType()" => "System.Type.IsValueTypeImpl()->bool",
+            _ => string.Empty,
+        };
+
+        return implCall.Length != 0;
     }
 
     private static bool IsTypeIdentityWrapperMethod(string symbol)
