@@ -39,6 +39,25 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_WhenEffectSummaryJsonDisabled_IsIgnored()
+        {
+            var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                CreateLibraryCallSource(),
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreateEffectSummaryJson(coreLib, "System.ArgumentNullException.ThrowIfNull(object, string)"))
+                },
+                ImmutableArray<MetadataReference>.Empty,
+                ImmutableDictionary<string, string>.Empty.Add(
+                    "purelysharp_enable_effect_summary_json",
+                    "false"));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_EffectSummary_WithMismatchedAssemblyIdentity_IsIgnored()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
@@ -1363,6 +1382,44 @@ public class TestClass
                 diagnostics.Any(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
                 Is.False,
                 "Trusted generated purity should override the built-in known-impure member fallback for metadata methods.");
+        }
+
+        [Test]
+        public async Task Ps0002_EffectSummary_WhenEffectSummaryJsonDisabled_DoesNotOverrideKnownImpureEnvironmentMethod()
+        {
+            var identity = GetAssemblyIdentity(typeof(System.Environment).Assembly.Location);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod()
+    {
+        return Environment.GetEnvironmentVariable("PATH");
+    }
+}
+""",
+                new[]
+                {
+                    ("PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "System.Environment.GetEnvironmentVariable(string)",
+                            "pure",
+                            """[]"""))
+                },
+                ImmutableArray<MetadataReference>.Empty,
+                ImmutableDictionary<string, string>.Empty.Add(
+                    "purelysharp_enable_effect_summary_json",
+                    "false"));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.Not.EqualTo("generated_purity_summary"));
         }
 
         [Test]

@@ -68,7 +68,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
                     getterSymbol.OriginalDefinition,
                     context.SemanticModel.Compilation,
-                    out generatedPurity);
+                    out generatedPurity) &&
+                generatedPurity.IsDefinitive;
             var allowsKnownPureFallback = !hasTrustedGeneratedPurity;
             var requiresDispatchCheck = getterSymbol != null &&
                 IsPotentiallyDispatchedProperty(propertySymbol, context.SemanticModel.Compilation);
@@ -107,37 +108,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             {
                 PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter '{getterSymbol.ToDisplayString()}' is trusted pure from generated purity summary.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            if (!requiresDispatchCheck && hasTrustedGeneratedPurity)
-            {
-                if (generatedPurity.IsImpure)
-                {
-                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter '{getterSymbol.ToDisplayString()}' is trusted impure from generated purity summary.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        propertyReferenceOperation.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            generatedPurity.PrimaryCategory,
-                            ruleName: nameof(PropertyReferencePurityRule),
-                            operation: propertyReferenceOperation,
-                            syntaxNode: propertyReferenceOperation.Syntax,
-                            symbol: getterSymbol,
-                        catalogSource: "generated_purity_summary"));
-                }
-            }
-
-            if (knownImpureMemberSource != null)
-            {
-                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is built-in known impure. Impure.");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    propertyReferenceOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        GetCatalogHitCategory(propertySymbol),
-                        ruleName: nameof(PropertyReferencePurityRule),
-                        operation: propertyReferenceOperation,
-                        syntaxNode: propertyReferenceOperation.Syntax,
-                        symbol: propertySymbol,
-                        catalogSource: knownImpureMemberSource));
             }
 
             if (PurityAnalysisEngine.IsKnownImpure(propertySymbol))
@@ -184,6 +154,37 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         syntaxNode: propertyReferenceOperation.Syntax,
                         symbol: propertySymbol,
                         catalogSource: "known_impure_namespace_or_type"));
+            }
+
+            if (knownImpureMemberSource != null)
+            {
+                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is built-in known impure. Impure.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    propertyReferenceOperation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        GetCatalogHitCategory(propertySymbol),
+                        ruleName: nameof(PropertyReferencePurityRule),
+                        operation: propertyReferenceOperation,
+                        syntaxNode: propertyReferenceOperation.Syntax,
+                        symbol: propertySymbol,
+                        catalogSource: knownImpureMemberSource));
+            }
+
+            if (!requiresDispatchCheck && hasTrustedGeneratedPurity)
+            {
+                if (generatedPurity.IsNonPure)
+                {
+                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter '{getterSymbol.ToDisplayString()}' is trusted impure from generated purity summary.");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        propertyReferenceOperation.Syntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            generatedPurity.PrimaryCategory,
+                            ruleName: nameof(PropertyReferencePurityRule),
+                            operation: propertyReferenceOperation,
+                            syntaxNode: propertyReferenceOperation.Syntax,
+                            symbol: getterSymbol,
+                        catalogSource: "generated_purity_summary"));
+                }
             }
 
             if (!requiresDispatchCheck && IsSourceAutoPropertyGetter(propertySymbol))

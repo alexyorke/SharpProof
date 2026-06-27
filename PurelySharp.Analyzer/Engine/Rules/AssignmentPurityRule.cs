@@ -235,20 +235,28 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
                     operatorMethod.OriginalDefinition,
                     context.SemanticModel.Compilation,
-                    out generatedPurity);
+                    out generatedPurity) &&
+                generatedPurity.IsDefinitive;
+
+            if ((!hasTrustedGeneratedPurity &&
+                PurityAnalysisEngine.IsKnownPureBCLMember(operatorMethod, context.SemanticModel.Compilation)) ||
+                PurityAnalysisEngine.HasPureExternalAttribute(operatorMethod))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
 
             if (hasTrustedGeneratedPurity)
             {
-                if (generatedPurity.IsPure)
-                {
-                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-                }
+				if (generatedPurity.IsPure)
+				{
+					return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+				}
 
-                if (generatedPurity.IsImpure)
-                {
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        operation.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
+				if (generatedPurity.IsNonPure)
+				{
+					return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+						operation.Syntax,
+						PurityAnalysisEngine.PurityEvidence.Create(
                             generatedPurity.PrimaryCategory,
                             nameof(AssignmentPurityRule),
                             operation,
@@ -256,13 +264,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: operatorMethod.OriginalDefinition,
                             catalogSource: "generated_purity_summary"));
                 }
-            }
-
-            if ((!hasTrustedGeneratedPurity &&
-                PurityAnalysisEngine.IsKnownPureBCLMember(operatorMethod, context.SemanticModel.Compilation)) ||
-                PurityAnalysisEngine.HasPureExternalAttribute(operatorMethod))
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
             if (!ShouldAnalyzeCompoundAssignmentOperator(operatorMethod))

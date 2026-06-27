@@ -17,6 +17,7 @@ namespace PurelySharp.Analyzer.Configuration
         public MissingPuritySuggestionOptions MissingPuritySuggestions { get; }
         public bool EmitExplanations { get; }
         public bool ReportExceptions { get; }
+        public bool EnableEffectSummaryJson { get; }
         public string PurityProfile { get; }
 
         private AnalyzerConfiguration(
@@ -29,6 +30,7 @@ namespace PurelySharp.Analyzer.Configuration
             MissingPuritySuggestionOptions missingPuritySuggestions,
             bool emitExplanations,
             bool reportExceptions,
+            bool enableEffectSummaryJson,
             string purityProfile)
         {
             ExtraKnownImpureMethods = extraImpureMethods;
@@ -40,6 +42,7 @@ namespace PurelySharp.Analyzer.Configuration
             MissingPuritySuggestions = missingPuritySuggestions;
             EmitExplanations = emitExplanations;
             ReportExceptions = reportExceptions;
+            EnableEffectSummaryJson = enableEffectSummaryJson;
             PurityProfile = purityProfile;
         }
 
@@ -60,7 +63,8 @@ namespace PurelySharp.Analyzer.Configuration
                 GetValues(options, ConfigKeys.SuggestMissingEnforcePureNamespaceFilters));
             bool emitExplanations = GetBool(options, ConfigKeys.EmitExplanations);
             bool reportExceptions = GetBool(options, ConfigKeys.ReportExceptions);
-            return new AnalyzerConfiguration(impureMethods, pureMethods, impureNamespaces, impureTypes, debug, suggestMissing, missingPuritySuggestions, emitExplanations, reportExceptions, GetPurityProfile(options));
+            bool enableEffectSummaryJson = GetBoolOrDefaultTrue(options, ConfigKeys.EnableEffectSummaryJson);
+            return new AnalyzerConfiguration(impureMethods, pureMethods, impureNamespaces, impureTypes, debug, suggestMissing, missingPuritySuggestions, emitExplanations, reportExceptions, enableEffectSummaryJson, GetPurityProfile(options));
         }
 
         public static MissingPuritySuggestionOptions GetMissingPuritySuggestionOptions(

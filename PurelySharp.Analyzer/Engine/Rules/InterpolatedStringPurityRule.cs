@@ -211,7 +211,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             interpolation,
                             syntaxNode: interpolation.Syntax,
                             symbol: originalDefinition,
-                        catalogSource: "generated_purity_summary"));
+                            catalogSource: "generated_purity_summary"));
                 }
             }
 
@@ -224,8 +224,9 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         nameof(InterpolatedStringPurityRule),
                         interpolation,
                         syntaxNode: interpolation.Syntax,
-                        symbol: originalDefinition,
-                        catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinition) ?? "known_impure"));
+                            symbol: originalDefinition,
+                            catalogSource: PurityAnalysisEngine.GetKnownImpureMemberSource(
+                                originalDefinition) ?? "known_impure"));
             }
 
             if (IsFrameworkType(expressionType))

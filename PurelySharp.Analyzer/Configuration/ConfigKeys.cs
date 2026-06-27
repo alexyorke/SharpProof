@@ -18,5 +18,6 @@ namespace PurelySharp.Analyzer.Configuration
         public const string SuggestMissingEnforcePureNamespaceFilters = "purelysharp_suggest_missing_enforce_pure_namespace_filters";
         public const string EmitExplanations = "purelysharp_emit_explanations";
         public const string ReportExceptions = "purelysharp_report_exceptions";
+        public const string EnableEffectSummaryJson = "purelysharp_enable_effect_summary_json";
     }
 }

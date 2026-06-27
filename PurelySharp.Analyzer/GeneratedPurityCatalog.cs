@@ -19,6 +19,8 @@ namespace PurelySharp.Analyzer
     internal sealed class GeneratedPurityCatalog
     {
         private const string SummaryFileName = "PurelySharp.EffectSummary.json";
+        private const int BuiltInSummarySourcePriority = 0;
+        private const int AdditionalSummarySourcePriority = 1;
         private static readonly AsyncLocal<GeneratedPurityCatalog?> CurrentCatalog = new AsyncLocal<GeneratedPurityCatalog?>();
         private static readonly Lazy<GeneratedPurityCatalog> BuiltInCatalog =
             new Lazy<GeneratedPurityCatalog>(CreateBuiltInCatalog, LazyThreadSafetyMode.ExecutionAndPublication);
@@ -69,7 +71,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                foreach (var entry in ParseEntries(text!))
+                foreach (var entry in ParseEntries(text!, AdditionalSummarySourcePriority))
                 {
                     if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
                     {
@@ -207,20 +209,43 @@ namespace PurelySharp.Analyzer
             return TryGetPurity(staticConstructor.OriginalDefinition, compilation, out classification);
         }
 
-        private static int CompareTrustedPurityEntries(SummaryEntry left, SummaryEntry right)
-        {
-            return GetClassificationPriority(left.Classification).CompareTo(GetClassificationPriority(right.Classification));
-        }
+		private static int CompareTrustedPurityEntries(SummaryEntry left, SummaryEntry right)
+		{
+			var sourcePriorityComparison = left.SourcePriority.CompareTo(right.SourcePriority);
+			if (sourcePriorityComparison != 0)
+			{
+				return sourcePriorityComparison;
+			}
 
-        private static int GetClassificationPriority(PurityEntry classification)
-        {
-            if (classification.IsPure || classification.IsImpure)
-            {
-                return 2;
-            }
+			var leftPriority = GetClassificationPriority(left.Classification);
+			var rightPriority = GetClassificationPriority(right.Classification);
+			var priorityComparison = leftPriority.CompareTo(rightPriority);
+			if (priorityComparison != 0)
+			{
+				return priorityComparison;
+			}
 
-            return 1;
-        }
+			var leftPrimaryCategory = left.Classification.PrimaryCategory ?? string.Empty;
+			var rightPrimaryCategory = right.Classification.PrimaryCategory ?? string.Empty;
+			var primaryCategoryComparison = string.CompareOrdinal(leftPrimaryCategory, rightPrimaryCategory);
+			if (primaryCategoryComparison != 0)
+			{
+				return primaryCategoryComparison;
+			}
+
+			return string.CompareOrdinal(left.Symbol, right.Symbol);
+		}
+
+		private static int GetClassificationPriority(PurityEntry classification)
+		{
+			return classification.Classification switch
+			{
+				"impure" => 3,
+				"pure" => 2,
+				"conservative_unknown" => 1,
+				_ => 0,
+			};
+		}
 
         internal static bool TryCanMetadataMethodBeOverridden(IMethodSymbol methodSymbol, Compilation compilation, out bool canBeOverridden)
         {
@@ -276,7 +301,7 @@ namespace PurelySharp.Analyzer
             var builtInSummaryPath = Path.Combine(summaryDirectory, SummaryFileName);
             if (File.Exists(builtInSummaryPath))
             {
-                AddParsedEntries(entriesBySymbol, File.ReadAllText(builtInSummaryPath));
+                AddParsedEntries(entriesBySymbol, File.ReadAllText(builtInSummaryPath), BuiltInSummarySourcePriority);
             }
 
             foreach (var domainSummaryPath in Directory.EnumerateFiles(summaryDirectory, "*." + SummaryFileName, SearchOption.TopDirectoryOnly))
@@ -286,7 +311,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                AddParsedEntries(entriesBySymbol, File.ReadAllText(domainSummaryPath));
+                AddParsedEntries(entriesBySymbol, File.ReadAllText(domainSummaryPath), BuiltInSummarySourcePriority);
             }
         }
 
@@ -308,15 +333,16 @@ namespace PurelySharp.Analyzer
                 }
 
                 using var reader = new StreamReader(stream);
-                AddParsedEntries(entriesBySymbol, reader.ReadToEnd());
+                AddParsedEntries(entriesBySymbol, reader.ReadToEnd(), BuiltInSummarySourcePriority);
             }
         }
 
         private static void AddParsedEntries(
             Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol,
-            string json)
+            string json,
+            int sourcePriority)
         {
-            foreach (var entry in ParseEntries(json))
+            foreach (var entry in ParseEntries(json, sourcePriority))
             {
                 if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
                 {
@@ -334,7 +360,7 @@ namespace PurelySharp.Analyzer
                 string.Equals(resourceName, SummaryFileName, StringComparison.OrdinalIgnoreCase);
         }
 
-        private static IEnumerable<SummaryEntry> ParseEntries(string json)
+        private static IEnumerable<SummaryEntry> ParseEntries(string json, int sourcePriority)
         {
             using var document = JsonDocument.Parse(json);
             if (document.RootElement.TryGetProperty("GeneratedPurityCatalog", out var generatedCatalogElement) &&
@@ -361,12 +387,13 @@ namespace PurelySharp.Analyzer
                             classification.Trim(),
                             categories,
                             string.IsNullOrWhiteSpace(primaryCategory)
-                                ? categories.FirstOrDefault() ?? "generated_purity_summary"
+                                ? PrimaryCategoryFallback(categories)
                                 : primaryCategory.Trim(),
                             ReadBooleanProperty(entryElement, "HasFreshArrayAllocationEvidence"),
                             freshnessClassification),
                         SummaryAssemblyIdentity.FromFlatJson(entryElement),
-                        SummaryMethodIdentity.FromFlatJson(entryElement));
+                        SummaryMethodIdentity.FromFlatJson(entryElement),
+                        sourcePriority);
                 }
 
                 yield break;
@@ -398,8 +425,7 @@ namespace PurelySharp.Analyzer
                     }
 
                     var classification = CompatibilityHelpers.GetTrimmedStringProperty(purityElement, "Classification");
-                    if (string.IsNullOrWhiteSpace(classification) ||
-                        string.Equals(classification, "conservative_unknown", StringComparison.Ordinal))
+                    if (string.IsNullOrWhiteSpace(classification))
                     {
                         continue;
                     }
@@ -413,15 +439,20 @@ namespace PurelySharp.Analyzer
                             classification.Trim(),
                             categories,
                             string.IsNullOrWhiteSpace(primaryCategory)
-                                ? categories.FirstOrDefault() ?? "generated_purity_summary"
+                                ? PrimaryCategoryFallback(categories)
                                 : primaryCategory.Trim(),
                             ReadBooleanProperty(purityElement, "HasFreshArrayAllocationEvidence"),
                             freshnessClassification),
                         assemblyIdentity,
-                        SummaryMethodIdentity.FromJson(methodElement));
+                        SummaryMethodIdentity.FromJson(methodElement),
+                        sourcePriority);
                 }
             }
         }
+
+        private static string PrimaryCategoryFallback(ImmutableArray<string> categories) => categories.Length > 0
+            ? categories[0]
+            : "generated_purity_summary";
 
         private static bool ReadBooleanProperty(JsonElement element, string propertyName)
         {
@@ -437,7 +468,8 @@ namespace PurelySharp.Analyzer
                 return ImmutableArray<string>.Empty;
             }
 
-            var builder = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var builder = ImmutableArray.CreateBuilder<string>();
             foreach (var valueElement in valuesElement.EnumerateArray())
             {
                 if (valueElement.ValueKind != JsonValueKind.String)
@@ -448,11 +480,15 @@ namespace PurelySharp.Analyzer
                 var value = valueElement.GetString();
                 if (!string.IsNullOrWhiteSpace(value))
                 {
-                    builder.Add(value.Trim());
+                    var trimmedValue = value.Trim();
+                    if (seen.Add(trimmedValue))
+                    {
+                        builder.Add(trimmedValue);
+                    }
                 }
             }
 
-            return builder.ToImmutableArray();
+            return builder.ToImmutable();
         }
 
         private static IEnumerable<string> GetSymbolKeys(IMethodSymbol methodSymbol)
@@ -1449,18 +1485,21 @@ namespace PurelySharp.Analyzer
                 string symbol,
                 PurityEntry classification,
                 SummaryAssemblyIdentity? assemblyIdentity,
-                SummaryMethodIdentity? methodIdentity)
+                SummaryMethodIdentity? methodIdentity,
+                int sourcePriority)
             {
                 Symbol = symbol;
                 Classification = classification;
                 AssemblyIdentity = assemblyIdentity;
                 MethodIdentity = methodIdentity;
+                SourcePriority = sourcePriority;
             }
 
             public string Symbol { get; }
             public PurityEntry Classification { get; }
             public SummaryAssemblyIdentity? AssemblyIdentity { get; }
             public SummaryMethodIdentity? MethodIdentity { get; }
+            public int SourcePriority { get; }
 
             public bool IsTrustedFor(
                 IMethodSymbol methodSymbol,
@@ -1513,7 +1552,9 @@ namespace PurelySharp.Analyzer
             public string FreshnessClassification { get; }
             public bool IsPure => string.Equals(Classification, "pure", StringComparison.Ordinal);
             public bool IsImpure => string.Equals(Classification, "impure", StringComparison.Ordinal);
-            public bool IsNonPure => !string.IsNullOrWhiteSpace(Classification) && !IsPure;
+            public bool IsConservativeUnknown => string.Equals(Classification, "conservative_unknown", StringComparison.Ordinal);
+            public bool IsDefinitive => IsPure || IsImpure;
+            public bool IsNonPure => IsImpure;
             public bool IsFreshArrayCandidate =>
                 HasFreshArrayAllocationEvidence &&
                 (string.Equals(FreshnessClassification, "fresh_array_candidate_via_local_helpers", StringComparison.Ordinal) ||

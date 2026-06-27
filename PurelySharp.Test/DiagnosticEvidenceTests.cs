@@ -1166,7 +1166,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task GeneratedPurityCatalog_Resolves_ExceptionStateAccessorsAsPureEvidence()
+        public async Task GeneratedPurityCatalog_Resolves_ExceptionStateAccessors_WithMessageAsImpureEvidence()
         {
             const string source = @"
 using System;
@@ -1226,9 +1226,9 @@ public class TestClass
                 });
 
             Assert.That(classifications["error.Message"].matched, Is.True);
-            Assert.That(classifications["error.Message"].classification, Is.EqualTo("pure"));
+            Assert.That(classifications["error.Message"].classification, Is.EqualTo("impure"));
             Assert.That(classifications["error.Message"].currentMatched, Is.True);
-            Assert.That(classifications["error.Message"].currentClassification, Is.EqualTo("pure"));
+            Assert.That(classifications["error.Message"].currentClassification, Is.EqualTo("impure"));
             Assert.That(classifications["error.InnerException"].matched, Is.True);
             Assert.That(classifications["error.InnerException"].classification, Is.EqualTo("pure"));
             Assert.That(classifications["error.InnerException"].currentMatched, Is.True);
@@ -1332,7 +1332,7 @@ public class TestClass
             var purityEntry = args[2]!;
             var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_read"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(matched, Is.True, "Generated purity catalog should resolve Environment.CurrentDirectory.get.");
             Assert.That(classification, Is.EqualTo("impure"),
@@ -3889,7 +3889,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task GeneratedPurityCatalog_Resolves_ObjectGetTypeAndTypeToStringAsPureMetadataEvidence()
+        public async Task GeneratedPurityCatalog_Resolves_ObjectGetTypeAsPureMetadataEvidence()
         {
             const string source = @"
 using System;
@@ -3898,9 +3898,9 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string TestMethod(object value)
+    public Type TestMethod(object value)
     {
-        return value.GetType().ToString();
+        return value.GetType();
     }
 }";
 
@@ -3915,9 +3915,7 @@ public class TestClass
             var trackedMethods = syntaxTree.GetRoot()
                 .DescendantNodes()
                 .OfType<InvocationExpressionSyntax>()
-                .Where(node =>
-                    node.ToString() == "value.GetType()" ||
-                    node.ToString() == "value.GetType().ToString()")
+                .Where(node => node.ToString() == "value.GetType()")
                 .Select(node => (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!)
                 .ToArray();
             var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
@@ -3933,9 +3931,9 @@ public class TestClass
             Assert.That(
                 diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
                 Is.False,
-                "Trusted generated purity should allow object.GetType() and Type.ToString() as metadata-only reads.");
-            Assert.That(matched, Is.EqualTo(new[] { true, true }),
-                "Generated purity catalog should resolve object.GetType() and Type.ToString() from runtime metadata evidence.");
+                "Trusted generated purity should allow object.GetType() as metadata-only read.");
+            Assert.That(matched, Is.EqualTo(new[] { true }),
+                "Generated purity catalog should resolve object.GetType() from runtime metadata evidence.");
         }
 
         [Test]

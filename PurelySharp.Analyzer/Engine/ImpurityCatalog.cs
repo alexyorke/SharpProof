@@ -235,7 +235,7 @@ namespace PurelySharp.Analyzer.Engine
 			return MatchesSignature(ExtraPureMethods, NormalizeSignatures(ExtraPureMethods), signature);
 		}
 
-		private static bool TryGetGeneratedPureMethod(
+		private static bool TryGetGeneratedMethodPurity(
 			IMethodSymbol? methodSymbol,
 			Compilation? compilation,
 			out string signature,
@@ -253,13 +253,22 @@ namespace PurelySharp.Analyzer.Engine
 				return false;
 			}
 
-			if (!classification.IsPure)
+			signature = methodSymbol.OriginalDefinition.ToDisplayString();
+			return true;
+		}
+
+		private static bool TryGetGeneratedPureMethod(
+			IMethodSymbol? methodSymbol,
+			Compilation? compilation,
+			out string signature,
+			out GeneratedPurityCatalog.PurityEntry classification)
+		{
+			if (!TryGetGeneratedMethodPurity(methodSymbol, compilation, out signature, out classification))
 			{
 				return false;
 			}
 
-			signature = methodSymbol.OriginalDefinition.ToDisplayString();
-			return true;
+			return classification.IsPure;
 		}
 
 		private static bool MatchesSignature(
@@ -397,9 +406,9 @@ namespace PurelySharp.Analyzer.Engine
 				}
 			}
 
-			if (symbol is IMethodSymbol methodSymbol && methodSymbol.IsGenericMethod)
+			if (symbol is IMethodSymbol genericMethodSymbol && genericMethodSymbol.IsGenericMethod)
 			{
-				signature = methodSymbol.ConstructedFrom.ToDisplayString();
+				signature = genericMethodSymbol.ConstructedFrom.ToDisplayString();
 				if (ExtraImpureMethods.Contains(signature))
 				{
 					PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Generic match found for {symbol.ToDisplayString()} using configured signature '{signature}'");

@@ -41,8 +41,12 @@ namespace PurelySharp.Analyzer
                 var missingPuritySuggestions = config.MissingPuritySuggestions;
                 var emitExplanations = config.EmitExplanations;
                 var baseline = Configuration.DiagnosticBaseline.FromOptions(startContext.Options, startContext.CancellationToken);
-                var exceptionSummaryCatalog = ExceptionSummaryCatalog.FromOptions(startContext.Options, startContext.CancellationToken);
-                var generatedPurityCatalog = GeneratedPurityCatalog.FromOptions(startContext.Options, startContext.CancellationToken);
+                var exceptionSummaryCatalog = config.EnableEffectSummaryJson
+                    ? ExceptionSummaryCatalog.FromOptions(startContext.Options, startContext.CancellationToken)
+                    : ExceptionSummaryCatalog.Empty;
+                var generatedPurityCatalog = config.EnableEffectSummaryJson
+                    ? GeneratedPurityCatalog.FromOptions(startContext.Options, startContext.CancellationToken)
+                    : GeneratedPurityCatalog.Empty;
 
                 startContext.RegisterSyntaxNodeAction(c =>
                 {

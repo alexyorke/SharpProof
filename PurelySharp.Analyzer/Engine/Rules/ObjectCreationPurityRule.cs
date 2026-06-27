@@ -190,27 +190,13 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             catalogSource: trustedMetadataPurity.KnownImpureMemberSource));
                 }
 
-                // Check known mutable collection types before trusting the generated purity catalog:
-                // e.g. Dictionary..ctor() appears internal-only-pure in the catalog but creates mutable state.
-                string? mutableTypeName = objectCreationOperation.Type?.OriginalDefinition.ToDisplayString();
-                if (mutableTypeName != null && (
-                    mutableTypeName.StartsWith("System.Collections.Generic.List<") ||
-                    mutableTypeName.StartsWith("System.Collections.Generic.Dictionary<") ||
-                    mutableTypeName.StartsWith("System.Collections.Generic.HashSet<") ||
-                    mutableTypeName.StartsWith("System.Collections.Generic.Queue<") ||
-                    mutableTypeName.StartsWith("System.Collections.Generic.Stack<")
-                ))
+                if (trustedMetadataPurity.AllowsKnownPureFallback &&
+                    PurityAnalysisEngine.IsKnownPureBCLMember(
+                        constructorSymbol,
+                        context.SemanticModel.Compilation))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor creates known mutable collection type '{mutableTypeName}'. IMPURE.");
-                    return PurityAnalysisResult.Impure(
-                        objectCreationOperation.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "catalog_hit",
-                            ruleName: nameof(ObjectCreationPurityRule),
-                            operation: objectCreationOperation,
-                            syntaxNode: objectCreationOperation.Syntax,
-                            symbol: constructorSymbol ?? (ISymbol?)objectCreationOperation.Type,
-                            catalogSource: "known_mutable_collection"));
+                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a known-pure BCL member; skipping recursive callee analysis.");
+                    return PurityAnalysisResult.Pure;
                 }
 
                 if (hasTrustedGeneratedPurity)
@@ -221,12 +207,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         return PurityAnalysisResult.Pure;
                     }
 
-                    if (generatedPurity.IsImpure)
-                    {
-                        PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is trusted impure from generated purity summary.");
-                        return PurityAnalysisResult.Impure(
-                            objectCreationOperation.Syntax,
-                            PurityAnalysisEngine.PurityEvidence.Create(
+				if (generatedPurity.IsNonPure)
+				{
+					PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is trusted impure from generated purity summary.");
+					return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+						objectCreationOperation.Syntax,
+						PurityAnalysisEngine.PurityEvidence.Create(
                             generatedPurity.PrimaryCategory,
                             ruleName: nameof(ObjectCreationPurityRule),
                             operation: objectCreationOperation,
@@ -234,15 +220,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: constructorSymbol,
                                 catalogSource: "generated_purity_summary"));
                     }
-                }
-
-                if (trustedMetadataPurity.AllowsKnownPureFallback &&
-                    PurityAnalysisEngine.IsKnownPureBCLMember(
-                        constructorSymbol,
-                        context.SemanticModel.Compilation))
-                {
-                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is a known-pure BCL member; skipping recursive callee analysis.");
-                    return PurityAnalysisResult.Pure;
                 }
 
                 var constructorPurity = PurityAnalysisEngine.GetCalleePurity(constructorSymbol, context);

@@ -71,13 +71,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     PurityAnalysisEngine.TryGetTrustedGeneratedFieldPurity(
                         fieldSymbol.OriginalDefinition,
                         context.SemanticModel.Compilation,
-                        out generatedPurity);
-
-                if (hasTrustedGeneratedFieldPurity && generatedPurity.IsImpure)
-                {
-                    PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static field '{fieldSymbol.Name}' is trusted impure from generated purity summary.");
-                    return ImpureFieldRead(fieldReferenceOperation, generatedPurity.PrimaryCategory, "generated_purity_summary");
-                }
+                        out generatedPurity) &&
+                    generatedPurity.IsDefinitive;
 
                 var staticCtorResult = PurityAnalysisEngine.CheckStaticConstructorPurity(fieldSymbol.ContainingType, context, currentState);
                 if (!staticCtorResult.IsPure)
@@ -112,6 +107,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     {
                         PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static readonly field '{fieldSymbol.Name}' is built-in known impure.");
                         return ImpureFieldRead(fieldReferenceOperation, "known_impure_member", knownImpureMemberSource);
+                    }
+
+                    if (hasTrustedGeneratedFieldPurity && generatedPurity.IsNonPure)
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static readonly field '{fieldSymbol.Name}' is trusted impure from generated purity summary.");
+                        return ImpureFieldRead(fieldReferenceOperation, generatedPurity.PrimaryCategory, "generated_purity_summary");
                     }
 
                     PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static readonly field '{fieldSymbol.Name}' - Pure");
