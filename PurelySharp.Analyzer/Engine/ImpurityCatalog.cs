@@ -531,19 +531,14 @@ namespace PurelySharp.Analyzer.Engine
 					return true;
 				}
 
-				if (methodSymbol.AssociatedSymbol is IPropertySymbol associatedPropertySymbol &&
+				if (methodSymbol.AssociatedSymbol is IPropertySymbol &&
 					methodSymbol.MethodKind == MethodKind.PropertyGet)
 				{
 					return false;
 				}
 
-				return methodSymbol.MethodKind == MethodKind.Ordinary &&
-					(methodSymbol.Name.StartsWith("Append", StringComparison.Ordinal) ||
-					 methodSymbol.Name == "Clear" ||
-					 methodSymbol.Name == "EnsureCapacity" ||
-					 methodSymbol.Name == "Insert" ||
-					 methodSymbol.Name == "Remove" ||
-					 methodSymbol.Name == "Replace");
+				return IsOrdinaryMethodWithNamePrefix(methodSymbol, "Append") ||
+					IsOrdinaryMethodNamed(methodSymbol, "Clear", "EnsureCapacity", "Insert", "Remove", "Replace");
 			}
 
 			return false;
@@ -744,27 +739,22 @@ namespace PurelySharp.Analyzer.Engine
 
 			if (IsExactType(containingType, "System.Diagnostics.ActivitySource"))
 			{
-				return methodSymbol.MethodKind == MethodKind.Constructor ||
-					(methodSymbol.MethodKind == MethodKind.Ordinary &&
-					 string.Equals(methodSymbol.Name, "StartActivity", StringComparison.Ordinal));
+				return IsConstructorOrOrdinaryMethodNamed(methodSymbol, "StartActivity");
 			}
 
 			if (IsExactType(containingType, "System.Diagnostics.DiagnosticListener"))
 			{
-				return methodSymbol.MethodKind == MethodKind.Ordinary &&
-					string.Equals(methodSymbol.Name, "Write", StringComparison.Ordinal);
+				return IsOrdinaryMethodNamed(methodSymbol, "Write");
 			}
 
 			if (IsExactType(containingType, "System.Diagnostics.Metrics.Meter"))
 			{
-				return methodSymbol.MethodKind == MethodKind.Ordinary &&
-					methodSymbol.Name.StartsWith("Create", StringComparison.Ordinal);
+				return IsOrdinaryMethodWithNamePrefix(methodSymbol, "Create");
 			}
 
 			if (IsExactType(containingType, "System.Diagnostics.Metrics.Counter<T>"))
 			{
-				return methodSymbol.MethodKind == MethodKind.Ordinary &&
-					string.Equals(methodSymbol.Name, "Add", StringComparison.Ordinal);
+				return IsOrdinaryMethodNamed(methodSymbol, "Add");
 			}
 
 			return false;
@@ -784,14 +774,8 @@ namespace PurelySharp.Analyzer.Engine
 				return false;
 			}
 
-			if (methodSymbol.AssociatedSymbol is IPropertySymbol associatedProperty)
-			{
-				return string.Equals(associatedProperty.Name, "Current", StringComparison.Ordinal) &&
-					associatedProperty.IsStatic;
-			}
-
-			return methodSymbol.MethodKind == MethodKind.Ordinary &&
-				string.Equals(methodSymbol.Name, "SetTag", StringComparison.Ordinal);
+			return HasAssociatedStaticPropertyNamed(methodSymbol, "Current") ||
+				IsOrdinaryMethodNamed(methodSymbol, "SetTag");
 		}
 
 		private static bool IsIoStreamTextSemanticImpure(ISymbol symbol)
@@ -805,62 +789,85 @@ namespace PurelySharp.Analyzer.Engine
 
 			if (IsExactType(containingType, "System.IO.Stream"))
 			{
-				return methodSymbol.MethodKind == MethodKind.Ordinary &&
-					methodSymbol.Name is "Flush" or "Read" or "Seek" or "Write" or "Close" or "CopyToAsync" or "ReadAsync" or "WriteAsync";
+				return IsOrdinaryMethodNamed(methodSymbol, "Flush", "Read", "Seek", "Write", "Close", "CopyToAsync", "ReadAsync", "WriteAsync");
 			}
 
 			if (IsExactType(containingType, "System.IO.TextReader"))
 			{
-				return methodSymbol.MethodKind == MethodKind.Ordinary &&
-					methodSymbol.Name is "Peek" or "ReadToEnd";
+				return IsOrdinaryMethodNamed(methodSymbol, "Peek", "ReadToEnd");
 			}
 
 			if (IsExactType(containingType, "System.IO.TextWriter"))
 			{
-				return methodSymbol.MethodKind == MethodKind.Ordinary &&
-					methodSymbol.Name is "Flush" or "Write";
+				return IsOrdinaryMethodNamed(methodSymbol, "Flush", "Write");
 			}
 
 			if (IsExactType(containingType, "System.IO.StreamReader"))
 			{
-				return methodSymbol.MethodKind == MethodKind.Constructor ||
-					(methodSymbol.MethodKind == MethodKind.Ordinary &&
-					 string.Equals(methodSymbol.Name, "ReadLine", StringComparison.Ordinal));
+				return IsConstructorOrOrdinaryMethodNamed(methodSymbol, "ReadLine");
 			}
 
 			if (IsExactType(containingType, "System.IO.StreamWriter"))
 			{
-				return methodSymbol.MethodKind == MethodKind.Constructor ||
-					(methodSymbol.MethodKind == MethodKind.Ordinary &&
-					 string.Equals(methodSymbol.Name, "WriteLine", StringComparison.Ordinal));
+				return IsConstructorOrOrdinaryMethodNamed(methodSymbol, "WriteLine");
 			}
 
 			if (IsExactType(containingType, "System.IO.BufferedStream"))
 			{
-				return methodSymbol.MethodKind == MethodKind.Constructor ||
-					(methodSymbol.MethodKind == MethodKind.Ordinary &&
-					 string.Equals(methodSymbol.Name, "Flush", StringComparison.Ordinal));
+				return IsConstructorOrOrdinaryMethodNamed(methodSymbol, "Flush");
 			}
 
 			if (IsExactType(containingType, "System.IO.MemoryStream"))
 			{
-				return methodSymbol.MethodKind == MethodKind.Constructor ||
-					(methodSymbol.MethodKind == MethodKind.Ordinary &&
-					 methodSymbol.Name is "Write" or "ToArray");
+				return IsConstructorOrOrdinaryMethodNamed(methodSymbol, "Write", "ToArray");
 			}
 
 			if (IsExactType(containingType, "System.IO.StringReader"))
 			{
-				return methodSymbol.MethodKind == MethodKind.Constructor ||
-					(methodSymbol.MethodKind == MethodKind.Ordinary &&
-					 string.Equals(methodSymbol.Name, "ReadToEnd", StringComparison.Ordinal));
+				return IsConstructorOrOrdinaryMethodNamed(methodSymbol, "ReadToEnd");
 			}
 
 			if (IsExactType(containingType, "System.IO.StringWriter"))
 			{
-				return methodSymbol.MethodKind == MethodKind.Constructor ||
-					(methodSymbol.MethodKind == MethodKind.Ordinary &&
-					 string.Equals(methodSymbol.Name, "Write", StringComparison.Ordinal));
+				return IsConstructorOrOrdinaryMethodNamed(methodSymbol, "Write");
+			}
+
+			return false;
+		}
+
+		private static bool HasAssociatedStaticPropertyNamed(IMethodSymbol methodSymbol, string propertyName)
+		{
+			return methodSymbol.AssociatedSymbol is IPropertySymbol associatedProperty &&
+				associatedProperty.IsStatic &&
+				string.Equals(associatedProperty.Name, propertyName, StringComparison.Ordinal);
+		}
+
+		private static bool IsOrdinaryMethodNamed(IMethodSymbol methodSymbol, params string[] names)
+		{
+			return methodSymbol.MethodKind == MethodKind.Ordinary &&
+				HasMethodName(methodSymbol, names);
+		}
+
+		private static bool IsConstructorOrOrdinaryMethodNamed(IMethodSymbol methodSymbol, params string[] names)
+		{
+			return methodSymbol.MethodKind == MethodKind.Constructor ||
+				IsOrdinaryMethodNamed(methodSymbol, names);
+		}
+
+		private static bool IsOrdinaryMethodWithNamePrefix(IMethodSymbol methodSymbol, string prefix)
+		{
+			return methodSymbol.MethodKind == MethodKind.Ordinary &&
+				methodSymbol.Name.StartsWith(prefix, StringComparison.Ordinal);
+		}
+
+		private static bool HasMethodName(IMethodSymbol methodSymbol, params string[] names)
+		{
+			foreach (var name in names)
+			{
+				if (string.Equals(methodSymbol.Name, name, StringComparison.Ordinal))
+				{
+					return true;
+				}
 			}
 
 			return false;
