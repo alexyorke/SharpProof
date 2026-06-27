@@ -137,8 +137,6 @@ public static class Constants
         "System.Diagnostics.Switch.Level.get",
         "System.DirectoryServices.DirectoryEntry.DirectoryEntry(string)",
         "System.GC.GetGeneration(object)",
-        "System.GC.KeepAlive(object)",
-        "System.GC.KeepAlive(object?)",
         "System.Linq.ParallelEnumerable.ForAll<TSource>(System.Linq.ParallelQuery<TSource>, System.Action<TSource>)",
         "System.Linq.ParallelQuery<TSource>.ToList()",
         "System.Management.ManagementObjectSearcher.ManagementObjectSearcher(string)",

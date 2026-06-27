@@ -1017,6 +1017,13 @@ public static class ArrayConvertAllAndComparerSortCatalogSignatureSamples
         }
 
         [Test]
+        public void GarbageCollectionKeepAlive_IsNoLongerManualCataloged()
+        {
+            AssertNotInManualCatalogs("System.GC.KeepAlive(object)");
+            AssertNotInManualCatalogs("System.GC.KeepAlive(object?)");
+        }
+
+        [Test]
         public void Utf8ParserAndCrc32Helpers_AreSourcedFromGeneratedEvidence_NotStaticCatalogs()
         {
             var source = @"
