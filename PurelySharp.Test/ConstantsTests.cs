@@ -138,6 +138,32 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ThreadingAmbientAndChannelMembers_AreSourcedFromSemanticRules_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Threading.Mutex.ReleaseMutex()",
+                "System.Threading.CancellationToken.Register(System.Action)",
+                "System.Threading.CancellationToken.ThrowIfCancellationRequested()",
+                "System.Threading.CancellationTokenSource.Cancel()",
+                "System.Threading.AsyncLocal<T>.Value.get",
+                "System.Threading.AsyncLocal<T>.Value.set",
+                "System.Threading.Channels.Channel.CreateUnbounded<T>()",
+                "System.Threading.Channels.ChannelReader<T>.ReadAsync(System.Threading.CancellationToken)",
+                "System.Threading.Channels.ChannelWriter<T>.WriteAsync(T, System.Threading.CancellationToken)",
+                "System.Threading.LazyInitializer.EnsureInitialized<T>(ref T, System.Func<T>)",
+                "System.Threading.Semaphore.Semaphore(int, int)",
+                "System.Threading.ThreadLocal<T>.ThreadLocal(System.Func<T>)",
+                "System.Threading.ThreadLocal<T>.Value.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void XmlLinqMembers_AreSourcedFromSemanticRules_NotStaticCatalogs()
         {
             var members = new[]

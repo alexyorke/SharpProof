@@ -610,12 +610,22 @@ namespace PurelySharp.Analyzer.Engine
 				"System.Threading.Interlocked" or
 				"System.Threading.Volatile" or
 				"System.Threading.Monitor" => IsImpureThreadingUtilityMember(symbol),
+				"System.Threading.CancellationToken" => IsImpureCancellationTokenMember(symbol),
+				"System.Threading.CancellationTokenSource" => IsImpureCancellationTokenSourceMember(symbol),
+				"System.Threading.Mutex" => IsImpureMutexMember(symbol),
+				"System.Threading.Semaphore" => IsImpureSemaphoreMember(symbol),
 				"System.Threading.SemaphoreSlim" or
 				"System.Threading.ReaderWriterLockSlim" or
 				"System.Threading.SpinWait" or
 				"System.Threading.Timer" or
 				"System.Threading.Barrier" or
 				"System.Threading.CountdownEvent" => IsImpureThreadingPrimitiveMember(symbol),
+				"System.Threading.AsyncLocal<T>" => IsImpureAsyncLocalMember(symbol),
+				"System.Threading.ThreadLocal<T>" => IsImpureThreadLocalMember(symbol),
+				"System.Threading.LazyInitializer" => IsImpureLazyInitializerMember(symbol),
+				"System.Threading.Channels.Channel" => IsImpureChannelFactoryMember(symbol),
+				"System.Threading.Channels.ChannelReader<T>" => IsImpureChannelReaderMember(symbol),
+				"System.Threading.Channels.ChannelWriter<T>" => IsImpureChannelWriterMember(symbol),
 				"System.Threading.Thread" => IsImpureThreadMember(symbol),
 				_ => false,
 			};
@@ -659,6 +669,91 @@ namespace PurelySharp.Analyzer.Engine
 				methodSymbol.MethodKind == MethodKind.Ordinary ||
 				methodSymbol.MethodKind == MethodKind.PropertyGet ||
 				methodSymbol.MethodKind == MethodKind.PropertySet;
+		}
+
+		private static bool IsImpureCancellationTokenMember(ISymbol symbol)
+		{
+			return symbol is IMethodSymbol methodSymbol &&
+				!methodSymbol.IsImplicitlyDeclared &&
+				IsOrdinaryMethodNamed(methodSymbol, "Register", "ThrowIfCancellationRequested");
+		}
+
+		private static bool IsImpureCancellationTokenSourceMember(ISymbol symbol)
+		{
+			return symbol is IMethodSymbol methodSymbol &&
+				!methodSymbol.IsImplicitlyDeclared &&
+				IsOrdinaryMethodNamed(methodSymbol, "Cancel");
+		}
+
+		private static bool IsImpureMutexMember(ISymbol symbol)
+		{
+			return symbol is IMethodSymbol methodSymbol &&
+				!methodSymbol.IsImplicitlyDeclared &&
+				IsOrdinaryMethodNamed(methodSymbol, "ReleaseMutex");
+		}
+
+		private static bool IsImpureSemaphoreMember(ISymbol symbol)
+		{
+			return symbol is IMethodSymbol methodSymbol &&
+				!methodSymbol.IsImplicitlyDeclared &&
+				methodSymbol.MethodKind == MethodKind.Constructor;
+		}
+
+		private static bool IsImpureAsyncLocalMember(ISymbol symbol)
+		{
+			if (symbol is IPropertySymbol propertySymbol)
+			{
+				return string.Equals(propertySymbol.Name, "Value", StringComparison.Ordinal);
+			}
+
+			return symbol is IMethodSymbol methodSymbol &&
+				!methodSymbol.IsImplicitlyDeclared &&
+				HasAssociatedPropertyNamed(methodSymbol, "Value");
+		}
+
+		private static bool IsImpureThreadLocalMember(ISymbol symbol)
+		{
+			if (symbol is IPropertySymbol propertySymbol)
+			{
+				return string.Equals(propertySymbol.Name, "Value", StringComparison.Ordinal);
+			}
+
+			if (symbol is not IMethodSymbol methodSymbol ||
+				methodSymbol.IsImplicitlyDeclared)
+			{
+				return false;
+			}
+
+			return methodSymbol.MethodKind == MethodKind.Constructor ||
+				HasAssociatedPropertyNamed(methodSymbol, "Value");
+		}
+
+		private static bool IsImpureLazyInitializerMember(ISymbol symbol)
+		{
+			return symbol is IMethodSymbol methodSymbol &&
+				!methodSymbol.IsImplicitlyDeclared &&
+				IsOrdinaryMethodNamed(methodSymbol, "EnsureInitialized");
+		}
+
+		private static bool IsImpureChannelFactoryMember(ISymbol symbol)
+		{
+			return symbol is IMethodSymbol methodSymbol &&
+				!methodSymbol.IsImplicitlyDeclared &&
+				IsOrdinaryMethodNamed(methodSymbol, "CreateUnbounded");
+		}
+
+		private static bool IsImpureChannelReaderMember(ISymbol symbol)
+		{
+			return symbol is IMethodSymbol methodSymbol &&
+				!methodSymbol.IsImplicitlyDeclared &&
+				IsOrdinaryMethodNamed(methodSymbol, "ReadAsync");
+		}
+
+		private static bool IsImpureChannelWriterMember(ISymbol symbol)
+		{
+			return symbol is IMethodSymbol methodSymbol &&
+				!methodSymbol.IsImplicitlyDeclared &&
+				IsOrdinaryMethodNamed(methodSymbol, "WriteAsync");
 		}
 
 		private static bool IsXmlLinqSemanticImpure(ISymbol symbol)
@@ -839,6 +934,12 @@ namespace PurelySharp.Analyzer.Engine
 		{
 			return methodSymbol.AssociatedSymbol is IPropertySymbol associatedProperty &&
 				associatedProperty.IsStatic &&
+				string.Equals(associatedProperty.Name, propertyName, StringComparison.Ordinal);
+		}
+
+		private static bool HasAssociatedPropertyNamed(IMethodSymbol methodSymbol, string propertyName)
+		{
+			return methodSymbol.AssociatedSymbol is IPropertySymbol associatedProperty &&
 				string.Equals(associatedProperty.Name, propertyName, StringComparison.Ordinal);
 		}
 

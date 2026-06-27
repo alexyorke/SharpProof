@@ -28,6 +28,64 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task CancellationTokenRegister_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.Threading;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public CancellationTokenRegistration {|PS0002:TestMethod|}(CancellationToken token)
+    {
+        return token.Register(() => { });
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task CancellationTokenThrowIfCancellationRequested_Diagnostic()
+        {
+            var test = @"
+using System.Threading;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task CancellationTokenSourceCancel_Diagnostic()
+        {
+            var test = @"
+using System.Threading;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(CancellationTokenSource source)
+    {
+        source.Cancel();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task TaskIsCompleted_Diagnostic()
         {
             var test = @"

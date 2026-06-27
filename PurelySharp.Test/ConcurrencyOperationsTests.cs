@@ -187,6 +187,63 @@ public class TestClass
         }
 
         [Test]
+        public async Task ThreadLocalValueRead_Diagnostic()
+        {
+            var test = @"
+using System.Threading;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(ThreadLocal<int> state)
+    {
+        return state.Value;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SemaphoreConstructor_Diagnostic()
+        {
+            var test = @"
+using System.Threading;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Semaphore {|PS0002:TestMethod|}()
+    {
+        return new Semaphore(0, 1);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task MutexReleaseMutex_Diagnostic()
+        {
+            var test = @"
+using System.Threading;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(Mutex mutex)
+    {
+        mutex.ReleaseMutex();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task LazyConstructor_Diagnostic()
         {
             var test = @"
@@ -206,6 +263,26 @@ public class TestClass
         }
 
         [Test]
+        public async Task LazyInitializerEnsureInitialized_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.Threading;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(ref string value)
+    {
+        return LazyInitializer.EnsureInitialized(ref value, () => ""ready"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ChannelCreateUnbounded_Diagnostic()
         {
             var test = @"
@@ -218,6 +295,48 @@ public class TestClass
     public Channel<int> {|PS0002:TestMethod|}()
     {
         return Channel.CreateUnbounded<int>();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ChannelReaderReadAsync_Diagnostic()
+        {
+            var test = @"
+using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ValueTask<int> {|PS0002:TestMethod|}(ChannelReader<int> reader, CancellationToken token)
+    {
+        return reader.ReadAsync(token);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ChannelWriterWriteAsync_Diagnostic()
+        {
+            var test = @"
+using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ValueTask {|PS0002:TestMethod|}(ChannelWriter<int> writer, CancellationToken token)
+    {
+        return writer.WriteAsync(1, token);
     }
 }";
 
