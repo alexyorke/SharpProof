@@ -68,14 +68,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 context.EnforcePureAttributeSymbol,
                 context.PureAttributeSymbol);
             var getterSymbol = propertySymbol.GetMethod;
-            GeneratedPurityCatalog.PurityEntry generatedPurity = default;
-            var hasTrustedGeneratedPurity = getterSymbol != null &&
-                getterSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
-                    getterSymbol.OriginalDefinition,
-                    context.SemanticModel.Compilation,
-                    out generatedPurity) &&
-                generatedPurity.IsDefinitive;
+            var hasTrustedGeneratedPurity = PurityAnalysisEngine.TryGetTrustedDefinitiveGeneratedPurity(
+                getterSymbol,
+                context.SemanticModel.Compilation,
+                out var generatedPurity);
             var allowsKnownPureFallback = !hasTrustedGeneratedPurity;
             var requiresDispatchCheck = getterSymbol != null &&
                 IsPotentiallyDispatchedProperty(propertySymbol, context.SemanticModel.Compilation);
@@ -120,7 +116,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (!requiresDispatchCheck &&
                 getterSymbol != null &&
-                getterSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
+                PurityAnalysisEngine.IsMetadataSymbol(getterSymbol) &&
                 !hasTrustedGeneratedPurity &&
                 string.Equals(GetCatalogHitCategory(propertySymbol), "reflection_environment_source", StringComparison.Ordinal))
             {

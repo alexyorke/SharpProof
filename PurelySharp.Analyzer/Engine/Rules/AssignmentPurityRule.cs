@@ -230,13 +230,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IOperation operation,
             PurityAnalysisContext context)
         {
-            GeneratedPurityCatalog.PurityEntry generatedPurity = default;
-            var hasTrustedGeneratedPurity = operatorMethod.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
-                    operatorMethod.OriginalDefinition,
-                    context.SemanticModel.Compilation,
-                    out generatedPurity) &&
-                generatedPurity.IsDefinitive;
+            var hasTrustedGeneratedPurity = PurityAnalysisEngine.TryGetTrustedDefinitiveGeneratedPurity(
+                operatorMethod,
+                context.SemanticModel.Compilation,
+                out var generatedPurity);
 
             if ((!hasTrustedGeneratedPurity &&
                 PurityAnalysisEngine.IsKnownPureBCLMember(operatorMethod, context.SemanticModel.Compilation)) ||

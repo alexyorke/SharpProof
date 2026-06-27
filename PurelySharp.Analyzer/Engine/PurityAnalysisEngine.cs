@@ -1400,19 +1400,13 @@ namespace PurelySharp.Analyzer.Engine
                                     continue;
                                 }
 
-                                var knownImpureSource = GetKnownImpureMemberSource(targetMethod);
-                                var hasConfiguredKnownImpure = string.Equals(
-                                    knownImpureSource,
-                                    "config_known_impure",
-                                    StringComparison.Ordinal);
-                                GeneratedPurityCatalog.PurityEntry postCfgGeneratedPurity = default;
-                                var hasTrustedGeneratedPurityForInvocation = targetMethod.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                                    !hasConfiguredKnownImpure &&
-                                    TryGetTrustedGeneratedPurity(
-                                        targetMethod,
-                                        semanticModel.Compilation,
-                                        out postCfgGeneratedPurity) &&
-                                    postCfgGeneratedPurity.IsDefinitive;
+                                var invocationMetadataPurity = GetTrustedMethodPurityMetadata(
+                                    targetMethod,
+                                    semanticModel.Compilation);
+                                var knownImpureSource = invocationMetadataPurity.KnownImpureMemberSource;
+                                var hasConfiguredKnownImpure = invocationMetadataPurity.HasConfiguredKnownImpureMember;
+                                var postCfgGeneratedPurity = invocationMetadataPurity.GeneratedPurity;
+                                var hasTrustedGeneratedPurityForInvocation = invocationMetadataPurity.HasTrustedGeneratedPurity;
 
                                 if (hasConfiguredKnownImpure)
                                 {
@@ -2783,13 +2777,10 @@ namespace PurelySharp.Analyzer.Engine
                     }
 
 
-                    GeneratedPurityCatalog.PurityEntry generatedPurity = default;
-                    var hasTrustedGeneratedPurity = operatorMethod.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                        TryGetTrustedGeneratedPurity(
-                            operatorMethod.OriginalDefinition,
-                            context.SemanticModel.Compilation,
-                            out generatedPurity) &&
-                        generatedPurity.IsDefinitive;
+                    var hasTrustedGeneratedPurity = TryGetTrustedDefinitiveGeneratedPurity(
+                        operatorMethod,
+                        context.SemanticModel.Compilation,
+                        out var generatedPurity);
 
                     if (hasTrustedGeneratedPurity)
 				{

@@ -4087,7 +4087,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     }
                 } &&
                 (propertyName == null || candidatePropertyName == propertyName) &&
-                candidateGetterSymbol.Locations.FirstOrDefault()?.IsInMetadata == true)
+                PurityAnalysisEngine.IsMetadataSymbol(candidateGetterSymbol))
             {
                 containingType = candidateContainingType;
                 getterSymbol = candidateGetterSymbol;
@@ -4103,8 +4103,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IMethodSymbol getterSymbol,
             PurityAnalysisContext context)
         {
-            return PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
-                getterSymbol.OriginalDefinition,
+            return PurityAnalysisEngine.TryGetTrustedDefinitiveGeneratedPurity(
+                getterSymbol,
                 context.SemanticModel.Compilation,
                 out var generatedPurity) &&
                 generatedPurity.IsPure;

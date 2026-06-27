@@ -66,13 +66,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (fieldSymbol.IsStatic)
             {
-                GeneratedPurityCatalog.PurityEntry generatedPurity = default;
-                var hasTrustedGeneratedFieldPurity = fieldSymbol.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                    PurityAnalysisEngine.TryGetTrustedGeneratedFieldPurity(
-                        fieldSymbol.OriginalDefinition,
-                        context.SemanticModel.Compilation,
-                        out generatedPurity) &&
-                    generatedPurity.IsDefinitive;
+                var hasTrustedGeneratedFieldPurity = PurityAnalysisEngine.TryGetTrustedDefinitiveGeneratedFieldPurity(
+                    fieldSymbol,
+                    context.SemanticModel.Compilation,
+                    out var generatedPurity);
 
                 var staticCtorResult = PurityAnalysisEngine.CheckStaticConstructorPurity(fieldSymbol.ContainingType, context, currentState);
                 if (!staticCtorResult.IsPure)

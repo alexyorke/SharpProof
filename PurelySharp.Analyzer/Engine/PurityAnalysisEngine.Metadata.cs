@@ -49,6 +49,29 @@ namespace PurelySharp.Analyzer.Engine
             return GeneratedPurityCatalog.Current.TryGetPurity(methodSymbol, compilation, out purity);
         }
 
+        internal static bool IsMetadataSymbol(ISymbol? symbol)
+        {
+            return symbol?.Locations.FirstOrDefault()?.IsInMetadata == true;
+        }
+
+        internal static bool TryGetTrustedDefinitiveGeneratedPurity(
+            IMethodSymbol? methodSymbol,
+            Compilation compilation,
+            out GeneratedPurityCatalog.PurityEntry purity)
+        {
+            purity = default;
+
+            if (methodSymbol == null)
+            {
+                return false;
+            }
+
+            var originalDefinition = methodSymbol.OriginalDefinition;
+            return IsMetadataSymbol(methodSymbol) &&
+                TryGetTrustedGeneratedPurity(originalDefinition, compilation, out purity) &&
+                purity.IsDefinitive;
+        }
+
         internal readonly struct TrustedMethodPurityMetadata
         {
             public TrustedMethodPurityMetadata(
@@ -86,10 +109,8 @@ namespace PurelySharp.Analyzer.Engine
                 StringComparison.Ordinal);
 
             GeneratedPurityCatalog.PurityEntry generatedPurity = default;
-            var hasTrustedGeneratedPurity = originalDefinition.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                !hasConfiguredKnownImpureMember &&
-                TryGetTrustedGeneratedPurity(originalDefinition, compilation, out generatedPurity);
-            hasTrustedGeneratedPurity = hasTrustedGeneratedPurity && generatedPurity.IsDefinitive;
+            var hasTrustedGeneratedPurity = !hasConfiguredKnownImpureMember &&
+                TryGetTrustedDefinitiveGeneratedPurity(originalDefinition, compilation, out generatedPurity);
 
             return new TrustedMethodPurityMetadata(
                 knownImpureMemberSource,
@@ -105,12 +126,29 @@ namespace PurelySharp.Analyzer.Engine
             return GeneratedPurityCatalog.Current.TryGetFieldPurity(fieldSymbol, compilation, out purity);
         }
 
+        internal static bool TryGetTrustedDefinitiveGeneratedFieldPurity(
+            IFieldSymbol? fieldSymbol,
+            Compilation compilation,
+            out GeneratedPurityCatalog.PurityEntry purity)
+        {
+            purity = default;
+
+            if (fieldSymbol == null)
+            {
+                return false;
+            }
+
+            var originalDefinition = fieldSymbol.OriginalDefinition;
+            return IsMetadataSymbol(fieldSymbol) &&
+                TryGetTrustedGeneratedFieldPurity(originalDefinition, compilation, out purity) &&
+                purity.IsDefinitive;
+        }
+
         internal static bool HasTrustedGeneratedPurityCoverage(
             IMethodSymbol methodSymbol,
             Compilation compilation)
         {
-            return TryGetTrustedGeneratedPurity(methodSymbol.OriginalDefinition, compilation, out var purity) &&
-                purity.IsDefinitive;
+            return TryGetTrustedDefinitiveGeneratedPurity(methodSymbol, compilation, out _);
         }
 
         internal static bool IsTrustedGeneratedFreshOwnedArrayReturningMember(
