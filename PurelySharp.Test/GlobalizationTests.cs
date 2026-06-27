@@ -1704,9 +1704,29 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToSingle_String_CurrentCulture_NoDiagnostic()
+        public async Task ConvertToSingle_String_CurrentCulture_Diagnostic()
         {
             var test = @"
+#nullable enable
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public float {|PS0002:TestMethod|}(string value)
+    {
+        return Convert.ToSingle(value);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConvertToSingle_String_UsesCurrentCultureSemanticSource()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 #nullable enable
 using System;
 using PurelySharp.Attributes;
@@ -1718,9 +1738,14 @@ public class TestClass
     {
         return Convert.ToSingle(value);
     }
-}";
+}");
 
-            await VerifyCS.VerifyAnalyzerAsync(test);
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("current_culture_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Convert.ToSingle"));
         }
 
         [Test]

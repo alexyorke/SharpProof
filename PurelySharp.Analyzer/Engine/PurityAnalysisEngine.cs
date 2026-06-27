@@ -4472,7 +4472,7 @@ namespace PurelySharp.Analyzer.Engine
             var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
             if (targetMethod == null ||
                 targetMethod.ContainingType?.ToDisplayString() != "System.Convert" ||
-                targetMethod.Name != "ToDouble" ||
+                (targetMethod.Name != "ToDouble" && targetMethod.Name != "ToSingle") ||
                 targetMethod.Parameters.Length != 1 ||
                 invocationOperation.Arguments.Length != 1)
             {
