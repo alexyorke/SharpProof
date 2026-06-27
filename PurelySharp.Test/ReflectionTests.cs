@@ -124,6 +124,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task TypeGetMethods_Diagnostic()
+        {
+            var test = @"
+using System.Reflection;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public MethodInfo[] {|PS0002:TestMethod|}(System.Type type)
+    {
+        return type.GetMethods();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task TypeInfoGetMethods_Diagnostic()
         {
             var test = @"
@@ -315,6 +334,25 @@ public class TestClass
     public string? {|PS0002:TestMethod|}(System.Type type)
     {
         return type.FullName;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task AssemblyIsDynamic_Diagnostic()
+        {
+            var test = @"
+using System.Reflection;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool {|PS0002:TestMethod|}(Assembly assembly)
+    {
+        return assembly.IsDynamic;
     }
 }";
 

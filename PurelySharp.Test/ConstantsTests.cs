@@ -3411,6 +3411,51 @@ public static class ReflectionCtorCatalogSamples
         }
 
         [Test]
+        public void TypeReflectionSensitiveInvocationMembers_AreSourcedFromReflectionFallback_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Type.GetConstructor(System.Type[])",
+                "System.Type.GetConstructors()",
+                "System.Type.GetConstructors(System.Reflection.BindingFlags)",
+                "System.Type.GetEvent(string)",
+                "System.Type.GetEvent(string, System.Reflection.BindingFlags)",
+                "System.Type.GetEvents()",
+                "System.Type.GetEvents(System.Reflection.BindingFlags)",
+                "System.Type.GetField(string)",
+                "System.Type.GetField(string, System.Reflection.BindingFlags)",
+                "System.Type.GetFields()",
+                "System.Type.GetFields(System.Reflection.BindingFlags)",
+                "System.Type.GetInterface(string)",
+                "System.Type.GetInterface(string, bool)",
+                "System.Type.GetInterfaces()",
+                "System.Type.GetMember(string)",
+                "System.Type.GetMember(string, System.Reflection.BindingFlags)",
+                "System.Type.GetMember(string, System.Reflection.MemberTypes, System.Reflection.BindingFlags)",
+                "System.Type.GetMembers()",
+                "System.Type.GetMembers(System.Reflection.BindingFlags)",
+                "System.Type.GetMethod(string)",
+                "System.Type.GetMethod(string, System.Type[])",
+                "System.Type.GetMethod(string, System.Reflection.BindingFlags)",
+                "System.Type.GetMethods()",
+                "System.Type.GetMethods(System.Reflection.BindingFlags)",
+                "System.Type.GetNestedType(string)",
+                "System.Type.GetNestedType(string, System.Reflection.BindingFlags)",
+                "System.Type.GetNestedTypes()",
+                "System.Type.GetNestedTypes(System.Reflection.BindingFlags)",
+                "System.Type.GetProperty(string)",
+                "System.Type.GetProperty(string, System.Reflection.BindingFlags)",
+                "System.Type.GetProperties()",
+                "System.Type.GetProperties(System.Reflection.BindingFlags)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void InterlockedAndVolatileMembers_AreSourcedFromSemanticRules_NotStaticCatalogs()
         {
             var members = new[]
@@ -3520,6 +3565,17 @@ public static class TypeMetadataCatalogSignatureSamples
         {
             var members = new[]
             {
+                "System.Reflection.Assembly.CodeBase.get",
+                "System.Reflection.Assembly.EntryPoint.get",
+                "System.Reflection.Assembly.EscapedCodeBase.get",
+                "System.Reflection.Assembly.ExportedTypes.get",
+                "System.Reflection.Assembly.GlobalAssemblyCache.get",
+                "System.Reflection.Assembly.HostContext.get",
+                "System.Reflection.Assembly.IsDynamic.get",
+                "System.Reflection.Assembly.IsFullyTrusted.get",
+                "System.Reflection.Assembly.Modules.get",
+                "System.Reflection.Assembly.ReflectionOnly.get",
+                "System.Reflection.Assembly.SecurityRuleSet.get",
                 "System.Type.DefaultBinder.get",
                 "System.Type.GenericParameterAttributes.get",
                 "System.Type.GenericParameterPosition.get",
