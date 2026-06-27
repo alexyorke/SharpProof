@@ -876,6 +876,10 @@ internal static class PurityClassificationEngine
         {
             effectVisibilityClassification = "none";
         }
+        else if (HasPureRuntimeTypeMetadataWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "none";
+        }
         else if (HasPureTypeIdentityWrapperPattern(summary))
         {
             effectVisibilityClassification = "none";
@@ -1043,6 +1047,38 @@ internal static class PurityClassificationEngine
             "System.Type.get_Attributes()" => CallSitesMatch(
                 callSites,
                 ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true)),
+            _ => false,
+        };
+    }
+
+    private static bool HasPureRuntimeTypeMetadataWrapperPattern(MethodEffectSummary summary)
+    {
+        var callSites = EnumerateCallSites(summary).ToArray();
+        return summary.Symbol switch
+        {
+            "System.RuntimeType.get_ContainsGenericParameters()" =>
+                summary.Fields.Length == 0 &&
+                CallsOnly(summary, "calls_method", "virtual_call") &&
+                summary.RootCandidates.All(static root => string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)) &&
+                CallSitesMatch(
+                    callSites,
+                    ("System.RuntimeTypeHandle.ContainsGenericVariables()->bool", false),
+                    ("System.Type.GetRootElementType()->System.Type", false),
+                    ("System.Type.get_TypeHandle()->System.RuntimeTypeHandle", true)),
+            "System.RuntimeType.get_IsEnum()" =>
+                CallsOnly(summary, "calls_method", "reads_instance_field", "virtual_call") &&
+                summary.RootCandidates.All(static root => string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)) &&
+                summary.Fields.Length == 1 &&
+                string.Equals(summary.Fields[0], "System.Runtime.CompilerServices.MethodTable.ParentMethodTable", StringComparison.Ordinal) &&
+                CallSitesMatch(
+                    callSites,
+                    ("System.GC.KeepAlive(object)->void", false),
+                    ("System.Runtime.CompilerServices.TypeHandle.AsMethodTable()->System.Runtime.CompilerServices.MethodTable*", false),
+                    ("System.Runtime.CompilerServices.TypeHandle.TypeHandleOf()->System.Runtime.CompilerServices.TypeHandle", false),
+                    ("System.Runtime.CompilerServices.TypeHandle.get_IsTypeDesc()->bool", false),
+                    ("System.RuntimeType.GetNativeTypeHandle()->System.Runtime.CompilerServices.TypeHandle", false),
+                    ("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)->System.Type", false),
+                    ("System.Type.IsSubclassOf(System.Type)->bool", true)),
             _ => false,
         };
     }

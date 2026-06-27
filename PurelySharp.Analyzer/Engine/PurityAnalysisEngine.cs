@@ -3011,6 +3011,7 @@ namespace PurelySharp.Analyzer.Engine
         internal static bool TryResolveKnownConcreteType(
             IOperation? operation,
             PurityAnalysisState currentState,
+            Compilation? compilation,
             out INamedTypeSymbol concreteType)
         {
             operation = SkipImplicitConversions(operation);
@@ -3022,7 +3023,13 @@ namespace PurelySharp.Analyzer.Engine
 
             if (operation is IConversionOperation conversionOperation)
             {
-                return TryResolveKnownConcreteType(conversionOperation.Operand, currentState, out concreteType);
+                return TryResolveKnownConcreteType(conversionOperation.Operand, currentState, compilation, out concreteType);
+            }
+
+            if (operation != null &&
+                TryResolveKnownSystemTypeRuntimeReceiver(operation, compilation, out concreteType))
+            {
+                return true;
             }
 
             if (operation is IObjectCreationOperation objectCreationOperation &&
@@ -3052,8 +3059,8 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             if (operation is IConditionalOperation conditionalOperation &&
-                TryResolveKnownConcreteType(conditionalOperation.WhenTrue, currentState, out var whenTrueType) &&
-                TryResolveKnownConcreteType(conditionalOperation.WhenFalse, currentState, out var whenFalseType) &&
+                TryResolveKnownConcreteType(conditionalOperation.WhenTrue, currentState, compilation, out var whenTrueType) &&
+                TryResolveKnownConcreteType(conditionalOperation.WhenFalse, currentState, compilation, out var whenFalseType) &&
                 SymbolEqualityComparer.Default.Equals(whenTrueType, whenFalseType))
             {
                 concreteType = whenTrueType;
@@ -3061,8 +3068,8 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             if (operation is ICoalesceOperation coalesceOperation &&
-                TryResolveKnownConcreteType(coalesceOperation.Value, currentState, out var coalesceValueType) &&
-                TryResolveKnownConcreteType(coalesceOperation.WhenNull, currentState, out var coalesceWhenNullType) &&
+                TryResolveKnownConcreteType(coalesceOperation.Value, currentState, compilation, out var coalesceValueType) &&
+                TryResolveKnownConcreteType(coalesceOperation.WhenNull, currentState, compilation, out var coalesceWhenNullType) &&
                 SymbolEqualityComparer.Default.Equals(coalesceValueType, coalesceWhenNullType))
             {
                 concreteType = coalesceValueType;
@@ -3071,6 +3078,91 @@ namespace PurelySharp.Analyzer.Engine
 
             concreteType = null!;
             return false;
+        }
+
+        internal static bool TryResolveKnownConcreteType(
+            IOperation? operation,
+            PurityAnalysisState currentState,
+            out INamedTypeSymbol concreteType)
+        {
+            return TryResolveKnownConcreteType(operation, currentState, compilation: null, out concreteType);
+        }
+
+        private static bool TryResolveKnownSystemTypeRuntimeReceiver(
+            IOperation operation,
+            Compilation? compilation,
+            out INamedTypeSymbol concreteType)
+        {
+            concreteType = null!;
+
+            if (operation is ITypeOfOperation)
+            {
+                return TryGetRuntimeTypeSymbol(operation.Type, compilation, out concreteType);
+            }
+
+            if (operation is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod is not { } targetMethod)
+            {
+                return false;
+            }
+
+            if (IsObjectGetTypeMethod(targetMethod) || IsTypeGetTypeFromHandleMethod(targetMethod))
+            {
+                return TryGetRuntimeTypeSymbol(invocationOperation.Type, compilation, out concreteType);
+            }
+
+            return false;
+        }
+
+        private static bool TryGetRuntimeTypeSymbol(
+            ITypeSymbol? typeSymbol,
+            Compilation? compilation,
+            out INamedTypeSymbol concreteType)
+        {
+            concreteType = null!;
+
+            if (!IsSystemTypeSymbol(typeSymbol))
+            {
+                return false;
+            }
+
+            if (compilation?.GetTypeByMetadataName("System.RuntimeType") is INamedTypeSymbol runtimeTypeFromCompilation)
+            {
+                concreteType = runtimeTypeFromCompilation;
+                return true;
+            }
+
+            var containingAssembly = typeSymbol.ContainingAssembly;
+            if (containingAssembly?.GetTypeByMetadataName("System.RuntimeType") is not INamedTypeSymbol runtimeType)
+            {
+                return false;
+            }
+
+            concreteType = runtimeType;
+            return true;
+        }
+
+        private static bool IsObjectGetTypeMethod(IMethodSymbol methodSymbol)
+        {
+            return !methodSymbol.IsStatic &&
+                methodSymbol.Parameters.Length == 0 &&
+                methodSymbol.Name == nameof(object.GetType) &&
+                methodSymbol.ContainingType?.SpecialType == SpecialType.System_Object;
+        }
+
+        private static bool IsTypeGetTypeFromHandleMethod(IMethodSymbol methodSymbol)
+        {
+            return methodSymbol.IsStatic &&
+                methodSymbol.Parameters.Length == 1 &&
+                methodSymbol.Name == nameof(Type.GetTypeFromHandle) &&
+                IsSystemTypeSymbol(methodSymbol.ContainingType) &&
+                methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_RuntimeTypeHandle;
+        }
+
+        private static bool IsSystemTypeSymbol(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol != null &&
+                string.Equals(typeSymbol.ToDisplayString(), "System.Type", StringComparison.Ordinal);
         }
 
         private static bool IsDefinitelyNullValue(
@@ -4049,7 +4141,7 @@ namespace PurelySharp.Analyzer.Engine
                     {
                         foreach (var assignedLocalSymbol in writtenLocalSymbols)
                         {
-                            if (TryResolveKnownConcreteType(valueOperation, currentState, out var concreteType))
+                            if (TryResolveKnownConcreteType(valueOperation, currentState, context.SemanticModel.Compilation, out var concreteType))
                             {
                                 nextState = nextState.WithLocalConcreteType(assignedLocalSymbol, concreteType);
                             }
@@ -4117,7 +4209,7 @@ namespace PurelySharp.Analyzer.Engine
 
                     foreach (var assignedLocalSymbol in writtenLocalSymbols)
                     {
-                        if (TryResolveKnownConcreteType(valueOperation, currentState, out var concreteType))
+                        if (TryResolveKnownConcreteType(valueOperation, currentState, context.SemanticModel.Compilation, out var concreteType))
                         {
                             nextState = nextState.WithLocalConcreteType(assignedLocalSymbol, concreteType);
                         }
@@ -4213,7 +4305,7 @@ namespace PurelySharp.Analyzer.Engine
                         nextState = nextState.WithFlowCaptureTarget(flowCaptureOperation.Id, valueTargets.Value);
                     }
 
-                    if (TryResolveKnownConcreteType(flowCaptureOperation.Value, currentState, out var concreteType))
+                    if (TryResolveKnownConcreteType(flowCaptureOperation.Value, currentState, context.SemanticModel.Compilation, out var concreteType))
                     {
                         nextState = nextState.WithFlowCaptureConcreteType(flowCaptureOperation.Id, concreteType);
                     }
@@ -4239,7 +4331,7 @@ namespace PurelySharp.Analyzer.Engine
                                 var initializerValue = declarator.Initializer.Value;
                                 ILocalSymbol declaredSymbol = declarator.Symbol;
 
-                                if (TryResolveKnownConcreteType(initializerValue, nextState, out var concreteType))
+                                if (TryResolveKnownConcreteType(initializerValue, nextState, context.SemanticModel.Compilation, out var concreteType))
                                 {
                                     nextState = nextState.WithLocalConcreteType(declaredSymbol, concreteType);
                                 }

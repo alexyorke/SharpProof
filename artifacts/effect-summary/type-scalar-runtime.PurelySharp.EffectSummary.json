@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-27T16:25:45.9476094+00:00",
+  "GeneratedAtUtc": "2026-06-27T16:32:00.6122042+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -8,8 +8,143 @@
       "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
       "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
       "MethodCount": 34519,
-      "EmittedMethodCount": 38,
+      "EmittedMethodCount": 50,
       "Methods": [
+        {
+          "Symbol": "System.RuntimeType.get_IsEnum()",
+          "ExactSymbolKey": "System.RuntimeType.get_IsEnum()-\u003Ebool",
+          "MetadataToken": "0x060007A2",
+          "RelativeVirtualAddress": 6845312,
+          "MethodBodySha256": "1cf6dd9706a9f3d038470d5dcc658d09a529c82624997b9be936fe129be263f7",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060007A2|il:1cf6dd9706a9f3d038470d5dcc658d09a529c82624997b9be936fe129be263f7",
+          "Effects": [
+            "calls_method",
+            "reads_instance_field",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.GC.KeepAlive(object)-\u003Evoid",
+            "System.Runtime.CompilerServices.TypeHandle.AsMethodTable()-\u003ESystem.Runtime.CompilerServices.MethodTable*",
+            "System.Runtime.CompilerServices.TypeHandle.TypeHandleOf()-\u003ESystem.Runtime.CompilerServices.TypeHandle",
+            "System.Runtime.CompilerServices.TypeHandle.get_IsTypeDesc()-\u003Ebool",
+            "System.RuntimeType.GetNativeTypeHandle()-\u003ESystem.Runtime.CompilerServices.TypeHandle",
+            "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+            "System.Type.IsSubclassOf(System.Type)-\u003Ebool"
+          ],
+          "Fields": [
+            "System.Runtime.CompilerServices.MethodTable.ParentMethodTable"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.GC.KeepAlive(object)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Runtime.CompilerServices.TypeHandle.AsMethodTable()-\u003ESystem.Runtime.CompilerServices.MethodTable*",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Runtime.CompilerServices.TypeHandle.TypeHandleOf()-\u003ESystem.Runtime.CompilerServices.TypeHandle",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Runtime.CompilerServices.TypeHandle.get_IsTypeDesc()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.RuntimeType.GetNativeTypeHandle()-\u003ESystem.Runtime.CompilerServices.TypeHandle",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.IsSubclassOf(System.Type)-\u003Ebool",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.RuntimeType.get_ContainsGenericParameters()",
+          "ExactSymbolKey": "System.RuntimeType.get_ContainsGenericParameters()-\u003Ebool",
+          "MetadataToken": "0x060007B0",
+          "RelativeVirtualAddress": 6846276,
+          "MethodBodySha256": "a9bc513bd8da4131973a41a9640d263758d93deebd34c7ba2301250e815aa833",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060007B0|il:a9bc513bd8da4131973a41a9640d263758d93deebd34c7ba2301250e815aa833",
+          "Effects": [
+            "calls_method",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.RuntimeTypeHandle.ContainsGenericVariables()-\u003Ebool",
+            "System.Type.GetRootElementType()-\u003ESystem.Type",
+            "System.Type.get_TypeHandle()-\u003ESystem.RuntimeTypeHandle"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.RuntimeTypeHandle.ContainsGenericVariables()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.GetRootElementType()-\u003ESystem.Type",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.get_TypeHandle()-\u003ESystem.RuntimeTypeHandle",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
         {
           "Symbol": "System.Type.get_IsInterface()",
           "ExactSymbolKey": "System.Type.get_IsInterface()-\u003Ebool",
@@ -1223,6 +1358,449 @@
           }
         },
         {
+          "Symbol": "System.GC.KeepAlive(object)",
+          "ExactSymbolKey": "System.GC.KeepAlive(object)-\u003Evoid",
+          "MetadataToken": "0x0600054E",
+          "RelativeVirtualAddress": 6824508,
+          "MethodBodySha256": "684888c0ebb17f374298b65ee2807526c066094c701bcc7ebbe1c1095f494fc1",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600054E|il:684888c0ebb17f374298b65ee2807526c066094c701bcc7ebbe1c1095f494fc1",
+          "Effects": [],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Runtime.CompilerServices.TypeHandle.AsMethodTable()",
+          "ExactSymbolKey": "System.Runtime.CompilerServices.TypeHandle.AsMethodTable()-\u003ESystem.Runtime.CompilerServices.MethodTable*",
+          "MetadataToken": "0x06006461",
+          "RelativeVirtualAddress": 7899044,
+          "MethodBodySha256": "771a3deef76c83d6ca0e5e2e9fd0f1ffb70be2c12ccb044abc0f28869e9c40b9",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06006461|il:771a3deef76c83d6ca0e5e2e9fd0f1ffb70be2c12ccb044abc0f28869e9c40b9",
+          "Effects": [
+            "reads_instance_field"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Runtime.CompilerServices.TypeHandle.m_asTAddr"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Runtime.CompilerServices.TypeHandle.TypeHandleOf()",
+          "ExactSymbolKey": "System.Runtime.CompilerServices.TypeHandle.TypeHandleOf()-\u003ESystem.Runtime.CompilerServices.TypeHandle",
+          "MetadataToken": "0x06006462",
+          "RelativeVirtualAddress": 7899052,
+          "MethodBodySha256": "5d9aa7b4af562ba8444effbd751dc11fda52449d401e70ff77a774e3f37c23dc",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06006462|il:5d9aa7b4af562ba8444effbd751dc11fda52449d401e70ff77a774e3f37c23dc",
+          "Effects": [
+            "allocates_object",
+            "calls_method",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Runtime.CompilerServices.TypeHandle..ctor(void*)-\u003Evoid",
+            "System.RuntimeTypeHandle.ToIntPtr(System.RuntimeTypeHandle)-\u003Enint",
+            "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+            "System.Type.get_TypeHandle()-\u003ESystem.RuntimeTypeHandle"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Runtime.CompilerServices.TypeHandle..ctor(void*)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.RuntimeTypeHandle.ToIntPtr(System.RuntimeTypeHandle)-\u003Enint",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.get_TypeHandle()-\u003ESystem.RuntimeTypeHandle",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Runtime.CompilerServices.TypeHandle.get_IsTypeDesc()",
+          "ExactSymbolKey": "System.Runtime.CompilerServices.TypeHandle.get_IsTypeDesc()-\u003Ebool",
+          "MetadataToken": "0x06006460",
+          "RelativeVirtualAddress": 7899028,
+          "MethodBodySha256": "8389348ee621e781ee86769ecc1fcff6cd0acc9879c9a8c89c47f089d8c06b9a",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06006460|il:8389348ee621e781ee86769ecc1fcff6cd0acc9879c9a8c89c47f089d8c06b9a",
+          "Effects": [
+            "reads_instance_field"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Runtime.CompilerServices.TypeHandle.m_asTAddr"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.RuntimeType.GetNativeTypeHandle()",
+          "ExactSymbolKey": "System.RuntimeType.GetNativeTypeHandle()-\u003ESystem.Runtime.CompilerServices.TypeHandle",
+          "MetadataToken": "0x06000770",
+          "RelativeVirtualAddress": 6840628,
+          "MethodBodySha256": "4c87adb8cb9281dbb5d5eaf2375092fb39a2cacf0d643839b49acdda908a5576",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000770|il:4c87adb8cb9281dbb5d5eaf2375092fb39a2cacf0d643839b49acdda908a5576",
+          "Effects": [
+            "allocates_object",
+            "reads_instance_field"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Runtime.CompilerServices.TypeHandle..ctor(void*)-\u003Evoid"
+          ],
+          "Fields": [
+            "System.RuntimeType.m_handle"
+          ],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Runtime.CompilerServices.TypeHandle..ctor(void*)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
+          }
+        },
+        {
+          "Symbol": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)",
+          "ExactSymbolKey": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+          "MetadataToken": "0x0600096D",
+          "RelativeVirtualAddress": 6879252,
+          "MethodBodySha256": "b2acfe61d667747d959e76c932b715aa36165cc356b1eddc87687a6e295e5310",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600096D|il:b2acfe61d667747d959e76c932b715aa36165cc356b1eddc87687a6e295e5310",
+          "Effects": [
+            "reads_instance_field"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.RuntimeTypeHandle.m_type"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.Type.IsSubclassOf(System.Type)",
+          "ExactSymbolKey": "System.Type.IsSubclassOf(System.Type)-\u003Ebool",
+          "MetadataToken": "0x06000A30",
+          "RelativeVirtualAddress": 6884436,
+          "MethodBodySha256": "9949493f852019a86f6c5c86196e3b91becb89acaa6ca8e853245f14ff9bd432",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000A30|il:9949493f852019a86f6c5c86196e3b91becb89acaa6ca8e853245f14ff9bd432",
+          "Effects": [
+            "calls_method",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Type.get_BaseType()-\u003ESystem.Type",
+            "System.Type.op_Equality(System.Type, System.Type)-\u003Ebool",
+            "System.Type.op_Inequality(System.Type, System.Type)-\u003Ebool"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Type.get_BaseType()-\u003ESystem.Type",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.op_Equality(System.Type, System.Type)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.op_Inequality(System.Type, System.Type)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "unknown_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Type.get_BaseType()"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
+          "Symbol": "System.RuntimeTypeHandle.ContainsGenericVariables()",
+          "ExactSymbolKey": "System.RuntimeTypeHandle.ContainsGenericVariables()-\u003Ebool",
+          "MetadataToken": "0x060006B0",
+          "RelativeVirtualAddress": 6835480,
+          "MethodBodySha256": "4ae7fa5eeaeee94a0995f9ea33a4c046a3bbb79ff4d5d8b6cf85e7c266fd56b3",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060006B0|il:4ae7fa5eeaeee94a0995f9ea33a4c046a3bbb79ff4d5d8b6cf85e7c266fd56b3",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.RuntimeTypeHandle.ContainsGenericVariables(System.RuntimeType)-\u003Ebool",
+            "System.RuntimeTypeHandle.GetTypeChecked()-\u003ESystem.RuntimeType"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.RuntimeTypeHandle.ContainsGenericVariables(System.RuntimeType)-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.RuntimeTypeHandle.GetTypeChecked()-\u003ESystem.RuntimeType",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "global_state_read",
+              "global_state_write",
+              "impure_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.RuntimeTypeHandle.ContainsGenericVariables(System.RuntimeType)"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
+          "Symbol": "System.Type.GetRootElementType()",
+          "ExactSymbolKey": "System.Type.GetRootElementType()-\u003ESystem.Type",
+          "MetadataToken": "0x06000A2C",
+          "RelativeVirtualAddress": 6883364,
+          "MethodBodySha256": "b06426db840f7f0f798526e9c18c7aff0e431e5527005c9cf34dd771e1be5282",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000A2C|il:b06426db840f7f0f798526e9c18c7aff0e431e5527005c9cf34dd771e1be5282",
+          "Effects": [
+            "calls_method",
+            "virtual_call"
+          ],
+          "RootCandidates": [
+            "dynamic_dispatch"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.Type.GetElementType()-\u003ESystem.Type",
+            "System.Type.get_HasElementType()-\u003Ebool"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.Type.GetElementType()-\u003ESystem.Type",
+              "UsesDynamicDispatch": true,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Type.get_HasElementType()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "conservative_unknown",
+            "Categories": [
+              "unknown_callee"
+            ],
+            "FirstBlockingCallChain": [
+              "System.Type.GetElementType()"
+            ],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "unknown"
+          }
+        },
+        {
+          "Symbol": "System.Type.get_TypeHandle()",
+          "ExactSymbolKey": "System.Type.get_TypeHandle()-\u003ESystem.RuntimeTypeHandle",
+          "MetadataToken": "0x060009F7",
+          "RelativeVirtualAddress": 6881000,
+          "MethodBodySha256": "e5332934dc42970c8eecee14c5530cabf0edf253ff52050b7f8bef62f9dbe0fa",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060009F7|il:e5332934dc42970c8eecee14c5530cabf0edf253ff52050b7f8bef62f9dbe0fa",
+          "Effects": [
+            "allocates_object",
+            "throws"
+          ],
+          "RootCandidates": [
+            "throw"
+          ],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [
+            "System.NotSupportedException"
+          ],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [
+            {
+              "ExceptionType": "System.NotSupportedException",
+              "SourcePath": "System.Type.get_TypeHandle()"
+            }
+          ],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.NotSupportedException..ctor()-\u003Evoid"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.NotSupportedException..ctor()-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "impure",
+            "Categories": [
+              "throw"
+            ],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": true,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "caller_visible"
+          }
+        },
+        {
           "Symbol": "System.RuntimeTypeHandle.IsInterface(System.RuntimeType)",
           "ExactSymbolKey": "System.RuntimeTypeHandle.IsInterface(System.RuntimeType)-\u003Ebool",
           "MetadataToken": "0x06000690",
@@ -1633,10 +2211,10 @@
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 38,
-    "PureCount": 28,
-    "ImpureCount": 2,
-    "ConservativeUnknownCount": 8,
+    "MethodCount": 50,
+    "PureCount": 36,
+    "ImpureCount": 4,
+    "ConservativeUnknownCount": 10,
     "CatalogComparison": {
       "KnownPureMembers": [],
       "KnownImpureMembers": [],
@@ -1646,6 +2224,26 @@
   "GeneratedPurityCatalog": {
     "SchemaVersion": 2,
     "Entries": [
+      {
+        "Symbol": "System.GC.KeepAlive(object)",
+        "ExactSymbolKey": "System.GC.KeepAlive(object)-\u003Evoid",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600054E|il:684888c0ebb17f374298b65ee2807526c066094c701bcc7ebbe1c1095f494fc1",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x0600054E",
+        "MethodBodySha256": "684888c0ebb17f374298b65ee2807526c066094c701bcc7ebbe1c1095f494fc1",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
       {
         "Symbol": "System.NotSupportedException..ctor(string)",
         "ExactSymbolKey": "System.NotSupportedException..ctor(string)-\u003Evoid",
@@ -1665,6 +2263,152 @@
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "fresh_owned_object_write",
         "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Runtime.CompilerServices.TypeHandle.AsMethodTable()",
+        "ExactSymbolKey": "System.Runtime.CompilerServices.TypeHandle.AsMethodTable()-\u003ESystem.Runtime.CompilerServices.MethodTable*",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06006461|il:771a3deef76c83d6ca0e5e2e9fd0f1ffb70be2c12ccb044abc0f28869e9c40b9",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06006461",
+        "MethodBodySha256": "771a3deef76c83d6ca0e5e2e9fd0f1ffb70be2c12ccb044abc0f28869e9c40b9",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Runtime.CompilerServices.TypeHandle.TypeHandleOf()",
+        "ExactSymbolKey": "System.Runtime.CompilerServices.TypeHandle.TypeHandleOf()-\u003ESystem.Runtime.CompilerServices.TypeHandle",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06006462|il:5d9aa7b4af562ba8444effbd751dc11fda52449d401e70ff77a774e3f37c23dc",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06006462",
+        "MethodBodySha256": "5d9aa7b4af562ba8444effbd751dc11fda52449d401e70ff77a774e3f37c23dc",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.Runtime.CompilerServices.TypeHandle.get_IsTypeDesc()",
+        "ExactSymbolKey": "System.Runtime.CompilerServices.TypeHandle.get_IsTypeDesc()-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06006460|il:8389348ee621e781ee86769ecc1fcff6cd0acc9879c9a8c89c47f089d8c06b9a",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06006460",
+        "MethodBodySha256": "8389348ee621e781ee86769ecc1fcff6cd0acc9879c9a8c89c47f089d8c06b9a",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.RuntimeType.GetNativeTypeHandle()",
+        "ExactSymbolKey": "System.RuntimeType.GetNativeTypeHandle()-\u003ESystem.Runtime.CompilerServices.TypeHandle",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000770|il:4c87adb8cb9281dbb5d5eaf2375092fb39a2cacf0d643839b49acdda908a5576",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06000770",
+        "MethodBodySha256": "4c87adb8cb9281dbb5d5eaf2375092fb39a2cacf0d643839b49acdda908a5576",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
+      },
+      {
+        "Symbol": "System.RuntimeType.get_ContainsGenericParameters()",
+        "ExactSymbolKey": "System.RuntimeType.get_ContainsGenericParameters()-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060007B0|il:a9bc513bd8da4131973a41a9640d263758d93deebd34c7ba2301250e815aa833",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x060007B0",
+        "MethodBodySha256": "a9bc513bd8da4131973a41a9640d263758d93deebd34c7ba2301250e815aa833",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.RuntimeType.get_IsEnum()",
+        "ExactSymbolKey": "System.RuntimeType.get_IsEnum()-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060007A2|il:1cf6dd9706a9f3d038470d5dcc658d09a529c82624997b9be936fe129be263f7",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x060007A2",
+        "MethodBodySha256": "1cf6dd9706a9f3d038470d5dcc658d09a529c82624997b9be936fe129be263f7",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.RuntimeTypeHandle.ContainsGenericVariables()",
+        "ExactSymbolKey": "System.RuntimeTypeHandle.ContainsGenericVariables()-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060006B0|il:4ae7fa5eeaeee94a0995f9ea33a4c046a3bbb79ff4d5d8b6cf85e7c266fd56b3",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x060006B0",
+        "MethodBodySha256": "4ae7fa5eeaeee94a0995f9ea33a4c046a3bbb79ff4d5d8b6cf85e7c266fd56b3",
+        "Classification": "impure",
+        "PrimaryCategory": "global_state_write",
+        "Categories": [
+          "global_state_read",
+          "global_state_write",
+          "impure_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.RuntimeTypeHandle.ContainsGenericVariables(System.RuntimeType)"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
       },
       {
         "Symbol": "System.RuntimeTypeHandle.IsInterface(System.RuntimeType)",
@@ -1740,6 +2484,50 @@
         "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.Type.GetRootElementType()",
+        "ExactSymbolKey": "System.Type.GetRootElementType()-\u003ESystem.Type",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000A2C|il:b06426db840f7f0f798526e9c18c7aff0e431e5527005c9cf34dd771e1be5282",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06000A2C",
+        "MethodBodySha256": "b06426db840f7f0f798526e9c18c7aff0e431e5527005c9cf34dd771e1be5282",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "unknown_callee",
+        "Categories": [
+          "unknown_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Type.GetElementType()"
+        ],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)",
+        "ExactSymbolKey": "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)-\u003ESystem.Type",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600096D|il:b2acfe61d667747d959e76c932b715aa36165cc356b1eddc87687a6e295e5310",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x0600096D",
+        "MethodBodySha256": "b2acfe61d667747d959e76c932b715aa36165cc356b1eddc87687a6e295e5310",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
       },
       {
         "Symbol": "System.Type.IsArrayImpl()",
@@ -1850,6 +2638,30 @@
           "no_il_body"
         ],
         "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.Type.IsSubclassOf(System.Type)",
+        "ExactSymbolKey": "System.Type.IsSubclassOf(System.Type)-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x06000A30|il:9949493f852019a86f6c5c86196e3b91becb89acaa6ca8e853245f14ff9bd432",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x06000A30",
+        "MethodBodySha256": "9949493f852019a86f6c5c86196e3b91becb89acaa6ca8e853245f14ff9bd432",
+        "Classification": "conservative_unknown",
+        "PrimaryCategory": "unknown_callee",
+        "Categories": [
+          "unknown_callee"
+        ],
+        "FirstBlockingCallChain": [
+          "System.Type.get_BaseType()"
+        ],
         "HasFreshArrayAllocationEvidence": false,
         "HasFreshObjectAllocationEvidence": false,
         "HasUnsupportedEffects": true,
@@ -2450,6 +3262,28 @@
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.Type.get_TypeHandle()",
+        "ExactSymbolKey": "System.Type.get_TypeHandle()-\u003ESystem.RuntimeTypeHandle",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060009F7|il:e5332934dc42970c8eecee14c5530cabf0edf253ff52050b7f8bef62f9dbe0fa",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x060009F7",
+        "MethodBodySha256": "e5332934dc42970c8eecee14c5530cabf0edf253ff52050b7f8bef62f9dbe0fa",
+        "Classification": "impure",
+        "PrimaryCategory": "throw",
+        "Categories": [
+          "throw"
+        ],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": true,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "caller_visible"
       }
     ]
   }

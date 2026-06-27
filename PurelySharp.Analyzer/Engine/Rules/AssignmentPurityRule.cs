@@ -362,7 +362,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var candidates = ResolvePotentialSetterTargets(
                 propertyReferenceOperation.Property,
                 context.SemanticModel,
-                GetTrackedLocalReceiverType(propertyReferenceOperation.Instance, currentState) ??
+                GetTrackedLocalReceiverType(propertyReferenceOperation.Instance, currentState, context.SemanticModel.Compilation) ??
                     GetKnownReceiverType(propertyReferenceOperation.Instance));
 
             if (candidates.IsDefaultOrEmpty)
@@ -390,9 +390,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static INamedTypeSymbol? GetTrackedLocalReceiverType(
             IOperation? instanceOperation,
-            PurityAnalysisEngine.PurityAnalysisState currentState)
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            Compilation compilation)
         {
-            return PurityAnalysisEngine.TryResolveKnownConcreteType(instanceOperation, currentState, out var concreteType)
+            return PurityAnalysisEngine.TryResolveKnownConcreteType(instanceOperation, currentState, compilation, out var concreteType)
                 ? concreteType
                 : null;
         }

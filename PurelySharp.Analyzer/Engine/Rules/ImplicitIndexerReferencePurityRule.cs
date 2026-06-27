@@ -45,6 +45,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var receiverType = GetKnownReceiverType(
                 implicitIndexerReferenceOperation.Instance,
                 currentState,
+                context.SemanticModel.Compilation,
                 out var hasStableConcreteReceiver);
 
             if (implicitIndexerReferenceOperation.LengthSymbol is IPropertySymbol lengthProperty)
@@ -252,9 +253,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static INamedTypeSymbol? GetKnownReceiverType(
             IOperation? instanceOperation,
             PurityAnalysisEngine.PurityAnalysisState currentState,
+            Compilation compilation,
             out bool hasStableConcreteReceiver)
         {
-            if (PurityAnalysisEngine.TryResolveKnownConcreteType(instanceOperation, currentState, out var concreteType))
+            if (PurityAnalysisEngine.TryResolveKnownConcreteType(instanceOperation, currentState, compilation, out var concreteType))
             {
                 hasStableConcreteReceiver = true;
                 return concreteType;

@@ -1141,6 +1141,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var hasExactReceiverType = PurityAnalysisEngine.TryResolveKnownConcreteType(
                 propertyReferenceOperation.Instance,
                 currentState,
+                context.SemanticModel.Compilation,
                 out var exactReceiverType);
 
             var knownReceiverType = hasExactReceiverType
@@ -1244,9 +1245,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static INamedTypeSymbol? GetTrackedLocalReceiverType(
             IOperation? instanceOperation,
-            PurityAnalysisEngine.PurityAnalysisState currentState)
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            Compilation compilation)
         {
-            return PurityAnalysisEngine.TryResolveKnownConcreteType(instanceOperation, currentState, out var concreteType)
+            return PurityAnalysisEngine.TryResolveKnownConcreteType(instanceOperation, currentState, compilation, out var concreteType)
                 ? concreteType
                 : null;
         }

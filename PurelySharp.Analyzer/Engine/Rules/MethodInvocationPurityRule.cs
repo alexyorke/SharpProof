@@ -311,7 +311,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     : invocationOperation.Instance != null
                         && !IsBaseReference(invocationOperation.Instance)))
             {
-                var exactReceiverType = GetTrackedLocalReceiverType(invocationOperation.Instance, currentState);
+                var exactReceiverType = GetTrackedLocalReceiverType(
+                    invocationOperation.Instance,
+                    currentState,
+                    context.SemanticModel.Compilation);
                 var hasExactReceiverType = exactReceiverType != null;
                 var knownReceiverType = exactReceiverType ??
                     GetStableInitializerReceiverType(invocationOperation.Instance, context, currentState) ??
@@ -1102,9 +1105,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static INamedTypeSymbol? GetTrackedLocalReceiverType(
             IOperation? invocationInstance,
-            PurityAnalysisEngine.PurityAnalysisState currentState)
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            Compilation compilation)
         {
-            return PurityAnalysisEngine.TryResolveKnownConcreteType(invocationInstance, currentState, out var concreteType)
+            return PurityAnalysisEngine.TryResolveKnownConcreteType(invocationInstance, currentState, compilation, out var concreteType)
                 ? concreteType
                 : null;
         }
@@ -1122,7 +1126,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return null;
             }
 
-            if (PurityAnalysisEngine.TryResolveKnownConcreteType(initializerOperation, currentState, out var concreteType))
+            if (PurityAnalysisEngine.TryResolveKnownConcreteType(initializerOperation, currentState, context.SemanticModel.Compilation, out var concreteType))
             {
                 return concreteType;
             }
@@ -3784,7 +3788,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             PurityAnalysisEngine.PurityAnalysisState currentState)
         {
             var unwrappedSource = PurityAnalysisEngine.SkipImplicitConversions(sourceOperation) ?? sourceOperation;
-            var sourceType = PurityAnalysisEngine.TryResolveKnownConcreteType(unwrappedSource, currentState, out var concreteType)
+            var sourceType = PurityAnalysisEngine.TryResolveKnownConcreteType(unwrappedSource, currentState, context.SemanticModel.Compilation, out var concreteType)
                 ? (ITypeSymbol)concreteType
                 : unwrappedSource.Type;
             if (sourceType == null)

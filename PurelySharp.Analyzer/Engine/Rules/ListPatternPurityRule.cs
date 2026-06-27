@@ -25,6 +25,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var receiverType = GetKnownReceiverType(
                 matchedInputOperation,
                 currentState,
+                context.SemanticModel.Compilation,
                 out var hasStableConcreteReceiver);
 
             if (operation is IListPatternOperation listPattern)
@@ -332,9 +333,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
         private static INamedTypeSymbol? GetKnownReceiverType(
             IOperation? instanceOperation,
             PurityAnalysisEngine.PurityAnalysisState currentState,
+            Compilation compilation,
             out bool hasStableConcreteReceiver)
         {
-            if (PurityAnalysisEngine.TryResolveKnownConcreteType(instanceOperation, currentState, out var concreteType))
+            if (PurityAnalysisEngine.TryResolveKnownConcreteType(instanceOperation, currentState, compilation, out var concreteType))
             {
                 hasStableConcreteReceiver = true;
                 return concreteType;
