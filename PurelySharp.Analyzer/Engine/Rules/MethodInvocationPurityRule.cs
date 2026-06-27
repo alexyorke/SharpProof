@@ -4037,17 +4037,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IOperation value,
             PurityAnalysisContext context)
         {
-            value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
-            if (value is not IPropertyReferenceOperation
-                {
-                    Property:
-                    {
-                        IsStatic: true,
-                        Name: "Default",
-                        ContainingType: { } containingType,
-                        GetMethod: { } getterSymbol
-                    }
-                })
+            if (!TryGetStaticMetadataPropertyGetter(value, "Default", out var containingType, out var getterSymbol))
             {
                 return false;
             }
@@ -4059,42 +4049,60 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return false;
             }
 
-            if (getterSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
-            {
-                return false;
-            }
-
-            return PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
-                getterSymbol.OriginalDefinition,
-                context.SemanticModel.Compilation,
-                out var generatedPurity) &&
-                generatedPurity.IsPure;
+            return IsTrustedGeneratedPureMetadataGetter(getterSymbol, context);
         }
 
         private static bool IsTrustedGeneratedPureStringComparerSingleton(
             IOperation value,
             PurityAnalysisContext context)
         {
+            if (!TryGetStaticMetadataPropertyGetter(value, propertyName: null, out var containingType, out var getterSymbol))
+            {
+                return false;
+            }
+
+            if (containingType.OriginalDefinition.ToDisplayString() != "System.StringComparer")
+            {
+                return false;
+            }
+
+            return IsTrustedGeneratedPureMetadataGetter(getterSymbol, context);
+        }
+
+        private static bool TryGetStaticMetadataPropertyGetter(
+            IOperation value,
+            string? propertyName,
+            out INamedTypeSymbol containingType,
+            out IMethodSymbol getterSymbol)
+        {
             value = PurityAnalysisEngine.SkipImplicitConversions(value) ?? value;
-            if (value is not IPropertyReferenceOperation
+            if (value is IPropertyReferenceOperation
                 {
                     Property:
                     {
                         IsStatic: true,
-                        ContainingType: { } containingType,
-                        GetMethod: { } getterSymbol
+                        Name: var candidatePropertyName,
+                        ContainingType: { } candidateContainingType,
+                        GetMethod: { } candidateGetterSymbol
                     }
-                })
+                } &&
+                (propertyName == null || candidatePropertyName == propertyName) &&
+                candidateGetterSymbol.Locations.FirstOrDefault()?.IsInMetadata == true)
             {
-                return false;
+                containingType = candidateContainingType;
+                getterSymbol = candidateGetterSymbol;
+                return true;
             }
 
-            if (containingType.OriginalDefinition.ToDisplayString() != "System.StringComparer" ||
-                getterSymbol.Locations.FirstOrDefault()?.IsInMetadata != true)
-            {
-                return false;
-            }
+            containingType = null!;
+            getterSymbol = null!;
+            return false;
+        }
 
+        private static bool IsTrustedGeneratedPureMetadataGetter(
+            IMethodSymbol getterSymbol,
+            PurityAnalysisContext context)
+        {
             return PurityAnalysisEngine.TryGetTrustedGeneratedPurity(
                 getterSymbol.OriginalDefinition,
                 context.SemanticModel.Compilation,
