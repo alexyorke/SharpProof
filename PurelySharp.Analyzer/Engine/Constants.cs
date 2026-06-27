@@ -207,15 +207,6 @@ public static class Constants
 
         "System.Text.Json.JsonSerializer.DeserializeAsync",
         "System.Text.Json.JsonSerializer.SerializeAsync",
-        "System.Text.StringBuilder.Append(string?)",
-        "System.Text.StringBuilder.Append(char)",
-        "System.Text.StringBuilder.Append(object)",
-        "System.Text.StringBuilder.AppendLine(string)",
-        "System.Text.StringBuilder.Clear()",
-        "System.Text.StringBuilder.EnsureCapacity(int)",
-        "System.Text.StringBuilder.Insert(int, string)",
-        "System.Text.StringBuilder.Remove(int, int)",
-        "System.Text.StringBuilder.Replace(string, string)",
         "System.Threading.Monitor.Enter(object)",
         "System.Threading.Monitor.Pulse(object)",
         "System.Threading.Monitor.Wait(object)",
@@ -459,7 +450,6 @@ public static class Constants
         "System.IO.Stream.WriteAsync(byte[], int, int, System.Threading.CancellationToken)",
         "System.IO.StreamReader.StreamReader(string)",
         "System.IO.StreamWriter.StreamWriter(string)",
-        "System.Text.StringBuilder.AppendJoin(string, object[])",
         "System.Threading.Monitor.TryEnter(object)",
 
 

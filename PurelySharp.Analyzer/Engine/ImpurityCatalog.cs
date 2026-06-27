@@ -370,6 +370,12 @@ namespace PurelySharp.Analyzer.Engine
 				return "random_semantic_rule";
 			}
 
+			if (IsStringBuilderSemanticImpure(symbol))
+			{
+				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: StringBuilder semantic rule matched: {symbol.ToDisplayString()}");
+				return "string_builder_semantic_rule";
+			}
+
 			if (IsAssemblyLoadContextSemanticImpure(symbol))
 			{
 				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: AssemblyLoadContext semantic rule matched: {symbol.ToDisplayString()}");
@@ -486,6 +492,49 @@ namespace PurelySharp.Analyzer.Engine
 		{
 			return typeSymbol != null &&
 				string.Equals(typeSymbol.OriginalDefinition.ToDisplayString(), "System.Random", StringComparison.Ordinal);
+		}
+
+		private static bool IsStringBuilderSemanticImpure(ISymbol symbol)
+		{
+			if (!IsExactStringBuilderType(symbol.ContainingType))
+			{
+				return false;
+			}
+
+			if (symbol is IMethodSymbol methodSymbol)
+			{
+				if (methodSymbol.IsImplicitlyDeclared)
+				{
+					return false;
+				}
+
+				if (methodSymbol.MethodKind == MethodKind.PropertySet)
+				{
+					return true;
+				}
+
+				if (methodSymbol.AssociatedSymbol is IPropertySymbol associatedPropertySymbol &&
+					methodSymbol.MethodKind == MethodKind.PropertyGet)
+				{
+					return false;
+				}
+
+				return methodSymbol.MethodKind == MethodKind.Ordinary &&
+					(methodSymbol.Name.StartsWith("Append", StringComparison.Ordinal) ||
+					 methodSymbol.Name == "Clear" ||
+					 methodSymbol.Name == "EnsureCapacity" ||
+					 methodSymbol.Name == "Insert" ||
+					 methodSymbol.Name == "Remove" ||
+					 methodSymbol.Name == "Replace");
+			}
+
+			return false;
+		}
+
+		private static bool IsExactStringBuilderType(INamedTypeSymbol? typeSymbol)
+		{
+			return typeSymbol != null &&
+				string.Equals(typeSymbol.OriginalDefinition.ToDisplayString(), "System.Text.StringBuilder", StringComparison.Ordinal);
 		}
 
 		private static bool IsAssemblyLoadContextSemanticImpure(ISymbol symbol)

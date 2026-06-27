@@ -148,6 +148,30 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_StringBuilderAppend_UsesStringBuilderSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Text;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(StringBuilder sb)
+    {
+        sb.Append(""hello"");
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("string_builder_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Text.StringBuilder.Append"));
+        }
+
+        [Test]
         public async Task Ps0002_StringFormat_UsesGeneratedPuritySummarySource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

@@ -83,6 +83,21 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void StringBuilderMutators_AreSourcedFromSemanticRules_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Text.StringBuilder.Append(string?)");
+            AssertNotInManualCatalogs("System.Text.StringBuilder.Append(char)");
+            AssertNotInManualCatalogs("System.Text.StringBuilder.Append(object)");
+            AssertNotInManualCatalogs("System.Text.StringBuilder.AppendLine(string)");
+            AssertNotInManualCatalogs("System.Text.StringBuilder.AppendJoin(string, object[])");
+            AssertNotInManualCatalogs("System.Text.StringBuilder.Clear()");
+            AssertNotInManualCatalogs("System.Text.StringBuilder.EnsureCapacity(int)");
+            AssertNotInManualCatalogs("System.Text.StringBuilder.Insert(int, string)");
+            AssertNotInManualCatalogs("System.Text.StringBuilder.Remove(int, int)");
+            AssertNotInManualCatalogs("System.Text.StringBuilder.Replace(string, string)");
+        }
+
+        [Test]
         public void GeneratedPathHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]
