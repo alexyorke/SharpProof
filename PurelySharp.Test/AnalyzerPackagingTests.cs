@@ -478,6 +478,95 @@ public static class TestClass
         }
 
         [Test]
+        public void ExceptionSummaryCatalog_CreateBuiltInCatalog_IgnoresNonMatchingJsonFileNames()
+        {
+            var analyzerAssemblyPath = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly.Location;
+            var analyzerAssemblyDirectory = Path.GetDirectoryName(analyzerAssemblyPath);
+            Assert.That(string.IsNullOrWhiteSpace(analyzerAssemblyDirectory), Is.False);
+
+            var (fixtureDirectory, fixtureAssemblyPath) = CreateFixtureAssembly(
+                "AnalyzerPackagingIgnoredSummaryFixture",
+                """
+namespace PackagingFixture;
+
+public static class ThrowingBoundary
+{
+    public static void Invoke()
+    {
+    }
+}
+""");
+            var summaryPath = Path.Combine(
+                analyzerAssemblyDirectory!,
+                "AnalyzerPackagingTests." + Guid.NewGuid().ToString("N") + ".json");
+            var summaryJson = GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                fixtureAssemblyPath,
+                "PackagingFixture.ThrowingBoundary.Invoke()",
+                "pure",
+                "[]")
+                .Replace(@"""ThrownExceptionTypes"": [],", @"""ThrownExceptionTypes"": [ ""System.ArgumentException"" ],", StringComparison.Ordinal)
+                .Replace(@"""TransitiveThrownExceptionTypes"": [],", @"""TransitiveThrownExceptionTypes"": [ ""System.ArgumentException"" ],", StringComparison.Ordinal);
+
+            try
+            {
+                File.WriteAllText(summaryPath, summaryJson);
+
+                var catalogType = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly.GetType(
+                    "PurelySharp.Analyzer.ExceptionSummaryCatalog",
+                    throwOnError: true)!;
+                var createBuiltInCatalog = catalogType.GetMethod("CreateBuiltInCatalog", BindingFlags.NonPublic | BindingFlags.Static)!;
+                var tryGetExceptions = catalogType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                    .Single(method => method.Name == "TryGetExceptions" &&
+                        method.GetParameters().Length == 3 &&
+                        method.GetParameters()[1].ParameterType == typeof(Compilation));
+                var builtInCatalog = createBuiltInCatalog.Invoke(null, null)!;
+
+                const string source = """
+using PackagingFixture;
+
+public static class TestClass
+{
+    public static void Call()
+    {
+        ThrowingBoundary.Invoke();
+    }
+}
+""";
+
+                var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+                var compilation = CSharpCompilation.Create(
+                    "ExceptionSummaryBuiltInCatalogIgnoredFileName",
+                    new[] { syntaxTree },
+                    GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(fixtureAssemblyPath)),
+                    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                var semanticModel = compilation.GetSemanticModel(syntaxTree);
+                var invocation = syntaxTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
+                var methodSymbol = (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!;
+
+                var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
+                var matched = (bool)tryGetExceptions.Invoke(builtInCatalog, args)!;
+                var exceptionTypes = args[2] is ImmutableArray<string> values
+                    ? values
+                    : ImmutableArray<string>.Empty;
+
+                Assert.That(matched, Is.False, "Only *.PurelySharp.EffectSummary.json files should be consumed as built-in exception summaries.");
+                Assert.That(exceptionTypes, Is.Empty);
+            }
+            finally
+            {
+                if (File.Exists(summaryPath))
+                {
+                    File.Delete(summaryPath);
+                }
+
+                if (Directory.Exists(fixtureDirectory))
+                {
+                    Directory.Delete(fixtureDirectory, recursive: true);
+                }
+            }
+        }
+
+        [Test]
         public void AttributesPackage_ShouldUseReleaseReadyNuGetMetadata()
         {
             var projectPath = Path.Combine(FindRepositoryRoot(), "PurelySharp.Attributes", "PurelySharp.Attributes.csproj");
@@ -512,6 +601,33 @@ public static class TestClass
             }
 
             throw new DirectoryNotFoundException("Could not locate repository root from test directory.");
+        }
+
+        private static (string DirectoryPath, string AssemblyPath) CreateFixtureAssembly(string assemblyName, string source)
+        {
+            var fixtureDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "analyzer-packaging-fixture-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(fixtureDirectory);
+            var assemblyPath = Path.Combine(fixtureDirectory, assemblyName + ".dll");
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                assemblyName,
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            using var stream = File.Create(assemblyPath);
+            var emitResult = compilation.Emit(stream);
+            if (!emitResult.Success)
+            {
+                throw new AssertionException(string.Join(
+                    Environment.NewLine,
+                    emitResult.Diagnostics.Select(diagnostic => diagnostic.ToString())));
+            }
+
+            return (fixtureDirectory, assemblyPath);
         }
 
         private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()

@@ -628,9 +628,10 @@ public class TestClass
 
             var analyzerOptions = new AnalyzerOptions(
                 ImmutableArray<AdditionalText>.Empty,
-                new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty.Add(
-                    "purelysharp_report_exceptions",
-                    "true")));
+                new TestAnalyzerConfigOptionsProvider(
+                    ImmutableDictionary<string, string>.Empty
+                        .Add("purelysharp_report_exceptions", "true")
+                        .Add("purelysharp_checked_exceptions", "true")));
 
             var compilationWithAnalyzers = compilation.WithAnalyzers(
                 ImmutableArray.Create<DiagnosticAnalyzer>(new PurelySharpAnalyzer()),

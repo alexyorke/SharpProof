@@ -17,6 +17,7 @@ namespace PurelySharp.Analyzer.Configuration
         public MissingPuritySuggestionOptions MissingPuritySuggestions { get; }
         public bool EmitExplanations { get; }
         public bool ReportExceptions { get; }
+        public bool CheckedExceptions { get; }
         public bool EnableEffectSummaryJson { get; }
         public string PurityProfile { get; }
 
@@ -30,6 +31,7 @@ namespace PurelySharp.Analyzer.Configuration
             MissingPuritySuggestionOptions missingPuritySuggestions,
             bool emitExplanations,
             bool reportExceptions,
+            bool checkedExceptions,
             bool enableEffectSummaryJson,
             string purityProfile)
         {
@@ -42,6 +44,7 @@ namespace PurelySharp.Analyzer.Configuration
             MissingPuritySuggestions = missingPuritySuggestions;
             EmitExplanations = emitExplanations;
             ReportExceptions = reportExceptions;
+            CheckedExceptions = checkedExceptions;
             EnableEffectSummaryJson = enableEffectSummaryJson;
             PurityProfile = purityProfile;
         }
@@ -63,8 +66,9 @@ namespace PurelySharp.Analyzer.Configuration
                 GetValues(options, ConfigKeys.SuggestMissingEnforcePureNamespaceFilters));
             bool emitExplanations = GetBool(options, ConfigKeys.EmitExplanations);
             bool reportExceptions = GetBool(options, ConfigKeys.ReportExceptions);
+            bool checkedExceptions = GetBool(options, ConfigKeys.CheckedExceptions);
             bool enableEffectSummaryJson = GetBool(options, ConfigKeys.EnableEffectSummaryJson);
-            return new AnalyzerConfiguration(impureMethods, pureMethods, impureNamespaces, impureTypes, debug, suggestMissing, missingPuritySuggestions, emitExplanations, reportExceptions, enableEffectSummaryJson, GetPurityProfile(options));
+            return new AnalyzerConfiguration(impureMethods, pureMethods, impureNamespaces, impureTypes, debug, suggestMissing, missingPuritySuggestions, emitExplanations, reportExceptions, checkedExceptions, enableEffectSummaryJson, GetPurityProfile(options));
         }
 
         public static MissingPuritySuggestionOptions GetMissingPuritySuggestionOptions(
@@ -115,6 +119,22 @@ namespace PurelySharp.Analyzer.Configuration
             {
                 var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
                 return GetBoolOrDefault(treeOptions, ConfigKeys.ReportExceptions, fallback);
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
+        public static bool GetCheckedExceptions(
+            AnalyzerOptions options,
+            SyntaxTree syntaxTree,
+            bool fallback)
+        {
+            try
+            {
+                var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
+                return GetBoolOrDefault(treeOptions, ConfigKeys.CheckedExceptions, fallback);
             }
             catch
             {

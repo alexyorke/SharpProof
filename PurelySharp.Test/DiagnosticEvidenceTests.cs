@@ -12759,12 +12759,24 @@ public class TestClass
 }";
 
             var defaultDiagnostics = await GetAnalyzerDiagnosticsAsync(source);
-            var exceptionDiagnostics = await GetAnalyzerDiagnosticsAsync(
+            var reportDiagnostics = await GetAnalyzerDiagnosticsAsync(
                 source,
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
+            var checkedDiagnostics = await GetAnalyzerDiagnosticsAsync(
+                source,
+                CheckedExceptionsOptions());
+            var combinedDiagnostics = await GetAnalyzerDiagnosticsAsync(
+                source,
+                ReportAndCheckedExceptionsOptions());
 
             Assert.That(defaultDiagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
-            Assert.That(exceptionDiagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.True);
+            Assert.That(defaultDiagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+            Assert.That(reportDiagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.True);
+            Assert.That(reportDiagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+            Assert.That(checkedDiagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+            Assert.That(checkedDiagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.True);
+            Assert.That(combinedDiagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.True);
+            Assert.That(combinedDiagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.True);
         }
 
         [Test]
@@ -12785,7 +12797,7 @@ public class TestClass
         return value.Length > 0 ? value : throw new InvalidOperationException();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.ExceptionSummaryId);
 
@@ -12813,7 +12825,7 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
@@ -12831,7 +12843,7 @@ public class TestClass
         return () => throw new InvalidOperationException();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
@@ -12854,7 +12866,7 @@ public class TestClass
         throw new InvalidOperationException();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var exceptionDiagnostics = diagnostics
                 .Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId)
@@ -12889,7 +12901,7 @@ public class TestClass
         throw new InvalidOperationException();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var exceptionDiagnostics = diagnostics
                 .Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId)
@@ -12920,7 +12932,7 @@ public class Widget
         throw new InvalidOperationException();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var exceptionDiagnostics = diagnostics
                 .Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId)
@@ -12958,7 +12970,7 @@ public class Widget
         throw new InvalidOperationException();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var exceptionDiagnostics = diagnostics
                 .Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId)
@@ -12992,7 +13004,7 @@ public class Widget
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var exceptionDiagnostics = diagnostics
                 .Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId)
@@ -13033,7 +13045,7 @@ public class Widget
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var exceptionDiagnostics = diagnostics
                 .Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId)
@@ -13056,7 +13068,7 @@ public class TestClass
         ArgumentNullException.ThrowIfNull(value);
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                ReportExceptionsOptions(),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(
@@ -13096,7 +13108,7 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                ReportExceptionsOptions(),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(
@@ -13121,7 +13133,7 @@ public class TestClass
         ArgumentNullException.ThrowIfNull(value);
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                CheckedExceptionsOptions(),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(
@@ -13158,7 +13170,7 @@ public class TestClass
         ArgumentException.ThrowIfNullOrEmpty(text);
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                CheckedExceptionsOptions(),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(
@@ -13207,7 +13219,7 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                CheckedExceptionsOptions(),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(
@@ -13220,7 +13232,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task Ps0011_EffectSummaryLibraryCall_PartiallyCaughtAtCallSite_ReportsOnlyEscapingType()
+        public async Task Ps0010AndPs0011_EffectSummaryLibraryCall_PartiallyCaughtAtCallSite_ReportsOnlyEscapingType()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
 using System;
@@ -13238,7 +13250,7 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                ReportAndCheckedExceptionsOptions(),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(
@@ -13275,7 +13287,7 @@ public class TestClass
         return new Uri(value);
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                CheckedExceptionsOptions(),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(
@@ -13313,7 +13325,7 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                CheckedExceptionsOptions(),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(
@@ -13337,7 +13349,7 @@ public class DerivedException : Exception
     {
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                ReportAndCheckedExceptionsOptions(),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(
@@ -13386,7 +13398,7 @@ public class TestClass
         throw new InvalidOperationException();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(
                 diagnostics
@@ -13420,7 +13432,7 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                CheckedExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(
                 diagnostics
@@ -13452,7 +13464,7 @@ public class TestClass
         thunk();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                CheckedExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(
                 diagnostics
@@ -13494,7 +13506,7 @@ public class TestClass
         throw new InvalidOperationException();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                CheckedExceptionsOptions());
 
             var siteDiagnostics = diagnostics
                 .Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId)
@@ -13525,7 +13537,7 @@ public class DerivedClass : BaseClass
     {
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportAndCheckedExceptionsOptions());
 
             var summaryDiagnostic = SingleDiagnostic(
                 diagnostics
@@ -13580,7 +13592,7 @@ public class TestClass
         alias.Work();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                CheckedExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(
                 diagnostics
@@ -13609,7 +13621,7 @@ public class TestClass
         throw new InvalidOperationException();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                CheckedExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(
                 diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
@@ -13632,7 +13644,7 @@ public class TestClass
         return value / 0;
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                CheckedExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(
                 diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
@@ -13656,7 +13668,7 @@ public class TestClass
         return value.Length;
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                CheckedExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(
                 diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
@@ -13691,7 +13703,7 @@ public class TestClass
         throw new InvalidOperationException();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                CheckedExceptionsOptions());
 
             var diagnostic = diagnostics
                 .Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId)
@@ -13722,7 +13734,7 @@ public class TestClass
         return new Uri(value);
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                ReportExceptionsOptions(),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(
@@ -13749,7 +13761,7 @@ public class TestClass
         return Environment.CurrentDirectory;
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"),
+                ReportExceptionsOptions(),
                 additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(
@@ -13761,6 +13773,38 @@ public class TestClass
 
             Assert.That(diagnostic.GetMessage(), Does.Contain("'Read'"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
+        public async Task Ps0011_EffectSummaryPropertyGetter_UncaughtAtAccessSite_ReportsWarning()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public string Read()
+    {
+        return Environment.CurrentDirectory;
+    }
+}",
+                CheckedExceptionsOptions(),
+                additionalFiles: ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
+                    "PurelySharp.EffectSummary.json",
+                    CreateEffectSummaryJson(
+                        typeof(Environment).Assembly.Location,
+                        "System.Environment.get_CurrentDirectory()",
+                        new[] { "System.InvalidOperationException" }))));
+
+            var diagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("Environment.CurrentDirectory"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("effect_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSymbolProperty], Does.Contain("System.Environment.CurrentDirectory.get"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Does.Contain("System.Environment.CurrentDirectory.get"));
         }
 
         [Test]
@@ -13787,7 +13831,7 @@ public class TestClass
     {
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(), PurelySharpDiagnostics.ExceptionSummaryId);
 
@@ -13825,7 +13869,7 @@ public class TestClass
     {
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
@@ -13841,7 +13885,7 @@ public class TestClass
         return value / 0;
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(), PurelySharpDiagnostics.ExceptionSummaryId);
 
@@ -13869,7 +13913,7 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
@@ -13885,7 +13929,7 @@ public class TestClass
         return value / 0.0;
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
@@ -13906,7 +13950,7 @@ public class TestClass
         return 0;
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(), PurelySharpDiagnostics.ExceptionSummaryId);
 
@@ -13933,7 +13977,7 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(), PurelySharpDiagnostics.ExceptionSummaryId);
 
@@ -13952,7 +13996,7 @@ public class TestClass
         return ((string)null).Length;
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(), PurelySharpDiagnostics.ExceptionSummaryId);
 
@@ -13978,7 +14022,7 @@ public class TestClass
         return 0;
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(), PurelySharpDiagnostics.ExceptionSummaryId);
 
@@ -14004,7 +14048,7 @@ public class TestClass
         return 0;
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
@@ -14022,7 +14066,7 @@ public class TestClass
         throw new InvalidOperationException();
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(), PurelySharpDiagnostics.ExceptionSummaryId);
 
@@ -14051,7 +14095,7 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(diagnostics.Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(), PurelySharpDiagnostics.ExceptionSummaryId);
 
@@ -14081,7 +14125,7 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                CheckedExceptionsOptions());
 
             var siteDiagnostics = diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToArray();
 
@@ -14111,7 +14155,7 @@ public class TestClass
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
@@ -14127,7 +14171,7 @@ public class TestClass
         return ((string)null)?.Length;
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ReportExceptionsOptions());
 
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
@@ -14135,6 +14179,21 @@ public class TestClass
         private static Diagnostic SingleDiagnostic(ImmutableArray<Diagnostic> diagnostics, string diagnosticId)
         {
             return diagnostics.Single(d => d.Id == diagnosticId);
+        }
+
+        private static ImmutableDictionary<string, string> ReportExceptionsOptions()
+        {
+            return ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true");
+        }
+
+        private static ImmutableDictionary<string, string> CheckedExceptionsOptions()
+        {
+            return ImmutableDictionary<string, string>.Empty.Add("purelysharp_checked_exceptions", "true");
+        }
+
+        private static ImmutableDictionary<string, string> ReportAndCheckedExceptionsOptions()
+        {
+            return ReportExceptionsOptions().Add("purelysharp_checked_exceptions", "true");
         }
 
         private static void AssertExceptionEdgesPropertyContains(Diagnostic diagnostic, params string[] expectedFragments)

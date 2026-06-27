@@ -115,7 +115,7 @@ public sealed class Publisher
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_checked_exceptions", "true"));
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(
                 diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),

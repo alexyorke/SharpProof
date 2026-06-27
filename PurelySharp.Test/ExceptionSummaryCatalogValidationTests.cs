@@ -2690,6 +2690,13 @@ public class TestClass
                     "true");
             }
 
+            if (!analyzerGlobalOptions.ContainsKey("purelysharp_checked_exceptions"))
+            {
+                analyzerGlobalOptions = analyzerGlobalOptions.Add(
+                    "purelysharp_checked_exceptions",
+                    "true");
+            }
+
             var analyzerOptions = new AnalyzerOptions(
                 effectSummaryFiles
                     .Select(file => (AdditionalText)new InMemoryAdditionalText(file.Path, file.Text))

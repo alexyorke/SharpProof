@@ -41,7 +41,9 @@ namespace PurelySharp.Analyzer
                 var missingPuritySuggestions = config.MissingPuritySuggestions;
                 var emitExplanations = config.EmitExplanations;
                 var baseline = Configuration.DiagnosticBaseline.FromOptions(startContext.Options, startContext.CancellationToken);
-                var exceptionSummaryCatalog = config.EnableEffectSummaryJson
+                var needsExceptionSummaryCatalog = config.EnableEffectSummaryJson &&
+                    (config.ReportExceptions || config.CheckedExceptions);
+                var exceptionSummaryCatalog = needsExceptionSummaryCatalog
                     ? ExceptionSummaryCatalog.FromOptions(startContext.Options, startContext.CancellationToken)
                     : ExceptionSummaryCatalog.Empty;
                 var generatedPurityCatalog = config.EnableEffectSummaryJson
@@ -54,7 +56,7 @@ namespace PurelySharp.Analyzer
                     using (Engine.ImpurityCatalog.UseConfiguredOverrides(config))
                     {
                         MethodPurityAnalyzer.AnalyzeSymbolForPurity(c, purityService, missingPuritySuggestions, emitExplanations, baseline);
-                        ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(c, config.ReportExceptions, exceptionSummaryCatalog);
+                        ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(c, config.ReportExceptions, config.CheckedExceptions, exceptionSummaryCatalog);
                     }
                 },
                     SyntaxKind.AddAccessorDeclaration,

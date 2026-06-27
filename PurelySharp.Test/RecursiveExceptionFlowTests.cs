@@ -60,7 +60,9 @@ public sealed class AcceptedDocument
 {
 }
 """,
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ImmutableDictionary<string, string>.Empty
+                    .Add("purelysharp_report_exceptions", "true")
+                    .Add("purelysharp_checked_exceptions", "true"));
 
             var summaryDiagnostic = diagnostics
                 .Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId)
@@ -116,7 +118,9 @@ public sealed class CycleService
     }
 }
 """,
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ImmutableDictionary<string, string>.Empty
+                    .Add("purelysharp_report_exceptions", "true")
+                    .Add("purelysharp_checked_exceptions", "true"));
 
             var summaryDiagnostic = diagnostics
                 .Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId)
@@ -190,7 +194,9 @@ public sealed class AcceptedDocument
 {
 }
 """,
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ImmutableDictionary<string, string>.Empty
+                    .Add("purelysharp_report_exceptions", "true")
+                    .Add("purelysharp_checked_exceptions", "true"));
 
             var summaryDiagnostic = diagnostics
                 .Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId)

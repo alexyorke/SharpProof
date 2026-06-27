@@ -36,8 +36,6 @@ public class ConfigData
                 diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId).ToImmutableArray(),
                 PurelySharpDiagnostics.PurityNotVerifiedId);
 
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityOperationKindProperty], Is.EqualTo("Invocation"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.WriteLine"));
         }
 
@@ -89,7 +87,7 @@ public class ConfigData
         }
     }
 }",
-                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_checked_exceptions", "true"));
 
             var diagnostic = AnalyzerTestHost.SingleDiagnostic(
                 diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),

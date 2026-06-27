@@ -33,7 +33,7 @@ The analyzer provides the following checks:
 
 - **Code fixes** (`PurelySharp.CodeFixes`) for `PS0002`-`PS0008` (remove/add attributes, resolve conflicts). The demo and tests reference the code-fix project where applicable.
 - **Configuration** via `.editorconfig` / MSBuild `global analyzerconfig`: `purelysharp_known_impure_methods`, `purelysharp_known_pure_methods`, `purelysharp_known_impure_namespaces`, `purelysharp_known_impure_types`, `purelysharp_purity_profile` (`balanced`, `strict`, `pragmatic`; default `balanced`), `purelysharp_enable_debug_logging`, `purelysharp_suggest_missing_enforce_pure` (`true`/`false`, default `true`), and `purelysharp_suggest_missing_enforce_pure_scope` (`all`, `public`, `internal`, `off`, default `all`) to tune `PS0004` suggestions. The `strict` profile currently tightens mutable `this` field reads; `balanced` preserves the default adoption behavior. Optional PS0004 filters include `purelysharp_suggest_missing_enforce_pure_exclude_generated`, `purelysharp_suggest_missing_enforce_pure_exclude_tests`, `purelysharp_suggest_missing_enforce_pure_min_complexity`, and `purelysharp_suggest_missing_enforce_pure_namespace_filters`; these PS0004 controls honor per-file `.editorconfig` sections. Adoption baselines are supported through an additional file named `PurelySharp.Baseline.json`, matching diagnostics by ID, symbol documentation ID, and relative path. Boundary attributes `[PureExternal]` and `[Impure]` let teams explicitly trust or reject boundary methods, properties, constructors, or whole assemblies without broad catalog changes.
-- **Exception-flow reporting** is available as opt-in `PS0010` and `PS0011` diagnostics with `purelysharp_report_exceptions = true`. The current implementation reports method-level uncaught exception summaries, warns on uncaught call sites, reports source-level uncaught `throw` / throw-expression exception types, infers typed `throw;` rethrows from enclosing catch clauses, detects definite integer/decimal divide-by-zero and modulo-by-zero expressions, detects branch-implied zero divisors including simple short-circuit and guard-if cases, detects definite null dereferences on literal/default-null receivers and branch-implied null receivers including `is not null` else branches, propagates summaries recursively through same-compilation source method calls, constructors, and property getters with cycle detection, suppresses simple caught throws at throw, call, object-creation, property-read, definite divide-by-zero, and definite null-dereference sites, preserves multi-hop source-callee evidence chains, and keeps nested lambdas/local functions separate. The repo no longer keeps checked-in effect-summary JSON artifacts in the active development flow.
+- **Exception-flow reporting** is available as opt-in `PS0010` and `PS0011` diagnostics. Enable method-level exception summaries with `purelysharp_report_exceptions = true` and enable call-site uncaught-exception warnings with `purelysharp_checked_exceptions = true`. The current implementation reports method-level uncaught exception summaries, warns on uncaught call sites, reports source-level uncaught `throw` / throw-expression exception types, infers typed `throw;` rethrows from enclosing catch clauses, detects definite integer/decimal divide-by-zero and modulo-by-zero expressions, detects branch-implied zero divisors including simple short-circuit and guard-if cases, detects definite null dereferences on literal/default-null receivers and branch-implied null receivers including `is not null` else branches, propagates summaries recursively through same-compilation source method calls, constructors, and property getters with cycle detection, suppresses simple caught throws at throw, call, object-creation, property-read, definite divide-by-zero, and definite null-dereference sites, preserves multi-hop source-callee evidence chains, and keeps nested lambdas/local functions separate. The repo no longer keeps checked-in effect-summary JSON artifacts in the active development flow.
 - **Bottom-up SDK purity calibration** still has a report-first path in `Tools/PurelySharp.EffectSummary`, but the repo no longer checks in generated effect-summary JSON artifacts or the reviewed artifact spec. Use ad hoc local outputs if this tool is revisited.
 - **`[AllowSynchronization]`** is supported alongside `[EnforcePure]`/`[Pure]` (`PS0006`-`PS0008`).
 
@@ -138,6 +138,7 @@ is_global = true
 dotnet_diagnostic.PS0010.severity = suggestion
 dotnet_diagnostic.PS0011.severity = warning
 purelysharp_report_exceptions = true
+purelysharp_checked_exceptions = true
 ```
 
 Example:
@@ -182,7 +183,7 @@ public sealed class AcceptedDocument
 }
 ```
 
-With `purelysharp_report_exceptions = true`, the analyzer reports:
+With both exception-flow options enabled, the analyzer reports:
 
 - `PS0010` on `Render`, because `System.InvalidOperationException` can escape the method.
 - `PS0011` on the uncaught `LoadAcceptedDocument(voucher)` call site, with the propagated exception type and source chain.
@@ -209,7 +210,7 @@ For source methods in the same compilation, propagation follows the call graph r
 
   - **Message:** `Operation '{0}' may throw uncaught exceptions: {1}`
   - **Severity:** Warning
-  - **Enabled by:** `.editorconfig` option `purelysharp_report_exceptions = true`
+  - **Enabled by:** `.editorconfig` option `purelysharp_checked_exceptions = true`
   - **Meaning:** The analyzer found an uncaught exception at a specific call, property access, object creation, direct `throw`, definite divide-by-zero, or definite null-dereference site. `PS0011` emits the same structured exception type/category/source evidence as `PS0010`, the same additive `purelysharp.exceptions.edges` JSON when available, plus `purelysharp.exceptions.symbol` for the underlying callee when one is known.
 
 - **PS0003: Misplaced Attribute**

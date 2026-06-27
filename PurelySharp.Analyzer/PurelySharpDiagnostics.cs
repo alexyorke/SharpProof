@@ -80,7 +80,7 @@ namespace PurelySharp.Analyzer
         public const string UncaughtExceptionSiteId = "PS0011";
         private static readonly LocalizableString UncaughtExceptionSiteTitle = "Operation May Throw Uncaught Exceptions";
         private static readonly LocalizableString UncaughtExceptionSiteMessageFormat = "Operation '{0}' may throw uncaught exceptions: {1}";
-        private static readonly LocalizableString UncaughtExceptionSiteDescription = "Reports uncaught exceptions at specific operations. Enable with purelysharp_report_exceptions = true.";
+        private static readonly LocalizableString UncaughtExceptionSiteDescription = "Reports uncaught exceptions at specific operations. Enable with purelysharp_checked_exceptions = true.";
 
         public static readonly DiagnosticDescriptor UncaughtExceptionSiteRule = new DiagnosticDescriptor(
             id: UncaughtExceptionSiteId,
