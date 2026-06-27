@@ -106,21 +106,7 @@ namespace PurelySharp.Analyzer
 
                         matchedAssignment = true;
                     }
-                    else if (candidate is PrefixUnaryExpressionSyntax prefixUnary &&
-                             (prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) || prefixUnary.IsKind(SyntaxKind.PreDecrementExpression)) &&
-                             ExpressionMatchesSymbol(prefixUnary.Operand, symbol, semanticModel, cancellationToken))
-                    {
-                        return false;
-                    }
-                    else if (candidate is PostfixUnaryExpressionSyntax postfixUnary &&
-                             (postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) || postfixUnary.IsKind(SyntaxKind.PostDecrementExpression)) &&
-                             ExpressionMatchesSymbol(postfixUnary.Operand, symbol, semanticModel, cancellationToken))
-                    {
-                        return false;
-                    }
-                    else if (candidate is ArgumentSyntax argument &&
-                             !argument.RefKindKeyword.IsKind(SyntaxKind.None) &&
-                             ExpressionMatchesSymbol(argument.Expression, symbol, semanticModel, cancellationToken))
+                    else if (MutatesSymbol(candidate, symbol, semanticModel, cancellationToken))
                     {
                         return false;
                     }
@@ -352,35 +338,35 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                if (node is AssignmentExpressionSyntax assignment &&
-                    ExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken))
-                {
-                    return true;
-                }
-
-                if (node is PrefixUnaryExpressionSyntax prefixUnary &&
-                    (prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) || prefixUnary.IsKind(SyntaxKind.PreDecrementExpression)) &&
-                    ExpressionMatchesSymbol(prefixUnary.Operand, symbol, semanticModel, cancellationToken))
-                {
-                    return true;
-                }
-
-                if (node is PostfixUnaryExpressionSyntax postfixUnary &&
-                    (postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) || postfixUnary.IsKind(SyntaxKind.PostDecrementExpression)) &&
-                    ExpressionMatchesSymbol(postfixUnary.Operand, symbol, semanticModel, cancellationToken))
-                {
-                    return true;
-                }
-
-                if (node is ArgumentSyntax argument &&
-                    !argument.RefKindKeyword.IsKind(SyntaxKind.None) &&
-                    ExpressionMatchesSymbol(argument.Expression, symbol, semanticModel, cancellationToken))
+                if (MutatesSymbol(node, symbol, semanticModel, cancellationToken))
                 {
                     return true;
                 }
             }
 
             return false;
+        }
+
+        private static bool MutatesSymbol(
+            SyntaxNode node,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            return node switch
+            {
+                AssignmentExpressionSyntax assignment =>
+                    ExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken),
+                PrefixUnaryExpressionSyntax prefixUnary
+                    when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) || prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
+                    ExpressionMatchesSymbol(prefixUnary.Operand, symbol, semanticModel, cancellationToken),
+                PostfixUnaryExpressionSyntax postfixUnary
+                    when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) || postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
+                    ExpressionMatchesSymbol(postfixUnary.Operand, symbol, semanticModel, cancellationToken),
+                ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) =>
+                    ExpressionMatchesSymbol(argument.Expression, symbol, semanticModel, cancellationToken),
+                _ => false
+            };
         }
 
         private static bool StatementDefinitelyExits(StatementSyntax statement)

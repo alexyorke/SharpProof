@@ -213,8 +213,8 @@ namespace PurelySharp.Analyzer
                     var exceptionTypes = ImmutableSortedSet.CreateBuilder<string>(StringComparer.Ordinal);
                     var exceptionSources = new Dictionary<string, ImmutableSortedSet<string>.Builder>(StringComparer.Ordinal);
                     var exceptionEdges = new Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>>(StringComparer.Ordinal);
-                    AddExceptionTypes(exceptionTypes, methodElement, "ThrownExceptionTypes");
-                    AddExceptionTypes(exceptionTypes, methodElement, "TransitiveThrownExceptionTypes");
+                    exceptionTypes.UnionWith(GetExceptionTypes(methodElement, "ThrownExceptionTypes"));
+                    exceptionTypes.UnionWith(GetExceptionTypes(methodElement, "TransitiveThrownExceptionTypes"));
                     AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "ThrownExceptionSourcePaths");
                     AddExceptionSources(exceptionTypes, exceptionSources, methodElement, "TransitiveThrownExceptionSourcePaths");
                     AddExceptionEdges(exceptionTypes, exceptionSources, exceptionEdges, methodElement, "ThrownExceptionEdges");
@@ -322,58 +322,14 @@ namespace PurelySharp.Analyzer
             }
         }
 
-        private static void AddExceptionTypes(
-            ImmutableSortedSet<string>.Builder exceptionTypes,
-            JsonElement methodElement,
-            string propertyName)
-        {
-            if (!methodElement.TryGetProperty(propertyName, out var valuesElement) ||
-                valuesElement.ValueKind != JsonValueKind.Array)
-            {
-                return;
-            }
-
-            foreach (var valueElement in valuesElement.EnumerateArray())
-            {
-                if (valueElement.ValueKind != JsonValueKind.String)
-                {
-                    continue;
-                }
-
-                var value = valueElement.GetString();
-                if (!string.IsNullOrWhiteSpace(value))
-                {
-                    exceptionTypes.Add(value.Trim());
-                }
-            }
-        }
-
         private static void AddExceptionTypeFacts(
             Dictionary<SummaryExceptionFact, SummaryExceptionFact> factMap,
             JsonElement methodElement,
             string propertyName,
             Func<string, SummaryExceptionOriginKind> getOriginKind)
         {
-            if (!methodElement.TryGetProperty(propertyName, out var valuesElement) ||
-                valuesElement.ValueKind != JsonValueKind.Array)
+            foreach (var trimmedValue in EnumerateTrimmedStringArrayValues(methodElement, propertyName))
             {
-                return;
-            }
-
-            foreach (var valueElement in valuesElement.EnumerateArray())
-            {
-                if (valueElement.ValueKind != JsonValueKind.String)
-                {
-                    continue;
-                }
-
-                var value = valueElement.GetString();
-                if (string.IsNullOrWhiteSpace(value))
-                {
-                    continue;
-                }
-
-                var trimmedValue = value.Trim();
                 var fact = new SummaryExceptionFact(
                     trimmedValue,
                     getOriginKind(trimmedValue),
@@ -390,22 +346,9 @@ namespace PurelySharp.Analyzer
             JsonElement methodElement,
             string propertyName)
         {
-            if (!methodElement.TryGetProperty(propertyName, out var valuesElement) ||
-                valuesElement.ValueKind != JsonValueKind.Array)
+            foreach (var valueElement in EnumerateObjectArrayProperty(methodElement, propertyName))
             {
-                return;
-            }
-
-            foreach (var valueElement in valuesElement.EnumerateArray())
-            {
-                if (valueElement.ValueKind != JsonValueKind.Object)
-                {
-                    continue;
-                }
-
-                var exceptionType = CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "ExceptionType");
-                var sourcePath = CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "SourcePath");
-                if (exceptionType == null)
+                if (!TryGetExceptionTypeAndSourcePath(valueElement, out var exceptionType, out var sourcePath))
                 {
                     continue;
                 }
@@ -432,26 +375,13 @@ namespace PurelySharp.Analyzer
             string propertyName,
             Func<string, string?, SummaryExceptionOriginKind> getOriginKind)
         {
-            if (!methodElement.TryGetProperty(propertyName, out var valuesElement) ||
-                valuesElement.ValueKind != JsonValueKind.Array)
+            foreach (var valueElement in EnumerateObjectArrayProperty(methodElement, propertyName))
             {
-                return;
-            }
-
-            foreach (var valueElement in valuesElement.EnumerateArray())
-            {
-                if (valueElement.ValueKind != JsonValueKind.Object)
+                if (!TryGetExceptionTypeAndSourcePath(valueElement, out var exceptionType, out var sourcePath))
                 {
                     continue;
                 }
 
-                var exceptionType = CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "ExceptionType");
-                if (exceptionType == null)
-                {
-                    continue;
-                }
-
-                var sourcePath = CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "SourcePath");
                 var fact = new SummaryExceptionFact(
                     exceptionType,
                     getOriginKind(exceptionType, sourcePath),
@@ -469,33 +399,16 @@ namespace PurelySharp.Analyzer
             JsonElement methodElement,
             string propertyName)
         {
-            if (!methodElement.TryGetProperty(propertyName, out var valuesElement) ||
-                valuesElement.ValueKind != JsonValueKind.Array)
+            foreach (var valueElement in EnumerateObjectArrayProperty(methodElement, propertyName))
             {
-                return;
-            }
-
-            foreach (var valueElement in valuesElement.EnumerateArray())
-            {
-                if (valueElement.ValueKind != JsonValueKind.Object)
-                {
-                    continue;
-                }
-
-                var exceptionType = CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "ExceptionType");
-                if (exceptionType == null)
+                if (!TryGetExceptionType(valueElement, out var exceptionType))
                 {
                     continue;
                 }
 
                 exceptionTypes.Add(exceptionType);
 
-                var sourcePath =
-                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "SourcePath") ??
-                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "ExceptionSourcePath") ??
-                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CallPath") ??
-                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CalleeExactSymbolKey") ??
-                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CalleeSymbol");
+                var sourcePath = GetEdgeSourcePath(valueElement);
                 if (sourcePath == null)
                 {
                     continue;
@@ -517,8 +430,7 @@ namespace PurelySharp.Analyzer
 
                 var edge = new SummaryExceptionEdgeInfo(
                     sourcePath,
-                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CalleeExactSymbolKey") ??
-                        CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CalleeSymbol"),
+                    GetEdgeCalleeExactSymbolKey(valueElement),
                     TryGetOptionalInt32(valueElement, "Depth"));
                 edgeMap[edge] = edge;
             }
@@ -530,34 +442,15 @@ namespace PurelySharp.Analyzer
             string propertyName,
             Func<string, string?, string?, int?, SummaryExceptionOriginKind> getOriginKind)
         {
-            if (!methodElement.TryGetProperty(propertyName, out var valuesElement) ||
-                valuesElement.ValueKind != JsonValueKind.Array)
+            foreach (var valueElement in EnumerateObjectArrayProperty(methodElement, propertyName))
             {
-                return;
-            }
-
-            foreach (var valueElement in valuesElement.EnumerateArray())
-            {
-                if (valueElement.ValueKind != JsonValueKind.Object)
+                if (!TryGetExceptionType(valueElement, out var exceptionType))
                 {
                     continue;
                 }
 
-                var exceptionType = CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "ExceptionType");
-                if (exceptionType == null)
-                {
-                    continue;
-                }
-
-                var sourcePath =
-                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "SourcePath") ??
-                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "ExceptionSourcePath") ??
-                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CallPath") ??
-                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CalleeExactSymbolKey") ??
-                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CalleeSymbol");
-                var calleeExactSymbolKey =
-                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CalleeExactSymbolKey") ??
-                    CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "CalleeSymbol");
+                var sourcePath = GetEdgeSourcePath(valueElement);
+                var calleeExactSymbolKey = GetEdgeCalleeExactSymbolKey(valueElement);
                 var depth = TryGetOptionalInt32(valueElement, "Depth");
                 var fact = new SummaryExceptionFact(
                     exceptionType,
@@ -572,48 +465,17 @@ namespace PurelySharp.Analyzer
         private static HashSet<string> GetExceptionTypes(JsonElement methodElement, string propertyName)
         {
             var exceptionTypes = new HashSet<string>(StringComparer.Ordinal);
-            if (!methodElement.TryGetProperty(propertyName, out var valuesElement) ||
-                valuesElement.ValueKind != JsonValueKind.Array)
-            {
-                return exceptionTypes;
-            }
-
-            foreach (var valueElement in valuesElement.EnumerateArray())
-            {
-                if (valueElement.ValueKind != JsonValueKind.String)
-                {
-                    continue;
-                }
-
-                var value = valueElement.GetString();
-                if (!string.IsNullOrWhiteSpace(value))
-                {
-                    exceptionTypes.Add(value.Trim());
-                }
-            }
-
+            exceptionTypes.UnionWith(EnumerateTrimmedStringArrayValues(methodElement, propertyName));
             return exceptionTypes;
         }
 
         private static HashSet<string> GetExceptionSourceKeys(JsonElement methodElement, string propertyName)
         {
             var sourceKeys = new HashSet<string>(StringComparer.Ordinal);
-            if (!methodElement.TryGetProperty(propertyName, out var valuesElement) ||
-                valuesElement.ValueKind != JsonValueKind.Array)
+            foreach (var valueElement in EnumerateObjectArrayProperty(methodElement, propertyName))
             {
-                return sourceKeys;
-            }
-
-            foreach (var valueElement in valuesElement.EnumerateArray())
-            {
-                if (valueElement.ValueKind != JsonValueKind.Object)
-                {
-                    continue;
-                }
-
-                var exceptionType = CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "ExceptionType");
-                var sourcePath = CompatibilityHelpers.GetTrimmedStringProperty(valueElement, "SourcePath");
-                if (exceptionType == null || sourcePath == null)
+                if (!TryGetExceptionTypeAndSourcePath(valueElement, out var exceptionType, out var sourcePath) ||
+                    sourcePath == null)
                 {
                     continue;
                 }
@@ -644,6 +506,93 @@ namespace PurelySharp.Analyzer
         private static string CreateExceptionFactSourceKey(string exceptionType, string sourcePath)
         {
             return exceptionType + "|" + sourcePath;
+        }
+
+        private static IEnumerable<string> EnumerateTrimmedStringArrayValues(JsonElement element, string propertyName)
+        {
+            if (!TryGetArrayProperty(element, propertyName, out var valuesElement))
+            {
+                yield break;
+            }
+
+            foreach (var valueElement in valuesElement.EnumerateArray())
+            {
+                if (valueElement.ValueKind != JsonValueKind.String)
+                {
+                    continue;
+                }
+
+                var value = valueElement.GetString();
+                if (value != null && !string.IsNullOrWhiteSpace(value))
+                {
+                    yield return value.Trim();
+                }
+            }
+        }
+
+        private static IEnumerable<JsonElement> EnumerateObjectArrayProperty(JsonElement element, string propertyName)
+        {
+            if (!TryGetArrayProperty(element, propertyName, out var valuesElement))
+            {
+                yield break;
+            }
+
+            foreach (var valueElement in valuesElement.EnumerateArray())
+            {
+                if (valueElement.ValueKind == JsonValueKind.Object)
+                {
+                    yield return valueElement;
+                }
+            }
+        }
+
+        private static bool TryGetArrayProperty(JsonElement element, string propertyName, out JsonElement valuesElement)
+        {
+            if (element.TryGetProperty(propertyName, out valuesElement) &&
+                valuesElement.ValueKind == JsonValueKind.Array)
+            {
+                return true;
+            }
+
+            valuesElement = default;
+            return false;
+        }
+
+        private static bool TryGetExceptionTypeAndSourcePath(
+            JsonElement element,
+            out string exceptionType,
+            out string? sourcePath)
+        {
+            sourcePath = CompatibilityHelpers.GetTrimmedStringProperty(element, "SourcePath");
+            return TryGetExceptionType(element, out exceptionType);
+        }
+
+        private static bool TryGetExceptionType(JsonElement element, out string exceptionType)
+        {
+            var value = CompatibilityHelpers.GetTrimmedStringProperty(element, "ExceptionType");
+            if (value == null)
+            {
+                exceptionType = null!;
+                return false;
+            }
+
+            exceptionType = value;
+            return true;
+        }
+
+        private static string? GetEdgeSourcePath(JsonElement element)
+        {
+            return CompatibilityHelpers.GetTrimmedStringProperty(element, "SourcePath") ??
+                CompatibilityHelpers.GetTrimmedStringProperty(element, "ExceptionSourcePath") ??
+                CompatibilityHelpers.GetTrimmedStringProperty(element, "CallPath") ??
+                CompatibilityHelpers.GetTrimmedStringProperty(element, "CalleeExactSymbolKey") ??
+                CompatibilityHelpers.GetTrimmedStringProperty(element, "CalleeSymbol");
+        }
+
+        private static string? GetEdgeCalleeExactSymbolKey(JsonElement element)
+        {
+            return CompatibilityHelpers.GetTrimmedStringProperty(element, "CalleeExactSymbolKey") ??
+                CompatibilityHelpers.GetTrimmedStringProperty(element, "CalleeSymbol");
         }
 
         private static int? TryGetOptionalInt32(JsonElement element, string propertyName)

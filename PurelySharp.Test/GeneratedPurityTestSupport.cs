@@ -23,15 +23,32 @@ namespace PurelySharp.Test
             params (string AssemblyPath, string FileName, string ActualMethodLookupSymbol, string DisplaySymbol, string Classification, string CategoriesJson)[] entries)
         {
             return entries
-                .Select(entry => (AdditionalText)new AnalyzerTestHost.InMemoryAdditionalText(
+                .Select(entry => CreatePuritySummaryAdditionalText(
                     entry.FileName,
-                    CreatePuritySummaryJson(
-                        entry.AssemblyPath,
-                        entry.ActualMethodLookupSymbol,
-                        entry.Classification,
-                        entry.CategoriesJson,
-                        entry.DisplaySymbol)))
+                    entry.AssemblyPath,
+                    entry.ActualMethodLookupSymbol,
+                    entry.Classification,
+                    entry.CategoriesJson,
+                    entry.DisplaySymbol))
                 .ToImmutableArray();
+        }
+
+        public static AdditionalText CreatePuritySummaryAdditionalText(
+            string fileName,
+            string assemblyPath,
+            string actualMethodLookupSymbol,
+            string classification,
+            string categoriesJson,
+            string? symbolOverride = null)
+        {
+            return new AnalyzerTestHost.InMemoryAdditionalText(
+                fileName,
+                CreatePuritySummaryJson(
+                    assemblyPath,
+                    actualMethodLookupSymbol,
+                    classification,
+                    categoriesJson,
+                    symbolOverride));
         }
 
         public static string CreatePuritySummaryJson(
@@ -103,6 +120,48 @@ namespace PurelySharp.Test
             "HasUnsupportedEffects": false,
             "FreshnessClassification": "none"
           }
+        }
+      ]
+    }
+  ]
+}
+""";
+        }
+
+        public static string CreateEffectSummaryJson(
+            string assemblyPath,
+            string symbol,
+            string[] thrownExceptionTypes,
+            params string[] transitiveThrownExceptionTypes)
+        {
+            var assemblyIdentity = GetAssemblyIdentity(assemblyPath);
+            var methodIdentity = GetMethodIdentity(assemblyPath, symbol);
+
+            return $$"""
+{
+  "SchemaVersion": 1,
+  "Assemblies": [
+    {
+      "AssemblyName": "{{assemblyIdentity.AssemblyName}}",
+      "AssemblyPath": "runtime",
+      "AssemblySha256": "{{assemblyIdentity.AssemblySha256}}",
+      "ModuleVersionId": "{{assemblyIdentity.ModuleVersionId}}",
+      "MethodCount": 1,
+      "EmittedMethodCount": 1,
+      "Methods": [
+        {
+          "Symbol": "{{symbol}}",
+          "MetadataToken": "{{methodIdentity.MetadataToken}}",
+          "RelativeVirtualAddress": 0,
+          "MethodBodySha256": {{FormatJsonStringOrNull(methodIdentity.MethodBodySha256)}},
+          "CacheKey": "diagnostic-evidence-test",
+          "Effects": [],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": {{FormatJsonArray(thrownExceptionTypes)}},
+          "TransitiveThrownExceptionTypes": {{FormatJsonArray(transitiveThrownExceptionTypes)}},
+          "Calls": [],
+          "Fields": []
         }
       ]
     }
@@ -329,16 +388,23 @@ namespace PurelySharp.Test
             return value == null ? "null" : "\"" + value + "\"";
         }
 
+        private static string FormatJsonArray(params string[] values)
+        {
+            if (values.Length == 0)
+            {
+                return "[]";
+            }
+
+            return "[\"" + string.Join("\", \"", values) + "\"]";
+        }
+
         private sealed record AssemblyIdentity(string AssemblyName, string AssemblySha256, string ModuleVersionId);
         private sealed record MethodIdentity(string MetadataToken, string? MethodBodySha256, string ExactSymbolKey);
 
         private sealed class EffectSummaryTypeNameProvider : ISignatureTypeProvider<string, object?>
         {
-            private readonly MetadataReader _reader;
-
             public EffectSummaryTypeNameProvider(MetadataReader reader)
             {
-                _reader = reader;
             }
 
             public string GetArrayType(string elementType, ArrayShape shape) => elementType + "[]";

@@ -1930,18 +1930,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IMethodSymbol methodSymbol,
             out int argumentIndex)
         {
-            argumentIndex = -1;
-
-            for (int i = 0; i < methodSymbol.Parameters.Length; i++)
-            {
-                if (IsComparerType(methodSymbol.Parameters[i].Type))
-                {
-                    argumentIndex = i;
-                    return true;
-                }
-            }
-
-            return false;
+            return TryGetParameterIndex(methodSymbol, IsComparerType, out argumentIndex);
         }
 
         private static bool IsComparerType(ITypeSymbol? typeSymbol)
@@ -1954,15 +1943,25 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IMethodSymbol methodSymbol,
             out int argumentIndex)
         {
+            return TryGetParameterIndex(methodSymbol, IsEqualityComparerType, out argumentIndex);
+        }
+
+        private static bool TryGetParameterIndex(
+            IMethodSymbol methodSymbol,
+            Func<ITypeSymbol?, bool> matchesParameterType,
+            out int argumentIndex)
+        {
             argumentIndex = -1;
 
-            for (int i = 0; i < methodSymbol.Parameters.Length; i++)
+            for (var i = 0; i < methodSymbol.Parameters.Length; i++)
             {
-                if (IsEqualityComparerType(methodSymbol.Parameters[i].Type))
+                if (!matchesParameterType(methodSymbol.Parameters[i].Type))
                 {
-                    argumentIndex = i;
-                    return true;
+                    continue;
                 }
+
+                argumentIndex = i;
+                return true;
             }
 
             return false;

@@ -5,10 +5,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Reflection.Metadata;
-using System.Reflection.Metadata.Ecma335;
-using System.Reflection.PortableExecutable;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14300,42 +14296,11 @@ public class TestClass
             string[] thrownExceptionTypes,
             params string[] transitiveThrownExceptionTypes)
         {
-            var identity = GetAssemblyIdentity(assemblyPath);
-            var methodIdentity = GetMethodIdentity(assemblyPath, symbol);
-            var methodBodySha256Json = methodIdentity.MethodBodySha256 == null
-                ? "null"
-                : "\"" + methodIdentity.MethodBodySha256 + "\"";
-            return $$"""
-{
-  "SchemaVersion": 1,
-  "Assemblies": [
-    {
-      "AssemblyName": "{{identity.AssemblyName}}",
-      "AssemblyPath": "runtime",
-      "AssemblySha256": "{{identity.AssemblySha256}}",
-      "ModuleVersionId": "{{identity.ModuleVersionId}}",
-      "MethodCount": 1,
-      "EmittedMethodCount": 1,
-      "Methods": [
-        {
-          "Symbol": "{{symbol}}",
-          "MetadataToken": "{{methodIdentity.MetadataToken}}",
-          "RelativeVirtualAddress": 0,
-          "MethodBodySha256": {{methodBodySha256Json}},
-          "CacheKey": "diagnostic-evidence-test",
-          "Effects": [],
-          "RootCandidates": [],
-          "TransitiveRootCandidates": [],
-          "ThrownExceptionTypes": {{FormatJsonArray(thrownExceptionTypes)}},
-          "TransitiveThrownExceptionTypes": {{FormatJsonArray(transitiveThrownExceptionTypes)}},
-          "Calls": [],
-          "Fields": []
-        }
-      ]
-    }
-  ]
-}
-""";
+            return GeneratedPurityTestSupport.CreateEffectSummaryJson(
+                assemblyPath,
+                symbol,
+                thrownExceptionTypes,
+                transitiveThrownExceptionTypes);
         }
 
         private static string CreatePuritySummaryJson(
@@ -14351,164 +14316,6 @@ public class TestClass
                 classification,
                 categoriesJson,
                 symbolOverride);
-        }
-
-        private static MethodIdentity GetMethodIdentity(string assemblyPath, string symbol)
-        {
-            using var stream = File.OpenRead(assemblyPath);
-            using var peReader = new PEReader(stream);
-            var metadataReader = peReader.GetMetadataReader();
-
-            foreach (var handle in metadataReader.MethodDefinitions)
-            {
-                var methodSymbol = GetMethodSymbol(metadataReader, handle);
-                if (!string.Equals(methodSymbol, symbol, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                var definition = metadataReader.GetMethodDefinition(handle);
-                string? methodBodySha256 = null;
-                if (definition.RelativeVirtualAddress != 0)
-                {
-                    var body = peReader.GetMethodBody(definition.RelativeVirtualAddress);
-                    var il = body.GetILBytes();
-                    if (il != null)
-                    {
-                        using var sha256 = SHA256.Create();
-                        methodBodySha256 = Convert.ToHexString(sha256.ComputeHash(il)).ToLowerInvariant();
-                    }
-                }
-
-                return new MethodIdentity(
-                    $"0x{MetadataTokens.GetToken(handle):X8}",
-                    methodBodySha256,
-                    GetMethodExactSymbolKey(metadataReader, handle));
-            }
-
-            throw new AssertionException("Method symbol did not resolve in assembly: " + symbol);
-        }
-
-        private static string GetMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
-        {
-            var definition = reader.GetMethodDefinition(handle);
-            var typeName = GetTypeName(reader, definition.GetDeclaringType());
-            var methodName = reader.GetString(definition.Name);
-            var signature = DecodeMethodSignature(reader, definition);
-            return typeName + "." + methodName + signature;
-        }
-
-        private static string GetTypeName(MetadataReader reader, TypeDefinitionHandle handle)
-        {
-            if (handle.IsNil)
-            {
-                return "<module>";
-            }
-
-            var definition = reader.GetTypeDefinition(handle);
-            var name = reader.GetString(definition.Name);
-            var declaringType = definition.GetDeclaringType();
-            if (!declaringType.IsNil)
-            {
-                return GetTypeName(reader, declaringType) + "+" + name;
-            }
-
-            var ns = reader.GetString(definition.Namespace);
-            return string.IsNullOrEmpty(ns) ? name : ns + "." + name;
-        }
-
-        private static string GetTypeReferenceName(MetadataReader reader, TypeReferenceHandle handle)
-        {
-            var reference = reader.GetTypeReference(handle);
-            var name = reader.GetString(reference.Name);
-            var ns = reader.GetString(reference.Namespace);
-            return string.IsNullOrEmpty(ns) ? name : ns + "." + name;
-        }
-
-        private static string DecodeMethodSignature(MetadataReader reader, MethodDefinition definition)
-        {
-            try
-            {
-                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
-                return "(" + string.Join(", ", signature.ParameterTypes) + ")";
-            }
-            catch (BadImageFormatException)
-            {
-                return "(?)";
-            }
-        }
-
-        private static string GetMethodExactSymbolKey(MetadataReader reader, MethodDefinitionHandle handle)
-        {
-            var definition = reader.GetMethodDefinition(handle);
-            var typeName = NormalizeExactTypeName(GetTypeName(reader, definition.GetDeclaringType()));
-            var methodName = reader.GetString(definition.Name);
-            var signature = DecodeExactMethodSignature(reader, definition);
-            return typeName + "." + methodName + signature;
-        }
-
-        private static string DecodeExactMethodSignature(MetadataReader reader, MethodDefinition definition)
-        {
-            try
-            {
-                var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
-                return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
-            }
-            catch (BadImageFormatException)
-            {
-                return "(?)->?";
-            }
-        }
-
-        private static string NormalizeExactTypeName(string typeName)
-        {
-            return typeName switch
-            {
-                "System.Boolean" => "bool",
-                "System.Byte" => "byte",
-                "System.Char" => "char",
-                "System.Decimal" => "decimal",
-                "System.Double" => "double",
-                "System.Int16" => "short",
-                "System.Int32" => "int",
-                "System.Int64" => "long",
-                "System.IntPtr" => "nint",
-                "System.Object" => "object",
-                "System.SByte" => "sbyte",
-                "System.Single" => "float",
-                "System.String" => "string",
-                "System.UInt16" => "ushort",
-                "System.UInt32" => "uint",
-                "System.UInt64" => "ulong",
-                "System.UIntPtr" => "nuint",
-                "System.Void" => "void",
-                _ => typeName
-            };
-        }
-
-        private static string FormatJsonArray(params string[] values)
-        {
-            if (values.Length == 0)
-            {
-                return "[]";
-            }
-
-            return "[\"" + string.Join("\", \"", values) + "\"]";
-        }
-
-        private static AssemblyIdentity GetAssemblyIdentity(string assemblyPath)
-        {
-            using var stream = File.OpenRead(assemblyPath);
-            using var peReader = new PEReader(stream);
-            var metadataReader = peReader.GetMetadataReader();
-            var assemblyName = metadataReader.IsAssembly
-                ? metadataReader.GetString(metadataReader.GetAssemblyDefinition().Name)
-                : Path.GetFileNameWithoutExtension(assemblyPath);
-            var moduleVersionId = metadataReader.GetGuid(metadataReader.GetModuleDefinition().Mvid).ToString("D");
-            stream.Position = 0;
-            using var sha256 = SHA256.Create();
-            var assemblySha256 = Convert.ToHexString(sha256.ComputeHash(stream)).ToLowerInvariant();
-            return new AssemblyIdentity(assemblyName, assemblySha256, moduleVersionId);
         }
 
         private static AnalyzerOptions CreateAnalyzerOptions(
@@ -14567,62 +14374,5 @@ public class TestClass
 
         private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences() =>
             AnalyzerTestHost.GetTrustedPlatformReferences();
-
-        private sealed record AssemblyIdentity(string AssemblyName, string AssemblySha256, string ModuleVersionId);
-        private sealed record MethodIdentity(string MetadataToken, string? MethodBodySha256, string ExactSymbolKey);
-
-        private sealed class EffectSummaryTypeNameProvider : ISignatureTypeProvider<string, object?>
-        {
-            private readonly MetadataReader _reader;
-
-            public EffectSummaryTypeNameProvider(MetadataReader reader)
-            {
-                _reader = reader;
-            }
-
-            public string GetArrayType(string elementType, ArrayShape shape)
-            {
-                var rank = Math.Max(shape.Rank, 1);
-                return elementType + "[" + new string(',', rank - 1) + "]";
-            }
-
-            public string GetByReferenceType(string elementType) => "ref " + elementType;
-            public string GetFunctionPointerType(MethodSignature<string> signature) => "delegate*";
-            public string GetGenericInstantiation(string genericType, ImmutableArray<string> typeArguments) => genericType + "<" + string.Join(", ", typeArguments) + ">";
-            public string GetGenericMethodParameter(object? genericContext, int index) => "!!" + index;
-            public string GetGenericTypeParameter(object? genericContext, int index) => "!" + index;
-            public string GetModifiedType(string modifier, string unmodifiedType, bool isRequired) => unmodifiedType;
-            public string GetPinnedType(string elementType) => elementType;
-            public string GetPointerType(string elementType) => elementType + "*";
-            public string GetPrimitiveType(PrimitiveTypeCode typeCode) => typeCode switch
-            {
-                PrimitiveTypeCode.Boolean => "bool",
-                PrimitiveTypeCode.Byte => "byte",
-                PrimitiveTypeCode.Char => "char",
-                PrimitiveTypeCode.Double => "double",
-                PrimitiveTypeCode.Int16 => "short",
-                PrimitiveTypeCode.Int32 => "int",
-                PrimitiveTypeCode.Int64 => "long",
-                PrimitiveTypeCode.IntPtr => "nint",
-                PrimitiveTypeCode.Object => "object",
-                PrimitiveTypeCode.SByte => "sbyte",
-                PrimitiveTypeCode.Single => "float",
-                PrimitiveTypeCode.String => "string",
-                PrimitiveTypeCode.TypedReference => "typedref",
-                PrimitiveTypeCode.UInt16 => "ushort",
-                PrimitiveTypeCode.UInt32 => "uint",
-                PrimitiveTypeCode.UInt64 => "ulong",
-                PrimitiveTypeCode.UIntPtr => "nuint",
-                PrimitiveTypeCode.Void => "void",
-                _ => typeCode.ToString(),
-            };
-            public string GetSZArrayType(string elementType) => elementType + "[]";
-            public string GetTypeFromDefinition(MetadataReader metadataReader, TypeDefinitionHandle handle, byte rawTypeKind)
-                => NormalizeExactTypeName(GetTypeName(metadataReader, handle));
-            public string GetTypeFromReference(MetadataReader metadataReader, TypeReferenceHandle handle, byte rawTypeKind)
-                => NormalizeExactTypeName(GetTypeReferenceName(metadataReader, handle));
-            public string GetTypeFromSpecification(MetadataReader metadataReader, object? genericContext, TypeSpecificationHandle handle, byte rawTypeKind)
-                => metadataReader.GetTypeSpecification(handle).DecodeSignature(this, genericContext);
-        }
     }
 }

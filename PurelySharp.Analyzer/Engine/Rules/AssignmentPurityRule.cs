@@ -415,14 +415,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (targetProperty.ContainingType?.TypeKind == TypeKind.Interface)
             {
-                foreach (var type in EnumerateAllNamedTypes(semanticModel.Compilation.Assembly.GlobalNamespace))
+                foreach (var type in PropertyDispatchHelper.EnumerateAllNamedTypes(semanticModel.Compilation.Assembly.GlobalNamespace))
                 {
                     if (type.TypeKind != TypeKind.Class && type.TypeKind != TypeKind.Struct)
                     {
                         continue;
                     }
 
-                    if (!ImplementsInterface(type, targetProperty.ContainingType))
+                    if (!PropertyDispatchHelper.ImplementsInterface(type, targetProperty.ContainingType))
                     {
                         continue;
                     }
@@ -438,20 +438,20 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return targets.ToImmutableArray();
             }
 
-            var baseProperty = GetRootOverriddenProperty(targetProperty);
+            var baseProperty = PropertyDispatchHelper.GetRootOverriddenProperty(targetProperty);
             var baseType = baseProperty.ContainingType;
             if (baseType != null)
             {
-                foreach (var type in EnumerateAllNamedTypes(semanticModel.Compilation.Assembly.GlobalNamespace))
+                foreach (var type in PropertyDispatchHelper.EnumerateAllNamedTypes(semanticModel.Compilation.Assembly.GlobalNamespace))
                 {
-                    if (!DerivesFrom(type, baseType))
+                    if (!PropertyDispatchHelper.DerivesFrom(type, baseType))
                     {
                         continue;
                     }
 
                     foreach (var property in type.GetMembers(baseProperty.Name).OfType<IPropertySymbol>())
                     {
-                        if (OverridesProperty(property, baseProperty) && property.SetMethod != null)
+                        if (PropertyDispatchHelper.OverridesProperty(property, baseProperty) && property.SetMethod != null)
                         {
                             targets.Add(property.SetMethod.OriginalDefinition);
                         }
@@ -469,13 +469,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static INamedTypeSymbol? GetKnownReceiverType(IOperation? instanceOperation)
         {
-            var unwrapped = PurityAnalysisEngine.SkipImplicitConversions(instanceOperation);
-            if (unwrapped is IObjectCreationOperation objectCreationOperation)
-            {
-                return objectCreationOperation.Type as INamedTypeSymbol;
-            }
-
-            return unwrapped?.Type as INamedTypeSymbol;
+            return PropertyDispatchHelper.GetKnownReceiverType(instanceOperation);
         }
 
         private static void AddSetterForReceiverType(
@@ -497,7 +491,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         .OfType<IPropertySymbol>()
                         .FirstOrDefault(property =>
                             SymbolEqualityComparer.Default.Equals(property.OriginalDefinition, targetProperty) ||
-                            OverridesProperty(property, targetProperty));
+                            PropertyDispatchHelper.OverridesProperty(property, targetProperty));
                     if (implementation != null)
                     {
                         break;
@@ -513,84 +507,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             {
                 targets.Add(methodSymbol.OriginalDefinition);
             }
-        }
-
-        private static IPropertySymbol GetRootOverriddenProperty(IPropertySymbol propertySymbol)
-        {
-            var current = propertySymbol;
-            while (current.OverriddenProperty != null)
-            {
-                current = current.OverriddenProperty;
-            }
-
-            return current.OriginalDefinition;
-        }
-
-        private static bool OverridesProperty(IPropertySymbol property, IPropertySymbol target)
-        {
-            var current = property;
-            while (current != null)
-            {
-                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
-                {
-                    return true;
-                }
-
-                current = current.OverriddenProperty;
-            }
-
-            return false;
-        }
-
-        private static IEnumerable<INamedTypeSymbol> EnumerateAllNamedTypes(INamespaceSymbol namespaceSymbol)
-        {
-            foreach (var type in namespaceSymbol.GetTypeMembers())
-            {
-                foreach (var nested in EnumerateTypeAndNestedTypes(type))
-                {
-                    yield return nested;
-                }
-            }
-
-            foreach (var nestedNamespace in namespaceSymbol.GetNamespaceMembers())
-            {
-                foreach (var type in EnumerateAllNamedTypes(nestedNamespace))
-                {
-                    yield return type;
-                }
-            }
-        }
-
-        private static IEnumerable<INamedTypeSymbol> EnumerateTypeAndNestedTypes(INamedTypeSymbol typeSymbol)
-        {
-            yield return typeSymbol;
-
-            foreach (var nestedType in typeSymbol.GetTypeMembers())
-            {
-                foreach (var nested in EnumerateTypeAndNestedTypes(nestedType))
-                {
-                    yield return nested;
-                }
-            }
-        }
-
-        private static bool DerivesFrom(INamedTypeSymbol type, INamedTypeSymbol baseType)
-        {
-            for (INamedTypeSymbol? current = type; current != null; current = current.BaseType)
-            {
-                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, baseType.OriginalDefinition))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool ImplementsInterface(INamedTypeSymbol type, INamedTypeSymbol interfaceSymbol)
-        {
-            return type.AllInterfaces.Any(candidate =>
-                SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, interfaceSymbol.OriginalDefinition));
         }
 
         private bool IsAssignmentTargetPure(IOperation targetOperation, PurityAnalysisContext context, ISymbol? targetSymbol, PurityAnalysisEngine.PurityAnalysisState currentState)
@@ -1563,6 +1479,98 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return reboundOperation is not null and not Microsoft.CodeAnalysis.FlowAnalysis.IFlowCaptureReferenceOperation
                 ? reboundOperation
                 : targetOperation;
+        }
+    }
+
+    internal static class PropertyDispatchHelper
+    {
+        internal static INamedTypeSymbol? GetKnownReceiverType(IOperation? instanceOperation)
+        {
+            var unwrapped = PurityAnalysisEngine.SkipImplicitConversions(instanceOperation);
+            if (unwrapped is IObjectCreationOperation objectCreationOperation)
+            {
+                return objectCreationOperation.Type as INamedTypeSymbol;
+            }
+
+            return unwrapped?.Type as INamedTypeSymbol;
+        }
+
+        internal static IPropertySymbol GetRootOverriddenProperty(IPropertySymbol propertySymbol)
+        {
+            var current = propertySymbol;
+            while (current.OverriddenProperty != null)
+            {
+                current = current.OverriddenProperty;
+            }
+
+            return current.OriginalDefinition;
+        }
+
+        internal static bool OverridesProperty(IPropertySymbol property, IPropertySymbol target)
+        {
+            var current = property;
+            while (current != null)
+            {
+                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
+                {
+                    return true;
+                }
+
+                current = current.OverriddenProperty;
+            }
+
+            return false;
+        }
+
+        internal static bool ImplementsInterface(INamedTypeSymbol type, INamedTypeSymbol interfaceSymbol)
+        {
+            return type.AllInterfaces.Any(candidate =>
+                SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, interfaceSymbol.OriginalDefinition));
+        }
+
+        internal static bool DerivesFrom(INamedTypeSymbol type, INamedTypeSymbol baseType)
+        {
+            for (INamedTypeSymbol? current = type; current != null; current = current.BaseType)
+            {
+                if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, baseType.OriginalDefinition))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        internal static IEnumerable<INamedTypeSymbol> EnumerateAllNamedTypes(INamespaceSymbol namespaceSymbol)
+        {
+            foreach (var type in namespaceSymbol.GetTypeMembers())
+            {
+                foreach (var nested in EnumerateTypeAndNestedTypes(type))
+                {
+                    yield return nested;
+                }
+            }
+
+            foreach (var nestedNamespace in namespaceSymbol.GetNamespaceMembers())
+            {
+                foreach (var type in EnumerateAllNamedTypes(nestedNamespace))
+                {
+                    yield return type;
+                }
+            }
+        }
+
+        private static IEnumerable<INamedTypeSymbol> EnumerateTypeAndNestedTypes(INamedTypeSymbol typeSymbol)
+        {
+            yield return typeSymbol;
+
+            foreach (var nestedType in typeSymbol.GetTypeMembers())
+            {
+                foreach (var nested in EnumerateTypeAndNestedTypes(nestedType))
+                {
+                    yield return nested;
+                }
+            }
         }
     }
 }

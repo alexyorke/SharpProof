@@ -195,21 +195,6 @@ public static class ConditionHost
             }
         }
 
-        internal sealed class DiskAdditionalText : AdditionalText
-        {
-            public DiskAdditionalText(string path)
-            {
-                Path = path;
-            }
-
-            public override string Path { get; }
-
-            public override SourceText GetText(CancellationToken cancellationToken = default)
-            {
-                return SourceText.From(File.ReadAllText(Path));
-            }
-        }
-
         private sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
         {
             private readonly AnalyzerConfigOptions _globalOptions;

@@ -57,80 +57,56 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 else if (IsKnownPureArrayFactoryReturn(sourceReturnedValue, context.SemanticModel.Compilation, out var factoryMethod))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes mutable array from known-pure factory '{factoryMethod.ToDisplayString()}'. Return statement is Impure.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    return CreateMutableStateEscapeResult(
+                        returnOperation,
                         returnOperation.ReturnedValue.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "mutable_state_escape",
-                            ruleName: nameof(ReturnStatementPurityRule),
-                            operation: returnOperation,
-                            syntaxNode: returnOperation.ReturnedValue.Syntax,
-                            symbol: factoryMethod,
-                            catalogSource: "returned_array_factory"));
+                        factoryMethod,
+                        "returned_array_factory");
                 }
                 else if (IsPureArrayReturningInvocationReturn(sourceReturnedValue, out var arrayReturningMethod))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes mutable array from known-pure method '{arrayReturningMethod.ToDisplayString()}'. Return statement is Impure.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    return CreateMutableStateEscapeResult(
+                        returnOperation,
                         returnOperation.ReturnedValue.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "mutable_state_escape",
-                            ruleName: nameof(ReturnStatementPurityRule),
-                            operation: returnOperation,
-                            syntaxNode: returnOperation.ReturnedValue.Syntax,
-                            symbol: arrayReturningMethod,
-                            catalogSource: "returned_known_pure_array"));
+                        arrayReturningMethod,
+                        "returned_known_pure_array");
                 }
                 else if (IsOwnedLocalArrayReturn(sourceReturnedValue, currentState, out var localSymbol))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes owned fresh local array '{localSymbol.Name}'. Return statement is Impure.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    return CreateMutableStateEscapeResult(
+                        returnOperation,
                         returnOperation.ReturnedValue.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "mutable_state_escape",
-                            ruleName: nameof(ReturnStatementPurityRule),
-                            operation: returnOperation,
-                            syntaxNode: returnOperation.ReturnedValue.Syntax,
-                            symbol: localSymbol,
-                            catalogSource: "owned_local_array_return"));
+                        localSymbol,
+                        "owned_local_array_return");
                 }
                 else if (IsCallerOwnedArrayReadOnlyCollectionReturn(sourceReturnedValue, currentState, context.SemanticModel, out var readOnlyCollectionMethod))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes read-only collection view over caller-owned array through '{readOnlyCollectionMethod.ToDisplayString()}'. Return statement is Impure.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    return CreateMutableStateEscapeResult(
+                        returnOperation,
                         returnOperation.ReturnedValue.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "mutable_state_escape",
-                            ruleName: nameof(ReturnStatementPurityRule),
-                            operation: returnOperation,
-                            syntaxNode: returnOperation.ReturnedValue.Syntax,
-                            symbol: readOnlyCollectionMethod,
-                            catalogSource: "returned_array_read_only_view"));
+                        readOnlyCollectionMethod,
+                        "returned_array_read_only_view");
                 }
                 else if (IsCallerOwnedArraySpanReturn(sourceReturnedValue, currentState, context.SemanticModel, out var spanMethod))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes span view over caller-owned array through '{spanMethod.ToDisplayString()}'. Return statement is Impure.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    return CreateMutableStateEscapeResult(
+                        returnOperation,
                         returnOperation.ReturnedValue.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "mutable_state_escape",
-                            ruleName: nameof(ReturnStatementPurityRule),
-                            operation: returnOperation,
-                            syntaxNode: returnOperation.ReturnedValue.Syntax,
-                            symbol: spanMethod,
-                            catalogSource: "returned_array_span_view"));
+                        spanMethod,
+                        "returned_array_span_view");
                 }
                 else if (IsCallerOwnedArrayMemoryReturn(sourceReturnedValue, currentState, context.SemanticModel, out var memoryConstructor))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes memory view over caller-owned array through '{memoryConstructor.ToDisplayString()}'. Return statement is Impure.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    return CreateMutableStateEscapeResult(
+                        returnOperation,
                         returnOperation.ReturnedValue.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "mutable_state_escape",
-                            ruleName: nameof(ReturnStatementPurityRule),
-                            operation: returnOperation,
-                            syntaxNode: returnOperation.ReturnedValue.Syntax,
-                            symbol: memoryConstructor,
-                            catalogSource: "returned_array_memory_view"));
+                        memoryConstructor,
+                        "returned_array_memory_view");
                 }
                 else if (TryFindReturnedInitializerArrayEscape(
                              returnOperation.ReturnedValue,
@@ -141,15 +117,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                              out var catalogSource))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned initializer escapes mutable array through '{escapeSyntax}'. Return statement is Impure.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    return CreateMutableStateEscapeResult(
+                        returnOperation,
                         escapeSyntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "mutable_state_escape",
-                            ruleName: nameof(ReturnStatementPurityRule),
-                            operation: returnOperation,
-                            syntaxNode: escapeSyntax,
-                            symbol: escapeSymbol,
-                            catalogSource: catalogSource));
+                        escapeSymbol,
+                        catalogSource);
                 }
                 else if (TryFindReturnedInitializerMutableObjectEscape(
                              returnOperation.ReturnedValue,
@@ -159,15 +131,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                              out var nestedObjectCatalogSource))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned initializer escapes fresh mutable object through '{nestedObjectEscapeSyntax}'. Return statement is Impure.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    return CreateMutableStateEscapeResult(
+                        returnOperation,
                         nestedObjectEscapeSyntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "mutable_state_escape",
-                            ruleName: nameof(ReturnStatementPurityRule),
-                            operation: returnOperation,
-                            syntaxNode: nestedObjectEscapeSyntax,
-                            symbol: nestedObjectEscapeSymbol,
-                            catalogSource: nestedObjectCatalogSource));
+                        nestedObjectEscapeSymbol,
+                        nestedObjectCatalogSource);
                 }
                 else if (TryFindMutableCollectionReturnEscape(
                              returnOperation.ReturnedValue,
@@ -177,15 +145,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                              out var collectionCatalogSource))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes mutable collection through '{collectionEscapeSyntax}'. Return statement is Impure.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    return CreateMutableStateEscapeResult(
+                        returnOperation,
                         collectionEscapeSyntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "mutable_state_escape",
-                            ruleName: nameof(ReturnStatementPurityRule),
-                            operation: returnOperation,
-                            syntaxNode: collectionEscapeSyntax,
-                            symbol: collectionEscapeSymbol,
-                            catalogSource: collectionCatalogSource));
+                        collectionEscapeSymbol,
+                        collectionCatalogSource);
                 }
                 else if (TryFindFreshMutableObjectReturnEscape(
                              returnOperation.ReturnedValue,
@@ -195,15 +159,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                              out var objectCatalogSource))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes fresh mutable object through '{objectEscapeSyntax}'. Return statement is Impure.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    return CreateMutableStateEscapeResult(
+                        returnOperation,
                         objectEscapeSyntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "mutable_state_escape",
-                            ruleName: nameof(ReturnStatementPurityRule),
-                            operation: returnOperation,
-                            syntaxNode: objectEscapeSyntax,
-                            symbol: objectEscapeSymbol,
-                            catalogSource: objectCatalogSource));
+                        objectEscapeSymbol,
+                        objectCatalogSource);
                 }
                 else
                 {
@@ -213,6 +173,23 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        }
+
+        private static PurityAnalysisEngine.PurityAnalysisResult CreateMutableStateEscapeResult(
+            IReturnOperation returnOperation,
+            SyntaxNode escapeSyntax,
+            ISymbol escapeSymbol,
+            string catalogSource)
+        {
+            return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                escapeSyntax,
+                PurityAnalysisEngine.PurityEvidence.Create(
+                    "mutable_state_escape",
+                    ruleName: nameof(ReturnStatementPurityRule),
+                    operation: returnOperation,
+                    syntaxNode: escapeSyntax,
+                    symbol: escapeSymbol,
+                    catalogSource: catalogSource));
         }
 
         private static IOperation? GetSourceReturnedValueOperation(IReturnOperation returnOperation, SemanticModel semanticModel)
