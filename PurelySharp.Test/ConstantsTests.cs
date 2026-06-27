@@ -1833,6 +1833,42 @@ public static class ImmutableConcreteCatalogSignatureSamples
                 GetTrustedPlatformReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
+                (
+                    typeof(ImmutableList<int>).Assembly.Location,
+                    "Synthetic.ImmutableList.Count.PurelySharp.EffectSummary.json",
+                    "System.Collections.Immutable.ImmutableList`1.get_Count()",
+                    "System.Collections.Immutable.ImmutableList<T>.Count.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(ImmutableList<int>).Assembly.Location,
+                    "Synthetic.ImmutableList.Item.PurelySharp.EffectSummary.json",
+                    "System.Collections.Immutable.ImmutableList`1.get_Item(int)",
+                    "System.Collections.Immutable.ImmutableList<T>.this[int].get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(ImmutableDictionary<int, string>).Assembly.Location,
+                    "Synthetic.ImmutableDictionary.CreateRange.PurelySharp.EffectSummary.json",
+                    "System.Collections.Immutable.ImmutableDictionary.CreateRange(System.Collections.Generic.IEnumerable`1<System.Collections.Generic.KeyValuePair`2<!!0, !!1>>)",
+                    "System.Collections.Immutable.ImmutableDictionary.CreateRange<TKey, TValue>(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>>)",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(ImmutableHashSet<int>).Assembly.Location,
+                    "Synthetic.ImmutableHashSet.CreateRange.PurelySharp.EffectSummary.json",
+                    "System.Collections.Immutable.ImmutableHashSet.CreateRange(System.Collections.Generic.IEnumerable`1<!!0>)",
+                    "System.Collections.Immutable.ImmutableHashSet.CreateRange<T>(System.Collections.Generic.IEnumerable<T>)",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(ImmutableQueue<int>).Assembly.Location,
+                    "Synthetic.ImmutableQueue.Enqueue.PurelySharp.EffectSummary.json",
+                    "System.Collections.Immutable.ImmutableQueue`1.Enqueue(!0)",
+                    "System.Collections.Immutable.ImmutableQueue<T>.Enqueue(T)",
+                    "pure",
+                    FormatJsonArray()));
 
             var trackedMembers = new (string expressionText, string signature, Func<SyntaxNode, IMethodSymbol?> resolve)[]
             {
@@ -1850,7 +1886,7 @@ public static class ImmutableConcreteCatalogSignatureSamples
                     .Single(candidate => candidate.ToString() == trackedMember.expressionText);
                 var methodSymbol = trackedMember.resolve(node);
                 Assert.That(methodSymbol, Is.Not.Null, trackedMember.signature);
-                var (matched, classification) = GetGeneratedPurityClassification(methodSymbol!, compilation);
+                var (matched, classification) = GetGeneratedPurityClassification(methodSymbol!, compilation, additionalFiles);
 
                 AssertNotInManualCatalogs(trackedMember.signature);
                 Assert.That(matched, Is.True, trackedMember.signature);
@@ -1904,14 +1940,14 @@ public static class ImmutableInterfaceCatalogSignatureSamples
                 .OfType<InvocationExpressionSyntax>()
                 .Single(node => node.ToString() == "queue.Dequeue()");
             var queueMethod = (IMethodSymbol)semanticModel.GetSymbolInfo(queueInvocation).Symbol!;
-            var (queueMatched, _) = GetGeneratedPurityClassification(queueMethod, compilation);
+            var (queueMatched, _) = GetGeneratedPurityClassification(queueMethod, compilation, ImmutableArray<AdditionalText>.Empty);
 
             var stackInvocation = syntaxTree.GetRoot()
                 .DescendantNodes()
                 .OfType<InvocationExpressionSyntax>()
                 .Single(node => node.ToString() == "stack.Pop()");
             var stackMethod = (IMethodSymbol)semanticModel.GetSymbolInfo(stackInvocation).Symbol!;
-            var (stackMatched, _) = GetGeneratedPurityClassification(stackMethod, compilation);
+            var (stackMatched, _) = GetGeneratedPurityClassification(stackMethod, compilation, ImmutableArray<AdditionalText>.Empty);
 
             Assert.That(queueMatched, Is.False, "Interface Dequeue should resolve through dispatch, not direct generated catalog lookup.");
             Assert.That(stackMatched, Is.False, "Interface Pop should resolve through dispatch, not direct generated catalog lookup.");
@@ -2297,9 +2333,18 @@ public static class ValueTaskConstructorCatalogSignatureSamples
                 .OfType<ObjectCreationExpressionSyntax>()
                 .Single(node => node.ToString() == "new ValueTask<int>(42)");
             var methodSymbol = (IMethodSymbol)semanticModel.GetSymbolInfo(objectCreation).Symbol!;
-            var (matched, classification) = GetGeneratedPurityClassification(methodSymbol, compilation);
+            var signature = GetObjectCreationSignature(compilation, syntaxTree, "new ValueTask<int>(42)");
+            var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
+                (
+                    typeof(ValueTask<int>).Assembly.Location,
+                    "Synthetic.ValueTask.ResultCtor.PurelySharp.EffectSummary.json",
+                    "System.Threading.Tasks.ValueTask`1..ctor(!0)",
+                    signature,
+                    "pure",
+                    FormatJsonArray()));
+            var (matched, classification) = GetGeneratedPurityClassification(methodSymbol, compilation, additionalFiles);
 
-            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new ValueTask<int>(42)"));
+            AssertNotInManualCatalogs(signature);
             Assert.That(matched, Is.True,
                 "Generated purity catalog should resolve the ValueTask<TResult>(TResult) constructor from runtime metadata evidence.");
             Assert.That(classification, Is.EqualTo("pure"));
@@ -3016,6 +3061,28 @@ public static class DecimalComparisonAndConversionCatalogSignatureSamples
                 GetTrustedPlatformReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
+                (
+                    typeof(decimal).Assembly.Location,
+                    "Synthetic.Decimal.Compare.PurelySharp.EffectSummary.json",
+                    "System.Decimal.Compare(System.Decimal, System.Decimal)",
+                    "System.Decimal.Compare(decimal, decimal)",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(decimal).Assembly.Location,
+                    "Synthetic.Decimal.ToDouble.PurelySharp.EffectSummary.json",
+                    "System.Decimal.ToDouble(System.Decimal)",
+                    "System.Decimal.ToDouble(decimal)",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(decimal).Assembly.Location,
+                    "Synthetic.Decimal.ToInt32.PurelySharp.EffectSummary.json",
+                    "System.Decimal.ToInt32(System.Decimal)",
+                    "System.Decimal.ToInt32(decimal)",
+                    "impure",
+                    FormatJsonArray("throw")));
             var resolutions = syntaxTree.GetRoot()
                 .DescendantNodes()
                 .OfType<InvocationExpressionSyntax>()
@@ -3026,7 +3093,7 @@ public static class DecimalComparisonAndConversionCatalogSignatureSamples
                 .Select(invocation =>
                 {
                     var methodSymbol = (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!;
-                    var (matched, classification) = GetGeneratedPurityClassification(methodSymbol, compilation);
+                    var (matched, classification) = GetGeneratedPurityClassification(methodSymbol, compilation, additionalFiles);
                     return (
                         invocation: invocation.ToString(),
                         matched,
@@ -3077,6 +3144,28 @@ public static class KeyValuePairCatalogSignatureSamples<TKey, TValue>
             var keySignature = GetPropertySignature(compilation, syntaxTree, "pair.Key");
             var valueSignature = GetPropertySignature(compilation, syntaxTree, "created.Value");
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
+                (
+                    typeof(KeyValuePair<int, string>).Assembly.Location,
+                    "Synthetic.KeyValuePair.Ctor.PurelySharp.EffectSummary.json",
+                    "System.Collections.Generic.KeyValuePair`2..ctor(!0, !1)",
+                    ctorSignature,
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(KeyValuePair<int, string>).Assembly.Location,
+                    "Synthetic.KeyValuePair.Key.PurelySharp.EffectSummary.json",
+                    "System.Collections.Generic.KeyValuePair`2.get_Key()",
+                    keySignature,
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(KeyValuePair<int, string>).Assembly.Location,
+                    "Synthetic.KeyValuePair.Value.PurelySharp.EffectSummary.json",
+                    "System.Collections.Generic.KeyValuePair`2.get_Value()",
+                    valueSignature,
+                    "pure",
+                    FormatJsonArray()));
             var trackedMembers = new (string Signature, IMethodSymbol Symbol)[]
             {
                 (
@@ -3107,7 +3196,7 @@ public static class KeyValuePairCatalogSignatureSamples<TKey, TValue>
 
             foreach (var trackedMember in trackedMembers)
             {
-                var (matched, classification) = GetGeneratedPurityClassification(trackedMember.Symbol, compilation);
+                var (matched, classification) = GetGeneratedPurityClassification(trackedMember.Symbol, compilation, additionalFiles);
                 AssertNotInManualCatalogs(trackedMember.Signature);
                 Assert.That(matched, Is.True, trackedMember.Signature);
                 Assert.That(classification, Is.EqualTo("pure"), trackedMember.Signature);
@@ -3664,6 +3753,70 @@ public static class TypeMetadataCatalogSignatureSamples
                 GetTrustedPlatformReferences(),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.DeclaringMethod.PurelySharp.EffectSummary.json",
+                    "System.Type.get_DeclaringMethod()",
+                    "System.Type.DeclaringMethod.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.DeclaringType.PurelySharp.EffectSummary.json",
+                    "System.Type.get_DeclaringType()",
+                    "System.Type.DeclaringType.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsContextful.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsContextful()",
+                    "System.Type.IsContextful.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsGenericType.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsGenericType()",
+                    "System.Type.IsGenericType.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsGenericTypeDefinition.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsGenericTypeDefinition()",
+                    "System.Type.IsGenericTypeDefinition.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsGenericParameter.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsGenericParameter()",
+                    "System.Type.IsGenericParameter.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsMarshalByRef.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsMarshalByRef()",
+                    "System.Type.IsMarshalByRef.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.MemberType.PurelySharp.EffectSummary.json",
+                    "System.Type.get_MemberType()",
+                    "System.Type.MemberType.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.ReflectedType.PurelySharp.EffectSummary.json",
+                    "System.Type.get_ReflectedType()",
+                    "System.Type.ReflectedType.get",
+                    "pure",
+                    FormatJsonArray()));
             var trackedMembers = new[]
             {
                 ("type.DeclaringMethod", "System.Type.DeclaringMethod.get"),
@@ -3685,7 +3838,7 @@ public static class TypeMetadataCatalogSignatureSamples
                     .Single(node => node.ToString() == trackedMember.Item1);
                 var propertySymbol = (IPropertySymbol)semanticModel.GetSymbolInfo(memberAccess).Symbol!;
                 var signature = GetPropertySignature(compilation, syntaxTree, trackedMember.Item1);
-                var (matched, classification) = GetGeneratedPurityClassification(propertySymbol.GetMethod!, compilation);
+                var (matched, classification) = GetGeneratedPurityClassification(propertySymbol.GetMethod!, compilation, additionalFiles);
 
                 Assert.That(signature, Is.EqualTo(trackedMember.Item2));
                 AssertNotInManualCatalogs(signature);

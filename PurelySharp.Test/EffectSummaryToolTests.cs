@@ -10858,20 +10858,23 @@ public sealed class StableCacheDerived : StaticFieldBase
 
         private static string CreateReviewedSummaryDocument(params object[] entries)
         {
-            return JsonSerializer.Serialize(new
+            return CreateGeneratedPurityCatalogSummaryDocument(new
             {
-                GeneratedPurityCatalog = new
-                {
-                    Entries = entries
-                }
+                Entries = entries
             });
         }
 
         private static string CreateGeneratedOnlySummaryDocument(JsonDocument summary)
         {
-            return "{\"GeneratedPurityCatalog\":" +
-                summary.RootElement.GetProperty("GeneratedPurityCatalog").GetRawText() +
-                "}";
+            return CreateGeneratedPurityCatalogSummaryDocument(summary.RootElement.GetProperty("GeneratedPurityCatalog"));
+        }
+
+        private static string CreateGeneratedPurityCatalogSummaryDocument(object generatedPurityCatalog)
+        {
+            return JsonSerializer.Serialize(new
+            {
+                GeneratedPurityCatalog = generatedPurityCatalog
+            });
         }
 
         private static string[] GetGeneratedPurityCatalogSymbols(JsonDocument summary)

@@ -228,12 +228,85 @@ namespace PurelySharp.Test
             try
             {
                 var signature = definition.DecodeSignature(new EffectSummaryTypeNameProvider(reader), genericContext: null);
-                return "(" + string.Join(", ", signature.ParameterTypes) + ")->" + signature.ReturnType;
+                return "(" +
+                    string.Join(", ", signature.ParameterTypes.Select(NormalizeExactSignatureTypeName)) +
+                    ")->" +
+                    NormalizeExactSignatureTypeName(signature.ReturnType);
             }
             catch (BadImageFormatException)
             {
                 return "(?)->?";
             }
+        }
+
+        private static string NormalizeExactSignatureTypeName(string typeName)
+        {
+            if (string.IsNullOrEmpty(typeName))
+            {
+                return typeName;
+            }
+
+            if (typeName.EndsWith("[]", StringComparison.Ordinal))
+            {
+                return NormalizeExactSignatureTypeName(typeName[..^2]) + "[]";
+            }
+
+            if (typeName.EndsWith("*", StringComparison.Ordinal))
+            {
+                return NormalizeExactSignatureTypeName(typeName[..^1]) + "*";
+            }
+
+            if (typeName.StartsWith("ref readonly ", StringComparison.Ordinal))
+            {
+                return "ref readonly " + NormalizeExactSignatureTypeName(typeName["ref readonly ".Length..]);
+            }
+
+            if (typeName.StartsWith("ref ", StringComparison.Ordinal))
+            {
+                return "ref " + NormalizeExactSignatureTypeName(typeName["ref ".Length..]);
+            }
+
+            var genericStart = typeName.IndexOf('<');
+            if (genericStart >= 0 && typeName.EndsWith(">", StringComparison.Ordinal))
+            {
+                var genericType = typeName[..genericStart];
+                var genericArguments = SplitTopLevelArguments(typeName[(genericStart + 1)..^1])
+                    .Select(NormalizeExactSignatureTypeName);
+                return NormalizeExactTypeName(genericType) + "<" + string.Join(", ", genericArguments) + ">";
+            }
+
+            return NormalizeExactTypeName(typeName);
+        }
+
+        private static ImmutableArray<string> SplitTopLevelArguments(string arguments)
+        {
+            if (string.IsNullOrEmpty(arguments))
+            {
+                return ImmutableArray<string>.Empty;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<string>();
+            var depth = 0;
+            var start = 0;
+            for (var index = 0; index < arguments.Length; index++)
+            {
+                switch (arguments[index])
+                {
+                    case '<':
+                        depth++;
+                        break;
+                    case '>':
+                        depth--;
+                        break;
+                    case ',' when depth == 0:
+                        builder.Add(arguments[start..index].Trim());
+                        start = index + 1;
+                        break;
+                }
+            }
+
+            builder.Add(arguments[start..].Trim());
+            return builder.ToImmutable();
         }
 
         private static string NormalizeExactTypeName(string typeName)
