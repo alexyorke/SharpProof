@@ -11520,6 +11520,31 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ThrowExpression_IncludesThrowEvidence()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(string text)
+    {
+        return string.IsNullOrWhiteSpace(text)
+            ? throw new FormatException(""fuzz"")
+            : text.Length;
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("throw"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ThrowOperationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityOperationKindProperty], Is.EqualTo("Throw"));
+        }
+
+        [Test]
         public async Task Ps0002_UnsafePointerOperation_IncludesUnsafePointerCategory()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
@@ -12797,7 +12822,7 @@ public class TestClass
         return value.Length > 0 ? value : throw new InvalidOperationException();
     }
 }",
-                ReportExceptionsOptions());
+                CheckedExceptionsOptions());
 
             var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.ExceptionSummaryId);
 
@@ -13678,6 +13703,57 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_null_dereference"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.NullReferenceException=definite_null_dereference:null_receiver"));
+        }
+
+        [Test]
+        public async Task Ps0011_DefiniteDivideByZero_Caught_IsSuppressed()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        try
+        {
+            return value / 0;
+        }
+        catch (DivideByZeroException)
+        {
+            return 0;
+        }
+    }
+}",
+                CheckedExceptionsOptions());
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0011_DefiniteNullDereference_Caught_IsSuppressed()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        try
+        {
+            string value = null!;
+            return value.Length;
+        }
+        catch (NullReferenceException)
+        {
+            return 0;
+        }
+    }
+}",
+                CheckedExceptionsOptions());
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
         }
 
         [Test]

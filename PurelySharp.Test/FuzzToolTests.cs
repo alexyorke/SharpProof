@@ -306,7 +306,10 @@ public class KnownImpureConsoleCase
                     .ToArray();
 
                 Assert.That(analysis.CompilationErrors, Is.Empty, family);
-                Assert.That(analysis.Findings, Is.Empty, family);
+                Assert.That(
+                    analysis.Findings,
+                    Is.Empty,
+                    family + Environment.NewLine + string.Join(Environment.NewLine, analysis.DiagnosticSignatures));
                 Assert.That(
                     exceptionDiagnostics.Length,
                     Is.GreaterThan(0),

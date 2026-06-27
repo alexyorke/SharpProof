@@ -542,7 +542,7 @@ namespace PurelySharp.Analyzer.Engine
             public PurityAnalysisState WithImpurity(SyntaxNode node)
             {
                 if (HasPotentialImpurity) return this;
-                return new PurityAnalysisState(true, node, this.DelegateTargetMap, this.FlowCaptures, this.FlowCaptureTargets, this.OwnedLocalArraySymbols, this.DefinitelyNullLocalSymbols, PurityEvidence.Create("unsupported_operation", syntaxNode: node), localConcreteTypes: this.LocalConcreteTypes, flowCaptureConcreteTypes: this.FlowCaptureConcreteTypes, pathConditions: this.PathConditions, flowCaptureSymbols: this.FlowCaptureSymbols, ownedArrayFlowCaptures: this.OwnedArrayFlowCaptures);
+                return new PurityAnalysisState(true, node, this.DelegateTargetMap, this.FlowCaptures, this.FlowCaptureTargets, this.OwnedLocalArraySymbols, this.DefinitelyNullLocalSymbols, PurityEvidence.Create("unsupported_operation", ruleName: "UnsupportedOperation", syntaxNode: node), localConcreteTypes: this.LocalConcreteTypes, flowCaptureConcreteTypes: this.FlowCaptureConcreteTypes, pathConditions: this.PathConditions, flowCaptureSymbols: this.FlowCaptureSymbols, ownedArrayFlowCaptures: this.OwnedArrayFlowCaptures);
             }
 
             public PurityAnalysisState WithImpurity(PurityAnalysisResult result, SyntaxNode fallbackNode)
@@ -550,7 +550,7 @@ namespace PurelySharp.Analyzer.Engine
                 if (HasPotentialImpurity) return this;
                 var node = result.ImpureSyntaxNode ?? fallbackNode;
                 var evidence = result.Evidence.IsEmpty
-                    ? PurityEvidence.Create("unsupported_operation", syntaxNode: node)
+                    ? PurityEvidence.Create("unsupported_operation", ruleName: "UnsupportedOperation", syntaxNode: node)
                     : result.Evidence.WithSyntax(node);
                 return new PurityAnalysisState(true, node, this.DelegateTargetMap, this.FlowCaptures, this.FlowCaptureTargets, this.OwnedLocalArraySymbols, this.DefinitelyNullLocalSymbols, evidence, localConcreteTypes: this.LocalConcreteTypes, flowCaptureConcreteTypes: this.FlowCaptureConcreteTypes, pathConditions: this.PathConditions, flowCaptureSymbols: this.FlowCaptureSymbols, ownedArrayFlowCaptures: this.OwnedArrayFlowCaptures);
             }
@@ -1097,13 +1097,14 @@ namespace PurelySharp.Analyzer.Engine
                 {
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is extern. Assuming impure due unknown implementation.");
                     var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
-                    var externResult = ImpureResult(
-                        syntax,
-                        PurityEvidence.Create(
-                            "unknown_external_call",
-                            syntaxNode: syntax,
-                            symbol: methodSymbol,
-                            catalogSource: "extern"));
+                        var externResult = ImpureResult(
+                            syntax,
+                            PurityEvidence.Create(
+                                "unknown_external_call",
+                                ruleName: "MethodInvocationPurityRule",
+                                syntaxNode: syntax,
+                                symbol: methodSymbol,
+                                catalogSource: "extern"));
                     purityCache[methodSymbol] = externResult;
                     LogDebug($"{indent}<< Exit DeterminePurity (Extern): {methodSymbol.ToDisplayString()}");
                     return externResult;
@@ -1151,6 +1152,7 @@ namespace PurelySharp.Analyzer.Engine
                             generatedSyntax,
                             PurityEvidence.Create(
                                 generatedPurity.PrimaryCategory,
+                                ruleName: "MethodInvocationPurityRule",
                                 syntaxNode: generatedSyntax,
                                 symbol: methodSymbol,
                                 catalogSource: "generated_purity_summary"));
@@ -1165,6 +1167,7 @@ namespace PurelySharp.Analyzer.Engine
                         syntax,
                         PurityEvidence.Create(
                             "unknown_external_call",
+                            ruleName: "MethodInvocationPurityRule",
                             syntaxNode: syntax,
                             symbol: methodSymbol,
                             catalogSource: "no_body"));

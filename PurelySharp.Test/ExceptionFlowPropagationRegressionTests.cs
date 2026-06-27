@@ -87,6 +87,39 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0011_PropertySetter_CheckedOnly_ReportsAssignmentSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class Box
+{
+    public int Value
+    {
+        set
+        {
+            throw new InvalidOperationException();
+        }
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        var box = new Box();
+        box.Value = 1;
+    }
+}",
+                CheckedExceptionsOptions());
+
+            var diagnostic = diagnostics.Single(d =>
+                d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId &&
+                !d.GetMessage().Contains("throw new InvalidOperationException()", StringComparison.Ordinal));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
         public async Task Ps0010_UsingExistingLocalDispose_Propagates()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"
@@ -112,6 +145,76 @@ public class TestClass
 }", "TestMethod");
 
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
+        public async Task Ps0011_UsingExistingLocalDispose_CheckedOnly_ReportsUsingSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public sealed class ThrowingResource : IDisposable
+{
+    public void Dispose()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        var resource = new ThrowingResource();
+        using (resource)
+        {
+        }
+    }
+}",
+                CheckedExceptionsOptions());
+
+            var diagnostic = diagnostics.Single(d =>
+                d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId &&
+                d.GetMessage().Contains("using (resource)", StringComparison.Ordinal));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
+        public async Task Ps0011_PlainUsing_IgnoresDisposeAsync()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using System.Threading.Tasks;
+
+public sealed class Resource : IDisposable, IAsyncDisposable
+{
+    public void Dispose()
+    {
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        var resource = new Resource();
+        using (resource)
+        {
+        }
+    }
+}",
+                CheckedExceptionsOptions());
+
+            Assert.That(
+                diagnostics.Any(d =>
+                    d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId &&
+                    d.GetMessage().Contains("using (resource)", StringComparison.Ordinal)),
+                Is.False);
         }
 
         [Test]
@@ -165,6 +268,132 @@ public class TestClass
 }", "TestMethod");
 
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
+        public async Task Ps0011_ForeachGetEnumerator_CheckedOnly_ReportsForeachSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using System.Collections;
+using System.Collections.Generic;
+
+public sealed class ThrowingEnumerable : IEnumerable<int>
+{
+    public ThrowingEnumerator GetEnumerator()
+    {
+        throw new InvalidOperationException();
+    }
+
+    IEnumerator<int> IEnumerable<int>.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+}
+
+public sealed class ThrowingEnumerator : IEnumerator<int>
+{
+    public int Current => 0;
+    object IEnumerator.Current => 0;
+    public bool MoveNext() => false;
+    public void Reset()
+    {
+    }
+
+    public void Dispose()
+    {
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        foreach (var value in new ThrowingEnumerable())
+        {
+        }
+    }
+}",
+                CheckedExceptionsOptions());
+
+            var diagnostic = diagnostics.Single(d =>
+                d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId &&
+                d.GetMessage().Contains("new ThrowingEnumerable()", StringComparison.Ordinal));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
+        public async Task Ps0011_PlainForeach_IgnoresDisposeAsync()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+public sealed class SafeEnumerable : IEnumerable<int>
+{
+    public SafeEnumerator GetEnumerator()
+    {
+        return new SafeEnumerator();
+    }
+
+    IEnumerator<int> IEnumerable<int>.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+}
+
+public sealed class SafeEnumerator : IEnumerator<int>, IAsyncDisposable
+{
+    public int Current => 0;
+    object IEnumerator.Current => 0;
+
+    public bool MoveNext()
+    {
+        return false;
+    }
+
+    public void Reset()
+    {
+    }
+
+    public void Dispose()
+    {
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        foreach (var value in new SafeEnumerable())
+        {
+        }
+    }
+}",
+                CheckedExceptionsOptions());
+
+            Assert.That(
+                diagnostics.Any(d =>
+                    d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId &&
+                    d.GetMessage().Contains("new SafeEnumerable()", StringComparison.Ordinal)),
+                Is.False);
         }
 
         [Test]
@@ -614,7 +843,9 @@ public class TestClass
             return diagnostic.GetMessage().Contains("'" + methodName + "'", StringComparison.Ordinal);
         }
 
-        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(string source)
+        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
+            string source,
+            ImmutableDictionary<string, string>? globalOptions = null)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var references = GetTrustedPlatformReferences()
@@ -628,10 +859,7 @@ public class TestClass
 
             var analyzerOptions = new AnalyzerOptions(
                 ImmutableArray<AdditionalText>.Empty,
-                new TestAnalyzerConfigOptionsProvider(
-                    ImmutableDictionary<string, string>.Empty
-                        .Add("purelysharp_report_exceptions", "true")
-                        .Add("purelysharp_checked_exceptions", "true")));
+                new TestAnalyzerConfigOptionsProvider(globalOptions ?? ReportAndCheckedExceptionsOptions()));
 
             var compilationWithAnalyzers = compilation.WithAnalyzers(
                 ImmutableArray.Create<DiagnosticAnalyzer>(new PurelySharpAnalyzer()),
@@ -643,6 +871,18 @@ public class TestClass
                     reportSuppressedDiagnostics: false));
 
             return await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
+        }
+
+        private static ImmutableDictionary<string, string> CheckedExceptionsOptions()
+        {
+            return ImmutableDictionary<string, string>.Empty.Add("purelysharp_checked_exceptions", "true");
+        }
+
+        private static ImmutableDictionary<string, string> ReportAndCheckedExceptionsOptions()
+        {
+            return ImmutableDictionary<string, string>.Empty
+                .Add("purelysharp_report_exceptions", "true")
+                .Add("purelysharp_checked_exceptions", "true");
         }
 
         private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()

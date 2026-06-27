@@ -1384,7 +1384,9 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                foreach (var disposeMethod in GetDisposableMethods(resourceType))
+                foreach (var disposeMethod in GetDisposableMethods(
+                             resourceType,
+                             includeAsyncDispose: usingStatement.AwaitKeyword.RawKind != 0))
                 {
                     yield return new MethodCallCandidate(usingStatement, disposeMethod);
                 }
@@ -1403,7 +1405,9 @@ namespace PurelySharp.Analyzer
                         continue;
                     }
 
-                    foreach (var disposeMethod in GetDisposableMethods(resourceType))
+                    foreach (var disposeMethod in GetDisposableMethods(
+                                 resourceType,
+                                 includeAsyncDispose: usingDeclaration.AwaitKeyword.RawKind != 0))
                     {
                         yield return new MethodCallCandidate(usingDeclaration, disposeMethod);
                     }
@@ -1487,7 +1491,9 @@ namespace PurelySharp.Analyzer
                     yield return new MethodCallCandidate(forEachStatement, currentGetter);
                 }
 
-                foreach (var disposeMethod in GetDisposableMethods(enumeratorType))
+                foreach (var disposeMethod in GetDisposableMethods(
+                             enumeratorType,
+                             includeAsyncDispose: forEachStatement.AwaitKeyword.RawKind != 0))
                 {
                     yield return new MethodCallCandidate(forEachStatement, disposeMethod);
                 }
@@ -1519,7 +1525,7 @@ namespace PurelySharp.Analyzer
                 .FirstOrDefault(method => method != null);
         }
 
-        private static IEnumerable<IMethodSymbol> GetDisposableMethods(ITypeSymbol typeSymbol)
+        private static IEnumerable<IMethodSymbol> GetDisposableMethods(ITypeSymbol typeSymbol, bool includeAsyncDispose)
         {
             foreach (var method in typeSymbol
                          .GetMembers("Dispose")
@@ -1527,6 +1533,11 @@ namespace PurelySharp.Analyzer
                          .Where(candidate => candidate.Parameters.Length == 0))
             {
                 yield return method;
+            }
+
+            if (!includeAsyncDispose)
+            {
+                yield break;
             }
 
             foreach (var method in typeSymbol
