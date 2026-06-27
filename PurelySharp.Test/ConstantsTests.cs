@@ -1005,7 +1005,9 @@ public static class ArrayConvertAllAndComparerSortCatalogSignatureSamples
                 "System.Array.Fill<T>(T[], T, int, int)",
                 "System.Array.Resize<T>(ref T[], int)",
                 "System.Span<T>.Clear()",
+                "System.Span<T>.CopyTo(System.Span<T>)",
                 "System.Span<T>.Fill(T)",
+                "System.Span<T>.TryCopyTo(System.Span<T>)",
             };
 
             foreach (var member in members)

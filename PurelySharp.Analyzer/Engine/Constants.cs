@@ -161,8 +161,6 @@ public static class Constants
         "System.Threading.Tasks.Task<TResult>.Result.get",
 
 
-        "System.Span<T>.CopyTo(System.Span<T>)",
-        "System.Span<T>.TryCopyTo(System.Span<T>)",
         "System.MemoryExtensions.Reverse<T>(System.Span<T>)",
         "System.Exception.Source.set",
 

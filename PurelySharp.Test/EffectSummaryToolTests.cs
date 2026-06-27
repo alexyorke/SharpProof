@@ -9154,10 +9154,24 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(
                 knownImpureRows.Any(row => string.Equals(
                     row.GetProperty("Symbol").GetString(),
+                    "System.Span<T>.CopyTo(System.Span<T>)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "System.Span<T>.CopyTo(System.Span<T>) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
                     "System.Span<T>.Fill(T)",
                     StringComparison.Ordinal)),
                 Is.False,
                 "System.Span<T>.Fill(T) should no longer overlap the manual impure catalog.");
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Span<T>.TryCopyTo(System.Span<T>)",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "System.Span<T>.TryCopyTo(System.Span<T>) should no longer overlap the manual impure catalog.");
 
             AssertPurityClassification(summary, "System.Array.Clear(System.Array)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Array.Clear(System.Array)", "caller_visible");
