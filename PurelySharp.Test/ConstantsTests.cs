@@ -3156,6 +3156,74 @@ public static class StopwatchCatalogSignatureSamples
         }
 
         [Test]
+        public void ReflectionNamespaceRuntimeMembers_AreSourcedFromNamespaceFallback_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Reflection.Assembly.GetExecutingAssembly()",
+                "System.Reflection.Assembly.GetTypes()",
+                "System.Reflection.Assembly.Load(string)",
+                "System.Reflection.Assembly.LoadFrom(string)",
+                "System.Reflection.FieldInfo.SetValue(object, object)",
+                "System.Reflection.MethodBase.GetCurrentMethod()",
+                "System.Reflection.MethodInfo.Invoke(object, object[])",
+                "System.Reflection.PropertyInfo.SetValue(object, object)",
+                "System.Reflection.IntrospectionExtensions.GetTypeInfo(System.Type)",
+                "System.Reflection.MemberInfo.GetCustomAttributes(bool)",
+                "System.Reflection.Module.Assembly.get",
+                "System.Reflection.PropertyInfo.PropertyType.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
+        public void TypeGetTypeAndObjectEquals_AreSourcedFromSemanticRules_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "object.Equals(object)",
+                "System.Type.GetType(string)",
+                "System.Type.GetType(string, bool)",
+                "System.Type.GetType(string, bool, bool)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
+        public void InterlockedAndVolatileMembers_AreSourcedFromNamespaceFallback_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Threading.Interlocked.CompareExchange(ref int, int, int)",
+                "System.Threading.Interlocked.CompareExchange(ref long, long, long)",
+                "System.Threading.Interlocked.CompareExchange(ref object, object, object)",
+                "System.Threading.Interlocked.Increment(ref int)",
+                "System.Threading.Interlocked.Increment(ref long)",
+                "System.Threading.Interlocked.Decrement(ref int)",
+                "System.Threading.Interlocked.Decrement(ref long)",
+                "System.Threading.Interlocked.Add(ref int, int)",
+                "System.Threading.Interlocked.Add(ref long, long)",
+                "System.Threading.Interlocked.Exchange(ref int, int)",
+                "System.Threading.Interlocked.Exchange(ref long, long)",
+                "System.Threading.Interlocked.Exchange(ref object, object)",
+                "System.Threading.Volatile.Write",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void StringComparerInvocationMethods_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.StringComparer.InvariantCultureIgnoreCase.Compare(string, string)");
