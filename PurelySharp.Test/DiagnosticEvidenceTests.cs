@@ -9934,6 +9934,54 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_TimerStart_UsesTypeFallbackAfterMemberCatalogRemoval()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Timers;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Timer timer)
+    {
+        timer.Start();
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("known_impure_namespace_or_type"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Timers.Timer.Start"));
+        }
+
+        [Test]
+        public async Task Ps0002_TimerStop_UsesTypeFallbackAfterMemberCatalogRemoval()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Timers;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Timer timer)
+    {
+        timer.Stop();
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("known_impure_namespace_or_type"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Timers.Timer.Stop"));
+        }
+
+        [Test]
         public async Task Ps0002_SafeHandleDispose_UsesNamespaceFallbackAfterMemberCatalogRemoval()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

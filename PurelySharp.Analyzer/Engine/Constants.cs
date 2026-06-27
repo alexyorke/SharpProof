@@ -115,8 +115,6 @@ public static class Constants
         "System.Security.Principal.WindowsIdentity.GetCurrent()",
         "System.Security.SecureString.AppendChar(char)",
         "System.Security.SecureString.Dispose()",
-        "System.Timers.Timer.Start()",
-        "System.Timers.Timer.Stop()",
         "System.Xml.Xsl.XslCompiledTransform.Load(string)",
         "System.Xml.Xsl.XslCompiledTransform.Transform(string, string)",
         "System.Collections.Specialized.NameValueCollection.Add(string, string)",

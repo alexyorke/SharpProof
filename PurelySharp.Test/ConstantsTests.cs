@@ -83,6 +83,14 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void TimerMembers_AreSourcedFromKnownImpureTypeFallback_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownImpureTypeNames, Does.Contain("System.Timers.Timer"));
+            AssertNotInManualCatalogs("System.Timers.Timer.Start()");
+            AssertNotInManualCatalogs("System.Timers.Timer.Stop()");
+        }
+
+        [Test]
         public void StringBuilderMutators_AreSourcedFromSemanticRules_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.Text.StringBuilder.Append(string?)");
