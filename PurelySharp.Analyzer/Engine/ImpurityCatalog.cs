@@ -400,6 +400,12 @@ namespace PurelySharp.Analyzer.Engine
 				return "diagnostics_tracing_semantic_rule";
 			}
 
+			if (IsIoStreamTextSemanticImpure(symbol))
+			{
+				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: IO stream/text semantic rule matched: {symbol.ToDisplayString()}");
+				return "io_stream_text_semantic_rule";
+			}
+
 			if (IsAssemblyLoadContextSemanticImpure(symbol))
 			{
 				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: AssemblyLoadContext semantic rule matched: {symbol.ToDisplayString()}");
@@ -786,6 +792,78 @@ namespace PurelySharp.Analyzer.Engine
 
 			return methodSymbol.MethodKind == MethodKind.Ordinary &&
 				string.Equals(methodSymbol.Name, "SetTag", StringComparison.Ordinal);
+		}
+
+		private static bool IsIoStreamTextSemanticImpure(ISymbol symbol)
+		{
+			if (symbol.ContainingType is not INamedTypeSymbol containingType ||
+				symbol is not IMethodSymbol methodSymbol ||
+				methodSymbol.IsImplicitlyDeclared)
+			{
+				return false;
+			}
+
+			if (IsExactType(containingType, "System.IO.Stream"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Ordinary &&
+					methodSymbol.Name is "Flush" or "Read" or "Seek" or "Write" or "Close" or "CopyToAsync" or "ReadAsync" or "WriteAsync";
+			}
+
+			if (IsExactType(containingType, "System.IO.TextReader"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Ordinary &&
+					methodSymbol.Name is "Peek" or "ReadToEnd";
+			}
+
+			if (IsExactType(containingType, "System.IO.TextWriter"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Ordinary &&
+					methodSymbol.Name is "Flush" or "Write";
+			}
+
+			if (IsExactType(containingType, "System.IO.StreamReader"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Constructor ||
+					(methodSymbol.MethodKind == MethodKind.Ordinary &&
+					 string.Equals(methodSymbol.Name, "ReadLine", StringComparison.Ordinal));
+			}
+
+			if (IsExactType(containingType, "System.IO.StreamWriter"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Constructor ||
+					(methodSymbol.MethodKind == MethodKind.Ordinary &&
+					 string.Equals(methodSymbol.Name, "WriteLine", StringComparison.Ordinal));
+			}
+
+			if (IsExactType(containingType, "System.IO.BufferedStream"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Constructor ||
+					(methodSymbol.MethodKind == MethodKind.Ordinary &&
+					 string.Equals(methodSymbol.Name, "Flush", StringComparison.Ordinal));
+			}
+
+			if (IsExactType(containingType, "System.IO.MemoryStream"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Constructor ||
+					(methodSymbol.MethodKind == MethodKind.Ordinary &&
+					 methodSymbol.Name is "Write" or "ToArray");
+			}
+
+			if (IsExactType(containingType, "System.IO.StringReader"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Constructor ||
+					(methodSymbol.MethodKind == MethodKind.Ordinary &&
+					 string.Equals(methodSymbol.Name, "ReadToEnd", StringComparison.Ordinal));
+			}
+
+			if (IsExactType(containingType, "System.IO.StringWriter"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Constructor ||
+					(methodSymbol.MethodKind == MethodKind.Ordinary &&
+					 string.Equals(methodSymbol.Name, "Write", StringComparison.Ordinal));
+			}
+
+			return false;
 		}
 
 		private static bool IsAssemblyLoadContextSemanticImpure(ISymbol symbol)

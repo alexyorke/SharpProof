@@ -496,6 +496,153 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_MemoryStreamConstructor_UsesIoStreamTextSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public MemoryStream TestMethod()
+    {
+        return new MemoryStream();
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("io_stream_text_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.MemoryStream.MemoryStream"));
+        }
+
+        [Test]
+        public async Task Ps0002_StringReaderConstructor_UsesIoStreamTextSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public StringReader TestMethod()
+    {
+        return new StringReader(""text"");
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("io_stream_text_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.StringReader.StringReader"));
+        }
+
+        [Test]
+        public async Task Ps0002_StringReaderReadToEnd_UsesIoStreamTextSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(StringReader reader)
+    {
+        return reader.ReadToEnd();
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("io_stream_text_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.StringReader.ReadToEnd"));
+        }
+
+        [Test]
+        public async Task Ps0002_StreamReaderConstructor_UsesIoStreamTextSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public StreamReader TestMethod(Stream stream)
+    {
+        return new StreamReader(stream);
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("io_stream_text_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.StreamReader.StreamReader"));
+        }
+
+        [Test]
+        public async Task Ps0002_StreamWriterWriteLine_UsesIoStreamTextSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(StreamWriter writer)
+    {
+        writer.WriteLine(""line"");
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("io_stream_text_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.StreamWriter.WriteLine"));
+        }
+
+        [Test]
+        public async Task Ps0002_StringWriterWrite_UsesIoStreamTextSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(StringWriter writer)
+    {
+        writer.Write(""text"");
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("io_stream_text_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.IO.StringWriter.Write"));
+        }
+
+        [Test]
         public async Task Ps0002_StringFormat_UsesGeneratedPuritySummarySource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

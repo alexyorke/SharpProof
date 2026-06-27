@@ -183,6 +183,45 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void IoStreamTextMembers_AreSourcedFromSemanticRules_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.IO.MemoryStream.ToArray()",
+                "System.IO.StringReader.StringReader(string)",
+                "System.IO.MemoryStream.Write(byte[], int, int)",
+                "System.IO.Stream.Flush()",
+                "System.IO.Stream.Read(byte[], int, int)",
+                "System.IO.Stream.Seek(long, System.IO.SeekOrigin)",
+                "System.IO.Stream.Write(byte[], int, int)",
+                "System.IO.StreamReader.ReadLine()",
+                "System.IO.StreamReader.StreamReader(System.IO.Stream)",
+                "System.IO.StreamWriter.WriteLine(string)",
+                "System.IO.StreamWriter.StreamWriter(System.IO.Stream)",
+                "System.IO.StringReader.ReadToEnd()",
+                "System.IO.StringWriter.Write(string)",
+                "System.IO.BufferedStream.BufferedStream(System.IO.Stream)",
+                "System.IO.BufferedStream.Flush()",
+                "System.IO.Stream.Close()",
+                "System.IO.Stream.CopyToAsync(System.IO.Stream)",
+                "System.IO.TextReader.Peek()",
+                "System.IO.TextReader.ReadToEnd()",
+                "System.IO.TextWriter.Flush()",
+                "System.IO.TextWriter.Write(char)",
+                "System.IO.Stream.ReadAsync(byte[], int, int, System.Threading.CancellationToken)",
+                "System.IO.Stream.WriteAsync(byte[], int, int, System.Threading.CancellationToken)",
+                "System.IO.StreamReader.StreamReader(string)",
+                "System.IO.StreamWriter.StreamWriter(string)",
+                "System.IO.MemoryStream.MemoryStream()",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void GeneratedPathHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

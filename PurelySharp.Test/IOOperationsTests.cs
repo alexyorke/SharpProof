@@ -74,6 +74,121 @@ public class TestClass
         }
 
         [Test]
+        public async Task MemoryStreamConstructor_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public MemoryStream {|PS0002:TestMethod|}()
+    {
+        return new MemoryStream();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StreamFlush_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(Stream stream)
+    {
+        stream.Flush();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task TextReaderReadToEnd_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(TextReader reader)
+    {
+        return reader.ReadToEnd();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StreamReaderReadLine_Diagnostic()
+        {
+            var test = @"
+#nullable enable
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string? {|PS0002:TestMethod|}(StreamReader reader)
+    {
+        return reader.ReadLine();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StreamWriterWriteLine_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(StreamWriter writer)
+    {
+        writer.WriteLine(""line"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task StringWriterWrite_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(StringWriter writer)
+    {
+        writer.Write(""text"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task AsyncAwait_Diagnostic()
         {
             var test = @"
