@@ -8419,12 +8419,12 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
-            AssertPurityClassification(summary, "System.Convert.ToHexString(byte[])", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Convert.ToHexString(byte[])", "none");
-            AssertPurityClassification(summary, "System.Convert.ToHexString(byte[], int, int)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Convert.ToHexString(byte[], int, int)", "none");
-            AssertPurityClassification(summary, "System.Convert.ToHexString(System.ReadOnlySpan`1<byte>)", "pure");
-            AssertEffectVisibilityClassification(summary, "System.Convert.ToHexString(System.ReadOnlySpan`1<byte>)", "internal_only");
+            AssertPurityClassification(summary, "System.Convert.ToHexString(byte[])", "impure");
+            AssertEffectVisibilityClassification(summary, "System.Convert.ToHexString(byte[])", "caller_visible");
+            AssertPurityClassification(summary, "System.Convert.ToHexString(byte[], int, int)", "impure");
+            AssertEffectVisibilityClassification(summary, "System.Convert.ToHexString(byte[], int, int)", "caller_visible");
+            AssertPurityClassification(summary, "System.Convert.ToHexString(System.ReadOnlySpan`1<byte>)", "impure");
+            AssertEffectVisibilityClassification(summary, "System.Convert.ToHexString(System.ReadOnlySpan`1<byte>)", "caller_visible");
 
             var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
             var symbols = generatedCatalog.GetProperty("Entries")

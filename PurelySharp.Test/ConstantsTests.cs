@@ -3342,10 +3342,16 @@ public static class UriCatalogSignatureSamples
         }
 
         [Test]
-        public void AppDomainCurrentDomainAndBaseDirectory_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        public void AppDomainCurrentDomain_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.AppDomain.CurrentDomain.get");
+        }
+
+        [Test]
+        public void AppDomainBaseDirectoryAndFriendlyName_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
             AssertNotInManualCatalogs("System.AppDomain.BaseDirectory.get");
+            AssertNotInManualCatalogs("System.AppDomain.FriendlyName.get");
         }
 
         [Test]
@@ -3358,12 +3364,6 @@ public static class UriCatalogSignatureSamples
         public void SafeHandleDispose_IsSourcedFromNamespaceOrGeneratedEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.Runtime.InteropServices.SafeHandle.Dispose()");
-        }
-
-        [Test]
-        public void AppDomainFriendlyName_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
-        {
-            AssertNotInManualCatalogs("System.AppDomain.FriendlyName.get");
         }
 
         [Test]
@@ -4194,10 +4194,15 @@ public class GuardSignatureSamples
         }
 
         [Test]
-        public void TimeProviderAndTimeZoneInfoGlobals_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        public void TimeProviderSystem_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.TimeProvider.System.get");
+        }
+
+        [Test]
+        public void TimeProviderAndTimeZoneInfoImpureGlobals_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.TimeProvider.LocalTimeZone.get");
-            AssertNotInManualCatalogs("System.TimeProvider.System.get");
             AssertNotInManualCatalogs("System.TimeProvider.TimestampFrequency.get");
             AssertNotInManualCatalogs("System.TimeZoneInfo.Local.get");
             AssertNotInManualCatalogs("System.TimeZoneInfo.ConvertTime(System.DateTimeOffset, System.TimeZoneInfo)");

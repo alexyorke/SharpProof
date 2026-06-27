@@ -864,10 +864,29 @@ internal static class PurityClassificationEngine
         {
             effectVisibilityClassification = "none";
         }
+        else if (HasPureInvariantTextInfoStringWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "internal_only";
+        }
+        else if (HasPureStringHashWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "none";
+        }
         else if (HasPureStringSubstringWrapperPattern(summary) ||
                  HasPureFreshAllocatedStringCopyCorePattern(summary) ||
                  HasPureStringLengthCheckedConcatWrapperPattern(summary) ||
                  HasPureStringArrayConcatWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "internal_only";
+        }
+        else if (HasPureGuardedImmutableStringRewriteWrapperPattern(summary))
+        {
+            effectVisibilityClassification = summary.RootCandidates.Contains("safe_static_cache_read", StringComparer.Ordinal) ||
+                summary.RootCandidates.Contains("safe_static_constant_read", StringComparer.Ordinal)
+                ? "internal_only"
+                : "none";
+        }
+        else if (HasPureIndexedStringReplaceWrapperPattern(summary))
         {
             effectVisibilityClassification = "internal_only";
         }
@@ -945,6 +964,31 @@ internal static class PurityClassificationEngine
             summary.Calls.All(IsStringSliceNormalizationWrapperCall);
     }
 
+    private static bool HasPureInvariantTextInfoStringWrapperPattern(MethodEffectSummary summary)
+    {
+        return CallsOnly(summary, "calls_method", "reads_static_field") &&
+            RootsAreSemanticallyPureWrapperCompatible(summary) &&
+            summary.Fields.Length == 1 &&
+            string.Equals(summary.Fields[0], "System.Globalization.TextInfo.Invariant", StringComparison.Ordinal) &&
+            summary.Calls.Any(IsInvariantTextInfoStringWrapperCall) &&
+            summary.Calls.All(IsInvariantTextInfoStringWrapperCall);
+    }
+
+    private static bool HasPureStringHashWrapperPattern(MethodEffectSummary summary)
+    {
+        return summary.ExactSymbolKey.EndsWith(")->int", StringComparison.Ordinal) &&
+            CallsOnly(summary, "calls_method", "reads_instance_field") &&
+            summary.RootCandidates.Length == 0 &&
+            summary.Calls.Any(static call =>
+                string.Equals(call, "System.Marvin.ComputeHash32(ref byte, uint, uint, uint)->int", StringComparison.Ordinal)) &&
+            summary.Calls.Any(static call =>
+                string.Equals(call, "System.Marvin.get_DefaultSeed()->ulong", StringComparison.Ordinal)) &&
+            summary.Calls.All(IsStringHashWrapperCall) &&
+            summary.Fields.All(static field =>
+                string.Equals(field, "System.String._firstChar", StringComparison.Ordinal) ||
+                string.Equals(field, "System.String._stringLength", StringComparison.Ordinal));
+    }
+
     private static bool HasPureStackLocalCharBuilderStringWrapperPattern(MethodEffectSummary summary)
     {
         return CallsOnly(summary, "allocates_object", "calls_method") &&
@@ -1001,6 +1045,34 @@ internal static class PurityClassificationEngine
             summary.Calls.Any(IsFastAllocateStringCall) &&
             summary.Calls.Any(static call => string.Equals(call, "System.Array.Clone()->object", StringComparison.Ordinal)) &&
             summary.Calls.All(IsStringArrayConcatWrapperCall);
+    }
+
+    private static bool HasPureGuardedImmutableStringRewriteWrapperPattern(MethodEffectSummary summary)
+    {
+        return summary.ExactSymbolKey.EndsWith(")->string", StringComparison.Ordinal) &&
+            CallsOnly(summary, "allocates_object", "calls_method", "reads_instance_field", "reads_static_field") &&
+            RootsAreSemanticallyPureWrapperCompatible(summary) &&
+            summary.Calls.Any(IsFastAllocateStringCall) &&
+            summary.Calls.Any(static call =>
+                IsBufferMemmoveCall(call) ||
+                call.StartsWith("System.Span`1<char>.Fill(", StringComparison.Ordinal)) &&
+            summary.Calls.All(IsGuardedImmutableStringRewriteWrapperCall) &&
+            summary.Fields.All(static field =>
+                string.Equals(field, "System.String._firstChar", StringComparison.Ordinal) ||
+                string.Equals(field, "System.String.Empty", StringComparison.Ordinal));
+    }
+
+    private static bool HasPureIndexedStringReplaceWrapperPattern(MethodEffectSummary summary)
+    {
+        return CallsOnly(summary, "allocates_object", "calls_method", "reads_instance_field", "reads_static_field") &&
+            RootsAreSemanticallyPureWrapperCompatible(summary) &&
+            summary.Calls.Any(static call =>
+                call.StartsWith("string.ReplaceHelper(int, string, System.ReadOnlySpan`1<int>)", StringComparison.Ordinal)) &&
+            summary.Calls.Any(IsLocalScratchIndexBuilderCall) &&
+            summary.Calls.All(IsIndexedStringReplaceWrapperCall) &&
+            summary.Fields.All(static field =>
+                string.Equals(field, "System.String.Empty", StringComparison.Ordinal) ||
+                string.Equals(field, "System.String._firstChar", StringComparison.Ordinal));
     }
 
     private static bool RootsAreSemanticallyPureWrapperCompatible(MethodEffectSummary summary)
@@ -1121,6 +1193,19 @@ internal static class PurityClassificationEngine
             string.Equals(callSymbol, "string.op_Implicit(string)->System.ReadOnlySpan`1<char>", StringComparison.Ordinal);
     }
 
+    private static bool IsInvariantTextInfoStringWrapperCall(string callSymbol)
+    {
+        return string.Equals(callSymbol, "System.Globalization.TextInfo.ToLower(string)->string", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "System.Globalization.TextInfo.ToUpper(string)->string", StringComparison.Ordinal);
+    }
+
+    private static bool IsStringHashWrapperCall(string callSymbol)
+    {
+        return string.Equals(callSymbol, "System.Marvin.ComputeHash32(ref byte, uint, uint, uint)->int", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "System.Marvin.get_DefaultSeed()->ulong", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.As(ref !!0)->ref !!1", StringComparison.Ordinal);
+    }
+
     private static bool IsStringSubstringWrapperCall(string callSymbol)
     {
         return string.Equals(callSymbol, "string.InternalSubString(int, int)->string", StringComparison.Ordinal) ||
@@ -1150,6 +1235,46 @@ internal static class PurityClassificationEngine
             string.Equals(callSymbol, "System.ArgumentNullException.ThrowIfNull(object, string)->void", StringComparison.Ordinal) ||
             string.Equals(callSymbol, "System.Array.Clone()->object", StringComparison.Ordinal) ||
             string.Equals(callSymbol, "string.Concat(string[])->string", StringComparison.Ordinal);
+    }
+
+    private static bool IsGuardedImmutableStringRewriteWrapperCall(string callSymbol)
+    {
+        return IsFastAllocateStringCall(callSymbol) ||
+            IsBufferMemmoveCall(callSymbol) ||
+            IsPureArgumentGuardWrapper(callSymbol) ||
+            string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)->ref !!0", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "System.Span`1<char>..ctor(ref !0, int)->void", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Span`1<char>.Fill(", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.CopyStringContent(string, int, string)->void", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+    }
+
+    private static bool IsLocalScratchIndexBuilderCall(string callSymbol)
+    {
+        return callSymbol.StartsWith("System.Collections.Generic.ValueListBuilder`1<", StringComparison.Ordinal) &&
+            (callSymbol.Contains("..ctor(System.Span`1<!0>)", StringComparison.Ordinal) ||
+             callSymbol.Contains(".Append(!0)", StringComparison.Ordinal) ||
+             callSymbol.Contains(".AsSpan()", StringComparison.Ordinal) ||
+             callSymbol.Contains(".Dispose()", StringComparison.Ordinal) ||
+             callSymbol.Contains(".get_Length()", StringComparison.Ordinal));
+    }
+
+    private static bool IsIndexedStringReplaceWrapperCall(string callSymbol)
+    {
+        return IsLocalScratchIndexBuilderCall(callSymbol) ||
+            IsPureArgumentGuardWrapper(callSymbol) ||
+            callSymbol.StartsWith("System.PackedSpanHelpers.CanUsePackedIndexOf(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.PackedSpanHelpers.IndexOf(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.PackedSpanHelpers.get_PackedIndexOfIsSupported()", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.SpanHelpers.IndexOf(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.SpanHelpers.NonPackedIndexOfChar(", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, int)->ref !!0", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "System.Span`1<int>..ctor(void*, int)->void", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.Replace(char, char)->string", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.ReplaceHelper(int, string, System.ReadOnlySpan`1<int>)->string", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
     }
 
     private static bool IsFastAllocateStringCall(string callSymbol)
