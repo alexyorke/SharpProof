@@ -1379,7 +1379,7 @@ namespace PurelySharp.Analyzer.Engine
                                 invocationOp,
                                 out var semanticKnownImpureCatalogSource);
                             if (invocationOp.TargetMethod != null &&
-                                !IsArrayAsReadOnlyOwnedLocalArrayInvocation(invocationOp, postCfgReturnState) &&
+                                !IsArrayAsReadOnlyInvocation(invocationOp) &&
                                 !IsTransientCharArrayConsumedByStringConstructor(invocationOp, semanticModel))
                             {
                                 var targetMethod = invocationOp.TargetMethod.OriginalDefinition;
@@ -4414,6 +4414,14 @@ namespace PurelySharp.Analyzer.Engine
                    currentState.IsOwnedLocalArraySymbol(localReference.Local);
         }
 
+        internal static bool IsOwnedArrayValueOrTrustedFactory(
+            IOperation? valueOperation,
+            PurityAnalysisState currentState,
+            Compilation compilation)
+        {
+            return IsOwnedLocalArrayValue(valueOperation, currentState, compilation);
+        }
+
         internal static IOperation? UnwrapArrayOwnershipPreservingConversions(IOperation? operation)
         {
             while (operation is IConversionOperation conversion &&
@@ -4428,15 +4436,25 @@ namespace PurelySharp.Analyzer.Engine
             return operation;
         }
 
-        internal static bool IsArrayAsReadOnlyOwnedLocalArrayInvocation(
-            IInvocationOperation invocationOperation,
-            PurityAnalysisState currentState)
+        internal static bool IsArrayAsReadOnlyInvocation(IInvocationOperation invocationOperation)
         {
             var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
             if (targetMethod == null ||
                 targetMethod.Name != "AsReadOnly" ||
                 targetMethod.ContainingType?.ToDisplayString() != "System.Array" ||
                 invocationOperation.Arguments.Length != 1)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        internal static bool IsArrayAsReadOnlyOwnedLocalArrayInvocation(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisState currentState)
+        {
+            if (!IsArrayAsReadOnlyInvocation(invocationOperation))
             {
                 return false;
             }

@@ -86,6 +86,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task ExceptionToString_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string {|PS0002:TestMethod|}(Exception error)
+    {
+        return error.ToString();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ObjectMemberwiseClone_Diagnostic()
         {
             var test = @"

@@ -162,7 +162,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ListAsReadOnly_NoDiagnostic()
+        public async Task ListAsReadOnly_Diagnostic()
         {
             var test = @"
 using System.Collections.Generic;
@@ -172,7 +172,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public ReadOnlyCollection<int> TestMethod(List<int> values)
+    public ReadOnlyCollection<int> {|PS0002:TestMethod|}(List<int> values)
     {
         return values.AsReadOnly();
     }
@@ -340,6 +340,152 @@ public class TestClass
         }
 
         [Test]
+        public async Task ArrayAsReadOnlySpanViaLocal_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ReadOnlySpan<int> {|PS0002:TestMethod|}(int[] values)
+    {
+        var span = values.AsSpan();
+        return span;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ArrayAsReadOnlySpanSlice_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ReadOnlySpan<int> {|PS0002:TestMethod|}(int[] values)
+    {
+        return values.AsSpan().Slice(1);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SpanToReadOnlySpanImplicitConversion_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ReadOnlySpan<int> TestMethod(Span<int> values)
+    {
+        return values;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ArrayAsReadOnlyViaLocal_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.IO;
+using System.Collections.ObjectModel;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ReadOnlyCollection<int> {|PS0002:TestMethod|}(int[] values)
+    {
+        var view = Array.AsReadOnly(values);
+        return view;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ArrayAsReadOnlyImpureArraySource_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.IO;
+using System.Collections.ObjectModel;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ReadOnlyCollection<string> {|PS0002:TestMethod|}(string path)
+    {
+        return Array.AsReadOnly(Directory.GetFiles(path));
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [TestCase("Span<int>", "new Span<int>(values)")]
+        [TestCase("ReadOnlySpan<int>", "new ReadOnlySpan<int>(values)")]
+        [TestCase("Span<int>", "new Span<int>(values, 0, values.Length)")]
+        [TestCase("ReadOnlySpan<int>", "new ReadOnlySpan<int>(values, 0, values.Length)")]
+        public async Task SpanAndReadOnlySpanCtorCallerOwnedArray_Diagnostic(string returnType, string ctorExpression)
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public " + returnType + @" {|PS0002:TestMethod|}(int[] values)
+    {
+        return " + ctorExpression + @";
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [TestCase("Span<int>", "new Span<int>(values)")]
+        [TestCase("ReadOnlySpan<int>", "new ReadOnlySpan<int>(values)")]
+        [TestCase("Span<int>", "new Span<int>(values, 0, values.Length)")]
+        [TestCase("ReadOnlySpan<int>", "new ReadOnlySpan<int>(values, 0, values.Length)")]
+        public async Task SpanAndReadOnlySpanCtorOwnedArray_NoDiagnostic(string returnType, string ctorExpression)
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public " + returnType + @" TestMethod()
+    {
+        var values = new[] { 1, 2, 3 };
+        return " + ctorExpression + @";
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ReadOnlyMemoryCtorCallerOwnedArray_Diagnostic()
         {
             var test = @"
@@ -372,6 +518,65 @@ public class TestClass
     {
         var values = new[] { 1, 2, 3 };
         return new ReadOnlyMemory<int>(values);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ReadOnlySpanCtorImpureArraySource_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ReadOnlySpan<string> {|PS0002:TestMethod|}(string path)
+    {
+        return new ReadOnlySpan<string>(Directory.GetFiles(path));
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ReadOnlyMemoryViaLocalCallerOwnedArray_Diagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ReadOnlyMemory<int> {|PS0002:TestMethod|}(int[] values)
+    {
+        var memory = new ReadOnlyMemory<int>(values);
+        return memory;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task MemoryToReadOnlyMemoryImplicitConversion_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ReadOnlyMemory<int> TestMethod(Memory<int> values)
+    {
+        return values;
     }
 }";
 

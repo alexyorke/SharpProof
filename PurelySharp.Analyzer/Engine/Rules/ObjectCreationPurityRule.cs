@@ -47,10 +47,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
             bool freshArrayForImmutableWrapper = false;
             bool isReadOnlyCollectionConstructor = false;
             bool isReadOnlyMemoryOrMemoryConstructor = false;
+            bool isSpanOrReadOnlySpanArrayConstructor = false;
             if (objectCreationOperation.Arguments.Length > 0)
             {
                 isReadOnlyCollectionConstructor = IsReadOnlyCollectionConstructor(objectCreationOperation);
                 isReadOnlyMemoryOrMemoryConstructor = IsReadOnlyMemoryOrMemoryConstructor(objectCreationOperation);
+                isSpanOrReadOnlySpanArrayConstructor = IsSpanOrReadOnlySpanArrayConstructor(objectCreationOperation);
                 PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Checking {objectCreationOperation.Arguments.Length} constructor arguments...");
                 for (var argumentIndex = 0; argumentIndex < objectCreationOperation.Arguments.Length; argumentIndex++)
                 {
@@ -96,13 +98,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
                     if (isReadOnlyMemoryOrMemoryConstructor)
                     {
-                        if (argumentIndex == 0 && IsPureOwnedArrayConstructorArgument(objectCreationOperation, argument, currentState))
-                        {
-                            PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] Treating locally owned array as PURE for ReadOnlyMemory/Memory construction.");
-                            freshArrayForImmutableWrapper = true;
-                            continue;
-                        }
-
                         var readOnlyMemoryArgumentResult = PurityAnalysisEngine.CheckSingleOperation(argument.Value, context, currentState);
                         if (!readOnlyMemoryArgumentResult.IsPure)
                         {
@@ -111,18 +106,23 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
                         if (argumentIndex == 0)
                         {
-                            PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] ReadOnlyMemory/Memory source is not analyzer-owned. Treating wrapper construction as IMPURE.");
-                            return PurityAnalysisResult.Impure(
-                                objectCreationOperation.Syntax,
-                                PurityAnalysisEngine.PurityEvidence.Create(
-                                    "mutable_state_read",
-                                    ruleName: nameof(ObjectCreationPurityRule),
-                                    operation: objectCreationOperation,
-                                    syntaxNode: objectCreationOperation.Syntax,
-                                    symbol: objectCreationOperation.Constructor,
-                                    catalogSource: "read_only_memory_external_source"));
+                            PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] Treating array-backed ReadOnlyMemory/Memory construction as PURE; escape analysis decides whether the backing array can leak.");
+                            freshArrayForImmutableWrapper = true;
                         }
 
+                        continue;
+                    }
+
+                    if (isSpanOrReadOnlySpanArrayConstructor && argumentIndex == 0)
+                    {
+                        var spanArgumentResult = PurityAnalysisEngine.CheckSingleOperation(argument.Value, context, currentState);
+                        if (!spanArgumentResult.IsPure)
+                        {
+                            return spanArgumentResult;
+                        }
+
+                        PurityAnalysisEngine.LogDebug($"      [ObjCreateRule.Args] Treating array-backed Span/ReadOnlySpan construction as PURE.");
+                        freshArrayForImmutableWrapper = true;
                         continue;
                     }
 
@@ -394,6 +394,21 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var typeName = objectCreationOperation.Constructor?.ContainingType?.OriginalDefinition.ToDisplayString();
             return (typeName == "System.ReadOnlyMemory<T>" || typeName == "System.Memory<T>") &&
                 (objectCreationOperation.Arguments.Length == 1 || objectCreationOperation.Arguments.Length == 3);
+        }
+
+        private static bool IsSpanOrReadOnlySpanArrayConstructor(IObjectCreationOperation objectCreationOperation)
+        {
+            var constructorSymbol = objectCreationOperation.Constructor?.OriginalDefinition;
+            if (constructorSymbol == null ||
+                constructorSymbol.MethodKind != MethodKind.Constructor ||
+                constructorSymbol.Parameters.Length is not (1 or 3) ||
+                constructorSymbol.Parameters[0].Type is not IArrayTypeSymbol)
+            {
+                return false;
+            }
+
+            var typeName = constructorSymbol.ContainingType?.OriginalDefinition.ToDisplayString();
+            return typeName == "System.Span<T>" || typeName == "System.ReadOnlySpan<T>";
         }
 
         private static bool IsPureOwnedArrayConstructorArgument(

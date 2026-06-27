@@ -18,7 +18,7 @@ namespace PurelySharp.Test
 
 
         [Test]
-        public async Task Span_Creation_From_Array_NoDiagnostic()
+        public async Task Span_Creation_From_Array_Diagnostic()
         {
             var test = @"
 #nullable enable
@@ -30,9 +30,29 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public Span<byte> TestMethod(byte[] data)
+    public Span<byte> {|PS0002:TestMethod|}(byte[] data)
     {
-        // Pure: Creates a view over existing memory
+        return new Span<byte>(data);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Span_Creation_From_Owned_Array_NoDiagnostic()
+        {
+            var test = @"
+#nullable enable
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Span<byte> TestMethod()
+    {
+        var data = new byte[] { 1, 2, 3 };
         return new Span<byte>(data);
     }
 }";

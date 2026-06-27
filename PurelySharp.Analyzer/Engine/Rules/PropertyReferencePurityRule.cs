@@ -36,6 +36,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return argumentResult;
             }
 
+            if (IsArrayLengthProperty(propertyReferenceOperation))
+            {
+                PurityAnalysisEngine.LogDebug("    [PropRefRule] System.Array.Length is treated as a pure property read after its receiver is analyzed.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             if (IsPartOfAssignmentTarget(propertyReferenceOperation))
             {
                 PurityAnalysisEngine.LogDebug($"    [PropRefRule] Skipping property read {propertySymbol.Name} as it's an assignment target.");
@@ -411,6 +417,18 @@ namespace PurelySharp.Analyzer.Engine.Rules
             PurityAnalysisContext context,
             PurityAnalysisEngine.PurityAnalysisState currentState)
         {
+            if (propertyReferenceOperation.Instance != null)
+            {
+                var instanceResult = PurityAnalysisEngine.CheckSingleOperation(
+                    propertyReferenceOperation.Instance,
+                    context,
+                    currentState);
+                if (!instanceResult.IsPure)
+                {
+                    return instanceResult;
+                }
+            }
+
             foreach (var argument in propertyReferenceOperation.Arguments)
             {
                 if (argument.Value == null)
@@ -456,6 +474,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return false;
+        }
+
+        private static bool IsArrayLengthProperty(IPropertyReferenceOperation propertyReferenceOperation)
+        {
+            var propertySymbol = propertyReferenceOperation.Property;
+            return propertySymbol.Name == "Length" &&
+                propertySymbol.IsReadOnly &&
+                propertySymbol.ContainingType?.SpecialType == SpecialType.System_Array;
         }
 
         private static bool IsPartOfAssignmentTarget(IOperation operation)

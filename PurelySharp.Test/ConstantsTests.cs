@@ -2515,6 +2515,12 @@ public static class ExceptionAccessorCatalogSignatureSamples
         }
 
         [Test]
+        public void ExceptionToString_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Exception.ToString()");
+        }
+
+        [Test]
         public void FileNotFoundExceptionStringConstructor_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.IO.FileNotFoundException.FileNotFoundException(string?)");

@@ -93,6 +93,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task DirectoryGetFilesLength_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int {|PS0002:TestMethod|}(string path)
+    {
+        return Directory.GetFiles(path).Length;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task StreamFlush_Diagnostic()
         {
             var test = @"

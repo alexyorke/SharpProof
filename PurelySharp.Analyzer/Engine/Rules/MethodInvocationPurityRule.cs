@@ -536,6 +536,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return semanticParseResult;
             }
 
+            if (IsArrayEmptyFactoryInvocation(invocationOperation))
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] System.Array.Empty<T>() is treated as a pure fresh array factory.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             if (PurityAnalysisEngine.HasPureExternalAttribute(originalDefinitionSymbol))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> PURE ([PureExternal] boundary attribute)");
@@ -546,9 +552,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
             PurityAnalysisEngine.LogDebug($"  [MIR] Analyzing regular call to: {methodDisplayString} | Syntax: {invocationOperation.Syntax}");
 
 
-            if (TryCheckArrayAsReadOnlyOwnedLocalArrayPurity(invocationOperation, currentState, out var arrayAsReadOnlyResult))
+            if (TryCheckArrayAsReadOnlyOwnedLocalArrayPurity(invocationOperation, context, currentState, out var arrayAsReadOnlyResult))
             {
                 return arrayAsReadOnlyResult;
+            }
+
+            if (TryCheckSpanAndMemoryViewPurity(invocationOperation, context, currentState, out var spanAndMemoryViewResult))
+            {
+                return spanAndMemoryViewResult;
             }
 
             if (PurityAnalysisEngine.IsInvariantCultureDeterministicParseInvocation(invocationOperation))
@@ -759,18 +770,134 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static bool TryCheckArrayAsReadOnlyOwnedLocalArrayPurity(
             IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
             PurityAnalysisEngine.PurityAnalysisState currentState,
             out PurityAnalysisEngine.PurityAnalysisResult result)
         {
             result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
-            if (PurityAnalysisEngine.IsArrayAsReadOnlyOwnedLocalArrayInvocation(invocationOperation, currentState))
+            if (PurityAnalysisEngine.IsArrayAsReadOnlyInvocation(invocationOperation))
             {
-                PurityAnalysisEngine.LogDebug("  [MIR] Array.AsReadOnly over tracked fresh local array is treated as pure.");
+                var inputResult = CheckPureViewInvocationInputs(invocationOperation, context, currentState);
+                if (!inputResult.IsPure)
+                {
+                    result = inputResult;
+                }
+
+                PurityAnalysisEngine.LogDebug("  [MIR] Array.AsReadOnly view construction is treated as pure; escape analysis decides whether the backing array can leak.");
                 return true;
             }
 
             return false;
+        }
+
+        private static bool TryCheckSpanAndMemoryViewPurity(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            if (IsArrayAsSpanInvocation(invocationOperation))
+            {
+                var inputResult = CheckPureViewInvocationInputs(invocationOperation, context, currentState);
+                if (!inputResult.IsPure)
+                {
+                    result = inputResult;
+                }
+
+                PurityAnalysisEngine.LogDebug("  [MIR] MemoryExtensions.AsSpan array view construction is treated as pure; escape analysis decides whether the backing array can leak.");
+                return true;
+            }
+
+            if (IsSemanticallyPureSpanLikeSliceInvocation(invocationOperation))
+            {
+                var inputResult = CheckPureViewInvocationInputs(invocationOperation, context, currentState);
+                if (!inputResult.IsPure)
+                {
+                    result = inputResult;
+                }
+
+                PurityAnalysisEngine.LogDebug("  [MIR] Span/Memory slice view operation is treated as pure.");
+                return true;
+            }
+
+            return false;
+        }
+
+        private static PurityAnalysisEngine.PurityAnalysisResult CheckPureViewInvocationInputs(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState)
+        {
+            if (invocationOperation.Instance != null)
+            {
+                var instanceResult = PurityAnalysisEngine.CheckSingleOperation(
+                    invocationOperation.Instance,
+                    context,
+                    currentState);
+                if (!instanceResult.IsPure)
+                {
+                    return instanceResult;
+                }
+            }
+
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                var argumentResult = PurityAnalysisEngine.CheckSingleOperation(
+                    argument.Value,
+                    context,
+                    currentState);
+                if (!argumentResult.IsPure)
+                {
+                    return argumentResult;
+                }
+            }
+
+            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+        }
+
+        private static bool IsArrayAsSpanInvocation(IInvocationOperation invocationOperation)
+        {
+            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
+            if (targetMethod == null ||
+                targetMethod.Name != "AsSpan" ||
+                targetMethod.ContainingType?.ToDisplayString() != "System.MemoryExtensions" ||
+                targetMethod.Parameters.Length == 0 ||
+                targetMethod.Parameters[0].Type is not IArrayTypeSymbol)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsSemanticallyPureSpanLikeSliceInvocation(IInvocationOperation invocationOperation)
+        {
+            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
+            if (targetMethod == null ||
+                targetMethod.MethodKind != MethodKind.Ordinary ||
+                targetMethod.Name != "Slice" ||
+                targetMethod.IsStatic)
+            {
+                return false;
+            }
+
+            var containingType = targetMethod.ContainingType?.OriginalDefinition.ToDisplayString();
+            if (containingType is not ("System.Span<T>" or "System.ReadOnlySpan<T>" or "System.Memory<T>" or "System.ReadOnlyMemory<T>"))
+            {
+                return false;
+            }
+
+            if (targetMethod.Parameters.Length is not (1 or 2))
+            {
+                return false;
+            }
+
+            return targetMethod.Parameters.All(parameter =>
+                parameter.RefKind == RefKind.None &&
+                parameter.Type.SpecialType == SpecialType.System_Int32);
         }
 
         private static bool IsPotentiallyDispatchedMethod(IMethodSymbol methodSymbol, Compilation compilation)
@@ -828,6 +955,15 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             return operation is IDeclarationExpressionOperation ||
                 operation is IDiscardOperation;
+        }
+
+        private static bool IsArrayEmptyFactoryInvocation(IInvocationOperation invocationOperation)
+        {
+            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
+            return targetMethod != null &&
+                targetMethod.Name == "Empty" &&
+                targetMethod.Parameters.Length == 0 &&
+                targetMethod.ContainingType?.SpecialType == SpecialType.System_Array;
         }
 
         private static bool IsDeconstructOutArgumentMethod(IMethodSymbol methodSymbol)

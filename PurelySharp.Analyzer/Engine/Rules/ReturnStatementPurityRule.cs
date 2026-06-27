@@ -93,7 +93,20 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: localSymbol,
                             catalogSource: "owned_local_array_return"));
                 }
-                else if (IsCallerOwnedArraySpanReturn(sourceReturnedValue, currentState, out var spanMethod))
+                else if (IsCallerOwnedArrayReadOnlyCollectionReturn(sourceReturnedValue, currentState, context.SemanticModel, out var readOnlyCollectionMethod))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes read-only collection view over caller-owned array through '{readOnlyCollectionMethod.ToDisplayString()}'. Return statement is Impure.");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        returnOperation.ReturnedValue.Syntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            "mutable_state_escape",
+                            ruleName: nameof(ReturnStatementPurityRule),
+                            operation: returnOperation,
+                            syntaxNode: returnOperation.ReturnedValue.Syntax,
+                            symbol: readOnlyCollectionMethod,
+                            catalogSource: "returned_array_read_only_view"));
+                }
+                else if (IsCallerOwnedArraySpanReturn(sourceReturnedValue, currentState, context.SemanticModel, out var spanMethod))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes span view over caller-owned array through '{spanMethod.ToDisplayString()}'. Return statement is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -106,7 +119,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: spanMethod,
                             catalogSource: "returned_array_span_view"));
                 }
-                else if (IsCallerOwnedArrayMemoryReturn(sourceReturnedValue, currentState, out var memoryConstructor))
+                else if (IsCallerOwnedArrayMemoryReturn(sourceReturnedValue, currentState, context.SemanticModel, out var memoryConstructor))
                 {
                     PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes memory view over caller-owned array through '{memoryConstructor.ToDisplayString()}'. Return statement is Impure.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -475,82 +488,340 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return false;
         }
 
+        private enum ArrayViewKind
+        {
+            ReadOnlyCollection,
+            Span,
+            Memory,
+        }
+
+        private static bool IsCallerOwnedArrayReadOnlyCollectionReturn(
+            IOperation? returnedValue,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            SemanticModel semanticModel,
+            out IMethodSymbol methodSymbol)
+        {
+            return TryGetCallerOwnedArrayViewReturn(
+                returnedValue,
+                currentState,
+                semanticModel,
+                ArrayViewKind.ReadOnlyCollection,
+                out methodSymbol);
+        }
+
         private static bool IsCallerOwnedArraySpanReturn(
             IOperation? returnedValue,
             PurityAnalysisEngine.PurityAnalysisState currentState,
+            SemanticModel semanticModel,
             out IMethodSymbol methodSymbol)
         {
-            var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
-            if (unwrappedReturnedValue is IInvocationOperation invocationOperation &&
-                IsMemoryExtensionsArrayAsSpan(invocationOperation.TargetMethod.OriginalDefinition) &&
-                TryGetArraySpanSource(invocationOperation, out var sourceOperation) &&
-                !IsAnalyzerOwnedArraySpanSource(sourceOperation, currentState))
-            {
-                methodSymbol = invocationOperation.TargetMethod.OriginalDefinition;
-                return true;
-            }
+            return TryGetCallerOwnedArrayViewReturn(
+                returnedValue,
+                currentState,
+                semanticModel,
+                ArrayViewKind.Span,
+                out methodSymbol);
+        }
 
-            if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
-            {
-                if (TryGetConstantCondition(conditionalOperation, out var conditionValue))
-                {
-                    return IsCallerOwnedArraySpanReturn(
-                        conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
-                        currentState,
-                        out methodSymbol);
-                }
+        private static bool IsCallerOwnedArrayMemoryReturn(
+            IOperation? returnedValue,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            SemanticModel semanticModel,
+            out IMethodSymbol constructorSymbol)
+        {
+            return TryGetCallerOwnedArrayViewReturn(
+                returnedValue,
+                currentState,
+                semanticModel,
+                ArrayViewKind.Memory,
+                out constructorSymbol);
+        }
 
-                return IsCallerOwnedArraySpanReturn(conditionalOperation.WhenTrue, currentState, out methodSymbol) ||
-                    IsCallerOwnedArraySpanReturn(conditionalOperation.WhenFalse, currentState, out methodSymbol);
-            }
-
-            if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
+        private static bool TryGetCallerOwnedArrayViewReturn(
+            IOperation? returnedValue,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            SemanticModel semanticModel,
+            ArrayViewKind expectedKind,
+            out IMethodSymbol methodSymbol)
+        {
+            if (returnedValue != null &&
+                TryResolveReturnedArrayViewSource(
+                    returnedValue,
+                    returnedValue,
+                    semanticModel,
+                    expectedKind,
+                    new HashSet<ILocalSymbol>(SymbolEqualityComparer.Default),
+                    out var sourceOperation,
+                    out methodSymbol))
             {
-                return IsCallerOwnedArraySpanReturn(coalesceOperation.Value, currentState, out methodSymbol) ||
-                    IsCallerOwnedArraySpanReturn(coalesceOperation.WhenNull, currentState, out methodSymbol);
+                return !PurityAnalysisEngine.IsOwnedArrayValueOrTrustedFactory(
+                    sourceOperation,
+                    currentState,
+                    semanticModel.Compilation);
             }
 
             methodSymbol = null!;
             return false;
         }
 
-        private static bool IsCallerOwnedArrayMemoryReturn(
-            IOperation? returnedValue,
-            PurityAnalysisEngine.PurityAnalysisState currentState,
-            out IMethodSymbol constructorSymbol)
+        private static bool TryResolveReturnedArrayViewSource(
+            IOperation? candidateOperation,
+            IOperation returnedValue,
+            SemanticModel semanticModel,
+            ArrayViewKind expectedKind,
+            HashSet<ILocalSymbol> visitedLocals,
+            out IOperation sourceOperation,
+            out IMethodSymbol methodSymbol)
         {
-            var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
-            if (unwrappedReturnedValue is IObjectCreationOperation objectCreationOperation &&
-                IsMemoryViewConstructor(objectCreationOperation.Constructor) &&
-                objectCreationOperation.Arguments.Length > 0 &&
-                !IsAnalyzerOwnedArraySpanSource(objectCreationOperation.Arguments[0].Value, currentState))
+            var unwrappedOperation = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(
+                PurityAnalysisEngine.SkipImplicitConversions(candidateOperation));
+            if (unwrappedOperation == null)
             {
-                constructorSymbol = objectCreationOperation.Constructor!;
+                sourceOperation = null!;
+                methodSymbol = null!;
+                return false;
+            }
+
+            if (TryMatchArrayViewSource(unwrappedOperation, expectedKind, out sourceOperation, out methodSymbol))
+            {
                 return true;
             }
 
-            if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
+            if (TryGetViewSliceSource(unwrappedOperation, expectedKind, out var slicedSource))
+            {
+                return TryResolveReturnedArrayViewSource(
+                    slicedSource,
+                    returnedValue,
+                    semanticModel,
+                    expectedKind,
+                    visitedLocals,
+                    out sourceOperation,
+                    out methodSymbol);
+            }
+
+            if (unwrappedOperation is ILocalReferenceOperation localReference)
+            {
+                return TryGetStableArrayViewLocalReturn(
+                    localReference.Local,
+                    returnedValue,
+                    semanticModel,
+                    expectedKind,
+                    visitedLocals,
+                    out sourceOperation,
+                    out methodSymbol);
+            }
+
+            if (unwrappedOperation is IConditionalOperation conditionalOperation)
             {
                 if (TryGetConstantCondition(conditionalOperation, out var conditionValue))
                 {
-                    return IsCallerOwnedArrayMemoryReturn(
+                    return TryResolveReturnedArrayViewSource(
                         conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
-                        currentState,
-                        out constructorSymbol);
+                        returnedValue,
+                        semanticModel,
+                        expectedKind,
+                        visitedLocals,
+                        out sourceOperation,
+                        out methodSymbol);
                 }
 
-                return IsCallerOwnedArrayMemoryReturn(conditionalOperation.WhenTrue, currentState, out constructorSymbol) ||
-                    IsCallerOwnedArrayMemoryReturn(conditionalOperation.WhenFalse, currentState, out constructorSymbol);
+                return TryResolveReturnedArrayViewSource(
+                           conditionalOperation.WhenTrue,
+                           returnedValue,
+                           semanticModel,
+                           expectedKind,
+                           visitedLocals,
+                           out sourceOperation,
+                           out methodSymbol) ||
+                       TryResolveReturnedArrayViewSource(
+                           conditionalOperation.WhenFalse,
+                           returnedValue,
+                           semanticModel,
+                           expectedKind,
+                           new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
+                           out sourceOperation,
+                           out methodSymbol);
             }
 
-            if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
+            if (unwrappedOperation is ICoalesceOperation coalesceOperation)
             {
-                return IsCallerOwnedArrayMemoryReturn(coalesceOperation.Value, currentState, out constructorSymbol) ||
-                    IsCallerOwnedArrayMemoryReturn(coalesceOperation.WhenNull, currentState, out constructorSymbol);
+                return TryResolveReturnedArrayViewSource(
+                           coalesceOperation.Value,
+                           returnedValue,
+                           semanticModel,
+                           expectedKind,
+                           visitedLocals,
+                           out sourceOperation,
+                           out methodSymbol) ||
+                       TryResolveReturnedArrayViewSource(
+                           coalesceOperation.WhenNull,
+                           returnedValue,
+                           semanticModel,
+                           expectedKind,
+                           new HashSet<ILocalSymbol>(visitedLocals, SymbolEqualityComparer.Default),
+                           out sourceOperation,
+                           out methodSymbol);
             }
 
-            constructorSymbol = null!;
+            sourceOperation = null!;
+            methodSymbol = null!;
             return false;
+        }
+
+        private static bool TryMatchArrayViewSource(
+            IOperation operation,
+            ArrayViewKind expectedKind,
+            out IOperation sourceOperation,
+            out IMethodSymbol methodSymbol)
+        {
+            if (expectedKind == ArrayViewKind.ReadOnlyCollection &&
+                operation is IInvocationOperation readOnlyInvocation &&
+                PurityAnalysisEngine.IsArrayAsReadOnlyInvocation(readOnlyInvocation) &&
+                readOnlyInvocation.Arguments.Length == 1)
+            {
+                sourceOperation = readOnlyInvocation.Arguments[0].Value;
+                methodSymbol = readOnlyInvocation.TargetMethod.OriginalDefinition;
+                return true;
+            }
+
+            if (expectedKind == ArrayViewKind.Span)
+            {
+                if (operation is IInvocationOperation spanInvocation &&
+                    IsMemoryExtensionsArrayAsSpan(spanInvocation.TargetMethod.OriginalDefinition) &&
+                    TryGetArraySpanSource(spanInvocation, out sourceOperation))
+                {
+                    methodSymbol = spanInvocation.TargetMethod.OriginalDefinition;
+                    return true;
+                }
+
+                if (operation is IObjectCreationOperation spanConstruction &&
+                    IsSpanViewConstructor(spanConstruction.Constructor) &&
+                    spanConstruction.Arguments.Length > 0)
+                {
+                    sourceOperation = spanConstruction.Arguments[0].Value;
+                    methodSymbol = spanConstruction.Constructor!;
+                    return true;
+                }
+            }
+
+            if (expectedKind == ArrayViewKind.Memory &&
+                operation is IObjectCreationOperation memoryConstruction &&
+                IsMemoryViewConstructor(memoryConstruction.Constructor) &&
+                memoryConstruction.Arguments.Length > 0)
+            {
+                sourceOperation = memoryConstruction.Arguments[0].Value;
+                methodSymbol = memoryConstruction.Constructor!;
+                return true;
+            }
+
+            sourceOperation = null!;
+            methodSymbol = null!;
+            return false;
+        }
+
+        private static bool TryGetViewSliceSource(
+            IOperation operation,
+            ArrayViewKind expectedKind,
+            out IOperation sourceOperation)
+        {
+            if (operation is not IInvocationOperation invocationOperation ||
+                !IsSemanticallyPureSpanLikeSliceInvocation(invocationOperation))
+            {
+                sourceOperation = null!;
+                return false;
+            }
+
+            var containingType = invocationOperation.TargetMethod.ContainingType?.OriginalDefinition.ToDisplayString();
+            if (expectedKind == ArrayViewKind.Span &&
+                containingType is "System.Span<T>" or "System.ReadOnlySpan<T>" &&
+                invocationOperation.Instance != null)
+            {
+                sourceOperation = invocationOperation.Instance;
+                return true;
+            }
+
+            if (expectedKind == ArrayViewKind.Memory &&
+                containingType is "System.Memory<T>" or "System.ReadOnlyMemory<T>" &&
+                invocationOperation.Instance != null)
+            {
+                sourceOperation = invocationOperation.Instance;
+                return true;
+            }
+
+            sourceOperation = null!;
+            return false;
+        }
+
+        private static bool IsSemanticallyPureSpanLikeSliceInvocation(IInvocationOperation invocationOperation)
+        {
+            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
+            if (targetMethod == null ||
+                targetMethod.MethodKind != MethodKind.Ordinary ||
+                targetMethod.Name != "Slice" ||
+                targetMethod.IsStatic)
+            {
+                return false;
+            }
+
+            var containingType = targetMethod.ContainingType?.OriginalDefinition.ToDisplayString();
+            if (containingType is not ("System.Span<T>" or "System.ReadOnlySpan<T>" or "System.Memory<T>" or "System.ReadOnlyMemory<T>"))
+            {
+                return false;
+            }
+
+            if (targetMethod.Parameters.Length is not (1 or 2))
+            {
+                return false;
+            }
+
+            return targetMethod.Parameters.All(parameter =>
+                parameter.RefKind == RefKind.None &&
+                parameter.Type.SpecialType == SpecialType.System_Int32);
+        }
+
+        private static bool TryGetStableArrayViewLocalReturn(
+            ILocalSymbol localSymbol,
+            IOperation returnedValue,
+            SemanticModel semanticModel,
+            ArrayViewKind expectedKind,
+            HashSet<ILocalSymbol> visitedLocals,
+            out IOperation sourceOperation,
+            out IMethodSymbol methodSymbol)
+        {
+            if (!visitedLocals.Add(localSymbol))
+            {
+                sourceOperation = null!;
+                methodSymbol = null!;
+                return false;
+            }
+
+            var declaratorSyntax = localSymbol.DeclaringSyntaxReferences
+                .Select(reference => reference.GetSyntax())
+                .OfType<VariableDeclaratorSyntax>()
+                .FirstOrDefault();
+            var initializerSyntax = declaratorSyntax?.Initializer?.Value;
+            if (declaratorSyntax == null || initializerSyntax == null)
+            {
+                sourceOperation = null!;
+                methodSymbol = null!;
+                return false;
+            }
+
+            if (HasAssignmentToLocalBetweenDeclarationAndReturn(localSymbol, returnedValue, declaratorSyntax, semanticModel))
+            {
+                sourceOperation = null!;
+                methodSymbol = null!;
+                return false;
+            }
+
+            return TryResolveReturnedArrayViewSource(
+                semanticModel.GetOperation(initializerSyntax),
+                returnedValue,
+                semanticModel,
+                expectedKind,
+                visitedLocals,
+                out sourceOperation,
+                out methodSymbol);
         }
 
         private static bool IsMemoryViewConstructor(IMethodSymbol? methodSymbol)
@@ -565,6 +836,20 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return containingType.OriginalDefinition.ToDisplayString() is "System.Memory<T>" or "System.ReadOnlyMemory<T>";
+        }
+
+        private static bool IsSpanViewConstructor(IMethodSymbol? methodSymbol)
+        {
+            if (methodSymbol == null ||
+                methodSymbol.MethodKind != MethodKind.Constructor ||
+                methodSymbol.ContainingType is not INamedTypeSymbol containingType ||
+                methodSymbol.Parameters.Length == 0 ||
+                methodSymbol.Parameters[0].Type is not IArrayTypeSymbol)
+            {
+                return false;
+            }
+
+            return containingType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>";
         }
 
         private static bool TryGetArraySpanSource(

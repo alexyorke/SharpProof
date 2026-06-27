@@ -95,14 +95,43 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static bool IsPurityNeutralIntrinsicConversion(IMethodSymbol operatorMethod)
         {
-            return operatorMethod.ContainingType?.SpecialType == SpecialType.System_String &&
-                operatorMethod.Name == "op_Implicit" &&
-                operatorMethod.Parameters.Length == 1 &&
+            if (operatorMethod.Name != "op_Implicit" ||
+                operatorMethod.Parameters.Length != 1)
+            {
+                return false;
+            }
+
+            if (operatorMethod.ContainingType?.SpecialType == SpecialType.System_String &&
                 operatorMethod.Parameters[0].Type.SpecialType == SpecialType.System_String &&
-                operatorMethod.ReturnType is INamedTypeSymbol namedReturnType &&
-                namedReturnType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
-                namedReturnType.TypeArguments.Length == 1 &&
-                namedReturnType.TypeArguments[0].SpecialType == SpecialType.System_Char;
+                operatorMethod.ReturnType is INamedTypeSymbol stringSpanReturnType &&
+                stringSpanReturnType.OriginalDefinition.ToDisplayString() == "System.ReadOnlySpan<T>" &&
+                stringSpanReturnType.TypeArguments.Length == 1 &&
+                stringSpanReturnType.TypeArguments[0].SpecialType == SpecialType.System_Char)
+            {
+                return true;
+            }
+
+            if (operatorMethod.ContainingType is not INamedTypeSymbol containingType ||
+                operatorMethod.ReturnType is not INamedTypeSymbol returnType ||
+                operatorMethod.Parameters[0].Type is not INamedTypeSymbol parameterType)
+            {
+                return false;
+            }
+
+            var containingTypeDefinition = containingType.OriginalDefinition.ToDisplayString();
+            var parameterTypeDefinition = parameterType.OriginalDefinition.ToDisplayString();
+            var returnTypeDefinition = returnType.OriginalDefinition.ToDisplayString();
+
+            return containingTypeDefinition switch
+            {
+                "System.Span<T>" =>
+                    parameterTypeDefinition == "System.Span<T>" &&
+                    returnTypeDefinition == "System.ReadOnlySpan<T>",
+                "System.Memory<T>" =>
+                    parameterTypeDefinition == "System.Memory<T>" &&
+                    returnTypeDefinition == "System.ReadOnlyMemory<T>",
+                _ => false,
+            };
         }
 
         private static bool IsStaticAbstractInterfaceConversion(IMethodSymbol methodSymbol)

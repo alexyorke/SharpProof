@@ -2784,6 +2784,50 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeExceptionToStringSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.Exception.ToString");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            var knownImpureRows = catalogComparison.GetProperty("KnownImpureMembers").EnumerateArray().ToArray();
+            Assert.That(
+                knownImpureRows.Any(row => string.Equals(
+                    row.GetProperty("Symbol").GetString(),
+                    "System.Exception.ToString()",
+                    StringComparison.Ordinal)),
+                Is.False,
+                "System.Exception.ToString() should no longer overlap the manual impure catalog.");
+
+            AssertPurityClassification(
+                summary,
+                "System.Exception.ToString()",
+                "impure",
+                "global_state_read",
+                "global_state_write",
+                "impure_callee");
+            AssertEffectVisibilityClassification(
+                summary,
+                "System.Exception.ToString()",
+                "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.Exception.ToString()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeFileSystemPathGetterSlice_UsesGeneratedEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

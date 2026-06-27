@@ -52,8 +52,6 @@ public static class Constants
         "System.Runtime.GCSettings.IsServerGC.get",
         "System.CodeDom.Compiler.CodeDomProvider.CreateProvider(string)",
         "System.CodeDom.Compiler.CompilerResults.Errors.get",
-        "System.Exception.ToString()",
-
         "System.Text.Json.JsonSerializer.Deserialize",
         "JsonSerializer.Deserialize",
         "System.Text.Json.JsonSerializer.Deserialize<TValue>(string, System.Text.Json.JsonSerializerOptions?)",
