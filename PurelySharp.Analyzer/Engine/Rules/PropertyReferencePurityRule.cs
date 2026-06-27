@@ -1103,8 +1103,17 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static bool IsPotentiallyDispatchedGetter(IMethodSymbol getterSymbol, Compilation compilation)
         {
-            if (getterSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
-                getterSymbol.IsAbstract)
+            if (getterSymbol.ContainingType?.TypeKind == TypeKind.Interface)
+            {
+                return true;
+            }
+
+            if (GeneratedPurityCatalog.TryCanMetadataMethodBeOverridden(getterSymbol, compilation, out var canBeOverridden))
+            {
+                return canBeOverridden;
+            }
+
+            if (getterSymbol.IsAbstract)
             {
                 return true;
             }
@@ -1112,11 +1121,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (!getterSymbol.IsVirtual && !getterSymbol.IsOverride)
             {
                 return false;
-            }
-
-            if (GeneratedPurityCatalog.TryCanMetadataMethodBeOverridden(getterSymbol, compilation, out var canBeOverridden))
-            {
-                return canBeOverridden;
             }
 
             return !getterSymbol.IsSealed;

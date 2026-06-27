@@ -8161,6 +8161,63 @@ public static class DuplicateReviewedSeedFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeTypeScalarMetadataSlice_UsesGeneratedPurityEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.Type.get_IsAbstract",
+                "System.Type.get_IsArray",
+                "System.Type.get_IsClass",
+                "System.Type.get_IsInterface",
+                "System.Type.get_IsSealed",
+                "System.Type.get_IsValueType");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Type.get_IsAbstract()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.get_IsAbstract()", "none");
+            AssertPurityClassification(summary, "System.Type.get_IsArray()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.get_IsArray()", "none");
+            AssertPurityClassification(summary, "System.Type.get_IsClass()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.get_IsClass()", "none");
+            AssertPurityClassification(summary, "System.Type.get_IsInterface()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.get_IsInterface()", "none");
+            AssertPurityClassification(summary, "System.Type.get_IsSealed()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.get_IsSealed()", "none");
+            AssertPurityClassification(summary, "System.Type.get_IsValueType()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.get_IsValueType()", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Type.get_IsAbstract()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.get_IsArray()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.get_IsClass()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.get_IsInterface()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.get_IsSealed()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.get_IsValueType()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Type.get_IsAbstract()",
+                "System.Type.get_IsArray()",
+                "System.Type.get_IsClass()",
+                "System.Type.get_IsInterface()",
+                "System.Type.get_IsSealed()",
+                "System.Type.get_IsValueType()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeTypeIdentitySlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(

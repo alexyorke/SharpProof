@@ -549,7 +549,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsAbstract_Diagnostic()
+        public async Task TypeIsAbstract_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -557,7 +557,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(System.Type type)
+    public bool TestMethod(System.Type type)
     {
         return type.IsAbstract;
     }
@@ -567,7 +567,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsClass_Diagnostic()
+        public async Task TypeIsClass_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -575,7 +575,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(System.Type type)
+    public bool TestMethod(System.Type type)
     {
         return type.IsClass;
     }
@@ -603,7 +603,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsInterface_Diagnostic()
+        public async Task TypeIsInterface_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -611,7 +611,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(System.Type type)
+    public bool TestMethod(System.Type type)
     {
         return type.IsInterface;
     }
@@ -621,7 +621,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsValueType_Diagnostic()
+        public async Task TypeIsValueType_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -629,7 +629,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(System.Type type)
+    public bool TestMethod(System.Type type)
     {
         return type.IsValueType;
     }
@@ -639,7 +639,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeInfoIsValueType_Diagnostic()
+        public async Task TypeInfoIsValueType_NoDiagnostic()
         {
             var test = @"
 using System.Reflection;
@@ -648,7 +648,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(TypeInfo typeInfo)
+    public bool TestMethod(TypeInfo typeInfo)
     {
         return typeInfo.IsValueType;
     }
@@ -772,7 +772,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsArray_Diagnostic()
+        public async Task TypeIsArray_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -780,7 +780,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(System.Type type)
+    public bool TestMethod(System.Type type)
     {
         return type.IsArray;
     }
@@ -844,7 +844,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsSealed_Diagnostic()
+        public async Task TypeIsSealed_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -852,7 +852,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(System.Type type)
+    public bool TestMethod(System.Type type)
     {
         return type.IsSealed;
     }

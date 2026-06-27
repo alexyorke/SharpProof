@@ -868,6 +868,10 @@ internal static class PurityClassificationEngine
         {
             effectVisibilityClassification = "internal_only";
         }
+        else if (HasPureTypeMetadataBooleanWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "none";
+        }
         else if (HasPureTypeIdentityWrapperPattern(summary))
         {
             effectVisibilityClassification = "none";
@@ -980,6 +984,42 @@ internal static class PurityClassificationEngine
             string.Equals(summary.Fields[0], "System.Globalization.TextInfo.Invariant", StringComparison.Ordinal) &&
             summary.Calls.Any(IsInvariantTextInfoStringWrapperCall) &&
             summary.Calls.All(IsInvariantTextInfoStringWrapperCall);
+    }
+
+    private static bool HasPureTypeMetadataBooleanWrapperPattern(MethodEffectSummary summary)
+    {
+        if (summary.Fields.Length != 0 ||
+            !CallsOnly(summary, "calls_method", "virtual_call") ||
+            !summary.RootCandidates.All(static root => string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        var callSites = EnumerateCallSites(summary).ToArray();
+        return summary.Symbol switch
+        {
+            "System.Type.get_IsAbstract()" => CallSitesMatch(
+                callSites,
+                ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true)),
+            "System.Type.get_IsArray()" => CallSitesMatch(
+                callSites,
+                ("System.Type.IsArrayImpl()->bool", true)),
+            "System.Type.get_IsClass()" => CallSitesMatch(
+                callSites,
+                ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true),
+                ("System.Type.get_IsValueType()->bool", false)),
+            "System.Type.get_IsInterface()" => CallSitesMatch(
+                callSites,
+                ("System.RuntimeTypeHandle.IsInterface(System.RuntimeType)->bool", false),
+                ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true)),
+            "System.Type.get_IsSealed()" => CallSitesMatch(
+                callSites,
+                ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true)),
+            "System.Type.get_IsValueType()" => CallSitesMatch(
+                callSites,
+                ("System.Type.IsValueTypeImpl()->bool", true)),
+            _ => false,
+        };
     }
 
     private static bool HasPureTypeIdentityWrapperPattern(MethodEffectSummary summary)
@@ -1228,6 +1268,28 @@ internal static class PurityClassificationEngine
     {
         return string.Equals(callSymbol, "System.Globalization.TextInfo.ToLower(string)->string", StringComparison.Ordinal) ||
             string.Equals(callSymbol, "System.Globalization.TextInfo.ToUpper(string)->string", StringComparison.Ordinal);
+    }
+
+    private static bool CallSitesMatch(
+        IReadOnlyList<CallSiteSummary> actual,
+        params (string ExactSymbolKey, bool UsesDynamicDispatch)[] expected)
+    {
+        if (actual.Count != expected.Length)
+        {
+            return false;
+        }
+
+        foreach (var expectedCallSite in expected)
+        {
+            if (actual.Count(callSite =>
+                    callSite.UsesDynamicDispatch == expectedCallSite.UsesDynamicDispatch &&
+                    string.Equals(callSite.ExactSymbolKey, expectedCallSite.ExactSymbolKey, StringComparison.Ordinal)) != 1)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool IsTypeIdentityWrapperMethod(string symbol)
