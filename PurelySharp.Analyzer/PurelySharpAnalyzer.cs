@@ -46,7 +46,7 @@ namespace PurelySharp.Analyzer
                     : ExceptionSummaryCatalog.Empty;
                 var generatedPurityCatalog = config.EnableEffectSummaryJson
                     ? GeneratedPurityCatalog.FromOptions(startContext.Options, startContext.CancellationToken)
-                    : GeneratedPurityCatalog.Empty;
+                    : GeneratedPurityCatalog.Current;
 
                 startContext.RegisterSyntaxNodeAction(c =>
                 {

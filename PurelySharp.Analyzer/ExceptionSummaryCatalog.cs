@@ -17,7 +17,8 @@ namespace PurelySharp.Analyzer
 {
     internal sealed class ExceptionSummaryCatalog
     {
-        private const string SummaryFileName = "PurelySharp.EffectSummary.json";
+        private static readonly Lazy<ExceptionSummaryCatalog> BuiltInCatalog =
+            new Lazy<ExceptionSummaryCatalog>(CreateBuiltInCatalog, LazyThreadSafetyMode.ExecutionAndPublication);
         private static readonly SymbolDisplayFormat EffectSummaryContainingTypeFormat = new SymbolDisplayFormat(
             typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces,
             genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
@@ -45,41 +46,12 @@ namespace PurelySharp.Analyzer
 
         public static ExceptionSummaryCatalog FromOptions(AnalyzerOptions options, CancellationToken cancellationToken)
         {
-            var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
-            foreach (var additionalFile in options.AdditionalFiles)
-            {
-                if (!IsSummaryFile(additionalFile.Path))
-                {
-                    continue;
-                }
-
-                var text = additionalFile.GetText(cancellationToken)?.ToString();
-                if (string.IsNullOrWhiteSpace(text))
-                {
-                    continue;
-                }
-
-                foreach (var entry in ParseEntries(text!))
-                {
-                    if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
-                    {
-                        builder = ImmutableArray.CreateBuilder<SummaryEntry>();
-                        entriesBySymbol.Add(entry.Symbol, builder);
-                    }
-
-                    builder.Add(entry);
-                }
-            }
-
-            if (entriesBySymbol.Count == 0)
-            {
-                return Empty;
-            }
-
-            return new ExceptionSummaryCatalog(entriesBySymbol.ToImmutableDictionary(
-                item => item.Key,
-                item => item.Value.ToImmutable(),
-                StringComparer.Ordinal));
+            var entriesBySymbol = CreateMutableEntries(BuiltInCatalog.Value);
+            BuiltInEffectSummaryLoader.LoadAdditionalSummaryJsonDocuments(
+                options,
+                cancellationToken,
+                json => AddParsedEntries(entriesBySymbol, json));
+            return CreateCatalog(entriesBySymbol);
         }
 
         public bool TryGetExceptions(IMethodSymbol methodSymbol, out ImmutableArray<string> exceptionTypes)
@@ -237,11 +209,56 @@ namespace PurelySharp.Analyzer
             return true;
         }
 
-        private static bool IsSummaryFile(string path)
+        private static ExceptionSummaryCatalog CreateBuiltInCatalog()
         {
-            var fileName = Path.GetFileName(path);
-            return string.Equals(fileName, SummaryFileName, StringComparison.OrdinalIgnoreCase) ||
-                fileName.EndsWith("." + SummaryFileName, StringComparison.OrdinalIgnoreCase);
+            var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
+            BuiltInEffectSummaryLoader.LoadBuiltInSummaryJsonDocuments(
+                json => AddParsedEntries(entriesBySymbol, json));
+            return CreateCatalog(entriesBySymbol);
+        }
+
+        private static Dictionary<string, ImmutableArray<SummaryEntry>.Builder> CreateMutableEntries(
+            ExceptionSummaryCatalog catalog)
+        {
+            var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
+            foreach (var entry in catalog._entriesBySymbol)
+            {
+                var builder = ImmutableArray.CreateBuilder<SummaryEntry>(entry.Value.Length);
+                builder.AddRange(entry.Value);
+                entriesBySymbol.Add(entry.Key, builder);
+            }
+
+            return entriesBySymbol;
+        }
+
+        private static ExceptionSummaryCatalog CreateCatalog(
+            Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol)
+        {
+            if (entriesBySymbol.Count == 0)
+            {
+                return Empty;
+            }
+
+            return new ExceptionSummaryCatalog(entriesBySymbol.ToImmutableDictionary(
+                item => item.Key,
+                item => item.Value.ToImmutable(),
+                StringComparer.Ordinal));
+        }
+
+        private static void AddParsedEntries(
+            Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol,
+            string json)
+        {
+            foreach (var entry in ParseEntries(json))
+            {
+                if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
+                {
+                    builder = ImmutableArray.CreateBuilder<SummaryEntry>();
+                    entriesBySymbol.Add(entry.Symbol, builder);
+                }
+
+                builder.Add(entry);
+            }
         }
 
         private static IEnumerable<SummaryEntry> ParseEntries(string json)

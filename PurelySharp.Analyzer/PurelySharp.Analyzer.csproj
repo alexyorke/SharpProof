@@ -8,7 +8,8 @@
     <LangVersion>preview</LangVersion> 
     <ImplicitUsings>enable</ImplicitUsings> 
     <NoWarn>$(NoWarn);RS2007;RS1035</NoWarn> 
-    <GeneratedPurityBuiltInSummaryDirectory Condition="'$(GeneratedPurityBuiltInSummaryDirectory)' == ''">$(IntermediateOutputPath)GeneratedPurity</GeneratedPurityBuiltInSummaryDirectory>
+    <GeneratedPurityBuiltInSummaryDirectory Condition="'$(GeneratedPurityBuiltInSummaryDirectory)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\GeneratedPurity</GeneratedPurityBuiltInSummaryDirectory>
+    <GeneratedPurityArtifactSourceDirectory Condition="'$(GeneratedPurityArtifactSourceDirectory)' == ''">$(MSBuildThisFileDirectory)..\artifacts\effect-summary</GeneratedPurityArtifactSourceDirectory>
   </PropertyGroup>
 
   <ItemGroup>
@@ -49,7 +50,31 @@
     </Compile>
   </ItemGroup>
 
-  <Target Name="IncludeGeneratedPurityBuiltInSummaries" BeforeTargets="CoreCompile">
+  <Target Name="StageGeneratedPurityBuiltInSummaries" BeforeTargets="AssignTargetPaths">
+    <ItemGroup Condition="Exists('$(GeneratedPurityArtifactSourceDirectory)')">
+      <_GeneratedPurityArtifactAlreadyNamed Include="$(GeneratedPurityArtifactSourceDirectory)\*.PurelySharp.EffectSummary.json" />
+      <_GeneratedPurityArtifactNeedsSuffix Include="$(GeneratedPurityArtifactSourceDirectory)\*.json"
+                                           Exclude="@(_GeneratedPurityArtifactAlreadyNamed)" />
+    </ItemGroup>
+
+    <RemoveDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)"
+               Condition="Exists('$(GeneratedPurityBuiltInSummaryDirectory)')" />
+    <MakeDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)"
+             Condition="'@(_GeneratedPurityArtifactAlreadyNamed)' != '' or '@(_GeneratedPurityArtifactNeedsSuffix)' != ''" />
+
+    <Copy SourceFiles="@(_GeneratedPurityArtifactAlreadyNamed)"
+          DestinationFolder="$(GeneratedPurityBuiltInSummaryDirectory)"
+          SkipUnchangedFiles="true"
+          Condition="'@(_GeneratedPurityArtifactAlreadyNamed)' != ''" />
+    <Copy SourceFiles="@(_GeneratedPurityArtifactNeedsSuffix)"
+          DestinationFiles="@(_GeneratedPurityArtifactNeedsSuffix->'$(GeneratedPurityBuiltInSummaryDirectory)\%(Filename).PurelySharp.EffectSummary.json')"
+          SkipUnchangedFiles="true"
+          Condition="'@(_GeneratedPurityArtifactNeedsSuffix)' != ''" />
+  </Target>
+
+  <Target Name="IncludeGeneratedPurityBuiltInSummaries"
+          BeforeTargets="AssignTargetPaths"
+          DependsOnTargets="StageGeneratedPurityBuiltInSummaries">
     <ItemGroup Condition="Exists('$(GeneratedPurityBuiltInSummaryDirectory)')">
       <_GeneratedPurityBuiltInSummary Include="$(GeneratedPurityBuiltInSummaryDirectory)\*.PurelySharp.EffectSummary.json" />
       <EmbeddedResource Include="@(_GeneratedPurityBuiltInSummary)">

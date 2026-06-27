@@ -1812,11 +1812,13 @@ internal static class AssemblyEffectSummarizer
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
         var included = new HashSet<string>(StringComparer.Ordinal);
+        var orderedExactSymbolKeys = new List<string>();
         var queue = new Queue<(string ExactSymbolKey, int Depth)>();
         foreach (var summary in allSummaries.Where(summary => MatchesSymbolPrefix(summary.Symbol, symbolPrefixes)))
         {
             if (included.Add(summary.ExactSymbolKey))
             {
+                orderedExactSymbolKeys.Add(summary.ExactSymbolKey);
                 queue.Enqueue((summary.ExactSymbolKey, 0));
             }
         }
@@ -1835,12 +1837,13 @@ internal static class AssemblyEffectSummarizer
                 if (TryResolveSummaryExactSymbolKey(call, bySymbol, out var resolvedCallKey, out _) &&
                     included.Add(resolvedCallKey))
                 {
+                    orderedExactSymbolKeys.Add(resolvedCallKey);
                     queue.Enqueue((resolvedCallKey, depth + 1));
                 }
             }
         }
 
-        return allSummaries.Where(summary => included.Contains(summary.ExactSymbolKey));
+        return orderedExactSymbolKeys.Select(exactSymbolKey => bySymbol[exactSymbolKey]);
     }
 
     private static MethodEffectSummary SummarizeMethod(

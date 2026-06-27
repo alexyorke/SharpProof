@@ -3167,18 +3167,17 @@ public static class StringComparisonFixture
                 .EnumerateArray()
                 .Where(row =>
                     string.Equals(row.GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal) &&
-                    (
-                        string.Equals(row.GetProperty("Symbol").GetString(), "System.BitConverter.ToInt32(byte[], int)", StringComparison.Ordinal) ||
-                        string.Equals(row.GetProperty("Symbol").GetString(), "System.BitConverter.ToInt32(System.ReadOnlySpan`1<byte>)", StringComparison.Ordinal)))
+                    string.Equals(row.GetProperty("Symbol").GetString(), "System.BitConverter.ToInt32(System.ReadOnlySpan`1<byte>)", StringComparison.Ordinal))
                 .ToArray();
 
             Assert.That(
                 generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
                 Is.EquivalentTo(new[]
                 {
-                    "System.BitConverter.ToInt32(byte[], int)",
                     "System.BitConverter.ToInt32(System.ReadOnlySpan`1<byte>)",
                 }));
+
+            AssertPurityClassification(summary, "System.BitConverter.ToInt32(byte[], int)", "impure", "global_state_read", "global_state_write", "impure_callee");
 
             foreach (var row in generatedRows)
             {
@@ -3202,18 +3201,17 @@ public static class StringComparisonFixture
                 .EnumerateArray()
                 .Where(row =>
                     string.Equals(row.GetProperty("Classification").GetString(), "pure", StringComparison.Ordinal) &&
-                    (
-                        string.Equals(row.GetProperty("Symbol").GetString(), "System.BitConverter.ToDouble(byte[], int)", StringComparison.Ordinal) ||
-                        string.Equals(row.GetProperty("Symbol").GetString(), "System.BitConverter.ToDouble(System.ReadOnlySpan`1<byte>)", StringComparison.Ordinal)))
+                    string.Equals(row.GetProperty("Symbol").GetString(), "System.BitConverter.ToDouble(System.ReadOnlySpan`1<byte>)", StringComparison.Ordinal))
                 .ToArray();
 
             Assert.That(
                 generatedRows.Select(row => row.GetProperty("Symbol").GetString()),
                 Is.EquivalentTo(new[]
                 {
-                    "System.BitConverter.ToDouble(byte[], int)",
                     "System.BitConverter.ToDouble(System.ReadOnlySpan`1<byte>)",
                 }));
+
+            AssertPurityClassification(summary, "System.BitConverter.ToDouble(byte[], int)", "impure", "global_state_read", "global_state_write", "impure_callee");
 
             foreach (var row in generatedRows)
             {
@@ -3380,13 +3378,30 @@ public static class StringComparisonFixture
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.IO.Path", limit: 80);
 
+            var pathSymbols = FindMethodsByPrefix(summary, "System.IO.Path.")
+                .Select(method => method.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(pathSymbols, Does.Contain("System.IO.Path.Combine(string, string)"));
+            Assert.That(pathSymbols, Does.Contain("System.IO.Path.HasExtension(string)"));
+            Assert.That(pathSymbols, Does.Contain("System.IO.Path.ChangeExtension(string, string)"));
+            Assert.That(pathSymbols, Does.Contain("System.IO.Path.GetDirectoryName(string)"));
+            Assert.That(pathSymbols, Does.Contain("System.IO.Path.GetExtension(string)"));
+            Assert.That(pathSymbols, Does.Contain("System.IO.Path.GetFileName(string)"));
+            Assert.That(pathSymbols, Does.Contain("System.IO.Path.GetFileNameWithoutExtension(string)"));
+
             AssertPurityClassification(summary, "System.IO.Path.Combine(string, string)", "pure");
             AssertPurityClassification(summary, "System.IO.Path.HasExtension(string)", "pure");
             AssertPurityClassification(summary, "System.IO.Path.ChangeExtension(string, string)", "pure");
             AssertPurityClassification(summary, "System.IO.Path.GetDirectoryName(string)", "pure");
+            AssertPurityClassification(summary, "System.IO.Path.GetDirectoryName(System.ReadOnlySpan`1<char>)", "pure");
             AssertPurityClassification(summary, "System.IO.Path.GetExtension(string)", "pure");
+            AssertPurityClassification(summary, "System.IO.Path.GetExtension(System.ReadOnlySpan`1<char>)", "pure");
             AssertPurityClassification(summary, "System.IO.Path.GetFileName(string)", "pure");
+            AssertPurityClassification(summary, "System.IO.Path.GetFileName(System.ReadOnlySpan`1<char>)", "pure");
             AssertPurityClassification(summary, "System.IO.Path.GetFileNameWithoutExtension(string)", "pure");
+            AssertPurityClassification(summary, "System.IO.Path.GetFileNameWithoutExtension(System.ReadOnlySpan`1<char>)", "pure");
         }
 
         [Test]

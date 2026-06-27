@@ -198,6 +198,13 @@ internal static class PurityClassificationEngine
             return intrinsicStubClassification;
         }
 
+        if (TryClassifySemanticPureWrapper(summary, out var semanticWrapperClassification))
+        {
+            visiting.Remove(symbol);
+            memo[symbol] = semanticWrapperClassification;
+            return semanticWrapperClassification;
+        }
+
         var impureCategories = new SortedSet<string>(StringComparer.Ordinal);
         var conservativeCategories = new SortedSet<string>(StringComparer.Ordinal);
 
@@ -601,7 +608,166 @@ internal static class PurityClassificationEngine
         return IsInteropLastErrorBookkeepingCall(callerSummary, calleeSymbol) ||
             (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
             HasDeterministicStringComparisonEvidence(callSite) &&
-            IsContextSensitiveStringComparisonMethod(calleeSymbol));
+            IsContextSensitiveStringComparisonMethod(calleeSymbol)) ||
+            (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+             IsFreshStringInitializationHelperCall(callerSummary, calleeSymbol, calleeClassification)) ||
+            (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+             IsCharSpanToStringWrapperCall(callerSummary, callSite, calleeSymbol, calleeClassification)) ||
+            (!string.Equals(calleeClassification.Classification, "pure", StringComparison.Ordinal) &&
+             IsSemanticallyPureCharSpanSearchHelperCall(callerSummary, calleeSymbol, calleeClassification));
+    }
+
+    private static bool IsFreshStringInitializationHelperCall(
+        MethodEffectSummary callerSummary,
+        string calleeSymbol,
+        MethodPurityClassification calleeClassification)
+    {
+        if (!IsFreshStringInitializationContext(callerSummary))
+        {
+            return false;
+        }
+
+        return IsFreshStringCopyHelperCall(calleeSymbol) &&
+            HasFreshStringCopyBlockingChain(calleeClassification.FirstBlockingCallChain);
+    }
+
+    private static bool IsFreshStringInitializationContext(MethodEffectSummary summary)
+    {
+        if (!summary.Effects.Contains("allocates_object", StringComparer.Ordinal) ||
+            summary.Effects.Contains("allocates_array", StringComparer.Ordinal) ||
+            summary.Effects.Contains("writes_static_field", StringComparer.Ordinal) ||
+            summary.Effects.Contains("writes_instance_field", StringComparer.Ordinal) ||
+            summary.Effects.Contains("writes_indirect_memory", StringComparer.Ordinal) ||
+            summary.Effects.Contains("indirect_call", StringComparer.Ordinal) ||
+            summary.Effects.Contains("virtual_call", StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        if (!summary.Calls.Any(static call =>
+                string.Equals(call, "string.FastAllocateString(int)->string", StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        return HasOnlySafeStaticReads(summary);
+    }
+
+    private static bool IsFreshStringCopyHelperCall(string calleeSymbol)
+    {
+        return calleeSymbol.StartsWith("System.ReadOnlySpan`1", StringComparison.Ordinal) &&
+            calleeSymbol.Contains(".CopyTo(System.Span`1<!0>)", StringComparison.Ordinal);
+    }
+
+    private static bool HasFreshStringCopyBlockingChain(string[] blockingCallChain)
+    {
+        if (blockingCallChain.Length == 0)
+        {
+            return false;
+        }
+
+        if (blockingCallChain.All(IsBufferMemmoveHelper))
+        {
+            return true;
+        }
+
+        return string.Equals(blockingCallChain[0], "System.ReadOnlySpan`1.CopyTo(System.Span`1<!0>)", StringComparison.Ordinal) &&
+            blockingCallChain.Skip(1).All(IsBufferMemmoveHelper);
+    }
+
+    private static bool IsBufferMemmoveHelper(string symbol)
+    {
+        return string.Equals(symbol, "System.Buffer.Memmove(ref !!0, ref !!0, nuint)", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Buffer.Memmove(ref byte, ref byte, nuint)", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Buffer._Memmove(ref byte, ref byte, nuint)", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Buffer.__Memmove(byte*, byte*, nuint)", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Buffer.BulkMoveWithWriteBarrier(ref byte, ref byte, nuint)", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Buffer._BulkMoveWithWriteBarrier(ref byte, ref byte, nuint)", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Buffer.__BulkMoveWithWriteBarrier(ref byte, ref byte, nuint)", StringComparison.Ordinal);
+    }
+
+    private static bool IsSemanticallyPureCharSpanSearchHelperCall(
+        MethodEffectSummary callerSummary,
+        string calleeSymbol,
+        MethodPurityClassification calleeClassification)
+    {
+        return HasCharSpanSearchContext(callerSummary) &&
+            IsEqualityBasedSpanSearchHelper(calleeSymbol) &&
+            HasEqualityBasedSpanSearchBlockingChain(calleeClassification.FirstBlockingCallChain);
+    }
+
+    private static bool IsCharSpanToStringWrapperCall(
+        MethodEffectSummary callerSummary,
+        CallSiteSummary callSite,
+        string calleeSymbol,
+        MethodPurityClassification calleeClassification)
+    {
+        if (callSite.UsesDynamicDispatch ||
+            !HasCharSpanToStringWrapperContext(callerSummary) ||
+            !IsObjectToStringCall(calleeSymbol))
+        {
+            return false;
+        }
+
+        return HasObjectToStringBlockingChain(calleeClassification.FirstBlockingCallChain);
+    }
+
+    private static bool HasCharSpanToStringWrapperContext(MethodEffectSummary summary)
+    {
+        if (!summary.ExactSymbolKey.EndsWith(")->string", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return summary.Calls.Any(IsCharSpanReturningCall);
+    }
+
+    private static bool IsCharSpanReturningCall(string callSymbol)
+    {
+        return callSymbol.EndsWith(")->System.ReadOnlySpan`1<char>", StringComparison.Ordinal) ||
+            callSymbol.EndsWith(")->System.Span`1<char>", StringComparison.Ordinal);
+    }
+
+    private static bool IsObjectToStringCall(string calleeSymbol)
+    {
+        return string.Equals(calleeSymbol, "object.ToString()", StringComparison.Ordinal) ||
+            string.Equals(calleeSymbol, "System.Object.ToString()", StringComparison.Ordinal);
+    }
+
+    private static bool HasObjectToStringBlockingChain(string[] blockingCallChain)
+    {
+        return blockingCallChain.Length == 1 &&
+            string.Equals(blockingCallChain[0], "System.Object.GetType()", StringComparison.Ordinal) ||
+            blockingCallChain.Length == 2 &&
+            string.Equals(blockingCallChain[0], "System.Object.ToString()", StringComparison.Ordinal) &&
+            string.Equals(blockingCallChain[1], "System.Object.GetType()", StringComparison.Ordinal);
+    }
+
+    private static bool HasCharSpanSearchContext(MethodEffectSummary summary)
+    {
+        return summary.Symbol.Contains("System.ReadOnlySpan`1<char>", StringComparison.Ordinal) ||
+            summary.Symbol.Contains("System.Span`1<char>", StringComparison.Ordinal);
+    }
+
+    private static bool IsEqualityBasedSpanSearchHelper(string calleeSymbol)
+    {
+        var methodBaseSymbol = GetMethodBaseSymbol(calleeSymbol);
+        return string.Equals(methodBaseSymbol, "System.MemoryExtensions.Contains", StringComparison.Ordinal) ||
+            string.Equals(methodBaseSymbol, "System.MemoryExtensions.IndexOf", StringComparison.Ordinal) ||
+            string.Equals(methodBaseSymbol, "System.MemoryExtensions.IndexOfAny", StringComparison.Ordinal) ||
+            string.Equals(methodBaseSymbol, "System.MemoryExtensions.LastIndexOf", StringComparison.Ordinal) ||
+            string.Equals(methodBaseSymbol, "System.MemoryExtensions.LastIndexOfAny", StringComparison.Ordinal);
+    }
+
+    private static bool HasEqualityBasedSpanSearchBlockingChain(string[] blockingCallChain)
+    {
+        return blockingCallChain.Length >= 2 &&
+            (blockingCallChain[0].StartsWith("System.SpanHelpers.Contains(", StringComparison.Ordinal) ||
+             blockingCallChain[0].StartsWith("System.SpanHelpers.IndexOf(", StringComparison.Ordinal) ||
+             blockingCallChain[0].StartsWith("System.SpanHelpers.IndexOfAny(", StringComparison.Ordinal) ||
+             blockingCallChain[0].StartsWith("System.SpanHelpers.LastIndexOf(", StringComparison.Ordinal) ||
+             blockingCallChain[0].StartsWith("System.SpanHelpers.LastIndexOfAny(", StringComparison.Ordinal)) &&
+            string.Equals(blockingCallChain[1], "System.IEquatable`1.Equals(!0)", StringComparison.Ordinal);
     }
 
     private static void AddImpureCalleeCategories(
@@ -632,15 +798,20 @@ internal static class PurityClassificationEngine
 
         if (IsPureRuntimeIntrinsicStub(summary.Symbol))
         {
+            var freshnessClassification = IsFastAllocateString(summary.Symbol)
+                ? "fresh_owned_object_write"
+                : "none";
             classification = new MethodPurityClassification(
                 Classification: "pure",
                 Categories: Array.Empty<string>(),
                 FirstBlockingCallChain: Array.Empty<string>(),
                 HasFreshArrayAllocationEvidence: false,
-                HasFreshObjectAllocationEvidence: false,
+                HasFreshObjectAllocationEvidence: string.Equals(freshnessClassification, "fresh_owned_object_write", StringComparison.Ordinal),
                 HasUnsupportedEffects: false,
-                FreshnessClassification: "none",
-                EffectVisibilityClassification: "none");
+                FreshnessClassification: freshnessClassification,
+                EffectVisibilityClassification: string.Equals(freshnessClassification, "fresh_owned_object_write", StringComparison.Ordinal)
+                    ? "internal_only"
+                    : "none");
             return true;
         }
 
@@ -661,11 +832,187 @@ internal static class PurityClassificationEngine
         return false;
     }
 
+    private static bool TryClassifySemanticPureWrapper(
+        MethodEffectSummary summary,
+        out MethodPurityClassification classification)
+    {
+        classification = default!;
+
+        string effectVisibilityClassification;
+        if (HasPureReadOnlyCharSpanSearchWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "none";
+        }
+        else if (HasPureStringFromReadOnlyCharSpanWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "none";
+        }
+        else if (HasPureStringSliceNormalizationWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "none";
+        }
+        else if (HasPureStackLocalCharBuilderStringWrapperPattern(summary) ||
+                 HasPureImmutableStringRewriteWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "internal_only";
+        }
+        else
+        {
+            return false;
+        }
+
+        classification = new MethodPurityClassification(
+            Classification: "pure",
+            Categories: Array.Empty<string>(),
+            FirstBlockingCallChain: Array.Empty<string>(),
+            HasFreshArrayAllocationEvidence: false,
+            HasFreshObjectAllocationEvidence: summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
+            HasUnsupportedEffects: false,
+            FreshnessClassification: "none",
+            EffectVisibilityClassification: effectVisibilityClassification);
+        return true;
+    }
+
     private static bool IsPureRuntimeIntrinsicStub(string symbol)
     {
         return symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.As(", StringComparison.Ordinal) ||
             symbol.StartsWith("System.Runtime.CompilerServices.Unsafe.ReadUnaligned(", StringComparison.Ordinal) ||
-            string.Equals(symbol, "System.Runtime.CompilerServices.Unsafe.SizeOf()", StringComparison.Ordinal);
+            string.Equals(symbol, "System.Runtime.CompilerServices.Unsafe.SizeOf()", StringComparison.Ordinal) ||
+            IsFastAllocateString(symbol);
+    }
+
+    private static bool IsFastAllocateString(string symbol)
+    {
+        return string.Equals(symbol, "string.FastAllocateString(int)", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.String.FastAllocateString(int)", StringComparison.Ordinal);
+    }
+
+    private static bool HasPureReadOnlyCharSpanSearchWrapperPattern(MethodEffectSummary summary)
+    {
+        return CallsOnly(summary, "calls_method") &&
+            RootsAreSemanticallyPureWrapperCompatible(summary) &&
+            summary.Calls.Any(static call => call.Contains("System.ReadOnlySpan`1<char>", StringComparison.Ordinal)) &&
+            summary.Calls.Any(IsReadOnlyCharSpanSearchHelperCall) &&
+            summary.Calls.All(IsReadOnlyCharSpanSearchHelperCall);
+    }
+
+    private static bool HasPureStringFromReadOnlyCharSpanWrapperPattern(MethodEffectSummary summary)
+    {
+        return CallsOnly(summary, "calls_method") &&
+            RootsAreSemanticallyPureWrapperCompatible(summary) &&
+            summary.Calls.Any(IsStringToReadOnlyCharSpanWrapperCall) &&
+            summary.Calls.Any(static call => string.Equals(call, "object.ToString()->string", StringComparison.Ordinal)) &&
+            summary.Calls.All(IsStringFromReadOnlyCharSpanWrapperCall);
+    }
+
+    private static bool HasPureStringSliceNormalizationWrapperPattern(MethodEffectSummary summary)
+    {
+        return CallsOnly(summary, "calls_method") &&
+            RootsAreSemanticallyPureWrapperCompatible(summary) &&
+            summary.Calls.Any(IsStringToReadOnlyCharSpanWrapperCall) &&
+            summary.Calls.Any(static call => string.Equals(call, "string.Substring(int, int)->string", StringComparison.Ordinal)) &&
+            summary.Calls.Any(static call =>
+                call.StartsWith("System.IO.PathInternal.NormalizeDirectorySeparators(string)", StringComparison.Ordinal)) &&
+            summary.Calls.All(IsStringSliceNormalizationWrapperCall);
+    }
+
+    private static bool HasPureStackLocalCharBuilderStringWrapperPattern(MethodEffectSummary summary)
+    {
+        return CallsOnly(summary, "allocates_object", "calls_method") &&
+            RootsAreSemanticallyPureWrapperCompatible(summary) &&
+            summary.Calls.Any(static call =>
+                call.StartsWith("System.Text.ValueStringBuilder..ctor(System.Span`1<char>)", StringComparison.Ordinal)) &&
+            summary.Calls.Any(static call =>
+                call.StartsWith("System.Text.ValueStringBuilder.Append(char)", StringComparison.Ordinal)) &&
+            summary.Calls.Any(static call => string.Equals(call, "object.ToString()->string", StringComparison.Ordinal)) &&
+            summary.Calls.All(IsStackLocalCharBuilderStringWrapperCall);
+    }
+
+    private static bool HasPureImmutableStringRewriteWrapperPattern(MethodEffectSummary summary)
+    {
+        return CallsOnly(summary, "calls_method", "reads_static_field") &&
+            RootsAreSemanticallyPureWrapperCompatible(summary) &&
+            summary.Calls.Any(static call =>
+                call.StartsWith("string.Concat(System.ReadOnlySpan`1<char>", StringComparison.Ordinal)) &&
+            summary.Calls.All(IsImmutableStringRewriteWrapperCall);
+    }
+
+    private static bool RootsAreSemanticallyPureWrapperCompatible(MethodEffectSummary summary)
+    {
+        return summary.RootCandidates.All(static root =>
+            string.Equals(root, "safe_static_cache_read", StringComparison.Ordinal) ||
+            string.Equals(root, "safe_static_constant_read", StringComparison.Ordinal));
+    }
+
+    private static bool CallsOnly(MethodEffectSummary summary, params string[] allowedEffects)
+    {
+        return summary.Effects.All(effect => allowedEffects.Contains(effect, StringComparer.Ordinal));
+    }
+
+    private static bool IsReadOnlyCharSpanSearchHelperCall(string callSymbol)
+    {
+        return callSymbol.StartsWith("System.IO.Path.GetDirectoryNameOffset(System.ReadOnlySpan`1<char>)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.IO.Path.GetExtension(System.ReadOnlySpan`1<char>)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.IO.Path.GetFileName(System.ReadOnlySpan`1<char>)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.IO.Path.GetFileNameWithoutExtension(System.ReadOnlySpan`1<char>)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.IO.Path.GetPathRoot(System.ReadOnlySpan`1<char>)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.IO.PathInternal.GetRootLength(System.ReadOnlySpan`1<char>)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.IO.PathInternal.IsDirectorySeparator(char)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.IO.PathInternal.IsEffectivelyEmpty(System.ReadOnlySpan`1<char>)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.MemoryExtensions.IndexOf(System.ReadOnlySpan`1<", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.MemoryExtensions.IndexOfAny(System.ReadOnlySpan`1<", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.MemoryExtensions.LastIndexOf(System.ReadOnlySpan`1<", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.MemoryExtensions.LastIndexOfAny(System.ReadOnlySpan`1<", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.ReadOnlySpan`1<char>.Slice(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.ReadOnlySpan`1<char>.get_Empty()", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.ReadOnlySpan`1<char>.get_Item(int)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.ReadOnlySpan`1<char>.get_Length()", StringComparison.Ordinal);
+    }
+
+    private static bool IsStringToReadOnlyCharSpanWrapperCall(string callSymbol)
+    {
+        return callSymbol.StartsWith("System.MemoryExtensions.AsSpan(string", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("string.op_Implicit(string)->System.ReadOnlySpan`1<char>", StringComparison.Ordinal);
+    }
+
+    private static bool IsStringFromReadOnlyCharSpanWrapperCall(string callSymbol)
+    {
+        return IsStringToReadOnlyCharSpanWrapperCall(callSymbol) ||
+            IsReadOnlyCharSpanSearchHelperCall(callSymbol) ||
+            string.Equals(callSymbol, "object.ToString()->string", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+    }
+
+    private static bool IsStringSliceNormalizationWrapperCall(string callSymbol)
+    {
+        return IsStringToReadOnlyCharSpanWrapperCall(callSymbol) ||
+            IsReadOnlyCharSpanSearchHelperCall(callSymbol) ||
+            callSymbol.StartsWith("System.IO.PathInternal.NormalizeDirectorySeparators(string)", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.Substring(int, int)->string", StringComparison.Ordinal);
+    }
+
+    private static bool IsStackLocalCharBuilderStringWrapperCall(string callSymbol)
+    {
+        return callSymbol.StartsWith("System.IO.PathInternal.IsDirectorySeparator(char)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Span`1<char>..ctor(", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Text.ValueStringBuilder..ctor(System.Span`1<char>)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Text.ValueStringBuilder.Append(char)", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "object.ToString()->string", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.IsNullOrEmpty(string)->bool", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
+    }
+
+    private static bool IsImmutableStringRewriteWrapperCall(string callSymbol)
+    {
+        return callSymbol.StartsWith("System.IO.PathInternal.IsDirectorySeparator(char)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.MemoryExtensions.AsSpan(string", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("string.Concat(System.ReadOnlySpan`1<char>", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("string.StartsWith(char)->bool", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("string.Substring(int, int)->string", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.op_Implicit(string)->System.ReadOnlySpan`1<char>", StringComparison.Ordinal);
     }
 
     private static bool HasOnlyDeterministicStringComparisonDispatch(MethodEffectSummary summary)
@@ -2759,6 +3106,8 @@ internal static class PurityClassificationEngine
             callSymbol.StartsWith("System.Runtime.CompilerServices.Unsafe.WriteUnaligned(", StringComparison.Ordinal) ||
             callSymbol.StartsWith("string.GetRawStringData()", StringComparison.Ordinal) ||
             callSymbol.StartsWith("string.get_Length()", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains("..ctor(void*, int)", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) && callSymbol.Contains("..ctor(void*, int)", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Span`1<", StringComparison.Ordinal) && callSymbol.Contains(".get_Length()", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.ReadOnlySpan`1<", StringComparison.Ordinal) && callSymbol.Contains(".get_Length()", StringComparison.Ordinal) ||
             callSymbol.StartsWith("System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences(", StringComparison.Ordinal);

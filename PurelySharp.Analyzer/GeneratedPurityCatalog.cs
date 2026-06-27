@@ -18,7 +18,6 @@ namespace PurelySharp.Analyzer
 {
     internal sealed class GeneratedPurityCatalog
     {
-        private const string SummaryFileName = "PurelySharp.EffectSummary.json";
         private const int BuiltInSummarySourcePriority = 0;
         private const int AdditionalSummarySourcePriority = 1;
         private static readonly AsyncLocal<GeneratedPurityCatalog?> CurrentCatalog = new AsyncLocal<GeneratedPurityCatalog?>();
@@ -56,21 +55,10 @@ namespace PurelySharp.Analyzer
         public static GeneratedPurityCatalog FromOptions(AnalyzerOptions options, CancellationToken cancellationToken)
         {
             var entriesBySymbol = CreateMutableEntries(BuiltInCatalog.Value);
-            foreach (var additionalFile in options.AdditionalFiles)
-            {
-                if (!IsSummaryFile(additionalFile.Path))
-                {
-                    continue;
-                }
-
-                var text = additionalFile.GetText(cancellationToken)?.ToString();
-                if (string.IsNullOrWhiteSpace(text))
-                {
-                    continue;
-                }
-
-                AddParsedEntries(entriesBySymbol, text!, AdditionalSummarySourcePriority);
-            }
+            BuiltInEffectSummaryLoader.LoadAdditionalSummaryJsonDocuments(
+                options,
+                cancellationToken,
+                json => AddParsedEntries(entriesBySymbol, json, AdditionalSummarySourcePriority));
 
             return CreateCatalog(entriesBySymbol);
         }
@@ -78,7 +66,8 @@ namespace PurelySharp.Analyzer
         private static GeneratedPurityCatalog CreateBuiltInCatalog()
         {
             var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
-            LoadBuiltInEntries(entriesBySymbol);
+            BuiltInEffectSummaryLoader.LoadBuiltInSummaryJsonDocuments(
+                json => AddParsedEntries(entriesBySymbol, json, BuiltInSummarySourcePriority));
             return CreateCatalog(entriesBySymbol);
         }
 
@@ -264,78 +253,6 @@ namespace PurelySharp.Analyzer
             return true;
         }
 
-        private static bool IsSummaryFile(string path)
-        {
-            var fileName = Path.GetFileName(path);
-            return string.Equals(fileName, SummaryFileName, StringComparison.OrdinalIgnoreCase) ||
-                fileName.EndsWith("." + SummaryFileName, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static void LoadBuiltInEntries(
-            Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol)
-        {
-            var summaryDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            AddSummaryDirectory(summaryDirectories, Path.GetDirectoryName(typeof(GeneratedPurityCatalog).Assembly.Location));
-            AddSummaryDirectory(summaryDirectories, AppContext.BaseDirectory);
-            foreach (var summaryDirectory in summaryDirectories)
-            {
-                LoadBuiltInSummaryEntries(entriesBySymbol, summaryDirectory);
-            }
-
-            LoadEmbeddedSummaryEntries(entriesBySymbol);
-        }
-
-        private static void AddSummaryDirectory(HashSet<string> directories, string? path)
-        {
-            if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
-            {
-                directories.Add(path);
-            }
-        }
-
-        private static void LoadBuiltInSummaryEntries(
-            Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol,
-            string summaryDirectory)
-        {
-            var builtInSummaryPath = Path.Combine(summaryDirectory, SummaryFileName);
-            if (File.Exists(builtInSummaryPath))
-            {
-                AddParsedEntries(entriesBySymbol, File.ReadAllText(builtInSummaryPath), BuiltInSummarySourcePriority);
-            }
-
-            foreach (var domainSummaryPath in Directory.EnumerateFiles(summaryDirectory, "*." + SummaryFileName, SearchOption.TopDirectoryOnly))
-            {
-                if (string.Equals(Path.GetFileName(domainSummaryPath), SummaryFileName, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                AddParsedEntries(entriesBySymbol, File.ReadAllText(domainSummaryPath), BuiltInSummarySourcePriority);
-            }
-        }
-
-        private static void LoadEmbeddedSummaryEntries(
-            Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol)
-        {
-            var assembly = typeof(GeneratedPurityCatalog).Assembly;
-            foreach (var resourceName in assembly.GetManifestResourceNames())
-            {
-                if (!IsSummaryResource(resourceName))
-                {
-                    continue;
-                }
-
-                using var stream = assembly.GetManifestResourceStream(resourceName);
-                if (stream == null)
-                {
-                    continue;
-                }
-
-                using var reader = new StreamReader(stream);
-                AddParsedEntries(entriesBySymbol, reader.ReadToEnd(), BuiltInSummarySourcePriority);
-            }
-        }
-
         private static void AddParsedEntries(
             Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol,
             string json,
@@ -351,12 +268,6 @@ namespace PurelySharp.Analyzer
 
                 builder.Add(entry);
             }
-        }
-
-        private static bool IsSummaryResource(string resourceName)
-        {
-            return resourceName.EndsWith("." + SummaryFileName, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(resourceName, SummaryFileName, StringComparison.OrdinalIgnoreCase);
         }
 
         private static IEnumerable<SummaryEntry> ParseEntries(string json, int sourcePriority)

@@ -1,0 +1,109 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading;
+using Microsoft.CodeAnalysis.Diagnostics;
+
+namespace PurelySharp.Analyzer
+{
+    internal static class BuiltInEffectSummaryLoader
+    {
+        internal const string SummaryFileName = "PurelySharp.EffectSummary.json";
+
+        internal static void LoadBuiltInSummaryJsonDocuments(Action<string> addJson)
+        {
+            var summaryDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            AddSummaryDirectory(summaryDirectories, Path.GetDirectoryName(typeof(BuiltInEffectSummaryLoader).Assembly.Location));
+            AddSummaryDirectory(summaryDirectories, AppContext.BaseDirectory);
+            foreach (var summaryDirectory in summaryDirectories)
+            {
+                LoadBuiltInSummaryJsonDocuments(addJson, summaryDirectory);
+            }
+
+            LoadEmbeddedSummaryJsonDocuments(addJson);
+        }
+
+        internal static void LoadAdditionalSummaryJsonDocuments(
+            AnalyzerOptions options,
+            CancellationToken cancellationToken,
+            Action<string> addJson)
+        {
+            foreach (var additionalFile in options.AdditionalFiles)
+            {
+                if (!IsSummaryFile(additionalFile.Path))
+                {
+                    continue;
+                }
+
+                var text = additionalFile.GetText(cancellationToken)?.ToString();
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    continue;
+                }
+
+                addJson(text!);
+            }
+        }
+
+        internal static bool IsSummaryFile(string path)
+        {
+            var fileName = Path.GetFileName(path);
+            return string.Equals(fileName, SummaryFileName, StringComparison.OrdinalIgnoreCase) ||
+                fileName.EndsWith("." + SummaryFileName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void AddSummaryDirectory(HashSet<string> directories, string? path)
+        {
+            if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+            {
+                directories.Add(path!);
+            }
+        }
+
+        private static void LoadBuiltInSummaryJsonDocuments(Action<string> addJson, string summaryDirectory)
+        {
+            var builtInSummaryPath = Path.Combine(summaryDirectory, SummaryFileName);
+            if (File.Exists(builtInSummaryPath))
+            {
+                addJson(File.ReadAllText(builtInSummaryPath));
+            }
+
+            foreach (var domainSummaryPath in Directory.EnumerateFiles(summaryDirectory, "*." + SummaryFileName, SearchOption.TopDirectoryOnly))
+            {
+                if (string.Equals(Path.GetFileName(domainSummaryPath), SummaryFileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                addJson(File.ReadAllText(domainSummaryPath));
+            }
+        }
+
+        private static void LoadEmbeddedSummaryJsonDocuments(Action<string> addJson)
+        {
+            var assembly = typeof(BuiltInEffectSummaryLoader).Assembly;
+            foreach (var resourceName in assembly.GetManifestResourceNames())
+            {
+                if (!IsSummaryResource(resourceName))
+                {
+                    continue;
+                }
+
+                using var stream = assembly.GetManifestResourceStream(resourceName);
+                if (stream == null)
+                {
+                    continue;
+                }
+
+                using var reader = new StreamReader(stream);
+                addJson(reader.ReadToEnd());
+            }
+        }
+
+        private static bool IsSummaryResource(string resourceName)
+        {
+            return resourceName.EndsWith("." + SummaryFileName, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(resourceName, SummaryFileName, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+}
