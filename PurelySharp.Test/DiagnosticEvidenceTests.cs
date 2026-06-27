@@ -4563,6 +4563,73 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_TypeIdentityHelpersAsPureEvidence()
+        {
+            const string source = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(Type left, Type right, object boxed)
+    {
+        var sameType = left.Equals(right);
+        var sameObject = left.Equals(boxed);
+        return sameType == sameObject ? left.GetHashCode() : right.GetHashCode();
+    }
+}";
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var invocations = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>()
+                .Where(node =>
+                    node.ToString() == "left.Equals(right)" ||
+                    node.ToString() == "left.Equals(boxed)" ||
+                    node.ToString() == "left.GetHashCode()" ||
+                    node.ToString() == "right.GetHashCode()")
+                .ToArray();
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
+            var classifications = invocations.ToDictionary(
+                node => node.ToString(),
+                node =>
+                {
+                    var methodSymbol = (IMethodSymbol)semanticModel.GetSymbolInfo(node).Symbol!;
+                    var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
+                    var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                    var purityEntry = args[2];
+                    var classification = matched
+                        ? (string)purityEntry!.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                        : string.Empty;
+                    return (matched, classification);
+                });
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Trusted generated purity should allow Type.Equals(Type), Type.Equals(object), and Type.GetHashCode().");
+            Assert.That(classifications["left.Equals(right)"].matched, Is.True);
+            Assert.That(classifications["left.Equals(right)"].classification, Is.EqualTo("pure"));
+            Assert.That(classifications["left.Equals(boxed)"].matched, Is.True);
+            Assert.That(classifications["left.Equals(boxed)"].classification, Is.EqualTo("pure"));
+            Assert.That(classifications["left.GetHashCode()"].matched, Is.True);
+            Assert.That(classifications["left.GetHashCode()"].classification, Is.EqualTo("pure"));
+            Assert.That(classifications["right.GetHashCode()"].matched, Is.True);
+            Assert.That(classifications["right.GetHashCode()"].classification, Is.EqualTo("pure"));
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_ObjectGetTypeAsPureMetadataEvidence()
         {
             const string source = @"
@@ -10354,6 +10421,35 @@ public class TestClass
         return value.GetHashCode();
     }
 }");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_StringReplaceChar_IsPureFromGeneratedPuritySummary()
+        {
+            var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
+                typeof(string).Assembly.Location,
+                (
+                    "Synthetic.String.Replace.Char.PurelySharp.EffectSummary.json",
+                    "System.String.Replace(char, char)",
+                    "System.String.Replace(char, char)",
+                    "pure",
+                    "[]"));
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(string input)
+    {
+        return input.Replace('a', 'b');
+    }
+}",
+                additionalFiles: additionalFiles);
 
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
         }

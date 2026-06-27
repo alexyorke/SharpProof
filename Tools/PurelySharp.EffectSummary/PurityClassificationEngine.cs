@@ -868,9 +868,17 @@ internal static class PurityClassificationEngine
         {
             effectVisibilityClassification = "internal_only";
         }
+        else if (HasPureTypeIdentityWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "none";
+        }
         else if (HasPureStringHashWrapperPattern(summary))
         {
             effectVisibilityClassification = "none";
+        }
+        else if (HasPureCharReplaceStringWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "internal_only";
         }
         else if (HasPureStringSubstringWrapperPattern(summary) ||
                  HasPureFreshAllocatedStringCopyCorePattern(summary) ||
@@ -974,6 +982,16 @@ internal static class PurityClassificationEngine
             summary.Calls.All(IsInvariantTextInfoStringWrapperCall);
     }
 
+    private static bool HasPureTypeIdentityWrapperPattern(MethodEffectSummary summary)
+    {
+        return summary.Fields.Length == 0 &&
+            CallsOnly(summary, "calls_method", "virtual_call") &&
+            summary.RootCandidates.All(static root => string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)) &&
+            IsTypeIdentityWrapperMethod(summary.Symbol) &&
+            summary.Calls.Any(IsTypeIdentityWrapperAnchorCall) &&
+            summary.Calls.All(IsTypeIdentityWrapperCall);
+    }
+
     private static bool HasPureStringHashWrapperPattern(MethodEffectSummary summary)
     {
         return summary.ExactSymbolKey.EndsWith(")->int", StringComparison.Ordinal) &&
@@ -1017,6 +1035,19 @@ internal static class PurityClassificationEngine
             summary.Calls.Any(static call => string.Equals(call, "string.InternalSubString(int, int)->string", StringComparison.Ordinal)) &&
             summary.Calls.Any(static call => string.Equals(call, "string.ThrowSubstringArgumentOutOfRange(int, int)->void", StringComparison.Ordinal)) &&
             summary.Calls.All(IsStringSubstringWrapperCall);
+    }
+
+    private static bool HasPureCharReplaceStringWrapperPattern(MethodEffectSummary summary)
+    {
+        return string.Equals(summary.Symbol, "System.String.Replace(char, char)", StringComparison.Ordinal) &&
+            CallsOnly(summary, "calls_method", "reads_instance_field") &&
+            summary.RootCandidates.Length == 0 &&
+            summary.Calls.Any(IsFastAllocateStringCall) &&
+            summary.Calls.Any(IsBufferMemmoveCall) &&
+            summary.Calls.Any(static call =>
+                string.Equals(call, "System.SpanHelpers.ReplaceValueType(ref !!0, ref !!0, !!0, !!0, nuint)->void", StringComparison.Ordinal)) &&
+            summary.Calls.All(IsCharReplaceStringWrapperCall) &&
+            summary.Fields.All(static field => string.Equals(field, "System.String._firstChar", StringComparison.Ordinal));
     }
 
     private static bool HasPureFreshAllocatedStringCopyCorePattern(MethodEffectSummary summary)
@@ -1199,6 +1230,27 @@ internal static class PurityClassificationEngine
             string.Equals(callSymbol, "System.Globalization.TextInfo.ToUpper(string)->string", StringComparison.Ordinal);
     }
 
+    private static bool IsTypeIdentityWrapperMethod(string symbol)
+    {
+        return string.Equals(symbol, "System.Type.Equals(System.Type)", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.Equals(object)", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Type.GetHashCode()", StringComparison.Ordinal);
+    }
+
+    private static bool IsTypeIdentityWrapperAnchorCall(string callSymbol)
+    {
+        return string.Equals(callSymbol, "System.Type.Equals(System.Type)->bool", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "System.Type.get_UnderlyingSystemType()->System.Type", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "System.Reflection.MemberInfo.GetHashCode()->int", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "object.GetHashCode()->int", StringComparison.Ordinal);
+    }
+
+    private static bool IsTypeIdentityWrapperCall(string callSymbol)
+    {
+        return IsTypeIdentityWrapperAnchorCall(callSymbol) ||
+            string.Equals(callSymbol, "System.Type.op_Equality(System.Type, System.Type)->bool", StringComparison.Ordinal);
+    }
+
     private static bool IsStringHashWrapperCall(string callSymbol)
     {
         return string.Equals(callSymbol, "System.Marvin.ComputeHash32(ref byte, uint, uint, uint)->int", StringComparison.Ordinal) ||
@@ -1218,6 +1270,20 @@ internal static class PurityClassificationEngine
         return IsBufferMemmoveCall(callSymbol) ||
             IsFastAllocateStringCall(callSymbol) ||
             string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nint)->ref !!0", StringComparison.Ordinal);
+    }
+
+    private static bool IsCharReplaceStringWrapperCall(string callSymbol)
+    {
+        return IsBufferMemmoveCall(callSymbol) ||
+            IsFastAllocateStringCall(callSymbol) ||
+            string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Add(ref !!0, nuint)->ref !!0", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "System.Runtime.CompilerServices.Unsafe.Subtract(ref !!0, nuint)->ref !!0", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "System.Runtime.Intrinsics.Vector128.get_IsHardwareAccelerated()->bool", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "System.Runtime.Intrinsics.Vector128`1<ushort>.get_Count()->int", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "System.SpanHelpers.ReplaceValueType(ref !!0, ref !!0, !!0, !!0, nuint)->void", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.GetRawStringDataAsUInt16()->ref ushort", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.IndexOf(char)->int", StringComparison.Ordinal) ||
+            string.Equals(callSymbol, "string.get_Length()->int", StringComparison.Ordinal);
     }
 
     private static bool IsStringLengthCheckedConcatWrapperCall(string callSymbol)

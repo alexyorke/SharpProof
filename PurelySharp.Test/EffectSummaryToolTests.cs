@@ -4411,6 +4411,8 @@ public static class StringComparisonFixture
             Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
             Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
 
+            AssertPurityClassification(summary, "System.String.Replace(char, char)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Replace(char, char)", "internal_only");
             AssertPurityClassification(summary, "System.String.Replace(string, string)", "pure");
             AssertEffectVisibilityClassification(summary, "System.String.Replace(string, string)", "internal_only");
 
@@ -4420,6 +4422,7 @@ public static class StringComparisonFixture
                 .Select(entry => entry.GetProperty("Symbol").GetString())
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol) && symbol.StartsWith("System.String.Replace", StringComparison.Ordinal))
                 .ToArray();
+            Assert.That(symbols, Does.Contain("System.String.Replace(char, char)"));
             Assert.That(symbols, Does.Contain("System.String.Replace(string, string)"));
         }
 
@@ -8051,6 +8054,49 @@ public static class DuplicateReviewedSeedFixture
                 "System.Type.get_IsMarshalByRef()",
                 "System.Type.get_MemberType()",
                 "System.Type.get_ReflectedType()",
+            }));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeTypeIdentitySlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                1,
+                false,
+                true,
+                "System.Type.GetTypeFromHandle",
+                "System.Type.Equals",
+                "System.Type.GetHashCode");
+
+            AssertPurityClassification(summary, "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)", "none");
+            AssertPurityClassification(summary, "System.Type.Equals(System.Type)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.Equals(System.Type)", "none");
+            AssertPurityClassification(summary, "System.Type.Equals(object)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.Equals(object)", "none");
+            AssertPurityClassification(summary, "System.Type.GetHashCode()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.GetHashCode()", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.Equals(System.Type)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.Equals(object)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.GetHashCode()", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Type.Equals(System.Type)",
+                "System.Type.Equals(object)",
+                "System.Type.GetHashCode()",
+                "System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)",
             }));
         }
 
