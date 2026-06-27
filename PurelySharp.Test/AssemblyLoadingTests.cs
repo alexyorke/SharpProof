@@ -266,6 +266,35 @@ namespace TestNamespace
         }
 
         [Test]
+        public async Task AssemblyLoadContext_DerivedConstructor_Diagnostic()
+        {
+            var test = @"
+using System.Runtime.Loader;
+using PurelySharp.Attributes;
+
+namespace TestNamespace
+{
+    public sealed class DerivedLoadContext : AssemblyLoadContext
+    {
+        public DerivedLoadContext() : base(""test"", isCollectible: true)
+        {
+        }
+    }
+
+    public class TestClass
+    {
+        [EnforcePure]
+        public DerivedLoadContext {|PS0002:TestMethod|}()
+        {
+            return new DerivedLoadContext();
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task AssemblyLoadContext_All_Diagnostic()
         {
             var test = @"

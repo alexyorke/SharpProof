@@ -10552,6 +10552,37 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_AssemblyLoadContextConstructor_UsesSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Runtime.Loader;
+using PurelySharp.Attributes;
+
+public sealed class DerivedLoadContext : AssemblyLoadContext
+{
+    public DerivedLoadContext() : base(""test"", isCollectible: true)
+    {
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public DerivedLoadContext TestMethod()
+    {
+        return new DerivedLoadContext();
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("reflection_environment_source"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("assembly_load_context_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("DerivedLoadContext.DerivedLoadContext()"));
+        }
+
+        [Test]
         public async Task GeneratedPuritySummary_Allows_TypeToString_WhenMetadataEvidenceIsPure()
         {
             const string metadataSymbol = "System.Type.ToString()";

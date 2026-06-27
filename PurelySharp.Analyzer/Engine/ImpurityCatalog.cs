@@ -445,10 +445,7 @@ namespace PurelySharp.Analyzer.Engine
 
 		private static bool IsAssemblyLoadContextSemanticImpure(ISymbol symbol)
 		{
-			if (!string.Equals(
-				symbol.ContainingType?.ToDisplayString(),
-				"System.Runtime.Loader.AssemblyLoadContext",
-				StringComparison.Ordinal))
+			if (!IsAssemblyLoadContextOrDerived(symbol.ContainingType))
 			{
 				return false;
 			}
@@ -463,6 +460,11 @@ namespace PurelySharp.Analyzer.Engine
 				return false;
 			}
 
+			if (methodSymbol.MethodKind == MethodKind.Constructor)
+			{
+				return true;
+			}
+
 			if (methodSymbol.AssociatedSymbol is IPropertySymbol associatedPropertySymbol)
 			{
 				return associatedPropertySymbol.Name is "All" or "Default" or "CurrentContextualReflectionContext";
@@ -472,8 +474,29 @@ namespace PurelySharp.Analyzer.Engine
 			{
 				"GetLoadContext" => methodSymbol.IsStatic && methodSymbol.Parameters.Length == 1,
 				"EnterContextualReflection" => true,
+				"Load" => methodSymbol.Parameters.Length == 1,
+				"LoadUnmanagedDll" => methodSymbol.Parameters.Length == 1,
+				"LoadUnmanagedDllFromPath" => methodSymbol.Parameters.Length == 1,
 				_ => methodSymbol.Name.StartsWith("LoadFrom", StringComparison.Ordinal)
 			};
+		}
+
+		private static bool IsAssemblyLoadContextOrDerived(INamedTypeSymbol? typeSymbol)
+		{
+			while (typeSymbol != null)
+			{
+				if (string.Equals(
+					typeSymbol.ToDisplayString(),
+					"System.Runtime.Loader.AssemblyLoadContext",
+					StringComparison.Ordinal))
+				{
+					return true;
+				}
+
+				typeSymbol = typeSymbol.BaseType;
+			}
+
+			return false;
 		}
 
 		public static bool IsInImpureNamespaceOrType(ISymbol symbol)

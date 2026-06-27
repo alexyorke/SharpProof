@@ -174,6 +174,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 var trustedMetadataPurity = PurityAnalysisEngine.GetTrustedMethodPurityMetadata(
                     constructorSymbol,
                     context.SemanticModel.Compilation);
+                var knownImpureMemberSource = trustedMetadataPurity.KnownImpureMemberSource;
                 var hasTrustedGeneratedPurity = trustedMetadataPurity.HasTrustedGeneratedPurity;
                 var generatedPurity = trustedMetadataPurity.GeneratedPurity;
 
@@ -188,7 +189,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             operation: objectCreationOperation,
                             syntaxNode: objectCreationOperation.Syntax,
                             symbol: constructorSymbol,
-                            catalogSource: trustedMetadataPurity.KnownImpureMemberSource));
+                            catalogSource: knownImpureMemberSource));
                 }
 
                 if (trustedMetadataPurity.AllowsKnownPureFallback &&
@@ -221,6 +222,25 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             symbol: constructorSymbol,
                                 catalogSource: "generated_purity_summary"));
                     }
+                }
+
+                if (knownImpureMemberSource != null)
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is known impure.");
+                    return PurityAnalysisResult.Impure(
+                        objectCreationOperation.Syntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            string.Equals(
+                                knownImpureMemberSource,
+                                "assembly_load_context_semantic_rule",
+                                StringComparison.Ordinal)
+                                ? "reflection_environment_source"
+                                : "catalog_hit",
+                            ruleName: nameof(ObjectCreationPurityRule),
+                            operation: objectCreationOperation,
+                            syntaxNode: objectCreationOperation.Syntax,
+                            symbol: constructorSymbol,
+                            catalogSource: knownImpureMemberSource));
                 }
 
                 var constructorPurity = PurityAnalysisEngine.GetCalleePurity(constructorSymbol, context);
