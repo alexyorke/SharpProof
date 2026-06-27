@@ -4504,7 +4504,7 @@ namespace PurelySharp.Analyzer.Engine
             if (targetMethod == null ||
                 !IsCultureSensitiveDateLikeType(targetMethod.ContainingType))
             {
-                return false;
+                return IsCurrentCultureSensitiveConvertDateLikeInvocation(invocationOperation);
             }
 
             if (IsInvariantCultureDeterministicParseInvocation(invocationOperation))
@@ -4557,6 +4557,21 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             return false;
+        }
+
+        private static bool IsCurrentCultureSensitiveConvertDateLikeInvocation(IInvocationOperation invocationOperation)
+        {
+            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
+            if (targetMethod == null ||
+                targetMethod.ContainingType?.ToDisplayString() != "System.Convert" ||
+                targetMethod.Name != "ToDateTime" ||
+                targetMethod.Parameters.Length != 1 ||
+                invocationOperation.Arguments.Length != 1)
+            {
+                return false;
+            }
+
+            return targetMethod.Parameters[0].Type.SpecialType == SpecialType.System_String;
         }
 
         private static bool IsCultureSensitiveNumericType(ITypeSymbol? containingType)

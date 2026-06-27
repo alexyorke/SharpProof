@@ -4159,7 +4159,6 @@ public static class IPEndPointCatalogSignatureSamples
             {
                 "System.Convert.ToByte(object?)",
                 "System.Convert.ToDateTime(object?)",
-                "System.Convert.ToDateTime(string?)",
                 "System.Convert.ToDecimal(object?)",
                 "System.Convert.ToDouble(object?)",
                 "System.Convert.ToInt16(object?)",
@@ -4284,6 +4283,7 @@ public static class IPEndPointCatalogSignatureSamples
                 "System.DateOnly.ToShortDateString()",
                 "System.DateOnly.TryParse(string, out System.DateOnly)",
                 "System.DateOnly.TryParse(System.ReadOnlySpan<char>, out System.DateOnly)",
+                "System.Convert.ToDateTime(string?)",
                 "System.DateOnly.TryParseExact(string, string, out System.DateOnly)",
                 "System.DateOnly.TryParseExact(System.ReadOnlySpan<char>, System.ReadOnlySpan<char>, out System.DateOnly)",
                 "System.DateOnly.TryParseExact(string, string[], out System.DateOnly)",
