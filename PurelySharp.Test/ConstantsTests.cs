@@ -172,6 +172,25 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void BuiltInImpureNamespaceFallbacks_DoNotDuplicate_ExactOrdinaryMembers()
+        {
+            var duplicatedMembers = Constants.KnownImpureMethods
+                .Where(signature => signature.Contains("(", StringComparison.Ordinal))
+                .Where(signature => !signature.EndsWith(".get", StringComparison.Ordinal) &&
+                    !signature.EndsWith(".set", StringComparison.Ordinal))
+                .Where(signature => Constants.KnownImpureNamespaces.Any(ns =>
+                    signature.StartsWith(ns + ".", StringComparison.Ordinal)))
+                .OrderBy(signature => signature, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(
+                duplicatedMembers,
+                Is.Empty,
+                "Built-in impure namespace fallbacks should own ordinary method and constructor classification without duplicated exact member rows. Duplicates: " +
+                string.Join(", ", duplicatedMembers));
+        }
+
+        [Test]
         public void XmlLinqMembers_AreSourcedFromSemanticRules_NotStaticCatalogs()
         {
             var members = new[]
