@@ -73,6 +73,14 @@ Examples:
 
 ## Current CLI
 
+For ad hoc local refreshes, prefer the repo wrapper:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Update-EffectSummaries.ps1 -SymbolPrefix System.String.Format -IncludeCallees -MaxDepth 2 -TransitiveRoots
+```
+
+The wrapper builds `Tools\PurelySharp.EffectSummary` under the repo's job-object .NET launcher and writes a timestamped `*.PurelySharp.EffectSummary.json` file under ignored `artifacts\effect-summary\...` paths by default. It does not require a checked-in `ReviewedRuntimeArtifactSpec.json`, and broad runtime scans now require an explicit `-AllowUnfilteredRuntimeScan`.
+
 Smoke run against the latest installed .NET 8 `System.Private.CoreLib.dll`:
 
 ```powershell

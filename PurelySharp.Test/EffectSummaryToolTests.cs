@@ -476,6 +476,98 @@ public static class PurityFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_CrossAssemblyPureChain_SelfBootstrapsGeneratedPurity()
+        {
+            const string leafSource = """
+public static class CrossAssemblyLeaf
+{
+    public static int AddOne(int value) => value + 1;
+}
+""";
+
+            const string middleSource = """
+public static class CrossAssemblyMiddle
+{
+    public static int AddOne(int value) => CrossAssemblyLeaf.AddOne(value);
+}
+""";
+
+            const string rootSource = """
+public static class CrossAssemblyRoot
+{
+    public static int AddTwo(int value) => CrossAssemblyMiddle.AddOne(value) + 1;
+}
+""";
+
+            await using var leaf = await CreateFixtureAssemblyAsync("CrossAssemblyLeaf", leafSource);
+            await using var middle = await CreateFixtureAssemblyAsync(
+                "CrossAssemblyMiddle",
+                middleSource,
+                MetadataReference.CreateFromFile(leaf.AssemblyPath));
+            await using var root = await CreateFixtureAssemblyAsync(
+                "CrossAssemblyRoot",
+                rootSource,
+                MetadataReference.CreateFromFile(middle.AssemblyPath));
+
+            using var summary = await RunEffectSummaryAsync(
+                new[] { root.AssemblyPath, middle.AssemblyPath, leaf.AssemblyPath },
+                includeTransitiveRoots: true,
+                classifyPurity: true);
+
+            AssertPurityClassification(summary, "CrossAssemblyRoot.AddTwo(int)", "pure");
+            AssertEffectVisibilityClassification(summary, "CrossAssemblyRoot.AddTwo(int)", "none");
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_CrossAssemblyImpureChain_SelfBootstrapsGeneratedPurity()
+        {
+            const string leafSource = """
+public static class CrossAssemblyImpureLeaf
+{
+    private static int s_value;
+
+    public static int Increment()
+    {
+        s_value++;
+        return s_value;
+    }
+}
+""";
+
+            const string middleSource = """
+public static class CrossAssemblyImpureMiddle
+{
+    public static int Increment() => CrossAssemblyImpureLeaf.Increment();
+}
+""";
+
+            const string rootSource = """
+public static class CrossAssemblyImpureRoot
+{
+    public static int IncrementPlusOne() => CrossAssemblyImpureMiddle.Increment() + 1;
+}
+""";
+
+            await using var leaf = await CreateFixtureAssemblyAsync("CrossAssemblyImpureLeaf", leafSource);
+            await using var middle = await CreateFixtureAssemblyAsync(
+                "CrossAssemblyImpureMiddle",
+                middleSource,
+                MetadataReference.CreateFromFile(leaf.AssemblyPath));
+            await using var root = await CreateFixtureAssemblyAsync(
+                "CrossAssemblyImpureRoot",
+                rootSource,
+                MetadataReference.CreateFromFile(middle.AssemblyPath));
+
+            using var summary = await RunEffectSummaryAsync(
+                new[] { root.AssemblyPath, middle.AssemblyPath, leaf.AssemblyPath },
+                includeTransitiveRoots: true,
+                classifyPurity: true);
+
+            AssertPurityClassification(summary, "CrossAssemblyImpureRoot.IncrementPlusOne()", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "CrossAssemblyImpureRoot.IncrementPlusOne()", "caller_visible");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_CapturesDeterministicStringComparisonArgumentEvidence()
         {
             var source = """
@@ -3746,6 +3838,42 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeVersionSlice_IgnoreReviewedPurityEntries_RemainsVerifiableFromGeneratedOutput()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                1,
+                false,
+                true,
+                "System.Version..ctor(int, int)",
+                "System.Version.CompareTo(System.Version)",
+                "System.Version.get_Major");
+
+            AssertPurityClassification(summary, "System.Version..ctor(int, int)", "pure");
+            AssertFreshnessClassification(summary, "System.Version..ctor(int, int)", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.Version..ctor(int, int)", "internal_only");
+            AssertPurityClassification(summary, "System.Version.CompareTo(System.Version)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Version.CompareTo(System.Version)", "none");
+            AssertPurityClassification(summary, "System.Version.get_Major()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Version.get_Major()", "none");
+
+            var generatedSymbols = GetGeneratedPurityCatalogSymbols(summary)
+                .Where(symbol =>
+                    string.Equals(symbol, "System.Version..ctor(int, int)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.CompareTo(System.Version)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Version.get_Major()", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.Version..ctor(int, int)",
+                "System.Version.CompareTo(System.Version)",
+                "System.Version.get_Major()",
+            }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeTimeSpanSlice_TreatsConstructorAsPureAndAddAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.TimeSpan", limit: 80);
@@ -5819,6 +5947,87 @@ public static class StringComparisonFixture
                 .ToArray();
 
             Assert.That(regeneratedSymbols, Is.EqualTo(seedSymbols));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_ReusesAdHocGeneratedOnlyCatalog()
+        {
+            var source = """
+using System;
+
+public static class PurityFixture
+{
+    private static int _state;
+
+    public static int PureLeaf() => 42;
+
+    public static int PureViaCallee() => PureLeaf();
+
+    public static int ImpureWrite()
+    {
+        _state++;
+        return _state;
+    }
+}
+""";
+
+            await using var fixture = await CreateFixtureAssemblyAsync("EffectSummaryArtifactSpecGeneratedOnly", source);
+
+            var workingDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "effect-summary-artifact-generated-only-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(workingDirectory);
+
+            var seedOutputPath = Path.Combine(workingDirectory, "seed-generated-only.PurelySharp.EffectSummary.json");
+            var regeneratedOutputPath = Path.Combine(workingDirectory, "regenerated.PurelySharp.EffectSummary.json");
+            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+            string[] seedSymbols;
+
+            using (var seedSummary = await RunEffectSummaryAsync(
+                       fixture.AssemblyPath,
+                       includeTransitiveRoots: true,
+                       classifyPurity: true,
+                       compareManualCatalogs: false))
+            {
+                seedSymbols = GetGeneratedPurityCatalogSymbols(seedSummary);
+                await File.WriteAllTextAsync(seedOutputPath, CreateGeneratedOnlySummaryDocument(seedSummary));
+            }
+
+            var artifactSpecJson = JsonSerializer.Serialize(
+                new
+                {
+                    SchemaVersion = 1,
+                    Artifacts = new object[]
+                    {
+                        new
+                        {
+                            OutputPath = regeneratedOutputPath,
+                            SourceSummaryPath = seedOutputPath,
+                            AssemblyPaths = new[]
+                            {
+                                fixture.AssemblyPath,
+                            },
+                            IncludeCallees = true,
+                            IncludePurityClassification = true,
+                        },
+                    },
+                },
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
+
+            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
+
+            using var regeneratedSummary = JsonDocument.Parse(await File.ReadAllTextAsync(regeneratedOutputPath));
+            Assert.That(GetGeneratedPurityCatalogSymbols(regeneratedSummary), Is.EqualTo(seedSymbols));
+            AssertPurityClassification(regeneratedSummary, "PurityFixture.PureLeaf()", "pure");
+            AssertEffectVisibilityClassification(regeneratedSummary, "PurityFixture.PureLeaf()", "none");
+            AssertPurityClassification(regeneratedSummary, "PurityFixture.PureViaCallee()", "pure");
+            AssertEffectVisibilityClassification(regeneratedSummary, "PurityFixture.PureViaCallee()", "none");
+            AssertPurityClassification(regeneratedSummary, "PurityFixture.ImpureWrite()", "impure", "global_state_write");
+            AssertEffectVisibilityClassification(regeneratedSummary, "PurityFixture.ImpureWrite()", "caller_visible");
         }
 
         [Test]
@@ -10216,6 +10425,19 @@ public sealed class StableCacheDerived : StaticFieldBase
             bool classifyPurity = false,
             bool compareManualCatalogs = false)
         {
+            return await RunEffectSummaryAsync(
+                new[] { assemblyPath },
+                includeTransitiveRoots,
+                classifyPurity,
+                compareManualCatalogs);
+        }
+
+        private static async Task<JsonDocument> RunEffectSummaryAsync(
+            string[] assemblyPaths,
+            bool includeTransitiveRoots,
+            bool classifyPurity = false,
+            bool compareManualCatalogs = false)
+        {
             var outputPath = Path.Combine(
                 TestContext.CurrentContext.WorkDirectory,
                 "effect-summary-" + Guid.NewGuid().ToString("N") + ".json");
@@ -10226,8 +10448,11 @@ public sealed class StableCacheDerived : StaticFieldBase
                 UseShellExecute = false,
             };
             startInfo.ArgumentList.Add(GetEffectSummaryToolDllPath());
-            startInfo.ArgumentList.Add("--assembly");
-            startInfo.ArgumentList.Add(assemblyPath);
+            foreach (var assemblyPath in assemblyPaths)
+            {
+                startInfo.ArgumentList.Add("--assembly");
+                startInfo.ArgumentList.Add(assemblyPath);
+            }
             startInfo.ArgumentList.Add("--output");
             startInfo.ArgumentList.Add(outputPath);
             if (includeTransitiveRoots)
@@ -10257,7 +10482,7 @@ public sealed class StableCacheDerived : StaticFieldBase
             {
                 throw new AssertionException(
                     "Effect summary tool failed with exit code " + process.ExitCode + "." + Environment.NewLine +
-                    "Assembly: " + assemblyPath + Environment.NewLine +
+                    "Assemblies: " + string.Join(", ", assemblyPaths) + Environment.NewLine +
                     "Output: " + outputPath);
             }
 
@@ -10548,7 +10773,10 @@ public sealed class StableCacheDerived : StaticFieldBase
             }
         }
 
-        private static async Task<FixtureAssembly> CreateFixtureAssemblyAsync(string assemblyName, string source)
+        private static async Task<FixtureAssembly> CreateFixtureAssemblyAsync(
+            string assemblyName,
+            string source,
+            params MetadataReference[] additionalReferences)
         {
             var tempDirectory = Path.Combine(
                 TestContext.CurrentContext.WorkDirectory,
@@ -10560,7 +10788,7 @@ public sealed class StableCacheDerived : StaticFieldBase
             var compilation = CSharpCompilation.Create(
                 assemblyName,
                 new[] { syntaxTree },
-                GetTrustedPlatformReferences(),
+                GetTrustedPlatformReferences().AddRange(additionalReferences),
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             await using var stream = File.Create(assemblyPath);
@@ -10637,6 +10865,25 @@ public sealed class StableCacheDerived : StaticFieldBase
                     Entries = entries
                 }
             });
+        }
+
+        private static string CreateGeneratedOnlySummaryDocument(JsonDocument summary)
+        {
+            return "{\"GeneratedPurityCatalog\":" +
+                summary.RootElement.GetProperty("GeneratedPurityCatalog").GetRawText() +
+                "}";
+        }
+
+        private static string[] GetGeneratedPurityCatalogSymbols(JsonDocument summary)
+        {
+            return summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .Select(symbol => symbol!)
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
         }
 
         private static object CreateReviewedEntry(

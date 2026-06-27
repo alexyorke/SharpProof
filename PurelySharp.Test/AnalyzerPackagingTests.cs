@@ -163,6 +163,20 @@ namespace TestNamespace {
         }
 
         [Test]
+        public void PackageToolsDirectory_ShouldOnlyContain_InstallAndUninstallScripts()
+        {
+            var toolsDirectory = Path.Combine(FindRepositoryRoot(), "PurelySharp.Package", "tools");
+            var toolScripts = Directory
+                .EnumerateFiles(toolsDirectory, "*.ps1", SearchOption.TopDirectoryOnly)
+                .Select(Path.GetFileName)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            Assert.That(toolScripts, Is.EqualTo(new[] { "install.ps1", "uninstall.ps1" }),
+                "NuGet package tools should stay limited to analyzer install and uninstall helpers.");
+        }
+
+        [Test]
         public void AnalyzerProject_ShouldNotCopyOrEmbed_EffectSummaryJsonArtifacts()
         {
             var projectPath = Path.Combine(FindRepositoryRoot(), "PurelySharp.Analyzer", "PurelySharp.Analyzer.csproj");
@@ -202,6 +216,35 @@ namespace TestNamespace {
             var reviewedSpecPath = Path.Combine(repositoryRoot, "Tools", "PurelySharp.EffectSummary", "ReviewedRuntimeArtifactSpec.json");
             Assert.That(File.Exists(reviewedSpecPath), Is.False,
                 "The dormant reviewed effect-summary artifact spec should stay out of the repository.");
+        }
+
+        [Test]
+        public void BuildAndPackagingEntrypoints_ShouldNotReference_LegacyEffectSummaryAutomation()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var entrypointFiles = Directory
+                .EnumerateFiles(repositoryRoot, "*.sln", SearchOption.TopDirectoryOnly)
+                .Concat(Directory.EnumerateFiles(repositoryRoot, "*.props", SearchOption.AllDirectories))
+                .Concat(Directory.EnumerateFiles(repositoryRoot, "*.targets", SearchOption.AllDirectories))
+                .Concat(Directory.EnumerateFiles(repositoryRoot, "*.csproj", SearchOption.AllDirectories))
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            var legacyAutomationReferences = entrypointFiles
+                .Select(path => new
+                {
+                    Path = path,
+                    Content = File.ReadAllText(path)
+                })
+                .Where(file =>
+                    file.Content.Contains("ReviewedRuntimeArtifactSpec.json", StringComparison.Ordinal) ||
+                    file.Content.Contains("Update-EffectSummaries.ps1", StringComparison.Ordinal) ||
+                    file.Content.Contains("PurelySharp.EffectSummary.json", StringComparison.Ordinal))
+                .Select(file => file.Path.Substring(repositoryRoot.Length).TrimStart(Path.DirectorySeparatorChar))
+                .ToArray();
+
+            Assert.That(legacyAutomationReferences, Is.Empty,
+                "Build and packaging entrypoints should not wire in legacy effect-summary artifact files or refresh scripts.");
         }
 
         [Test]

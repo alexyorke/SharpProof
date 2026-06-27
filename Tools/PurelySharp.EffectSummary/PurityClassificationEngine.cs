@@ -5,6 +5,8 @@ using PurelySharp.Analyzer.Engine;
 
 internal static class PurityClassificationEngine
 {
+    private const int MaxCrossAssemblyClassificationPasses = 8;
+
     private static readonly IReadOnlyDictionary<string, string> EmptyTypeParameterOrdinals =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -75,17 +77,39 @@ internal static class PurityClassificationEngine
         bool includeCatalogComparison,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry>? externalGeneratedPurityEntries = null)
     {
-        var classifiedAssemblies = assemblies
-            .Select(assembly => ClassifyAssembly(
-                assembly,
-                externalGeneratedPurityEntries ?? EmptyExternalGeneratedPurityEntries))
-            .ToArray();
+        var seedEntries = externalGeneratedPurityEntries ?? EmptyExternalGeneratedPurityEntries;
+        var resolvedExternalEntries = seedEntries;
+        Dictionary<string, GeneratedPurityCatalogEntry>? previousResolvedEntries = null;
+        AssemblyEffectReport[] classifiedAssemblies = assemblies;
+        GeneratedPurityCatalogDocument? generatedPurityCatalog = null;
+
+        for (var pass = 0; pass < MaxCrossAssemblyClassificationPasses; pass++)
+        {
+            classifiedAssemblies = assemblies
+                .Select(assembly => ClassifyAssembly(assembly, resolvedExternalEntries, seedEntries))
+                .ToArray();
+
+            generatedPurityCatalog = BuildGeneratedPurityCatalog(classifiedAssemblies);
+            var nextResolvedEntries = MergeGeneratedPurityEntries(
+                seedEntries.Values.Concat(generatedPurityCatalog.Entries));
+            if (previousResolvedEntries != null &&
+                HaveSameGeneratedPurityEntryMap(previousResolvedEntries, nextResolvedEntries))
+            {
+                break;
+            }
+
+            previousResolvedEntries = nextResolvedEntries;
+            resolvedExternalEntries = nextResolvedEntries;
+        }
+
         var methods = classifiedAssemblies
             .SelectMany(assembly => assembly.Methods)
             .ToArray();
         var report = BuildReport(methods, includeCatalogComparison);
-        var generatedPurityCatalog = BuildGeneratedPurityCatalog(classifiedAssemblies);
-        return new PurityClassificationOutput(classifiedAssemblies, report, generatedPurityCatalog);
+        return new PurityClassificationOutput(
+            classifiedAssemblies,
+            report,
+            generatedPurityCatalog ?? BuildGeneratedPurityCatalog(classifiedAssemblies));
     }
 
     private static readonly IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> EmptyExternalGeneratedPurityEntries =
@@ -93,7 +117,8 @@ internal static class PurityClassificationEngine
 
     private static AssemblyEffectReport ClassifyAssembly(
         AssemblyEffectReport assembly,
-        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries)
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries)
     {
         var bySymbol = assembly.Methods
             .GroupBy(method => method.ExactSymbolKey, StringComparer.Ordinal)
@@ -113,6 +138,7 @@ internal static class PurityClassificationEngine
                         method.ExactSymbolKey,
                         bySymbol,
                         externalGeneratedPurityEntries,
+                        reviewedGeneratedPurityEntries,
                         memo,
                         freshOwnedInitializationMemo,
                         validationThrowHelperMemo,
@@ -127,6 +153,7 @@ internal static class PurityClassificationEngine
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries,
         Dictionary<string, MethodPurityClassification> memo,
         Dictionary<string, bool> freshOwnedInitializationMemo,
         Dictionary<string, bool> validationThrowHelperMemo,
@@ -135,7 +162,7 @@ internal static class PurityClassificationEngine
         if (memo.TryGetValue(symbol, out var cached))
         {
             if (bySymbol.TryGetValue(symbol, out var cachedSummary) &&
-                TryResolveReviewedUpgrade(assembly, symbol, cachedSummary, externalGeneratedPurityEntries, out var reviewedUpgrade) &&
+                TryResolveReviewedUpgrade(assembly, symbol, cachedSummary, reviewedGeneratedPurityEntries, out var reviewedUpgrade) &&
                 ShouldPreferReviewedUpgrade(cached, reviewedUpgrade))
             {
                 memo[symbol] = reviewedUpgrade;
@@ -299,6 +326,7 @@ internal static class PurityClassificationEngine
                                 externalCallKey,
                                 bySymbol,
                                 externalGeneratedPurityEntries,
+                                reviewedGeneratedPurityEntries,
                                 memo,
                                 freshOwnedInitializationMemo,
                                 validationThrowHelperMemo,
@@ -360,6 +388,7 @@ internal static class PurityClassificationEngine
                 resolvedCallKey,
                 bySymbol,
                 externalGeneratedPurityEntries,
+                reviewedGeneratedPurityEntries,
                 memo,
                 freshOwnedInitializationMemo,
                 validationThrowHelperMemo,
@@ -394,6 +423,7 @@ internal static class PurityClassificationEngine
                         resolvedCallKey,
                         bySymbol,
                         externalGeneratedPurityEntries,
+                        reviewedGeneratedPurityEntries,
                         memo,
                         freshOwnedInitializationMemo,
                         validationThrowHelperMemo,
@@ -404,6 +434,7 @@ internal static class PurityClassificationEngine
                          resolvedCallKey,
                          bySymbol,
                          externalGeneratedPurityEntries,
+                         reviewedGeneratedPurityEntries,
                          memo,
                          freshOwnedInitializationMemo,
                          validationThrowHelperMemo,
@@ -524,7 +555,7 @@ internal static class PurityClassificationEngine
                 assembly,
                 symbol,
                 summary,
-                externalGeneratedPurityEntries,
+                reviewedGeneratedPurityEntries,
                 out var reviewedClassification) &&
             ShouldPreferReviewedUpgrade(result, reviewedClassification))
         {
@@ -848,6 +879,205 @@ internal static class PurityClassificationEngine
                 .SelectMany(assembly => assembly.Methods.Select(method => CreateGeneratedPurityEntry(assembly, method)))
                 .OrderBy(static entry => entry.ExactSymbolKey, StringComparer.Ordinal)
                 .ToArray());
+    }
+
+    private static Dictionary<string, GeneratedPurityCatalogEntry> MergeGeneratedPurityEntries(
+        IEnumerable<GeneratedPurityCatalogEntry> entries)
+    {
+        var candidatesByKey = new Dictionary<string, List<GeneratedPurityCatalogEntry>>(StringComparer.Ordinal);
+        foreach (var entry in entries)
+        {
+            if (!candidatesByKey.TryGetValue(entry.ExactSymbolKey, out var candidates))
+            {
+                candidates = new List<GeneratedPurityCatalogEntry>();
+                candidatesByKey.Add(entry.ExactSymbolKey, candidates);
+            }
+
+            candidates.Add(entry);
+        }
+
+        var resolvedEntries = new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
+        foreach (var pair in candidatesByKey)
+        {
+            var resolvedEntry = ResolveGeneratedPurityEntryCandidates(pair.Value);
+            if (resolvedEntry != null)
+            {
+                resolvedEntries[pair.Key] = resolvedEntry;
+            }
+        }
+
+        return resolvedEntries;
+    }
+
+    private static GeneratedPurityCatalogEntry? ResolveGeneratedPurityEntryCandidates(
+        IReadOnlyList<GeneratedPurityCatalogEntry> candidates)
+    {
+        GeneratedPurityCatalogEntry? bestEntry = null;
+        foreach (var implementationGroup in candidates
+                     .GroupBy(CreateGeneratedPurityImplementationKey, StringComparer.Ordinal))
+        {
+            var resolvedEntry = ResolveSameImplementationGeneratedPurityEntries(
+                implementationGroup.ToArray());
+            if (resolvedEntry == null)
+            {
+                continue;
+            }
+
+            if (bestEntry == null)
+            {
+                bestEntry = resolvedEntry;
+                continue;
+            }
+
+            if (AreEquivalentGeneratedPurityEntries(bestEntry, resolvedEntry))
+            {
+                continue;
+            }
+
+            var bestDominatesResolved = DoesGeneratedPurityEntryDominate(bestEntry, resolvedEntry);
+            var resolvedDominatesBest = DoesGeneratedPurityEntryDominate(resolvedEntry, bestEntry);
+            if (bestDominatesResolved == resolvedDominatesBest)
+            {
+                return null;
+            }
+
+            if (resolvedDominatesBest)
+            {
+                bestEntry = resolvedEntry;
+            }
+        }
+
+        return bestEntry;
+    }
+
+    private static GeneratedPurityCatalogEntry? ResolveSameImplementationGeneratedPurityEntries(
+        IReadOnlyList<GeneratedPurityCatalogEntry> candidates)
+    {
+        if (candidates.Count == 0)
+        {
+            return null;
+        }
+
+        var bestEntry = candidates[0];
+        for (var i = 1; i < candidates.Count; i++)
+        {
+            var candidate = candidates[i];
+            if (AreEquivalentGeneratedPurityEntries(bestEntry, candidate))
+            {
+                continue;
+            }
+
+            var bestDominatesCandidate = DoesGeneratedPurityEntryDominate(bestEntry, candidate);
+            var candidateDominatesBest = DoesGeneratedPurityEntryDominate(candidate, bestEntry);
+            if (bestDominatesCandidate == candidateDominatesBest)
+            {
+                return null;
+            }
+
+            if (candidateDominatesBest)
+            {
+                bestEntry = candidate;
+            }
+        }
+
+        return bestEntry;
+    }
+
+    private static bool HaveSameGeneratedPurityEntryMap(
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> left,
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        foreach (var pair in left)
+        {
+            if (!right.TryGetValue(pair.Key, out var rightEntry) ||
+                !AreEquivalentGeneratedPurityEntries(pair.Value, rightEntry))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool AreEquivalentGeneratedPurityEntries(
+        GeneratedPurityCatalogEntry left,
+        GeneratedPurityCatalogEntry right)
+    {
+        return string.Equals(left.Classification, right.Classification, StringComparison.Ordinal) &&
+            string.Equals(left.PrimaryCategory, right.PrimaryCategory, StringComparison.Ordinal) &&
+            string.Equals(left.FreshnessClassification, right.FreshnessClassification, StringComparison.Ordinal) &&
+            string.Equals(left.EffectVisibilityClassification, right.EffectVisibilityClassification, StringComparison.Ordinal) &&
+            left.HasFreshArrayAllocationEvidence == right.HasFreshArrayAllocationEvidence &&
+            left.HasFreshObjectAllocationEvidence == right.HasFreshObjectAllocationEvidence &&
+            left.HasUnsupportedEffects == right.HasUnsupportedEffects &&
+            HaveSameSet(left.Categories, right.Categories) &&
+            left.FirstBlockingCallChain.SequenceEqual(right.FirstBlockingCallChain, StringComparer.Ordinal);
+    }
+
+    private static bool DoesGeneratedPurityEntryDominate(
+        GeneratedPurityCatalogEntry stronger,
+        GeneratedPurityCatalogEntry weaker)
+    {
+        return string.Equals(stronger.Classification, weaker.Classification, StringComparison.Ordinal) &&
+            string.Equals(stronger.PrimaryCategory, weaker.PrimaryCategory, StringComparison.Ordinal) &&
+            string.Equals(stronger.FreshnessClassification, weaker.FreshnessClassification, StringComparison.Ordinal) &&
+            string.Equals(stronger.EffectVisibilityClassification, weaker.EffectVisibilityClassification, StringComparison.Ordinal) &&
+            (!weaker.HasFreshArrayAllocationEvidence || stronger.HasFreshArrayAllocationEvidence) &&
+            (!weaker.HasFreshObjectAllocationEvidence || stronger.HasFreshObjectAllocationEvidence) &&
+            (!weaker.HasUnsupportedEffects || stronger.HasUnsupportedEffects) &&
+            IsSetSuperset(stronger.Categories, weaker.Categories) &&
+            IsPrefix(weaker.FirstBlockingCallChain, stronger.FirstBlockingCallChain);
+    }
+
+    private static string CreateGeneratedPurityImplementationKey(GeneratedPurityCatalogEntry entry)
+    {
+        return string.Join(
+            "|",
+            entry.AssemblyName,
+            entry.AssemblySha256,
+            entry.ModuleVersionId,
+            entry.MetadataToken,
+            entry.MethodBodySha256 ?? string.Empty);
+    }
+
+    private static bool HaveSameSet(string[] left, string[] right)
+    {
+        return left.Length == right.Length &&
+            IsSetSuperset(left, right);
+    }
+
+    private static bool IsSetSuperset(string[] left, string[] right)
+    {
+        if (right.Length == 0)
+        {
+            return true;
+        }
+
+        var set = new HashSet<string>(left, StringComparer.Ordinal);
+        return right.All(set.Contains);
+    }
+
+    private static bool IsPrefix(string[] prefix, string[] sequence)
+    {
+        if (prefix.Length > sequence.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < prefix.Length; i++)
+        {
+            if (!string.Equals(prefix[i], sequence[i], StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static GeneratedPurityCatalogEntry CreateGeneratedPurityEntry(
@@ -2137,6 +2367,7 @@ internal static class PurityClassificationEngine
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries,
         Dictionary<string, MethodPurityClassification> memo,
         Dictionary<string, bool> freshOwnedInitializationMemo,
         Dictionary<string, bool> validationThrowHelperMemo,
@@ -2153,6 +2384,7 @@ internal static class PurityClassificationEngine
             symbol,
             bySymbol,
             externalGeneratedPurityEntries,
+            reviewedGeneratedPurityEntries,
             memo,
             freshOwnedInitializationMemo,
             validationThrowHelperMemo,
@@ -2167,6 +2399,7 @@ internal static class PurityClassificationEngine
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries,
         Dictionary<string, MethodPurityClassification> memo,
         Dictionary<string, bool> freshOwnedInitializationMemo,
         Dictionary<string, bool> validationThrowHelperMemo,
@@ -2236,6 +2469,7 @@ internal static class PurityClassificationEngine
                 resolvedCallKey,
                 bySymbol,
                 externalGeneratedPurityEntries,
+                reviewedGeneratedPurityEntries,
                 memo,
                 freshOwnedInitializationMemo,
                 validationThrowHelperMemo,
@@ -2256,6 +2490,7 @@ internal static class PurityClassificationEngine
                     resolvedCallKey,
                     bySymbol,
                     externalGeneratedPurityEntries,
+                    reviewedGeneratedPurityEntries,
                     memo,
                     freshOwnedInitializationMemo,
                     validationThrowHelperMemo,
@@ -2279,6 +2514,7 @@ internal static class PurityClassificationEngine
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries,
         Dictionary<string, MethodPurityClassification> memo,
         Dictionary<string, bool> freshOwnedInitializationMemo,
         Dictionary<string, bool> validationThrowHelperMemo,
@@ -2295,6 +2531,7 @@ internal static class PurityClassificationEngine
             symbol,
             bySymbol,
             externalGeneratedPurityEntries,
+            reviewedGeneratedPurityEntries,
             memo,
             freshOwnedInitializationMemo,
             validationThrowHelperMemo,
@@ -2309,6 +2546,7 @@ internal static class PurityClassificationEngine
         string symbol,
         IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries,
         Dictionary<string, MethodPurityClassification> memo,
         Dictionary<string, bool> freshOwnedInitializationMemo,
         Dictionary<string, bool> validationThrowHelperMemo,
@@ -2378,6 +2616,7 @@ internal static class PurityClassificationEngine
                 resolvedCallKey,
                 bySymbol,
                 externalGeneratedPurityEntries,
+                reviewedGeneratedPurityEntries,
                 memo,
                 freshOwnedInitializationMemo,
                 validationThrowHelperMemo,
@@ -2398,6 +2637,7 @@ internal static class PurityClassificationEngine
                     resolvedCallKey,
                     bySymbol,
                     externalGeneratedPurityEntries,
+                    reviewedGeneratedPurityEntries,
                     memo,
                     freshOwnedInitializationMemo,
                     validationThrowHelperMemo,
