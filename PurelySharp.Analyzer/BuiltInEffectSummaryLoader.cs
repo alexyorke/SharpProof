@@ -36,12 +36,12 @@ namespace PurelySharp.Analyzer
                 }
 
                 var text = additionalFile.GetText(cancellationToken)?.ToString();
-                if (string.IsNullOrWhiteSpace(text))
+                if (text == null || string.IsNullOrWhiteSpace(text))
                 {
                     continue;
                 }
 
-                addJson(text!);
+                addJson(text);
             }
         }
 
@@ -54,9 +54,9 @@ namespace PurelySharp.Analyzer
 
         private static void AddSummaryDirectory(HashSet<string> directories, string? path)
         {
-            if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+            if (path != null && !string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
             {
-                directories.Add(path!);
+                directories.Add(path);
             }
         }
 
