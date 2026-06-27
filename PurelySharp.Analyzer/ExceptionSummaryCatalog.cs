@@ -54,84 +54,6 @@ namespace PurelySharp.Analyzer
             return CreateCatalog(entriesBySymbol);
         }
 
-        public bool TryGetExceptions(IMethodSymbol methodSymbol, out ImmutableArray<string> exceptionTypes)
-        {
-            return TryGetExceptions(methodSymbol, compilation: null, out exceptionTypes);
-        }
-
-        public bool TryGetExceptions(
-            IMethodSymbol methodSymbol,
-            Compilation? compilation,
-            out ImmutableArray<string> exceptionTypes)
-        {
-            if (!TryGetExceptionInfos(methodSymbol, compilation, out var exceptionInfos))
-            {
-                exceptionTypes = ImmutableArray<string>.Empty;
-                return false;
-            }
-
-            exceptionTypes = exceptionInfos
-                .Select(info => info.ExceptionType)
-                .OrderBy(type => type, StringComparer.Ordinal)
-                .ToImmutableArray();
-            return exceptionTypes.Length > 0;
-        }
-
-        public bool TryGetExceptionFacts(IMethodSymbol methodSymbol, out ImmutableArray<SummaryExceptionFact> exceptionFacts)
-        {
-            return TryGetExceptionFacts(methodSymbol, compilation: null, out exceptionFacts);
-        }
-
-        public bool TryGetExceptionFacts(
-            IMethodSymbol methodSymbol,
-            Compilation? compilation,
-            out ImmutableArray<SummaryExceptionFact> exceptionFacts)
-        {
-            var matchedFacts = new Dictionary<SummaryExceptionFact, SummaryExceptionFact>(SummaryExceptionFactComparer.Instance);
-            var actualAssemblyIdentity = compilation is null
-                ? null
-                : TryResolveActualAssemblyIdentity(methodSymbol, compilation);
-            var actualMethodIdentity = compilation is null
-                ? null
-                : TryResolveActualMethodIdentity(methodSymbol, compilation);
-
-            foreach (var key in GetSymbolKeys(methodSymbol))
-            {
-                if (!_entriesBySymbol.TryGetValue(key, out var entries))
-                {
-                    continue;
-                }
-
-                foreach (var entry in entries)
-                {
-                    if (!entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity))
-                    {
-                        continue;
-                    }
-
-                    foreach (var exceptionFact in entry.ExceptionFacts)
-                    {
-                        matchedFacts[exceptionFact] = exceptionFact;
-                    }
-                }
-            }
-
-            if (matchedFacts.Count == 0)
-            {
-                exceptionFacts = ImmutableArray<SummaryExceptionFact>.Empty;
-                return false;
-            }
-
-            exceptionFacts = matchedFacts.Values
-                .OrderBy(fact => fact.ExceptionType, StringComparer.Ordinal)
-                .ThenBy(fact => fact.OriginKind)
-                .ThenBy(fact => fact.Depth ?? int.MinValue)
-                .ThenBy(fact => fact.CalleeExactSymbolKey, StringComparer.Ordinal)
-                .ThenBy(fact => fact.SourcePath, StringComparer.Ordinal)
-                .ToImmutableArray();
-            return true;
-        }
-
         public bool TryGetExceptionInfos(
             IMethodSymbol methodSymbol,
             Compilation? compilation,
@@ -1393,11 +1315,6 @@ namespace PurelySharp.Analyzer
 
         internal sealed class SummaryExceptionInfo
         {
-            public SummaryExceptionInfo(string exceptionType, ImmutableArray<string> sources)
-                : this(exceptionType, sources, ImmutableArray<SummaryExceptionEdgeInfo>.Empty)
-            {
-            }
-
             public SummaryExceptionInfo(
                 string exceptionType,
                 ImmutableArray<string> sources,

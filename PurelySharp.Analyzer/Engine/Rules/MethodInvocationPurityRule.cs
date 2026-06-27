@@ -27,12 +27,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (invokedMethodSymbol == null)
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] Cannot resolve target method. Assuming impure.");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "unsupported_operation",
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation));
+                return PurityAnalysisEngine.ImpureResult(
+                    invocationOperation,
+                    "unsupported_operation",
+                    nameof(MethodInvocationPurityRule));
             }
 
             if (TryCheckTypeEqualityPurity(invocationOperation, context, currentState, out var earlyTypeEqualityResult))
@@ -69,13 +67,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (invocationOperation.Instance != null && IsDynamicInvocationReceiver(invocationOperation.Instance))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] Invocation on dynamic instance is treated as conservative impure.");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "dynamic_dispatch",
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: invokedMethodSymbol));
+                return PurityAnalysisEngine.ImpureResult(
+                    invocationOperation,
+                    "dynamic_dispatch",
+                    nameof(MethodInvocationPurityRule),
+                    invokedMethodSymbol);
             }
 
 
@@ -89,12 +85,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 {
                     PurityAnalysisEngine.LogDebug("  [MIR-DEL-S] Instance is NULL (static delegate?). Assuming impure.");
                     return PurityAnalysisEngine.ImpureResult(
-                        invocationOperation.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "unresolved_delegate_target",
-                            nameof(MethodInvocationPurityRule),
-                            invocationOperation,
-                            symbol: invokedMethodSymbol));
+                        invocationOperation,
+                        "unresolved_delegate_target",
+                        nameof(MethodInvocationPurityRule),
+                        invokedMethodSymbol);
                 }
 
                 PurityAnalysisEngine.PurityAnalysisResult result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -109,12 +103,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     {
                         PurityAnalysisEngine.LogDebug("  [MIR-DEL-S] --> Resolved target set is empty or explicitly unresolved. Treating as unresolved delegate target.");
                         result = PurityAnalysisEngine.ImpureResult(
-                            delegateInstanceOp.Syntax,
-                            PurityAnalysisEngine.PurityEvidence.Create(
-                                "unresolved_delegate_target",
-                                nameof(MethodInvocationPurityRule),
-                                delegateInstanceOp,
-                                symbol: invokedMethodSymbol));
+                            delegateInstanceOp,
+                            "unresolved_delegate_target",
+                            nameof(MethodInvocationPurityRule),
+                            invokedMethodSymbol);
                     }
                     else
                     {
@@ -143,12 +135,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 {
                     PurityAnalysisEngine.LogDebug($"  [MIR-DEL-S] --> IMPURE (Could not resolve delegate targets for {delegateInstanceOp.Kind}). Fallback to PS0002 at instance op.");
                     result = PurityAnalysisEngine.ImpureResult(
-                        delegateInstanceOp.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "unresolved_delegate_target",
-                            nameof(MethodInvocationPurityRule),
-                            delegateInstanceOp,
-                            symbol: invokedMethodSymbol));
+                        delegateInstanceOp,
+                        "unresolved_delegate_target",
+                        nameof(MethodInvocationPurityRule),
+                        invokedMethodSymbol);
                 }
 
                 PurityAnalysisEngine.LogDebug($"  [MIR-DEL-S] Final Result for Delegate Invocation: IsPure={result.IsPure}");
@@ -178,13 +168,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 IsDynamicInvocationReceiver(invocationOperation.Arguments[0].Value))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] Extension invocation on dynamic receiver is treated as conservative impure.");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "dynamic_dispatch",
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: invokedMethodSymbol));
+                return PurityAnalysisEngine.ImpureResult(
+                    invocationOperation,
+                    "dynamic_dispatch",
+                    nameof(MethodInvocationPurityRule),
+                    invokedMethodSymbol);
             }
 
             if (invokedMethodSymbol.IsExtensionMethod &&
@@ -338,25 +326,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 dispatchWasProvenPure = true;
             }
 
-
-            if (invokedMethodSymbol.IsStatic && invokedMethodSymbol.ContainingType != null)
-            {
-                var staticOriginalDefinitionSymbol = invokedMethodSymbol.OriginalDefinition;
-                if (PurityAnalysisEngine.HasImpureAttribute(staticOriginalDefinitionSymbol))
-                {
-                    PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE ([Impure] boundary attribute)");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        invocationOperation.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "impure_boundary_attribute",
-                            nameof(MethodInvocationPurityRule),
-                            invocationOperation,
-                            symbol: staticOriginalDefinitionSymbol,
-                            catalogSource: "attribute"));
-                }
-
-            }
-
             if (invocationOperation.Instance != null
                 && !IsBaseReference(invocationOperation.Instance)
                 && invocationOperation.Instance is not IConditionalAccessInstanceOperation)
@@ -378,14 +347,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (PurityAnalysisEngine.HasImpureAttribute(originalDefinitionSymbol))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE ([Impure] boundary attribute)");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "impure_boundary_attribute",
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: originalDefinitionSymbol,
-                        catalogSource: "attribute"));
+                return PurityAnalysisEngine.ImpureResult(
+                    invocationOperation,
+                    "impure_boundary_attribute",
+                    nameof(MethodInvocationPurityRule),
+                    originalDefinitionSymbol,
+                    "attribute");
             }
 
             var trustedMetadataPurity = PurityAnalysisEngine.GetTrustedMethodPurityMetadata(
@@ -426,14 +393,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     if (!IsPureOutArgumentTarget(argument.Value) && !allowsTrustedPureRefRead)
                     {
                         PurityAnalysisEngine.LogDebug($"  [MIR]   By-reference argument '{argument.Syntax}' writes to non-local state.");
-                        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                            argument.Syntax,
-                            PurityAnalysisEngine.PurityEvidence.Create(
-                                "mutable_state_write",
-                                nameof(MethodInvocationPurityRule),
-                                argument,
-                                syntaxNode: argument.Syntax,
-                                symbol: PurityAnalysisEngine.TryResolveSymbol(argument.Value) ?? originalDefinitionSymbol));
+                        return PurityAnalysisEngine.ImpureResult(
+                            argument,
+                            "mutable_state_write",
+                            nameof(MethodInvocationPurityRule),
+                            PurityAnalysisEngine.TryResolveSymbol(argument.Value) ?? originalDefinitionSymbol);
                     }
 
                     if (argument.Parameter.RefKind == RefKind.Out &&
@@ -574,14 +538,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (PurityAnalysisEngine.TryGetSemanticKnownImpureCatalogSource(invocationOperation, out var semanticCatalogSource))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (semantic current-culture-sensitive invocation)");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "catalog_hit",
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: originalDefinitionSymbol,
-                        catalogSource: semanticCatalogSource));
+                return PurityAnalysisEngine.ImpureResult(
+                    invocationOperation,
+                    "catalog_hit",
+                    nameof(MethodInvocationPurityRule),
+                    originalDefinitionSymbol,
+                    semanticCatalogSource);
             }
 
             var knownImpureMemberSource = trustedMetadataPurity.KnownImpureMemberSource;
@@ -594,14 +556,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (hasConfiguredKnownImpureMember)
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (Configured Known Impure)");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        GetCatalogHitCategory(originalDefinitionSymbol),
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: originalDefinitionSymbol,
-                        catalogSource: knownImpureMemberSource));
+                return PurityAnalysisEngine.ImpureResult(
+                    invocationOperation,
+                    GetCatalogHitCategory(originalDefinitionSymbol),
+                    nameof(MethodInvocationPurityRule),
+                    originalDefinitionSymbol,
+                    knownImpureMemberSource);
             }
 
             if (hasTrustedGeneratedPurity &&
@@ -616,14 +576,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 if (generatedPurity.IsNonPure)
                 {
                     PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (trusted generated purity summary)");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        invocationOperation.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            generatedPurity.PrimaryCategory,
-                            nameof(MethodInvocationPurityRule),
-                            invocationOperation,
-                            symbol: originalDefinitionSymbol,
-                        catalogSource: "generated_purity_summary"));
+                    return PurityAnalysisEngine.ImpureResult(
+                        invocationOperation,
+                        generatedPurity.PrimaryCategory,
+                        nameof(MethodInvocationPurityRule),
+                        originalDefinitionSymbol,
+                        "generated_purity_summary");
                 }
             }
 
@@ -631,14 +589,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (knownImpureMemberSource != null)
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (Known Impure)");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        GetCatalogHitCategory(originalDefinitionSymbol),
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: originalDefinitionSymbol,
-                        catalogSource: knownImpureMemberSource));
+                return PurityAnalysisEngine.ImpureResult(
+                    invocationOperation,
+                    GetCatalogHitCategory(originalDefinitionSymbol),
+                    nameof(MethodInvocationPurityRule),
+                    originalDefinitionSymbol,
+                    knownImpureMemberSource);
             }
 
             if (PurityAnalysisEngine.IsInConfiguredImpureNamespaceOrType(originalDefinitionSymbol) &&
@@ -646,14 +602,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 !PurityAnalysisEngine.IsConfiguredKnownPureMember(originalDefinitionSymbol))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (In configured impure NS/Type and not explicitly Pure)");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        GetCatalogHitCategory(originalDefinitionSymbol),
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: originalDefinitionSymbol,
-                        catalogSource: "known_impure_namespace_or_type"));
+                return PurityAnalysisEngine.ImpureResult(
+                    invocationOperation,
+                    GetCatalogHitCategory(originalDefinitionSymbol),
+                    nameof(MethodInvocationPurityRule),
+                    originalDefinitionSymbol,
+                    "known_impure_namespace_or_type");
             }
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Checking IsKnownPureBCLMember with signature: '{originalDefinitionSymbol.ToDisplayString()}'");
@@ -669,14 +623,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (PurityAnalysisEngine.IsInImpureNamespaceOrType(originalDefinitionSymbol) && !isExplicitlyPure)
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (In Impure NS/Type and not explicitly Pure)");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        GetCatalogHitCategory(originalDefinitionSymbol),
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: originalDefinitionSymbol,
-                        catalogSource: "known_impure_namespace_or_type"));
+                return PurityAnalysisEngine.ImpureResult(
+                    invocationOperation,
+                    GetCatalogHitCategory(originalDefinitionSymbol),
+                    nameof(MethodInvocationPurityRule),
+                    originalDefinitionSymbol,
+                    "known_impure_namespace_or_type");
             }
 
             if (invocationOperation.Type is IArrayTypeSymbol &&
@@ -691,14 +643,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (IsUntrustedMetadataOnlyMethod(originalDefinitionSymbol))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (Metadata-only external method without purity boundary)");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "unknown_external_call",
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: originalDefinitionSymbol,
-                        catalogSource: "metadata"));
+                return PurityAnalysisEngine.ImpureResult(
+                    invocationOperation,
+                    "unknown_external_call",
+                    nameof(MethodInvocationPurityRule),
+                    originalDefinitionSymbol,
+                    "metadata");
             }
 
             PurityAnalysisEngine.LogDebug($"  [MIR] Performing purity check for: {methodDisplayString}");
@@ -1228,26 +1178,22 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 if (!hasConcreteImplementationCandidate)
                 {
                     PurityAnalysisEngine.LogDebug($"  [MIR] Method {invokedMethodSymbol.ContainingType?.Name}.{invokedMethodSymbol.Name} can dispatch to unknown external targets; treating as impure conservatively.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        invocationOperation.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "unknown_external_call",
-                            nameof(MethodInvocationPurityRule),
-                            invocationOperation,
-                            symbol: invokedMethodSymbol));
+                    return PurityAnalysisEngine.ImpureResult(
+                        invocationOperation,
+                        "unknown_external_call",
+                        nameof(MethodInvocationPurityRule),
+                        invokedMethodSymbol);
                 }
             }
 
             if (candidateMethods.Count == 0)
             {
                 PurityAnalysisEngine.LogDebug($"  [MIR] No concrete dispatch candidates found for {invokedMethodSymbol.Name}; treating unresolved closed-world dispatch as impure conservatively.");
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "dynamic_dispatch",
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        symbol: invokedMethodSymbol));
+                return PurityAnalysisEngine.ImpureResult(
+                    invocationOperation,
+                    "dynamic_dispatch",
+                    nameof(MethodInvocationPurityRule),
+                    invokedMethodSymbol);
             }
 
             foreach (var candidateMethod in candidateMethods)
@@ -4009,14 +3955,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (!foundImplementation && IsUnresolvedComparerDispatch(value.Type))
             {
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    invocationOperation.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "unknown_external_call",
-                        nameof(MethodInvocationPurityRule),
-                        invocationOperation,
-                        syntaxNode: invocationOperation.Syntax,
-                        symbol: PurityAnalysisEngine.TryResolveSymbol(value) ?? invocationOperation.TargetMethod));
+                return PurityAnalysisEngine.ImpureResult(
+                    invocationOperation,
+                    "unknown_external_call",
+                    nameof(MethodInvocationPurityRule),
+                    PurityAnalysisEngine.TryResolveSymbol(value) ?? invocationOperation.TargetMethod);
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -4060,14 +4003,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (!foundImplementation && IsUnresolvedComparerDispatch(value.Type))
             {
-                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                    value.Syntax,
-                    PurityAnalysisEngine.PurityEvidence.Create(
-                        "unknown_external_call",
-                        nameof(MethodInvocationPurityRule),
-                        argument,
-                        syntaxNode: value.Syntax,
-                        symbol: PurityAnalysisEngine.TryResolveSymbol(value) ?? argument.Parameter));
+                return PurityAnalysisEngine.ImpureResult(
+                    argument,
+                    "unknown_external_call",
+                    nameof(MethodInvocationPurityRule),
+                    PurityAnalysisEngine.TryResolveSymbol(value) ?? argument.Parameter);
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;

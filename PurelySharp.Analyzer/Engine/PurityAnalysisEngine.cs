@@ -19,7 +19,7 @@ using System.Threading;
 namespace PurelySharp.Analyzer.Engine
 {
 
-    internal class PurityAnalysisEngine
+    internal partial class PurityAnalysisEngine
     {
         private static readonly TimeSpan SmtTimeout = TimeSpan.FromMilliseconds(25);
         private readonly CompilationPurityService? _purityService;
@@ -954,18 +954,16 @@ namespace PurelySharp.Analyzer.Engine
 
             try
             {
+                var declaringSyntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
 
                 if (HasImpureAttribute(methodSymbol))
                 {
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is marked [Impure].");
-                    var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
                     var explicitlyImpureResult = ImpureResult(
-                        syntax,
-                        PurityEvidence.Create(
-                            "impure_boundary_attribute",
-                            syntaxNode: syntax,
-                            symbol: methodSymbol,
-                            catalogSource: "attribute"));
+                        declaringSyntax,
+                        "impure_boundary_attribute",
+                        symbol: methodSymbol,
+                        catalogSource: "attribute");
                     purityCache[methodSymbol] = explicitlyImpureResult;
                     LogDebug($"{indent}<< Exit DeterminePurity ([Impure]): {methodSymbol.ToDisplayString()}");
                     return explicitlyImpureResult;
@@ -982,15 +980,12 @@ namespace PurelySharp.Analyzer.Engine
                 if (IsInConfiguredImpureNamespaceOrType(methodSymbol) && !IsConfiguredKnownPureMember(methodSymbol))
                 {
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is in a configured impure namespace/type.");
-                    var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
                     var configuredImpureResult = ImpureResult(
-                        syntax,
-                        PurityEvidence.Create(
-                            "catalog_hit",
-                            "KnownImpureMethod",
-                            syntaxNode: syntax,
-                            symbol: methodSymbol,
-                            catalogSource: "known_impure_namespace_or_type"));
+                        declaringSyntax,
+                        "catalog_hit",
+                        "KnownImpureMethod",
+                        methodSymbol,
+                        "known_impure_namespace_or_type");
                     purityCache[methodSymbol] = configuredImpureResult;
                     LogDebug($"{indent}<< Exit DeterminePurity (Configured Impure Namespace/Type): {methodSymbol.ToDisplayString()}");
                     return configuredImpureResult;
@@ -1005,15 +1000,12 @@ namespace PurelySharp.Analyzer.Engine
                 if (hasConfiguredKnownImpureMember)
                 {
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is configured known impure.");
-                    var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
                     var configuredKnownImpureResult = ImpureResult(
-                        syntax,
-                        PurityEvidence.Create(
-                            "catalog_hit",
-                            "KnownImpureMethod",
-                            syntaxNode: syntax,
-                            symbol: methodSymbol,
-                            catalogSource: knownImpureMemberSource));
+                        declaringSyntax,
+                        "catalog_hit",
+                        "KnownImpureMethod",
+                        methodSymbol,
+                        knownImpureMemberSource);
                     purityCache[methodSymbol] = configuredKnownImpureResult;
                     LogDebug($"{indent}<< Exit DeterminePurity (Configured Known Impure): {methodSymbol.ToDisplayString()}");
                     return configuredKnownImpureResult;
@@ -1031,14 +1023,11 @@ namespace PurelySharp.Analyzer.Engine
 					if (generatedPurity.IsNonPure)
 					{
 						LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is trusted impure from generated purity summary.");
-						var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
 						var generatedResult = ImpureResult(
-							syntax,
-							PurityEvidence.Create(
-                                generatedPurity.PrimaryCategory,
-                                syntaxNode: syntax,
-                                symbol: methodSymbol,
-                                catalogSource: "generated_purity_summary"));
+							declaringSyntax,
+                            generatedPurity.PrimaryCategory,
+                            symbol: methodSymbol,
+                            catalogSource: "generated_purity_summary");
                         purityCache[methodSymbol] = generatedResult;
                         return generatedResult;
                     }
@@ -1047,15 +1036,12 @@ namespace PurelySharp.Analyzer.Engine
                 if (knownImpureMemberSource != null)
                 {
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is known impure.");
-                    var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
                     var knownImpureResult = ImpureResult(
-                        syntax,
-                        PurityEvidence.Create(
-                            "catalog_hit",
-                            "KnownImpureMethod",
-                            syntaxNode: syntax,
-                            symbol: methodSymbol,
-                            catalogSource: knownImpureMemberSource));
+                        declaringSyntax,
+                        "catalog_hit",
+                        "KnownImpureMethod",
+                        methodSymbol,
+                        knownImpureMemberSource);
                     purityCache[methodSymbol] = knownImpureResult;
                     LogDebug($"{indent}<< Exit DeterminePurity (Known Impure): {methodSymbol.ToDisplayString()}");
                     return knownImpureResult;
@@ -1096,15 +1082,12 @@ namespace PurelySharp.Analyzer.Engine
                 if (methodSymbol.IsExtern)
                 {
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is extern. Assuming impure due unknown implementation.");
-                    var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
-                        var externResult = ImpureResult(
-                            syntax,
-                            PurityEvidence.Create(
-                                "unknown_external_call",
-                                ruleName: "MethodInvocationPurityRule",
-                                syntaxNode: syntax,
-                                symbol: methodSymbol,
-                                catalogSource: "extern"));
+                    var externResult = ImpureResult(
+                        declaringSyntax,
+                        "unknown_external_call",
+                        "MethodInvocationPurityRule",
+                        methodSymbol,
+                        "extern");
                     purityCache[methodSymbol] = externResult;
                     LogDebug($"{indent}<< Exit DeterminePurity (Extern): {methodSymbol.ToDisplayString()}");
                     return externResult;
@@ -1134,7 +1117,8 @@ namespace PurelySharp.Analyzer.Engine
                         return PurityAnalysisResult.Pure;
                     }
 
-                    if (methodSymbol.MethodKind == MethodKind.Constructor &&
+                    if ((methodSymbol.MethodKind == MethodKind.Constructor ||
+                         methodSymbol.MethodKind == MethodKind.StaticConstructor) &&
                         !methodSymbol.IsExtern &&
                         methodSymbol.ContainingType?.Locations.Any(location => !location.IsInMetadata) == true)
                     {
@@ -1147,30 +1131,24 @@ namespace PurelySharp.Analyzer.Engine
                     if (hasTrustedGeneratedPurity && generatedPurity.IsNonPure)
                     {
                         LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} has no body but does have trusted non-pure generated summary evidence.");
-                        var generatedSyntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
                         var generatedNoBodyResult = ImpureResult(
-                            generatedSyntax,
-                            PurityEvidence.Create(
-                                generatedPurity.PrimaryCategory,
-                                ruleName: "MethodInvocationPurityRule",
-                                syntaxNode: generatedSyntax,
-                                symbol: methodSymbol,
-                                catalogSource: "generated_purity_summary"));
+                            declaringSyntax,
+                            generatedPurity.PrimaryCategory,
+                            "MethodInvocationPurityRule",
+                            methodSymbol,
+                            "generated_purity_summary");
                         purityCache[methodSymbol] = generatedNoBodyResult;
                         LogDebug($"{indent}<< Exit DeterminePurity (Abstract/NoBody Generated Summary): {methodSymbol.ToDisplayString()}");
                         return generatedNoBodyResult;
                     }
 
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is abstract or has no body AND lacks trusted purity evidence. Assuming impure.");
-                    var syntax = methodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax();
                     var noBodyResult = ImpureResult(
-                        syntax,
-                        PurityEvidence.Create(
-                            "unknown_external_call",
-                            ruleName: "MethodInvocationPurityRule",
-                            syntaxNode: syntax,
-                            symbol: methodSymbol,
-                            catalogSource: "no_body"));
+                        declaringSyntax,
+                        "unknown_external_call",
+                        "MethodInvocationPurityRule",
+                        methodSymbol,
+                        "no_body");
                     purityCache[methodSymbol] = noBodyResult;
                     LogDebug($"{indent}<< Exit DeterminePurity (Abstract/NoBody): {methodSymbol.ToDisplayString()}");
                     return noBodyResult;
@@ -1389,14 +1367,12 @@ namespace PurelySharp.Analyzer.Engine
                                 if (hasSemanticKnownImpureCatalogSource)
                                 {
                                     LogDebug($"{indent}    Post-CFG: Found semantically known impure invocation IMPURE: {invocationOp.Syntax} calling {invocationOp.TargetMethod.ToDisplayString()}");
-                                    result = PurityAnalysisResult.Impure(
-                                        invocationOp.Syntax,
-                                        PurityEvidence.Create(
-                                            "catalog_hit",
-                                            "MethodInvocationPurityRule",
-                                            invocationOp,
-                                            symbol: targetMethod,
-                                            catalogSource: semanticKnownImpureCatalogSource));
+                                    result = ImpureResult(
+                                        invocationOp,
+                                        "catalog_hit",
+                                        "MethodInvocationPurityRule",
+                                        targetMethod,
+                                        semanticKnownImpureCatalogSource);
                                     goto PostCfgChecksDone;
                                 }
 
@@ -1422,14 +1398,12 @@ namespace PurelySharp.Analyzer.Engine
                                 if (hasConfiguredKnownImpure)
                                 {
                                     LogDebug($"{indent}    Post-CFG: Found configured known impure invocation IMPURE: {invocationOp.Syntax} calling {invocationOp.TargetMethod.ToDisplayString()}");
-                                    result = PurityAnalysisResult.Impure(
-                                        invocationOp.Syntax,
-                                        PurityEvidence.Create(
-                                            "catalog_hit",
-                                            "MethodInvocationPurityRule",
-                                            invocationOp,
-                                        symbol: targetMethod,
-                                        catalogSource: knownImpureSource));
+                                    result = ImpureResult(
+                                        invocationOp,
+                                        "catalog_hit",
+                                        "MethodInvocationPurityRule",
+                                        targetMethod,
+                                        knownImpureSource);
                                     goto PostCfgChecksDone;
                                 }
 
@@ -1444,14 +1418,12 @@ namespace PurelySharp.Analyzer.Engine
                                     if (postCfgGeneratedPurity.IsNonPure)
                                     {
                                         LogDebug($"{indent}    Post-CFG: Found generated-summary impure invocation IMPURE: {invocationOp.Syntax} calling {invocationOp.TargetMethod.ToDisplayString()}");
-                                        result = PurityAnalysisResult.Impure(
-                                            invocationOp.Syntax,
-                                            PurityEvidence.Create(
-                                                postCfgGeneratedPurity.PrimaryCategory,
-                                                "MethodInvocationPurityRule",
-                                                invocationOp,
-                                                symbol: targetMethod,
-                                                catalogSource: "generated_purity_summary"));
+                                        result = ImpureResult(
+                                            invocationOp,
+                                            postCfgGeneratedPurity.PrimaryCategory,
+                                            "MethodInvocationPurityRule",
+                                            targetMethod,
+                                            "generated_purity_summary");
                                         goto PostCfgChecksDone;
                                     }
                                 }
@@ -1459,14 +1431,12 @@ namespace PurelySharp.Analyzer.Engine
                                 if (knownImpureSource != null)
                                 {
                                     LogDebug($"{indent}    Post-CFG: Found known impure invocation IMPURE: {invocationOp.Syntax} calling {invocationOp.TargetMethod.ToDisplayString()}");
-                                    result = PurityAnalysisResult.Impure(
-                                        invocationOp.Syntax,
-                                        PurityEvidence.Create(
-                                            "catalog_hit",
-                                            "MethodInvocationPurityRule",
+                                    result = ImpureResult(
                                         invocationOp,
-                                        symbol: targetMethod,
-                                        catalogSource: knownImpureSource));
+                                        "catalog_hit",
+                                        "MethodInvocationPurityRule",
+                                        targetMethod,
+                                        knownImpureSource);
                                     goto PostCfgChecksDone;
                                 }
                             }
@@ -1973,24 +1943,6 @@ namespace PurelySharp.Analyzer.Engine
             return currentState.HasPotentialImpurity
                 ? ImpureResult(currentState.FirstImpureSyntaxNode, currentState.FirstImpurityEvidence)
                 : PurityAnalysisResult.Pure;
-        }
-
-        private static bool IsNestedFunctionDescendant(IOperation operation, IOperation rootOperation)
-        {
-            if (operation == rootOperation)
-            {
-                return false;
-            }
-
-            for (var parent = operation.Parent; parent != null && parent != rootOperation; parent = parent.Parent)
-            {
-                if (parent is IAnonymousFunctionOperation || parent is IFlowAnonymousFunctionOperation || parent is ILocalFunctionOperation)
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         private static SyntaxNode? TryGetDirectThrowOnlySyntax(SyntaxNode? bodySyntaxNode)
@@ -3399,118 +3351,6 @@ namespace PurelySharp.Analyzer.Engine
             return HasAssemblyAttributeNamed(symbol, "PureExternalAttribute", "PurelySharp.Attributes.PureExternalAttribute");
         }
 
-        internal static bool TryGetTrustedGeneratedPurity(
-            IMethodSymbol methodSymbol,
-            Compilation compilation,
-            out GeneratedPurityCatalog.PurityEntry purity)
-        {
-            return GeneratedPurityCatalog.Current.TryGetPurity(methodSymbol, compilation, out purity);
-        }
-
-        internal readonly struct TrustedMethodPurityMetadata
-        {
-            public TrustedMethodPurityMetadata(
-                string? knownImpureMemberSource,
-                bool hasTrustedGeneratedPurity,
-                GeneratedPurityCatalog.PurityEntry generatedPurity)
-            {
-                KnownImpureMemberSource = knownImpureMemberSource;
-                HasTrustedGeneratedPurity = hasTrustedGeneratedPurity;
-                GeneratedPurity = generatedPurity;
-            }
-
-            public string? KnownImpureMemberSource { get; }
-            public bool HasConfiguredKnownImpureMember =>
-                string.Equals(KnownImpureMemberSource, "config_known_impure", StringComparison.Ordinal);
-            public bool HasTrustedGeneratedPurity { get; }
-            public GeneratedPurityCatalog.PurityEntry GeneratedPurity { get; }
-            public bool AllowsKnownPureFallback => !HasTrustedGeneratedPurity;
-        }
-
-        internal static TrustedMethodPurityMetadata GetTrustedMethodPurityMetadata(
-            IMethodSymbol methodSymbol,
-            Compilation compilation)
-        {
-            if (methodSymbol == null)
-            {
-                return default;
-            }
-
-            var originalDefinition = methodSymbol.OriginalDefinition;
-            var knownImpureMemberSource = GetKnownImpureMemberSource(originalDefinition);
-            var hasConfiguredKnownImpureMember = string.Equals(
-                knownImpureMemberSource,
-                "config_known_impure",
-                StringComparison.Ordinal);
-
-            GeneratedPurityCatalog.PurityEntry generatedPurity = default;
-            var hasTrustedGeneratedPurity = originalDefinition.Locations.FirstOrDefault()?.IsInMetadata == true &&
-                !hasConfiguredKnownImpureMember &&
-                TryGetTrustedGeneratedPurity(originalDefinition, compilation, out generatedPurity);
-            hasTrustedGeneratedPurity = hasTrustedGeneratedPurity && generatedPurity.IsDefinitive;
-
-            return new TrustedMethodPurityMetadata(
-                knownImpureMemberSource,
-                hasTrustedGeneratedPurity,
-                generatedPurity);
-        }
-
-        internal static bool TryGetTrustedGeneratedFieldPurity(
-            IFieldSymbol fieldSymbol,
-            Compilation compilation,
-            out GeneratedPurityCatalog.PurityEntry purity)
-        {
-            return GeneratedPurityCatalog.Current.TryGetFieldPurity(fieldSymbol, compilation, out purity);
-        }
-
-        internal static bool HasTrustedGeneratedPurityCoverage(
-            IMethodSymbol methodSymbol,
-            Compilation compilation)
-        {
-            return TryGetTrustedGeneratedPurity(methodSymbol.OriginalDefinition, compilation, out var purity) &&
-                purity.IsDefinitive;
-        }
-
-        internal static bool IsTrustedGeneratedFreshOwnedArrayReturningMember(
-            IMethodSymbol methodSymbol,
-            Compilation compilation)
-        {
-            return TryGetTrustedGeneratedPurity(methodSymbol, compilation, out var purity) &&
-                purity.IsPure &&
-                purity.IsFreshArrayCandidate;
-        }
-
-        internal static bool IsKnownFreshOwnedArrayReturningMember(
-            IMethodSymbol methodSymbol,
-            Compilation compilation)
-        {
-            if (methodSymbol == null)
-            {
-                return false;
-            }
-
-            if (TryGetTrustedGeneratedPurity(methodSymbol, compilation, out var purity))
-            {
-                return purity.IsPure && purity.IsFreshArrayCandidate;
-            }
-
-            var signature = methodSymbol.OriginalDefinition.ToDisplayString();
-            if (Constants.KnownFreshOwnedArrayReturningMembers.Contains(signature))
-            {
-                return true;
-            }
-
-            if (methodSymbol.ContainingType?.SpecialType == SpecialType.System_String &&
-                signature.StartsWith("string.", StringComparison.Ordinal) &&
-                Constants.KnownFreshOwnedArrayReturningMembers.Contains("System.String." + signature.Substring("string.".Length)))
-            {
-                return true;
-            }
-
-            return methodSymbol.IsGenericMethod &&
-                Constants.KnownFreshOwnedArrayReturningMembers.Contains(methodSymbol.ConstructedFrom.ToDisplayString());
-        }
-
         internal static bool IsKnownMutableCollectionBoundaryType(ITypeSymbol? typeSymbol)
         {
             if (typeSymbol is not INamedTypeSymbol namedType ||
@@ -3637,19 +3477,6 @@ namespace PurelySharp.Analyzer.Engine
                     StringComparison.Ordinal)
             );
         }
-
-
-        private static bool HasAttributeNamed(ISymbol symbol, string attributeName, string fullyQualifiedMetadataName)
-        {
-            if (symbol == null)
-            {
-                return false;
-            }
-
-            return HasDirectAttributeNamed(symbol, attributeName, fullyQualifiedMetadataName) ||
-                HasAssemblyAttributeNamed(symbol, attributeName, fullyQualifiedMetadataName);
-        }
-
         private static bool HasDirectAttributeNamed(ISymbol symbol, string attributeName, string fullyQualifiedMetadataName)
         {
             if (symbol == null)
@@ -4234,7 +4061,7 @@ namespace PurelySharp.Analyzer.Engine
             return cctorResult.IsPure
                 ? PurityAnalysisResult.Pure
                 : PurityAnalysisResult.Impure(
-                    cctorResult.ImpureSyntaxNode ?? typeSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() ?? ImpureResult(null).ImpureSyntaxNode ?? context.ContainingMethodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() ?? throw new InvalidOperationException("Cannot find syntax node for static constructor impurity"),
+                    cctorResult.ImpureSyntaxNode ?? typeSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() ?? context.ContainingMethodSymbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() ?? throw new InvalidOperationException("Cannot find syntax node for static constructor impurity"),
                     cctorResult.Evidence);
         }
 
@@ -5170,7 +4997,7 @@ namespace PurelySharp.Analyzer.Engine
                 (format == "O" || format == "o");
         }
 
-        private static bool IsTimeSpanStylesNone(IOperation? operation)
+        private static bool IsZeroStyle(IOperation? operation)
         {
             var unwrappedOperation = SkipImplicitConversions(operation);
             return unwrappedOperation?.ConstantValue.HasValue == true &&
@@ -5178,13 +5005,9 @@ namespace PurelySharp.Analyzer.Engine
                 styles == 0;
         }
 
-        private static bool IsDateTimeStylesNone(IOperation? operation)
-        {
-            var unwrappedOperation = SkipImplicitConversions(operation);
-            return unwrappedOperation?.ConstantValue.HasValue == true &&
-                unwrappedOperation.ConstantValue.Value is int styles &&
-                styles == 0;
-        }
+        private static bool IsTimeSpanStylesNone(IOperation? operation) => IsZeroStyle(operation);
+
+        private static bool IsDateTimeStylesNone(IOperation? operation) => IsZeroStyle(operation);
 
         private static bool IsReadOnlySpanOfChar(ITypeSymbol typeSymbol)
         {
