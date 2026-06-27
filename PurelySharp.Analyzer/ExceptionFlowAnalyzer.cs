@@ -14,7 +14,7 @@ using SearchLib.Smt;
 
 namespace PurelySharp.Analyzer
 {
-    internal static class ExceptionFlowAnalyzer
+    internal static partial class ExceptionFlowAnalyzer
     {
         private static readonly TimeSpan SmtTimeout = TimeSpan.FromMilliseconds(25);
 
@@ -147,6 +147,22 @@ namespace PurelySharp.Analyzer
             return node.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture) +
                 ":" +
                 node.Span.End.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static IEnumerable<TNode> GetRelevantDescendants<TNode>(SyntaxNode methodNode)
+            where TNode : SyntaxNode
+        {
+            return methodNode
+                .DescendantNodes(descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate))
+                .OfType<TNode>();
+        }
+
+        private static IEnumerable<TNode> GetRelevantDescendantsAndSelf<TNode>(SyntaxNode methodNode)
+            where TNode : SyntaxNode
+        {
+            return methodNode
+                .DescendantNodesAndSelf(descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate))
+                .OfType<TNode>();
         }
 
         internal static IEnumerable<MethodCallCandidate> GetCalleeCallSites(
@@ -364,22 +380,18 @@ namespace PurelySharp.Analyzer
 
         internal static IEnumerable<SyntaxNode> GetThrowNodes(SyntaxNode methodNode)
         {
-            return methodNode.DescendantNodes(
-                    descendIntoChildren: node => ReferenceEquals(node, methodNode) || !IsNestedCallableBoundary(node))
+            return GetRelevantDescendants<SyntaxNode>(methodNode)
                 .Where(node => node is ThrowStatementSyntax || node is ThrowExpressionSyntax);
         }
 
         private static IEnumerable<InvocationExpressionSyntax> GetInvocationNodes(SyntaxNode methodNode)
         {
-            return methodNode.DescendantNodes(
-                    descendIntoChildren: node => ReferenceEquals(node, methodNode) || !IsNestedCallableBoundary(node))
-                .OfType<InvocationExpressionSyntax>();
+            return GetRelevantDescendants<InvocationExpressionSyntax>(methodNode);
         }
 
         private static IEnumerable<SyntaxNode> GetObjectCreationNodes(SyntaxNode methodNode)
         {
-            return methodNode.DescendantNodes(
-                    descendIntoChildren: node => ReferenceEquals(node, methodNode) || !IsNestedCallableBoundary(node))
+            return GetRelevantDescendants<SyntaxNode>(methodNode)
                 .Where(node => node is ObjectCreationExpressionSyntax || node is ImplicitObjectCreationExpressionSyntax);
         }
 
@@ -420,9 +432,7 @@ namespace PurelySharp.Analyzer
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken)
         {
-            foreach (var binaryExpression in methodNode.DescendantNodes(
-                         descendIntoChildren: node => ReferenceEquals(node, methodNode) || !IsNestedCallableBoundary(node))
-                         .OfType<BinaryExpressionSyntax>())
+            foreach (var binaryExpression in GetRelevantDescendants<BinaryExpressionSyntax>(methodNode))
             {
                 if (!binaryExpression.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DivideExpression) &&
                     !binaryExpression.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.ModuloExpression))
@@ -448,8 +458,7 @@ namespace PurelySharp.Analyzer
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken)
         {
-            foreach (var node in methodNode.DescendantNodes(
-                         descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate)))
+            foreach (var node in GetRelevantDescendants<SyntaxNode>(methodNode))
             {
                 if (node is MemberAccessExpressionSyntax memberAccess &&
                     IsDefinitelyNullExpression(memberAccess.Expression, memberAccess, semanticModel, cancellationToken))
@@ -474,8 +483,7 @@ namespace PurelySharp.Analyzer
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken)
         {
-            foreach (var node in methodNode.DescendantNodes(
-                         descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate)))
+            foreach (var node in GetRelevantDescendants<SyntaxNode>(methodNode))
             {
                 if (node is MemberAccessExpressionSyntax memberAccess)
                 {
@@ -522,8 +530,7 @@ namespace PurelySharp.Analyzer
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken)
         {
-            foreach (var node in methodNode.DescendantNodes(
-                         descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate)))
+            foreach (var node in GetRelevantDescendants<SyntaxNode>(methodNode))
             {
                 if (TryGetPropertySetterMethod(node, semanticModel, cancellationToken, out _))
                 {
@@ -1369,186 +1376,6 @@ namespace PurelySharp.Analyzer
             return true;
         }
 
-        private static IEnumerable<MethodCallCandidate> GetUsingDisposeNodes(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
-        {
-            foreach (var usingStatement in methodNode.DescendantNodes(
-                         descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate))
-                         .OfType<UsingStatementSyntax>())
-            {
-                var resourceType = GetUsingStatementResourceType(usingStatement, semanticModel, cancellationToken);
-                if (resourceType == null)
-                {
-                    continue;
-                }
-
-                foreach (var disposeMethod in GetDisposableMethods(
-                             resourceType,
-                             includeAsyncDispose: usingStatement.AwaitKeyword.RawKind != 0))
-                {
-                    yield return new MethodCallCandidate(usingStatement, disposeMethod);
-                }
-            }
-
-            foreach (var usingDeclaration in methodNode.DescendantNodes(
-                         descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate))
-                         .OfType<LocalDeclarationStatementSyntax>()
-                         .Where(statement => !statement.UsingKeyword.IsKind(SyntaxKind.None)))
-            {
-                foreach (var variable in usingDeclaration.Declaration.Variables)
-                {
-                    var resourceType = GetUsingDeclarationVariableType(variable, semanticModel, cancellationToken);
-                    if (resourceType == null)
-                    {
-                        continue;
-                    }
-
-                    foreach (var disposeMethod in GetDisposableMethods(
-                                 resourceType,
-                                 includeAsyncDispose: usingDeclaration.AwaitKeyword.RawKind != 0))
-                    {
-                        yield return new MethodCallCandidate(usingDeclaration, disposeMethod);
-                    }
-                }
-            }
-        }
-
-        private static ITypeSymbol? GetUsingStatementResourceType(
-            UsingStatementSyntax usingStatement,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
-        {
-            if (usingStatement.Expression != null)
-            {
-                return semanticModel.GetTypeInfo(usingStatement.Expression, cancellationToken).ConvertedType;
-            }
-
-            if (usingStatement.Declaration == null)
-            {
-                return null;
-            }
-
-            foreach (var variable in usingStatement.Declaration.Variables)
-            {
-                var type = GetUsingDeclarationVariableType(variable, semanticModel, cancellationToken);
-                if (type != null)
-                {
-                    return type;
-                }
-            }
-
-            return semanticModel.GetTypeInfo(usingStatement.Declaration.Type, cancellationToken).Type;
-        }
-
-        private static ITypeSymbol? GetUsingDeclarationVariableType(
-            VariableDeclaratorSyntax variable,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
-        {
-            if (semanticModel.GetDeclaredSymbol(variable, cancellationToken) is ILocalSymbol localSymbol)
-            {
-                return localSymbol.Type;
-            }
-
-            return variable.Initializer == null
-                ? null
-                : semanticModel.GetTypeInfo(variable.Initializer.Value, cancellationToken).ConvertedType;
-        }
-
-        private static IEnumerable<MethodCallCandidate> GetForEachRuntimeMethodNodes(
-            SyntaxNode methodNode,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
-        {
-            foreach (var forEachStatement in methodNode.DescendantNodes(
-                         descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate))
-                         .OfType<ForEachStatementSyntax>())
-            {
-                var collectionType = semanticModel.GetTypeInfo(forEachStatement.Expression, cancellationToken).ConvertedType;
-                if (collectionType == null)
-                {
-                    continue;
-                }
-
-                var enumeratorMethod = FindGetEnumeratorMethod(collectionType);
-                if (enumeratorMethod == null)
-                {
-                    continue;
-                }
-
-                yield return new MethodCallCandidate(forEachStatement.Expression, enumeratorMethod);
-
-                var enumeratorType = enumeratorMethod.ReturnType;
-                if (FindParameterlessMethod(enumeratorType, "MoveNext") is { } moveNextMethod)
-                {
-                    yield return new MethodCallCandidate(forEachStatement, moveNextMethod);
-                }
-
-                if (FindPropertyGetter(enumeratorType, "Current") is { } currentGetter)
-                {
-                    yield return new MethodCallCandidate(forEachStatement, currentGetter);
-                }
-
-                foreach (var disposeMethod in GetDisposableMethods(
-                             enumeratorType,
-                             includeAsyncDispose: forEachStatement.AwaitKeyword.RawKind != 0))
-                {
-                    yield return new MethodCallCandidate(forEachStatement, disposeMethod);
-                }
-            }
-        }
-
-        private static IMethodSymbol? FindGetEnumeratorMethod(ITypeSymbol collectionType)
-        {
-            return collectionType
-                .GetMembers("GetEnumerator")
-                .OfType<IMethodSymbol>()
-                .FirstOrDefault(method => method.Parameters.Length == 0);
-        }
-
-        private static IMethodSymbol? FindParameterlessMethod(ITypeSymbol typeSymbol, string methodName)
-        {
-            return typeSymbol
-                .GetMembers(methodName)
-                .OfType<IMethodSymbol>()
-                .FirstOrDefault(method => method.Parameters.Length == 0);
-        }
-
-        private static IMethodSymbol? FindPropertyGetter(ITypeSymbol typeSymbol, string propertyName)
-        {
-            return typeSymbol
-                .GetMembers(propertyName)
-                .OfType<IPropertySymbol>()
-                .Select(property => property.GetMethod)
-                .FirstOrDefault(method => method != null);
-        }
-
-        private static IEnumerable<IMethodSymbol> GetDisposableMethods(ITypeSymbol typeSymbol, bool includeAsyncDispose)
-        {
-            foreach (var method in typeSymbol
-                         .GetMembers("Dispose")
-                         .OfType<IMethodSymbol>()
-                         .Where(candidate => candidate.Parameters.Length == 0))
-            {
-                yield return method;
-            }
-
-            if (!includeAsyncDispose)
-            {
-                yield break;
-            }
-
-            foreach (var method in typeSymbol
-                         .GetMembers("DisposeAsync")
-                         .OfType<IMethodSymbol>()
-                         .Where(candidate => candidate.Parameters.Length == 0))
-            {
-                yield return method;
-            }
-        }
-
         private static IEnumerable<MethodCallCandidate> GetOperatorAndConversionNodes(
             SyntaxNode methodNode,
             SemanticModel semanticModel,
@@ -1637,8 +1464,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken)
         {
             var knownTargets = new Dictionary<ISymbol, IMethodSymbol>(SymbolEqualityComparer.Default);
-            foreach (var node in methodNode.DescendantNodesAndSelf(
-                         descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate)))
+            foreach (var node in GetRelevantDescendantsAndSelf<SyntaxNode>(methodNode))
             {
                 UpdateKnownDelegateTargets(node, semanticModel, cancellationToken, knownTargets);
                 if (node is not InvocationExpressionSyntax invocation)
@@ -1734,9 +1560,7 @@ namespace PurelySharp.Analyzer
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken)
         {
-            foreach (var interpolatedString in methodNode.DescendantNodes(
-                         descendIntoChildren: candidate => ReferenceEquals(candidate, methodNode) || !IsNestedCallableBoundary(candidate))
-                         .OfType<InterpolatedStringExpressionSyntax>())
+            foreach (var interpolatedString in GetRelevantDescendants<InterpolatedStringExpressionSyntax>(methodNode))
             {
                 var typeInfo = semanticModel.GetTypeInfo(interpolatedString, cancellationToken);
                 var handlerType = typeInfo.ConvertedType ?? typeInfo.Type;
