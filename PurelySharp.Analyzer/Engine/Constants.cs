@@ -127,7 +127,6 @@ public static class Constants
         "System.Xml.Schema.XmlSchemaSet.Compile()",
         "System.Text.Json.JsonDocument.Parse(string, System.Text.Json.JsonDocumentOptions)",
         "System.Text.Json.JsonElement.GetString()",
-        "System.Runtime.Versioning.FrameworkName.FrameworkName(string)",
         "System.ComponentModel.Component.Dispose()",
         "System.ComponentModel.LicenseManager.Validate(System.Type, object)",
         "System.Diagnostics.Debugger.IsAttached.get",

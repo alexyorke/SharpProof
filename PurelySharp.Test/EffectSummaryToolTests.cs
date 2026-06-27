@@ -3944,6 +3944,31 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeFrameworkNameConstructorSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                16,
+                "System.Runtime.Versioning.FrameworkName..ctor(string)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            const string symbol = "System.Runtime.Versioning.FrameworkName..ctor(string)";
+            AssertPurityClassification(summary, symbol, "impure", "object_state_write", "throw");
+            AssertEffectVisibilityClassification(summary, symbol, "caller_visible");
+
+            var generatedSymbols = GetGeneratedPurityCatalogSymbols(summary)
+                .Where(candidate => string.Equals(candidate, symbol, StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[] { symbol }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeTimeSpanSlice_TreatsConstructorAsPureAndAddAsImpure()
         {
             using var summary = await RunRuntimeEffectSummaryAsync("System.TimeSpan", limit: 80);

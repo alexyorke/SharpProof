@@ -3501,6 +3501,29 @@ public static class StopwatchCatalogSignatureSamples
         }
 
         [Test]
+        public void FrameworkNameConstructor_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Runtime.Versioning;
+
+public static class RuntimeVersioningCatalogSignatureSamples
+{
+    public static FrameworkName Create()
+    {
+        return new FrameworkName("".NETCoreApp,Version=v8.0"");
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "FrameworkNameCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new FrameworkName(\".NETCoreApp,Version=v8.0\")"));
+        }
+
+        [Test]
         public void EnvironmentStablePureGetters_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

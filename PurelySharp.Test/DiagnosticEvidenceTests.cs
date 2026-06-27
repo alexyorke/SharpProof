@@ -1645,6 +1645,59 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_FrameworkNameConstructorAsImpureEvidence()
+        {
+            const string source = @"
+using System.Runtime.Versioning;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public FrameworkName TestMethod()
+    {
+        return new FrameworkName("".NETCoreApp,Version=v8.0"");
+    }
+}";
+
+            var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
+                typeof(System.Runtime.Versioning.FrameworkName).Assembly.Location,
+                (
+                    "Synthetic.FrameworkName.Constructor.PurelySharp.EffectSummary.json",
+                    "System.Runtime.Versioning.FrameworkName..ctor(string)",
+                    "System.Runtime.Versioning.FrameworkName..ctor(string)",
+                    "impure",
+                    FormatJsonArray("object_state_write", "throw")));
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source, additionalFiles: additionalFiles);
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var objectCreation = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<ObjectCreationExpressionSyntax>()
+                .Single(node => node.ToString() == "new FrameworkName(\".NETCoreApp,Version=v8.0\")");
+            var methodSymbol = (IMethodSymbol)compilation.GetSemanticModel(syntaxTree).GetSymbolInfo(objectCreation).Symbol!;
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { CreateAnalyzerOptions(additionalFiles: additionalFiles), CancellationToken.None })!;
+            var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
+            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+            var purityEntry = args[2]!;
+            var classification = (string)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry)!;
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(matched, Is.True, "Generated purity catalog should resolve System.Runtime.Versioning.FrameworkName..ctor(string).");
+            Assert.That(classification, Is.EqualTo("impure"),
+                "System.Runtime.Versioning.FrameworkName..ctor(string) parses framework names, can throw, and writes caller-visible object state.");
+        }
+
+        [Test]
         public async Task GeneratedPurityCatalog_Resolves_AggregateExceptionMembersAsImpureEvidence()
         {
             const string source = @"
@@ -9784,6 +9837,39 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.Stopwatch.GetTimestamp"));
+        }
+
+        [Test]
+        public async Task Ps0002_FrameworkNameConstructor_UsesGeneratedPurityCatalogSource()
+        {
+            var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
+                typeof(System.Runtime.Versioning.FrameworkName).Assembly.Location,
+                (
+                    "Synthetic.FrameworkName.Constructor.PurelySharp.EffectSummary.json",
+                    "System.Runtime.Versioning.FrameworkName..ctor(string)",
+                    "System.Runtime.Versioning.FrameworkName..ctor(string)",
+                    "impure",
+                    FormatJsonArray("object_state_write", "throw")));
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Runtime.Versioning;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public FrameworkName TestMethod()
+    {
+        return new FrameworkName("".NETCoreApp,Version=v8.0"");
+    }
+}", additionalFiles: additionalFiles);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("object_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Runtime.Versioning.FrameworkName"));
         }
 
         [Test]
