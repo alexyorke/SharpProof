@@ -1478,6 +1478,37 @@ public static class InterfaceCollectionLookupCatalogSignatureSamples
         }
 
         [Test]
+        public void InterfaceCollectionMutators_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Collections.Generic;
+
+public static class InterfaceCollectionMutatorCatalogSignatureSamples
+{
+    public static void Sample(ICollection<int> collection, IList<int> list, int value)
+    {
+        collection.Add(value);
+        _ = collection.Remove(value);
+        collection.Clear();
+        list.Insert(0, value);
+        list.RemoveAt(0);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "InterfaceCollectionMutatorCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "collection.Add(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "collection.Remove(value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "collection.Clear()"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "list.Insert(0, value)"));
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "list.RemoveAt(0)"));
+        }
+
+        [Test]
         public void InterfaceEnumeratorContracts_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"
