@@ -4262,6 +4262,12 @@ public static class StringComparisonFixture
             AssertEffectVisibilityClassification(summary, "System.String.TrimStart()", "none");
             AssertPurityClassification(summary, "System.String.TrimEnd()", "pure");
             AssertEffectVisibilityClassification(summary, "System.String.TrimEnd()", "none");
+            AssertPurityClassification(summary, "System.String.Trim(char)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.Trim(char)", "none");
+            AssertPurityClassification(summary, "System.String.TrimStart(char)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.TrimStart(char)", "none");
+            AssertPurityClassification(summary, "System.String.TrimEnd(char)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.TrimEnd(char)", "none");
 
             var generatedCatalog = summary.RootElement.GetProperty("GeneratedPurityCatalog");
             var symbols = generatedCatalog.GetProperty("Entries")
@@ -4273,6 +4279,9 @@ public static class StringComparisonFixture
             Assert.That(symbols, Does.Contain("System.String.Trim()"));
             Assert.That(symbols, Does.Contain("System.String.TrimStart()"));
             Assert.That(symbols, Does.Contain("System.String.TrimEnd()"));
+            Assert.That(symbols, Does.Contain("System.String.Trim(char)"));
+            Assert.That(symbols, Does.Contain("System.String.TrimStart(char)"));
+            Assert.That(symbols, Does.Contain("System.String.TrimEnd(char)"));
         }
 
         [Test]
@@ -4453,6 +4462,47 @@ public static class StringComparisonFixture
                 .ToArray();
             Assert.That(symbols, Does.Contain("System.String.IndexOf(char)"));
             Assert.That(symbols, Does.Contain("System.String.IndexOf(string)"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeStringLastIndexEnumeratorAndSpanViewSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsync(
+                60,
+                "System.String.LastIndexOf",
+                "System.String.GetEnumerator",
+                "System.String.op_Implicit");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.String.LastIndexOf(char)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.LastIndexOf(char)", "none");
+            AssertPurityClassification(summary, "System.String.GetEnumerator()", "pure");
+            AssertFreshnessClassification(summary, "System.String.GetEnumerator()", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.String.GetEnumerator()", "internal_only");
+            AssertPurityClassification(summary, "System.String.op_Implicit(string)", "pure");
+            AssertEffectVisibilityClassification(summary, "System.String.op_Implicit(string)", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol =>
+                    string.Equals(symbol, "System.String.LastIndexOf(char)", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.String.GetEnumerator()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.String.op_Implicit(string)", StringComparison.Ordinal))
+                .OrderBy(symbol => symbol, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[]
+            {
+                "System.String.GetEnumerator()",
+                "System.String.LastIndexOf(char)",
+                "System.String.op_Implicit(string)",
+            }));
         }
 
         [Test]

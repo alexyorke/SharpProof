@@ -10455,6 +10455,68 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_StringTrimLastIndexEnumeratorAndSpanViewHelpers_ArePureFromGeneratedPuritySummary()
+        {
+            var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
+                typeof(string).Assembly.Location,
+                (
+                    "Synthetic.String.Trim.Char.PurelySharp.EffectSummary.json",
+                    "System.String.Trim(char)",
+                    "System.String.Trim(char)",
+                    "pure",
+                    "[]"),
+                (
+                    "Synthetic.String.TrimStart.Char.PurelySharp.EffectSummary.json",
+                    "System.String.TrimStart(char)",
+                    "System.String.TrimStart(char)",
+                    "pure",
+                    "[]"),
+                (
+                    "Synthetic.String.TrimEnd.Char.PurelySharp.EffectSummary.json",
+                    "System.String.TrimEnd(char)",
+                    "System.String.TrimEnd(char)",
+                    "pure",
+                    "[]"),
+                (
+                    "Synthetic.String.LastIndexOf.Char.PurelySharp.EffectSummary.json",
+                    "System.String.LastIndexOf(char)",
+                    "System.String.LastIndexOf(char)",
+                    "pure",
+                    "[]"),
+                (
+                    "Synthetic.String.GetEnumerator.PurelySharp.EffectSummary.json",
+                    "System.String.GetEnumerator()",
+                    "System.String.GetEnumerator()",
+                    "pure",
+                    "[]"),
+                (
+                    "Synthetic.String.ReadOnlySpanView.PurelySharp.EffectSummary.json",
+                    "System.String.op_Implicit(string)",
+                    "System.String.op_Implicit(string)",
+                    "pure",
+                    "[]"));
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(string input)
+    {
+        ReadOnlySpan<char> span = input;
+        _ = input.GetEnumerator();
+        var trimmed = input.Trim('x').TrimStart('y').TrimEnd('z');
+        return span.Length + trimmed.LastIndexOf('a');
+    }
+}",
+                additionalFiles: additionalFiles);
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_ImmutableStackPop_UsesGeneratedPurityCatalogSource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
