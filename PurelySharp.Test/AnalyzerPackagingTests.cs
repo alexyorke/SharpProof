@@ -185,6 +185,26 @@ namespace TestNamespace {
         }
 
         [Test]
+        public void Repository_ShouldNotKeep_CheckedInEffectSummaryJsonArtifacts()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var analyzerDirectory = Path.Combine(repositoryRoot, "PurelySharp.Analyzer");
+            var checkedInSummaryFiles = Directory
+                .EnumerateFiles(analyzerDirectory, "*.PurelySharp.EffectSummary.json", SearchOption.TopDirectoryOnly)
+                .Concat(new[] { Path.Combine(analyzerDirectory, "PurelySharp.EffectSummary.json") })
+                .Where(File.Exists)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            Assert.That(checkedInSummaryFiles, Is.Empty,
+                "Checked-in effect-summary JSON artifacts should stay out of the repository.");
+
+            var reviewedSpecPath = Path.Combine(repositoryRoot, "Tools", "PurelySharp.EffectSummary", "ReviewedRuntimeArtifactSpec.json");
+            Assert.That(File.Exists(reviewedSpecPath), Is.False,
+                "The dormant reviewed effect-summary artifact spec should stay out of the repository.");
+        }
+
+        [Test]
         public void AttributesPackage_ShouldUseReleaseReadyNuGetMetadata()
         {
             var projectPath = Path.Combine(FindRepositoryRoot(), "PurelySharp.Attributes", "PurelySharp.Attributes.csproj");

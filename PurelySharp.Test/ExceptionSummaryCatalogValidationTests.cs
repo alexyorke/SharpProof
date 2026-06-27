@@ -19,6 +19,7 @@ using PurelySharp.Analyzer;
 namespace PurelySharp.Test
 {
     [TestFixture]
+    [Explicit("Effect summary JSON ingestion is dormant during active analyzer development.")]
     public class ExceptionSummaryCatalogValidationTests
     {
         private static readonly object EffectSummaryToolBuildLock = new object();

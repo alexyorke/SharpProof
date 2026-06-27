@@ -2,6 +2,8 @@
 
 `Tools/PurelySharp.EffectSummary` is the first step toward evidence-based BCL and framework purity summaries.
 
+Checked-in effect-summary JSON artifacts and the reviewed artifact spec have been removed from the repository. Treat this tool as an ad hoc calibration utility, not part of the active day-to-day analyzer development loop.
+
 The goal is to reduce hand-maintained heuristics by summarizing implementation assemblies and then feeding stable effect facts back into the analyzer/catalog pipeline.
 The current first landing is report-first: the tool can now emit fixed-point,
 implementation-derived purity classifications without changing live `PS0002`
@@ -111,23 +113,9 @@ Compare emitted methods against the current reviewed manual catalogs:
 dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix System.BitConverter.GetBytes --include-callees --classify-purity --compare-manual-catalogs --limit 50
 ```
 
-Generate multiple checked-in artifacts from a JSON spec:
-
-```powershell
-dotnet run --project Tools\PurelySharp.EffectSummary -- --artifact-spec Tools\PurelySharp.EffectSummary\ReviewedRuntimeArtifactSpec.json
-```
-
-`ReviewedRuntimeArtifactSpec.json` is a starter checked-in recipe for reviewed
-runtime slices such as `AppContext`, `AppDomain`, `DateTime`,
-`DateTimeOffset`, `TimeSpan`, `Environment`, `OperatingSystem`, `Version`,
-and the root `PurelySharp.EffectSummary.json`.
-Spec entries can also reuse the symbol set from an existing summary via
-`SourceSummaryPath`, which is how the root artifact is refreshed without
-duplicating its full reviewed symbol list in the spec.
-
 ## Analyzer consumption
 
-The analyzer can consume generated exception summaries when the JSON is supplied as an additional file named `PurelySharp.EffectSummary.json` or `*.PurelySharp.EffectSummary.json`.
+The analyzer can consume generated exception summaries when the JSON is supplied as an additional file named `PurelySharp.EffectSummary.json` or `*.PurelySharp.EffectSummary.json`, but the repository no longer ships or tracks checked-in copies of those files.
 
 With `purelysharp_report_exceptions = true`, `PS0010` and `PS0011` use `ThrownExceptionTypes` and `TransitiveThrownExceptionTypes` for matching metadata/library method calls. This extends exception-flow reporting beyond current-compilation source without doing slow live decompilation inside Roslyn analyzer callbacks. The analyzer also accepts `TransitiveThrownExceptionEdges` as additive metadata and folds their `SourcePath` provenance back into the existing diagnostics model.
 

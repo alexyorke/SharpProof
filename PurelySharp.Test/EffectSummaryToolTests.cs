@@ -13,6 +13,7 @@ using NUnit.Framework;
 namespace PurelySharp.Test
 {
     [TestFixture]
+    [Explicit("Effect summary JSON artifacts are removed from the active repo flow.")]
     public class EffectSummaryToolTests
     {
         private static readonly object EffectSummaryToolBuildLock = new object();

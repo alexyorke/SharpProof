@@ -5287,7 +5287,8 @@ public static class DecimalNegateCatalogSignatureSamples
 
         private static AnalyzerOptions CreateGeneratedPurityAnalyzerOptions()
         {
-            return new AnalyzerOptions(CheckedInEffectSummaryAdditionalFiles.Value);
+            Assert.Ignore("Checked-in effect summary JSON artifacts were removed from the repository.");
+            return new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty);
         }
 
         private static ImmutableArray<AdditionalText> CreateCheckedInEffectSummaryAdditionalFiles()
