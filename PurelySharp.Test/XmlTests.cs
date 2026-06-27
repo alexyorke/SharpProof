@@ -89,6 +89,84 @@ public class TestClass
         }
 
         [Test]
+        public async Task XElementLoad_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using System.Xml.Linq;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public XElement {|PS0002:TestMethod|}(Stream stream)
+    {
+        return XElement.Load(stream);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task XElementSave_Diagnostic()
+        {
+            var test = @"
+using System.IO;
+using System.Xml.Linq;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(XElement element, Stream stream)
+    {
+        element.Save(stream);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task XElementAdd_Diagnostic()
+        {
+            var test = @"
+using System.Xml.Linq;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(XElement element)
+    {
+        element.Add(new XAttribute(""id"", ""1""));
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task XNodeRemove_Diagnostic()
+        {
+            var test = @"
+using System.Xml.Linq;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(XNode node)
+    {
+        node.Remove();
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task XElementValue_Diagnostic()
         {
             var test = @"

@@ -138,6 +138,32 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void XmlLinqMembers_AreSourcedFromSemanticRules_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Xml.Linq.XElement.Add(object)",
+                "XElement.Add",
+                "System.Xml.Linq.XContainer.Add(object)",
+                "XContainer.Add",
+                "System.Xml.Linq.XElement.Load(System.IO.Stream)",
+                "System.Xml.Linq.XElement.Save(System.IO.Stream)",
+                "System.Xml.Linq.XNode.Remove()",
+                "System.Xml.Linq.XDocument.Parse(string)",
+                "System.Xml.Linq.XElement.Value.get",
+                "System.Xml.Linq.XAttribute.Value.get",
+                "System.Xml.Linq.XElement.Attribute(System.Xml.Linq.XName)",
+                "System.Xml.Linq.XContainer.Elements()",
+                "System.Xml.Linq.XContainer.Descendants()",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void GeneratedPathHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

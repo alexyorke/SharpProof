@@ -388,6 +388,12 @@ namespace PurelySharp.Analyzer.Engine
 				return "threading_semantic_rule";
 			}
 
+			if (IsXmlLinqSemanticImpure(symbol))
+			{
+				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: XML LINQ semantic rule matched: {symbol.ToDisplayString()}");
+				return "xml_linq_semantic_rule";
+			}
+
 			if (IsAssemblyLoadContextSemanticImpure(symbol))
 			{
 				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: AssemblyLoadContext semantic rule matched: {symbol.ToDisplayString()}");
@@ -646,6 +652,64 @@ namespace PurelySharp.Analyzer.Engine
 				methodSymbol.MethodKind == MethodKind.Ordinary ||
 				methodSymbol.MethodKind == MethodKind.PropertyGet ||
 				methodSymbol.MethodKind == MethodKind.PropertySet;
+		}
+
+		private static bool IsXmlLinqSemanticImpure(ISymbol symbol)
+		{
+			if (symbol.ContainingType is not INamedTypeSymbol containingType)
+			{
+				return false;
+			}
+
+			if (symbol is IPropertySymbol propertySymbol)
+			{
+				return string.Equals(propertySymbol.Name, "Value", StringComparison.Ordinal) &&
+					(IsExactType(containingType, "System.Xml.Linq.XElement") ||
+					 IsExactType(containingType, "System.Xml.Linq.XAttribute"));
+			}
+
+			if (symbol is not IMethodSymbol methodSymbol ||
+				methodSymbol.IsImplicitlyDeclared)
+			{
+				return false;
+			}
+
+			if (IsExactType(containingType, "System.Xml.Linq.XDocument"))
+			{
+				return methodSymbol.IsStatic &&
+					string.Equals(methodSymbol.Name, "Parse", StringComparison.Ordinal);
+			}
+
+			if (IsExactType(containingType, "System.Xml.Linq.XNode"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Ordinary &&
+					string.Equals(methodSymbol.Name, "Remove", StringComparison.Ordinal);
+			}
+
+			if (IsExactType(containingType, "System.Xml.Linq.XContainer"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Ordinary &&
+					(methodSymbol.Name is "Add" or "Elements" or "Descendants");
+			}
+
+			if (!IsExactType(containingType, "System.Xml.Linq.XElement"))
+			{
+				return false;
+			}
+
+			if (methodSymbol.IsStatic)
+			{
+				return string.Equals(methodSymbol.Name, "Load", StringComparison.Ordinal);
+			}
+
+			return methodSymbol.MethodKind == MethodKind.Ordinary &&
+				(methodSymbol.Name is "Add" or "Save" or "Attribute");
+		}
+
+		private static bool IsExactType(INamedTypeSymbol? typeSymbol, string metadataName)
+		{
+			return typeSymbol != null &&
+				string.Equals(typeSymbol.OriginalDefinition.ToDisplayString(), metadataName, StringComparison.Ordinal);
 		}
 
 		private static bool IsAssemblyLoadContextSemanticImpure(ISymbol symbol)
