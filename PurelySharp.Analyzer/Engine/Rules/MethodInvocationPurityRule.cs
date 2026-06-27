@@ -885,28 +885,25 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static bool IsPureOutArgumentTarget(IOperation? operation)
         {
-            operation = PurityAnalysisEngine.SkipImplicitConversions(operation);
-
-            if (operation is IConversionOperation conversionOperation)
-            {
-                return IsPureOutArgumentTarget(conversionOperation.Operand);
-            }
-
-            return operation is ILocalReferenceOperation ||
-                operation is IDeclarationExpressionOperation ||
-                operation is IDiscardOperation;
+            return IsOutArgumentTarget(operation, allowLocalReference: true);
         }
 
         private static bool IsDeclarationOrDiscardOutArgumentTarget(IOperation? operation)
+        {
+            return IsOutArgumentTarget(operation, allowLocalReference: false);
+        }
+
+        private static bool IsOutArgumentTarget(IOperation? operation, bool allowLocalReference)
         {
             operation = PurityAnalysisEngine.SkipImplicitConversions(operation);
 
             if (operation is IConversionOperation conversionOperation)
             {
-                return IsDeclarationOrDiscardOutArgumentTarget(conversionOperation.Operand);
+                return IsOutArgumentTarget(conversionOperation.Operand, allowLocalReference);
             }
 
-            return operation is IDeclarationExpressionOperation ||
+            return (allowLocalReference && operation is ILocalReferenceOperation) ||
+                operation is IDeclarationExpressionOperation ||
                 operation is IDiscardOperation;
         }
 

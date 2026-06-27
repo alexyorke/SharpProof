@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Configuration;
 using System.Globalization;
@@ -214,10 +215,29 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Array.Sort"));
         }
 
-        [Test]
-        public async Task Ps0002_MonitorEnter_UsesThreadingSemanticRuleSource()
+        [TestCaseSource(nameof(GetThreadingSemanticRuleCases))]
+        public async Task Ps0002_ThreadingSemanticRules_UseThreadingSemanticRuleSource(
+            string source,
+            string category,
+            string rule,
+            string symbolSubstring)
         {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                source,
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo(category));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo(rule));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("threading_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain(symbolSubstring));
+        }
+
+        private static IEnumerable<TestCaseData> GetThreadingSemanticRuleCases()
+        {
+            yield return new TestCaseData(
+                @"
 using System.Threading;
 using PurelySharp.Attributes;
 
@@ -229,20 +249,13 @@ public class TestClass
         Monitor.Enter(gate);
     }
 }",
-                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+                "synchronization",
+                "MethodInvocationPurityRule",
+                "System.Threading.Monitor.Enter")
+                .SetName("Ps0002_MonitorEnter_UsesThreadingSemanticRuleSource");
 
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("synchronization"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("threading_semantic_rule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Threading.Monitor.Enter"));
-        }
-
-        [Test]
-        public async Task Ps0002_ThreadSleep_UsesThreadingSemanticRuleSource()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+            yield return new TestCaseData(
+                @"
 using System.Threading;
 using PurelySharp.Attributes;
 
@@ -254,20 +267,13 @@ public class TestClass
         Thread.Sleep(1);
     }
 }",
-                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+                "catalog_hit",
+                "MethodInvocationPurityRule",
+                "System.Threading.Thread.Sleep")
+                .SetName("Ps0002_ThreadSleep_UsesThreadingSemanticRuleSource");
 
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("threading_semantic_rule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Threading.Thread.Sleep"));
-        }
-
-        [Test]
-        public async Task Ps0002_ThreadManagedThreadId_UsesThreadingSemanticRuleSource()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+            yield return new TestCaseData(
+                @"
 using System.Threading;
 using PurelySharp.Attributes;
 
@@ -279,20 +285,13 @@ public class TestClass
         return thread.ManagedThreadId;
     }
 }",
-                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+                "catalog_hit",
+                "PropertyReferencePurityRule",
+                "System.Threading.Thread.ManagedThreadId")
+                .SetName("Ps0002_ThreadManagedThreadId_UsesThreadingSemanticRuleSource");
 
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("threading_semantic_rule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Threading.Thread.ManagedThreadId"));
-        }
-
-        [Test]
-        public async Task Ps0002_CancellationTokenRegister_UsesThreadingSemanticRuleSource()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+            yield return new TestCaseData(
+                @"
 using System;
 using System.Threading;
 using PurelySharp.Attributes;
@@ -305,20 +304,13 @@ public class TestClass
         return token.Register(() => { });
     }
 }",
-                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+                "catalog_hit",
+                "MethodInvocationPurityRule",
+                "System.Threading.CancellationToken.Register")
+                .SetName("Ps0002_CancellationTokenRegister_UsesThreadingSemanticRuleSource");
 
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("threading_semantic_rule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Threading.CancellationToken.Register"));
-        }
-
-        [Test]
-        public async Task Ps0002_AsyncLocalValue_UsesThreadingSemanticRuleSource()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+            yield return new TestCaseData(
+                @"
 using System.Threading;
 using PurelySharp.Attributes;
 
@@ -330,20 +322,13 @@ public class TestClass
         return state.Value;
     }
 }",
-                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+                "catalog_hit",
+                "PropertyReferencePurityRule",
+                "System.Threading.AsyncLocal")
+                .SetName("Ps0002_AsyncLocalValue_UsesThreadingSemanticRuleSource");
 
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("threading_semantic_rule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Threading.AsyncLocal"));
-        }
-
-        [Test]
-        public async Task Ps0002_SemaphoreConstructor_UsesThreadingSemanticRuleSource()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+            yield return new TestCaseData(
+                @"
 using System.Threading;
 using PurelySharp.Attributes;
 
@@ -355,20 +340,13 @@ public class TestClass
         return new Semaphore(0, 1);
     }
 }",
-                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+                "catalog_hit",
+                "ObjectCreationPurityRule",
+                "System.Threading.Semaphore.Semaphore")
+                .SetName("Ps0002_SemaphoreConstructor_UsesThreadingSemanticRuleSource");
 
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("threading_semantic_rule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Threading.Semaphore.Semaphore"));
-        }
-
-        [Test]
-        public async Task Ps0002_ThreadLocalValue_UsesThreadingSemanticRuleSource()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+            yield return new TestCaseData(
+                @"
 using System.Threading;
 using PurelySharp.Attributes;
 
@@ -380,20 +358,13 @@ public class TestClass
         return state.Value;
     }
 }",
-                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+                "catalog_hit",
+                "PropertyReferencePurityRule",
+                "System.Threading.ThreadLocal")
+                .SetName("Ps0002_ThreadLocalValue_UsesThreadingSemanticRuleSource");
 
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("threading_semantic_rule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Threading.ThreadLocal"));
-        }
-
-        [Test]
-        public async Task Ps0002_ChannelCreateUnbounded_UsesThreadingSemanticRuleSource()
-        {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+            yield return new TestCaseData(
+                @"
 using System.Threading.Channels;
 using PurelySharp.Attributes;
 
@@ -405,14 +376,10 @@ public class TestClass
         return Channel.CreateUnbounded<int>();
     }
 }",
-                additionalFiles: ImmutableArray<AdditionalText>.Empty);
-
-            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
-
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("threading_semantic_rule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Threading.Channels.Channel.CreateUnbounded"));
+                "catalog_hit",
+                "MethodInvocationPurityRule",
+                "System.Threading.Channels.Channel.CreateUnbounded")
+                .SetName("Ps0002_ChannelCreateUnbounded_UsesThreadingSemanticRuleSource");
         }
 
         [Test]
@@ -14370,6 +14337,16 @@ public class TestClass
                     entry.DisplaySymbol,
                     entry.Classification,
                     entry.CategoriesJson)).ToArray());
+        }
+
+        private static string FormatJsonArray(params string[] values)
+        {
+            if (values.Length == 0)
+            {
+                return "[]";
+            }
+
+            return "[\"" + string.Join("\", \"", values) + "\"]";
         }
 
         private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences() =>

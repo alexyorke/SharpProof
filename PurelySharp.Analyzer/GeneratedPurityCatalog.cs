@@ -306,25 +306,15 @@ namespace PurelySharp.Analyzer
                 {
                     var symbol = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "ExactSymbolKey") ??
                         CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "Symbol");
-                    var classification = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "Classification");
-                    if (string.IsNullOrWhiteSpace(symbol) || string.IsNullOrWhiteSpace(classification))
+                    if (string.IsNullOrWhiteSpace(symbol) ||
+                        !TryCreatePurityEntry(entryElement, out var purityEntry))
                     {
                         continue;
                     }
 
-                    var categories = ReadStringArray(entryElement, "Categories");
-                    var primaryCategory = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "PrimaryCategory");
-                    var freshnessClassification = CompatibilityHelpers.GetTrimmedStringProperty(entryElement, "FreshnessClassification") ?? "none";
                     yield return new SummaryEntry(
                         symbol.Trim(),
-                        new PurityEntry(
-                            classification.Trim(),
-                            categories,
-                            string.IsNullOrWhiteSpace(primaryCategory)
-                                ? PrimaryCategoryFallback(categories)
-                                : primaryCategory.Trim(),
-                            ReadBooleanProperty(entryElement, "HasFreshArrayAllocationEvidence"),
-                            freshnessClassification),
+                        purityEntry,
                         SummaryAssemblyIdentity.FromFlatJson(entryElement),
                         SummaryMethodIdentity.FromFlatJson(entryElement),
                         sourcePriority);
@@ -353,35 +343,44 @@ namespace PurelySharp.Analyzer
                     var symbol = CompatibilityHelpers.GetTrimmedStringProperty(methodElement, "Symbol");
                     if (symbol == null ||
                         !methodElement.TryGetProperty("PurityClassification", out var purityElement) ||
-                        purityElement.ValueKind != JsonValueKind.Object)
+                        purityElement.ValueKind != JsonValueKind.Object ||
+                        !TryCreatePurityEntry(purityElement, out var purityEntry))
                     {
                         continue;
                     }
 
-                    var classification = CompatibilityHelpers.GetTrimmedStringProperty(purityElement, "Classification");
-                    if (string.IsNullOrWhiteSpace(classification))
-                    {
-                        continue;
-                    }
-
-                    var categories = ReadStringArray(purityElement, "Categories");
-                    var primaryCategory = CompatibilityHelpers.GetTrimmedStringProperty(purityElement, "PrimaryCategory");
-                    var freshnessClassification = CompatibilityHelpers.GetTrimmedStringProperty(purityElement, "FreshnessClassification") ?? "none";
                     yield return new SummaryEntry(
                         symbol,
-                        new PurityEntry(
-                            classification.Trim(),
-                            categories,
-                            string.IsNullOrWhiteSpace(primaryCategory)
-                                ? PrimaryCategoryFallback(categories)
-                                : primaryCategory.Trim(),
-                            ReadBooleanProperty(purityElement, "HasFreshArrayAllocationEvidence"),
-                            freshnessClassification),
+                        purityEntry,
                         assemblyIdentity,
                         SummaryMethodIdentity.FromJson(methodElement),
                         sourcePriority);
                 }
             }
+        }
+
+        private static bool TryCreatePurityEntry(JsonElement element, out PurityEntry purityEntry)
+        {
+            purityEntry = default;
+
+            var classification = CompatibilityHelpers.GetTrimmedStringProperty(element, "Classification");
+            if (string.IsNullOrWhiteSpace(classification))
+            {
+                return false;
+            }
+
+            var categories = ReadStringArray(element, "Categories");
+            var primaryCategory = CompatibilityHelpers.GetTrimmedStringProperty(element, "PrimaryCategory");
+            var freshnessClassification = CompatibilityHelpers.GetTrimmedStringProperty(element, "FreshnessClassification") ?? "none";
+            purityEntry = new PurityEntry(
+                classification.Trim(),
+                categories,
+                string.IsNullOrWhiteSpace(primaryCategory)
+                    ? PrimaryCategoryFallback(categories)
+                    : primaryCategory.Trim(),
+                ReadBooleanProperty(element, "HasFreshArrayAllocationEvidence"),
+                freshnessClassification);
+            return true;
         }
 
         private static string PrimaryCategoryFallback(ImmutableArray<string> categories) => categories.Length > 0
