@@ -164,6 +164,25 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void DiagnosticsTracingMembers_AreSourcedFromSemanticRules_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Diagnostics.ActivitySource.StartActivity(string)",
+                "System.Diagnostics.Activity.Current.get",
+                "System.Diagnostics.Activity.Current.set",
+                "System.Diagnostics.Activity.SetTag(string, object)",
+                "System.Diagnostics.DiagnosticListener.Write(string, object)",
+                "System.Diagnostics.Metrics.Counter<T>.Add(T, System.Collections.Generic.KeyValuePair<string, object?>)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void GeneratedPathHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

@@ -394,6 +394,12 @@ namespace PurelySharp.Analyzer.Engine
 				return "xml_linq_semantic_rule";
 			}
 
+			if (IsDiagnosticsTracingSemanticImpure(symbol))
+			{
+				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Diagnostics tracing semantic rule matched: {symbol.ToDisplayString()}");
+				return "diagnostics_tracing_semantic_rule";
+			}
+
 			if (IsAssemblyLoadContextSemanticImpure(symbol))
 			{
 				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: AssemblyLoadContext semantic rule matched: {symbol.ToDisplayString()}");
@@ -710,6 +716,76 @@ namespace PurelySharp.Analyzer.Engine
 		{
 			return typeSymbol != null &&
 				string.Equals(typeSymbol.OriginalDefinition.ToDisplayString(), metadataName, StringComparison.Ordinal);
+		}
+
+		private static bool IsDiagnosticsTracingSemanticImpure(ISymbol symbol)
+		{
+			if (symbol.ContainingType is not INamedTypeSymbol containingType)
+			{
+				return false;
+			}
+
+			if (IsExactType(containingType, "System.Diagnostics.Activity"))
+			{
+				return IsActivitySemanticImpure(symbol);
+			}
+
+			if (symbol is not IMethodSymbol methodSymbol ||
+				methodSymbol.IsImplicitlyDeclared)
+			{
+				return false;
+			}
+
+			if (IsExactType(containingType, "System.Diagnostics.ActivitySource"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Constructor ||
+					(methodSymbol.MethodKind == MethodKind.Ordinary &&
+					 string.Equals(methodSymbol.Name, "StartActivity", StringComparison.Ordinal));
+			}
+
+			if (IsExactType(containingType, "System.Diagnostics.DiagnosticListener"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Ordinary &&
+					string.Equals(methodSymbol.Name, "Write", StringComparison.Ordinal);
+			}
+
+			if (IsExactType(containingType, "System.Diagnostics.Metrics.Meter"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Ordinary &&
+					methodSymbol.Name.StartsWith("Create", StringComparison.Ordinal);
+			}
+
+			if (IsExactType(containingType, "System.Diagnostics.Metrics.Counter<T>"))
+			{
+				return methodSymbol.MethodKind == MethodKind.Ordinary &&
+					string.Equals(methodSymbol.Name, "Add", StringComparison.Ordinal);
+			}
+
+			return false;
+		}
+
+		private static bool IsActivitySemanticImpure(ISymbol symbol)
+		{
+			if (symbol is IPropertySymbol propertySymbol)
+			{
+				return string.Equals(propertySymbol.Name, "Current", StringComparison.Ordinal) &&
+					propertySymbol.IsStatic;
+			}
+
+			if (symbol is not IMethodSymbol methodSymbol ||
+				methodSymbol.IsImplicitlyDeclared)
+			{
+				return false;
+			}
+
+			if (methodSymbol.AssociatedSymbol is IPropertySymbol associatedProperty)
+			{
+				return string.Equals(associatedProperty.Name, "Current", StringComparison.Ordinal) &&
+					associatedProperty.IsStatic;
+			}
+
+			return methodSymbol.MethodKind == MethodKind.Ordinary &&
+				string.Equals(methodSymbol.Name, "SetTag", StringComparison.Ordinal);
 		}
 
 		private static bool IsAssemblyLoadContextSemanticImpure(ISymbol symbol)

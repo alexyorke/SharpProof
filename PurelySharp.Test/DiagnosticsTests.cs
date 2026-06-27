@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis.Testing;
+using Microsoft.CodeAnalysis.Testing;
 using NUnit.Framework;
 using System.Threading.Tasks;
 using PurelySharp.Analyzer;
@@ -50,6 +50,84 @@ public class TestClass
         }
 
         [Test]
+        public async Task ActivitySourceStartActivity_Diagnostic()
+        {
+            var test = @"
+#nullable enable
+using System.Diagnostics;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Activity? {|PS0002:TestMethod|}(ActivitySource source)
+    {
+        return source.StartActivity(""request"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ActivityCurrentGetter_Diagnostic()
+        {
+            var test = @"
+#nullable enable
+using System.Diagnostics;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Activity? {|PS0002:TestMethod|}()
+    {
+        return Activity.Current;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ActivityCurrentSetter_Diagnostic()
+        {
+            var test = @"
+using System.Diagnostics;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(Activity activity)
+    {
+        Activity.Current = activity;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ActivitySetTag_Diagnostic()
+        {
+            var test = @"
+using System.Diagnostics;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(Activity activity)
+    {
+        activity.SetTag(""key"", ""value"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task DiagnosticListenerConstructor_Diagnostic()
         {
             var test = @"
@@ -62,6 +140,25 @@ public class TestClass
     public DiagnosticListener {|PS0002:TestMethod|}()
     {
         return new DiagnosticListener(""test"");
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task DiagnosticListenerWrite_Diagnostic()
+        {
+            var test = @"
+using System.Diagnostics;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(DiagnosticListener listener)
+    {
+        listener.Write(""event"", 1);
     }
 }";
 

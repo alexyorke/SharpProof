@@ -370,6 +370,132 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ActivitySourceConstructor_UsesDiagnosticsTracingSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Diagnostics;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public ActivitySource TestMethod()
+    {
+        return new ActivitySource(""test"", ""1.0.0"");
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("ObjectCreationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("diagnostics_tracing_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.ActivitySource.ActivitySource"));
+        }
+
+        [Test]
+        public async Task Ps0002_ActivityCurrent_UsesDiagnosticsTracingSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+#nullable enable
+using System.Diagnostics;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Activity? TestMethod()
+    {
+        return Activity.Current;
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("diagnostics_tracing_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.Activity.Current"));
+        }
+
+        [Test]
+        public async Task Ps0002_ActivitySetTag_UsesDiagnosticsTracingSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Diagnostics;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Activity activity)
+    {
+        activity.SetTag(""key"", ""value"");
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("diagnostics_tracing_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.Activity.SetTag"));
+        }
+
+        [Test]
+        public async Task Ps0002_MeterCreateCounter_UsesDiagnosticsTracingSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Diagnostics.Metrics;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Counter<int> TestMethod(Meter meter)
+    {
+        return meter.CreateCounter<int>(""requests"", ""count"", ""Request count"");
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("diagnostics_tracing_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.Metrics.Meter.CreateCounter"));
+        }
+
+        [Test]
+        public async Task Ps0002_CounterAdd_UsesDiagnosticsTracingSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Diagnostics.Metrics;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Counter<int> counter)
+    {
+        counter.Add(1);
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("diagnostics_tracing_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Diagnostics.Metrics.Counter"));
+        }
+
+        [Test]
         public async Task Ps0002_StringFormat_UsesGeneratedPuritySummarySource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

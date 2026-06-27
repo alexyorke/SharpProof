@@ -27,5 +27,24 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task CounterAdd_Diagnostic()
+        {
+            var test = @"
+using System.Diagnostics.Metrics;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void {|PS0002:TestMethod|}(Counter<int> counter)
+    {
+        counter.Add(1);
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }
