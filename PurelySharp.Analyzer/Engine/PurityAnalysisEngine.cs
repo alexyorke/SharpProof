@@ -781,22 +781,7 @@ namespace PurelySharp.Analyzer.Engine
                 ImmutableDictionary<CaptureId, ISymbol> first,
                 ImmutableDictionary<CaptureId, ISymbol> second)
             {
-                if (first.IsEmpty || second.IsEmpty)
-                {
-                    return ImmutableDictionary.Create<CaptureId, ISymbol>();
-                }
-
-                var builder = ImmutableDictionary.CreateBuilder<CaptureId, ISymbol>();
-                foreach (var kvp in first)
-                {
-                    if (second.TryGetValue(kvp.Key, out var otherSymbol) &&
-                        SymbolEqualityComparer.Default.Equals(kvp.Value, otherSymbol))
-                    {
-                        builder[kvp.Key] = kvp.Value;
-                    }
-                }
-
-                return builder.ToImmutable();
+                return IntersectFlowCaptureSymbolMapsCore(first, second);
             }
 
             private static ImmutableDictionary<CaptureId, ISymbol> IntersectFlowCaptureSymbolsAcrossAll(
@@ -3894,6 +3879,13 @@ namespace PurelySharp.Analyzer.Engine
         }
 
         private static ImmutableDictionary<CaptureId, ISymbol> IntersectFlowCaptureSymbols(
+            ImmutableDictionary<CaptureId, ISymbol> first,
+            ImmutableDictionary<CaptureId, ISymbol> second)
+        {
+            return IntersectFlowCaptureSymbolMapsCore(first, second);
+        }
+
+        private static ImmutableDictionary<CaptureId, ISymbol> IntersectFlowCaptureSymbolMapsCore(
             ImmutableDictionary<CaptureId, ISymbol> first,
             ImmutableDictionary<CaptureId, ISymbol> second)
         {

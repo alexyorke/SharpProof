@@ -363,7 +363,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 propertyReferenceOperation.Property,
                 context.SemanticModel,
                 GetTrackedLocalReceiverType(propertyReferenceOperation.Instance, currentState, context.SemanticModel.Compilation) ??
-                    GetKnownReceiverType(propertyReferenceOperation.Instance));
+                    PropertyDispatchHelper.GetKnownReceiverType(propertyReferenceOperation.Instance));
 
             if (candidates.IsDefaultOrEmpty)
             {
@@ -465,11 +465,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return targets.ToImmutableArray();
-        }
-
-        private static INamedTypeSymbol? GetKnownReceiverType(IOperation? instanceOperation)
-        {
-            return PropertyDispatchHelper.GetKnownReceiverType(instanceOperation);
         }
 
         private static void AddSetterForReceiverType(
@@ -940,7 +935,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 .FirstOrDefault();
             var initializerSyntax = declaratorSyntax?.Initializer?.Value;
             if (declaratorSyntax == null || initializerSyntax == null ||
-                HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, observationSyntax, declaratorSyntax, semanticModel))
+                RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, observationSyntax, declaratorSyntax, semanticModel))
             {
                 objectCreationOperation = null!;
                 return false;
@@ -1088,14 +1083,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return false;
             }
 
-            if (HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, observationSyntax, declaratorSyntax, semanticModel))
+            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, observationSyntax, declaratorSyntax, semanticModel))
             {
                 return false;
             }
 
             var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax));
             if (initializerOperation is IObjectCreationOperation objectCreationOperation &&
-                IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
+                RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
             {
                 return true;
             }
@@ -1107,7 +1102,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (initializerOperation is IConditionalOperation conditionalOperation)
             {
-                if (TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
                 {
                     return HasStableFreshMutableObjectValueInOperation(
                         conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
@@ -1143,7 +1138,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
             if (unwrappedOperation is IObjectCreationOperation objectCreationOperation)
             {
-                if (IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
+                if (RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
                 {
                     return true;
                 }
@@ -1233,80 +1228,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return false;
-        }
-
-        private static bool HasAssignmentToLocalBetweenDeclarationAndObservation(
-            ILocalSymbol localSymbol,
-            SyntaxNode observationSyntax,
-            VariableDeclaratorSyntax declaratorSyntax,
-            SemanticModel semanticModel)
-        {
-            var containingBlock = observationSyntax.FirstAncestorOrSelf<BlockSyntax>();
-            if (containingBlock == null)
-            {
-                return false;
-            }
-
-            var start = declaratorSyntax.Span.End;
-            var end = observationSyntax.SpanStart;
-            if (end <= start)
-            {
-                return false;
-            }
-
-            foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
-            {
-                if (assignment.SpanStart < start || assignment.SpanStart >= end)
-                {
-                    continue;
-                }
-
-                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left).Symbol;
-                if (SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool TryGetConstantCondition(IConditionalOperation conditionalOperation, out bool conditionValue)
-        {
-            var constantValue = conditionalOperation.Condition.ConstantValue;
-            if (constantValue.HasValue && constantValue.Value is bool boolValue)
-            {
-                conditionValue = boolValue;
-                return true;
-            }
-
-            conditionValue = false;
-            return false;
-        }
-
-        private static bool IsFreshMutableEscapingReferenceType(ITypeSymbol? typeSymbol)
-        {
-            if (typeSymbol is not INamedTypeSymbol namedType ||
-                namedType.TypeKind == TypeKind.Delegate ||
-                namedType.IsValueType ||
-                namedType.SpecialType == SpecialType.System_String ||
-                namedType.DeclaringSyntaxReferences.Length == 0)
-            {
-                return false;
-            }
-
-            return namedType.GetMembers().Any(member =>
-                member switch
-                {
-                    IFieldSymbol field => !field.IsStatic &&
-                                          !field.IsReadOnly &&
-                                          field.DeclaredAccessibility != Accessibility.Private,
-                    IPropertySymbol property => !property.IsStatic &&
-                                                property.SetMethod != null &&
-                                                !property.SetMethod.IsInitOnly &&
-                                                property.SetMethod.DeclaredAccessibility != Accessibility.Private,
-                    _ => false
-                });
         }
 
         private static bool IsRefLocalAliasToExternallyVisibleStorage(
@@ -1571,6 +1492,83 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     yield return nested;
                 }
             }
+        }
+    }
+
+    internal static class RuleAnalysisHelper
+    {
+        internal static bool HasAssignmentToLocalBetweenDeclarationAndObservation(
+            ILocalSymbol localSymbol,
+            SyntaxNode observationSyntax,
+            VariableDeclaratorSyntax declaratorSyntax,
+            SemanticModel semanticModel)
+        {
+            var containingBlock = observationSyntax.FirstAncestorOrSelf<BlockSyntax>();
+            if (containingBlock == null)
+            {
+                return false;
+            }
+
+            var start = declaratorSyntax.Span.End;
+            var end = observationSyntax.SpanStart;
+            if (end <= start)
+            {
+                return false;
+            }
+
+            foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (assignment.SpanStart < start || assignment.SpanStart >= end)
+                {
+                    continue;
+                }
+
+                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left).Symbol;
+                if (SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        internal static bool TryGetConstantCondition(IConditionalOperation conditionalOperation, out bool conditionValue)
+        {
+            var constantValue = conditionalOperation.Condition.ConstantValue;
+            if (constantValue.HasValue && constantValue.Value is bool boolValue)
+            {
+                conditionValue = boolValue;
+                return true;
+            }
+
+            conditionValue = false;
+            return false;
+        }
+
+        internal static bool IsFreshMutableEscapingReferenceType(ITypeSymbol? typeSymbol)
+        {
+            if (typeSymbol is not INamedTypeSymbol namedType ||
+                namedType.TypeKind == TypeKind.Delegate ||
+                namedType.IsValueType ||
+                namedType.SpecialType == SpecialType.System_String ||
+                namedType.DeclaringSyntaxReferences.Length == 0)
+            {
+                return false;
+            }
+
+            return namedType.GetMembers().Any(member =>
+                member switch
+                {
+                    IFieldSymbol field => !field.IsStatic &&
+                                          !field.IsReadOnly &&
+                                          field.DeclaredAccessibility != Accessibility.Private,
+                    IPropertySymbol property => !property.IsStatic &&
+                                                property.SetMethod != null &&
+                                                !property.SetMethod.IsInitOnly &&
+                                                property.SetMethod.DeclaredAccessibility != Accessibility.Private,
+                    _ => false
+                });
         }
     }
 }

@@ -271,7 +271,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
             {
-                if (TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
                 {
                     return IsKnownPureArrayFactoryReturn(
                         conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
@@ -339,7 +339,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
             {
-                if (TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
                 {
                     return IsAllowedTrustedArrayReturn(
                         conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
@@ -408,7 +408,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return false;
             }
 
-            if (HasAssignmentToLocalBetweenDeclarationAndReturn(localSymbol, returnedValue, declaratorSyntax, semanticModel))
+            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, returnedValue.Syntax, declaratorSyntax, semanticModel))
             {
                 methodSymbol = null!;
                 return false;
@@ -444,7 +444,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
             {
-                if (TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
                 {
                     return IsPureArrayReturningInvocationReturn(
                         conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
@@ -590,7 +590,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (unwrappedOperation is IConditionalOperation conditionalOperation)
             {
-                if (TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
                 {
                     return TryResolveReturnedArrayViewSource(
                         conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
@@ -784,7 +784,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return false;
             }
 
-            if (HasAssignmentToLocalBetweenDeclarationAndReturn(localSymbol, returnedValue, declaratorSyntax, semanticModel))
+            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, returnedValue.Syntax, declaratorSyntax, semanticModel))
             {
                 sourceOperation = null!;
                 methodSymbol = null!;
@@ -889,7 +889,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
             {
-                if (TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
                 {
                     return IsOwnedLocalArrayReturn(
                         conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
@@ -1002,7 +1002,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
             {
-                if (TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
                 {
                     return TryFindMutableCollectionReturnEscape(
                         conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
@@ -1106,7 +1106,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
         {
             var unwrappedReturnedValue = PurityAnalysisEngine.SkipImplicitConversions(returnedValue);
             if (unwrappedReturnedValue is IObjectCreationOperation objectCreationOperation &&
-                IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
+                RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
             {
                 escapeSyntax = objectCreationOperation.Syntax;
                 escapeSymbol = objectCreationOperation.Constructor ?? (ISymbol)objectCreationOperation.Type!;
@@ -1139,7 +1139,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
             {
-                if (TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
                 {
                     return TryFindFreshMutableObjectReturnEscape(
                         conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
@@ -1256,7 +1256,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return false;
             }
 
-            if (HasAssignmentToLocalBetweenDeclarationAndReturn(localSymbol, returnedValue, declaratorSyntax, semanticModel))
+            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, returnedValue.Syntax, declaratorSyntax, semanticModel))
             {
                 escapeSyntax = null!;
                 escapeSymbol = null!;
@@ -1315,7 +1315,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return false;
             }
 
-            if (HasAssignmentToLocalBetweenDeclarationAndReturn(localSymbol, returnedValue, declaratorSyntax, semanticModel))
+            if (RuleAnalysisHelper.HasAssignmentToLocalBetweenDeclarationAndObservation(localSymbol, returnedValue.Syntax, declaratorSyntax, semanticModel))
             {
                 escapeSyntax = null!;
                 escapeSymbol = null!;
@@ -1325,7 +1325,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             var initializerOperation = PurityAnalysisEngine.SkipImplicitConversions(semanticModel.GetOperation(initializerSyntax));
             if (initializerOperation is IObjectCreationOperation objectCreationOperation &&
-                IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
+                RuleAnalysisHelper.IsFreshMutableEscapingReferenceType(objectCreationOperation.Type))
             {
                 escapeSyntax = returnedValue.Syntax;
                 escapeSymbol = objectCreationOperation.Constructor ?? (ISymbol)objectCreationOperation.Type!;
@@ -1366,67 +1366,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             escapeSymbol = null!;
             catalogSource = string.Empty;
             return false;
-        }
-
-        private static bool HasAssignmentToLocalBetweenDeclarationAndReturn(
-            ILocalSymbol localSymbol,
-            IOperation returnedValue,
-            VariableDeclaratorSyntax declaratorSyntax,
-            SemanticModel semanticModel)
-        {
-            var containingBlock = returnedValue.Syntax.FirstAncestorOrSelf<BlockSyntax>();
-            if (containingBlock == null)
-            {
-                return false;
-            }
-
-            var start = declaratorSyntax.Span.End;
-            var end = returnedValue.Syntax.SpanStart;
-            if (end <= start)
-            {
-                return false;
-            }
-
-            foreach (var assignment in containingBlock.DescendantNodes().OfType<AssignmentExpressionSyntax>())
-            {
-                if (assignment.SpanStart < start || assignment.SpanStart >= end)
-                {
-                    continue;
-                }
-
-                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left).Symbol;
-                if (SymbolEqualityComparer.Default.Equals(assignedSymbol, localSymbol))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool IsFreshMutableEscapingReferenceType(ITypeSymbol? typeSymbol)
-        {
-            if (typeSymbol is not INamedTypeSymbol namedType ||
-                namedType.TypeKind == TypeKind.Delegate ||
-                namedType.IsValueType ||
-                namedType.SpecialType == SpecialType.System_String ||
-                namedType.DeclaringSyntaxReferences.Length == 0)
-            {
-                return false;
-            }
-
-            return namedType.GetMembers().Any(member =>
-                member switch
-                {
-                    IFieldSymbol field => !field.IsStatic &&
-                                          !field.IsReadOnly &&
-                                          field.DeclaredAccessibility != Accessibility.Private,
-                    IPropertySymbol property => !property.IsStatic &&
-                                                property.SetMethod != null &&
-                                                !property.SetMethod.IsInitOnly &&
-                                                property.SetMethod.DeclaredAccessibility != Accessibility.Private,
-                    _ => false
-                });
         }
 
         private static bool IsConstructionWithEscapingParameters(
@@ -1530,17 +1469,5 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return false;
         }
 
-        private static bool TryGetConstantCondition(IConditionalOperation conditionalOperation, out bool conditionValue)
-        {
-            if (conditionalOperation.Condition.ConstantValue.HasValue &&
-                conditionalOperation.Condition.ConstantValue.Value is bool constantBool)
-            {
-                conditionValue = constantBool;
-                return true;
-            }
-
-            conditionValue = false;
-            return false;
-        }
     }
 }

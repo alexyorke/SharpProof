@@ -1146,7 +1146,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             var knownReceiverType = hasExactReceiverType
                 ? exactReceiverType
-                : GetKnownReceiverType(propertyReferenceOperation.Instance);
+                : PropertyDispatchHelper.GetKnownReceiverType(propertyReferenceOperation.Instance);
 
             if (hasExactReceiverType && knownReceiverType != null)
             {
@@ -1281,11 +1281,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return getterResult.IsPure
                 ? PurityAnalysisEngine.PurityAnalysisResult.Pure
                 : getterResult.WithCallee(getterSymbol, propertyReferenceOperation.Syntax);
-        }
-
-        private static INamedTypeSymbol? GetKnownReceiverType(IOperation? instanceOperation)
-        {
-            return PropertyDispatchHelper.GetKnownReceiverType(instanceOperation);
         }
 
         private static string GetCatalogHitCategory(ISymbol symbol) =>
