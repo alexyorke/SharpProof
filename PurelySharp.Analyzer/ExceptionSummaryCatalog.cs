@@ -663,14 +663,6 @@ namespace PurelySharp.Analyzer
             return EffectSummarySymbolKeyFactory.GetMethodSymbolKeys(methodSymbol);
         }
 
-        private static void AddSymbolKey(ImmutableHashSet<string>.Builder keys, string? value)
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                keys.Add(value.Trim());
-            }
-        }
-
         private static string CreateEffectSummaryKey(IMethodSymbol methodSymbol)
         {
             var containingTypeName = methodSymbol.ContainingType.ToDisplayString(EffectSummaryContainingTypeFormat);
