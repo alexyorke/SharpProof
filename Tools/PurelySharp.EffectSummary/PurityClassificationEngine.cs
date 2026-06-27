@@ -1024,6 +1024,10 @@ internal static class PurityClassificationEngine
                 callSites,
                 ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true),
                 ("System.Type.get_IsValueType()->bool", false)),
+            "System.Type.get_IsNested()" => CallSitesMatch(
+                callSites,
+                ("System.Reflection.MemberInfo.get_DeclaringType()->System.Type", true),
+                ("System.Type.op_Inequality(System.Type, System.Type)->bool", false)),
             "System.Type.get_IsInterface()" => CallSitesMatch(
                 callSites,
                 ("System.RuntimeTypeHandle.IsInterface(System.RuntimeType)->bool", false),

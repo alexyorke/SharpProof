@@ -880,7 +880,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsNested_Diagnostic()
+        public async Task TypeIsNested_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -888,7 +888,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(System.Type type)
+    public bool TestMethod(System.Type type)
     {
         return type.IsNested;
     }

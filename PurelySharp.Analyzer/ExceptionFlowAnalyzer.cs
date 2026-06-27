@@ -563,7 +563,10 @@ namespace PurelySharp.Analyzer
                     return false;
                 }
 
-                if (TryResolveKnownSystemTypeRuntimeReceiver(current, out exactReceiverType))
+                if (PurityAnalysisEngine.TryResolveKnownSystemTypeRuntimeReceiver(
+                    current,
+                    current.SemanticModel?.Compilation,
+                    out exactReceiverType))
                 {
                     return true;
                 }
@@ -623,83 +626,6 @@ namespace PurelySharp.Analyzer
 
                 return false;
             }
-        }
-
-        private static bool TryResolveKnownSystemTypeRuntimeReceiver(
-            IOperation operation,
-            out INamedTypeSymbol exactReceiverType)
-        {
-            exactReceiverType = null!;
-            var compilation = operation.SemanticModel?.Compilation;
-
-            if (operation is ITypeOfOperation)
-            {
-                return TryGetRuntimeTypeSymbol(operation.Type, compilation, out exactReceiverType);
-            }
-
-            if (operation is not IInvocationOperation invocationOperation ||
-                invocationOperation.TargetMethod is not { } targetMethod)
-            {
-                return false;
-            }
-
-            if (IsObjectGetTypeMethod(targetMethod) || IsTypeGetTypeFromHandleMethod(targetMethod))
-            {
-                return TryGetRuntimeTypeSymbol(invocationOperation.Type, compilation, out exactReceiverType);
-            }
-
-            return false;
-        }
-
-        private static bool TryGetRuntimeTypeSymbol(
-            ITypeSymbol? typeSymbol,
-            Compilation? compilation,
-            out INamedTypeSymbol exactReceiverType)
-        {
-            exactReceiverType = null!;
-
-            if (!IsSystemTypeSymbol(typeSymbol))
-            {
-                return false;
-            }
-
-            if (compilation?.GetTypeByMetadataName("System.RuntimeType") is INamedTypeSymbol runtimeTypeFromCompilation)
-            {
-                exactReceiverType = runtimeTypeFromCompilation;
-                return true;
-            }
-
-            var containingAssembly = typeSymbol.ContainingAssembly;
-            if (containingAssembly?.GetTypeByMetadataName("System.RuntimeType") is not INamedTypeSymbol runtimeType)
-            {
-                return false;
-            }
-
-            exactReceiverType = runtimeType;
-            return true;
-        }
-
-        private static bool IsObjectGetTypeMethod(IMethodSymbol methodSymbol)
-        {
-            return !methodSymbol.IsStatic &&
-                methodSymbol.Parameters.Length == 0 &&
-                methodSymbol.Name == nameof(object.GetType) &&
-                methodSymbol.ContainingType?.SpecialType == SpecialType.System_Object;
-        }
-
-        private static bool IsTypeGetTypeFromHandleMethod(IMethodSymbol methodSymbol)
-        {
-            return methodSymbol.IsStatic &&
-                methodSymbol.Parameters.Length == 1 &&
-                methodSymbol.Name == nameof(Type.GetTypeFromHandle) &&
-                IsSystemTypeSymbol(methodSymbol.ContainingType) &&
-                methodSymbol.Parameters[0].Type.SpecialType == SpecialType.System_RuntimeTypeHandle;
-        }
-
-        private static bool IsSystemTypeSymbol(ITypeSymbol? typeSymbol)
-        {
-            return typeSymbol != null &&
-                string.Equals(typeSymbol.ToDisplayString(), "System.Type", StringComparison.Ordinal);
         }
 
         private static IReadOnlyDictionary<ISymbol, INamedTypeSymbol>? GetKnownExactLocalTypesBefore(

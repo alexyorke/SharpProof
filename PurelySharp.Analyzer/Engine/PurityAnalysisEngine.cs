@@ -3088,7 +3088,7 @@ namespace PurelySharp.Analyzer.Engine
             return TryResolveKnownConcreteType(operation, currentState, compilation: null, out concreteType);
         }
 
-        private static bool TryResolveKnownSystemTypeRuntimeReceiver(
+        internal static bool TryResolveKnownSystemTypeRuntimeReceiver(
             IOperation operation,
             Compilation? compilation,
             out INamedTypeSymbol concreteType)
@@ -3114,7 +3114,7 @@ namespace PurelySharp.Analyzer.Engine
             return false;
         }
 
-        private static bool TryGetRuntimeTypeSymbol(
+        internal static bool TryGetRuntimeTypeSymbol(
             ITypeSymbol? typeSymbol,
             Compilation? compilation,
             out INamedTypeSymbol concreteType)

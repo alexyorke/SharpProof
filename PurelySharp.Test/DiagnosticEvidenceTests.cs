@@ -4763,6 +4763,7 @@ public class TestClass
         _ = type.IsInterface;
         _ = type.IsLayoutSequential;
         _ = type.IsMarshalByRef;
+        _ = type.IsNested;
         _ = type.IsNestedAssembly;
         _ = type.IsNestedFamANDAssem;
         _ = type.IsNestedFamORAssem;
@@ -4818,6 +4819,7 @@ public class TestClass
                     node.ToString() == "type.IsInterface" ||
                     node.ToString() == "type.IsLayoutSequential" ||
                     node.ToString() == "type.IsMarshalByRef" ||
+                    node.ToString() == "type.IsNested" ||
                     node.ToString() == "type.IsNestedAssembly" ||
                     node.ToString() == "type.IsNestedFamANDAssem" ||
                     node.ToString() == "type.IsNestedFamORAssem" ||
@@ -4874,6 +4876,7 @@ public class TestClass
             Assert.That(resolutions["type.IsInterface"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsLayoutSequential"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsMarshalByRef"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.IsNested"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsNestedAssembly"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsNestedFamANDAssem"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsNestedFamORAssem"], Is.EqualTo((true, "pure")));

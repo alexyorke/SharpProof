@@ -3841,6 +3841,7 @@ public static class TypeMetadataCatalogSignatureSamples
     public static bool IsGenericTypeDefinition(Type type) => type.IsGenericTypeDefinition;
     public static bool IsGenericParameter(Type type) => type.IsGenericParameter;
     public static bool IsMarshalByRef(Type type) => type.IsMarshalByRef;
+    public static bool IsNested(Type type) => type.IsNested;
     public static bool IsNestedAssembly(Type type) => type.IsNestedAssembly;
     public static bool IsNestedFamANDAssem(Type type) => type.IsNestedFamANDAssem;
     public static bool IsNestedFamORAssem(Type type) => type.IsNestedFamORAssem;
@@ -4009,6 +4010,13 @@ public static class TypeMetadataCatalogSignatureSamples
                     FormatJsonArray()),
                 (
                     typeof(Type).Assembly.Location,
+                    "Synthetic.Type.IsNested.PurelySharp.EffectSummary.json",
+                    "System.Type.get_IsNested()",
+                    "System.Type.IsNested.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
                     "Synthetic.Type.IsNestedAssembly.PurelySharp.EffectSummary.json",
                     "System.Type.get_IsNestedAssembly()",
                     "System.Type.IsNestedAssembly.get",
@@ -4141,6 +4149,7 @@ public static class TypeMetadataCatalogSignatureSamples
                 ("type.IsGenericTypeDefinition", "System.Type.IsGenericTypeDefinition.get"),
                 ("type.IsGenericParameter", "System.Type.IsGenericParameter.get"),
                 ("type.IsMarshalByRef", "System.Type.IsMarshalByRef.get"),
+                ("type.IsNested", "System.Type.IsNested.get"),
                 ("type.IsNestedAssembly", "System.Type.IsNestedAssembly.get"),
                 ("type.IsNestedFamANDAssem", "System.Type.IsNestedFamANDAssem.get"),
                 ("type.IsNestedFamORAssem", "System.Type.IsNestedFamORAssem.get"),
@@ -4213,7 +4222,6 @@ public static class TypeMetadataCatalogSignatureSamples
                 "System.Type.GUID.get",
                 "System.Type.HasElementType.get",
                 "System.Type.IsEnum.get",
-                "System.Type.IsNested.get",
                 "System.Type.IsSerializable.get",
                 "System.Type.IsVariableBoundArray.get",
                 "System.Type.IsVisible.get",
