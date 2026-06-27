@@ -3455,6 +3455,74 @@ public static class TypeMetadataCatalogSignatureSamples
         }
 
         [Test]
+        public void TypeReflectionSensitivePropertyMembers_AreSourcedFromReflectionFallback_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Type.DefaultBinder.get",
+                "System.Type.GenericParameterAttributes.get",
+                "System.Type.GenericParameterPosition.get",
+                "System.Type.GenericTypeArguments.get",
+                "System.Type.IsByRefLike.get",
+                "System.Type.IsConstructedGenericType.get",
+                "System.Type.IsSecurityCritical.get",
+                "System.Type.IsSecuritySafeCritical.get",
+                "System.Type.IsSecurityTransparent.get",
+                "System.Type.IsSZArray.get",
+                "System.Type.IsTypeDefinition.get",
+                "System.Type.StructLayoutAttribute.get",
+                "System.Type.TypeHandle.get",
+                "System.Type.TypeInitializer.get",
+                "System.Type.AssemblyQualifiedName.get",
+                "System.Type.Attributes.get",
+                "System.Type.BaseType.get",
+                "System.Type.ContainsGenericParameters.get",
+                "System.Type.FullName.get",
+                "System.Type.GUID.get",
+                "System.Type.HasElementType.get",
+                "System.Type.IsCOMObject.get",
+                "System.Type.IsAbstract.get",
+                "System.Type.IsAnsiClass.get",
+                "System.Type.IsArray.get",
+                "System.Type.IsAutoClass.get",
+                "System.Type.IsAutoLayout.get",
+                "System.Type.IsByRef.get",
+                "System.Type.IsClass.get",
+                "System.Type.IsEnum.get",
+                "System.Type.IsExplicitLayout.get",
+                "System.Type.IsImport.get",
+                "System.Type.IsInterface.get",
+                "System.Type.IsLayoutSequential.get",
+                "System.Type.IsNested.get",
+                "System.Type.IsNestedAssembly.get",
+                "System.Type.IsNestedFamANDAssem.get",
+                "System.Type.IsNestedFamORAssem.get",
+                "System.Type.IsNestedFamily.get",
+                "System.Type.IsNestedPrivate.get",
+                "System.Type.IsNestedPublic.get",
+                "System.Type.IsNotPublic.get",
+                "System.Type.IsPointer.get",
+                "System.Type.IsPrimitive.get",
+                "System.Type.IsPublic.get",
+                "System.Type.IsSealed.get",
+                "System.Type.IsSerializable.get",
+                "System.Type.IsSpecialName.get",
+                "System.Type.IsUnicodeClass.get",
+                "System.Type.IsValueType.get",
+                "System.Type.IsVariableBoundArray.get",
+                "System.Type.IsVisible.get",
+                "System.Type.Module.get",
+                "System.Type.Namespace.get",
+                "System.Type.UnderlyingSystemType.get",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void MemberInfoName_IsNotManualCataloged_AndRequiresConcreteImplementationEvidence()
         {
             const string source = @"

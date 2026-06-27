@@ -11046,6 +11046,56 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_TypeFullName_UsesDerivedDispatchEvidenceAfterManualCatalogRemoval()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+#nullable enable
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string? TestMethod(System.Type type)
+    {
+        return type.FullName;
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("dynamic_dispatch"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
+            Assert.That(diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.ImpurityCatalogSourceProperty), Is.False);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Type.FullName"));
+        }
+
+        [Test]
+        public async Task Ps0002_TypeTypeHandle_UsesDerivedDispatchEvidenceAfterManualCatalogRemoval()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public RuntimeTypeHandle TestMethod(System.Type type)
+    {
+        return type.TypeHandle;
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("dynamic_dispatch"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
+            Assert.That(diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.ImpurityCatalogSourceProperty), Is.False);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Type.TypeHandle"));
+        }
+
+        [Test]
         public async Task Ps0002_AssemblyLoadContextDefault_UsesSemanticRuleSource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
