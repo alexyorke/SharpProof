@@ -49,11 +49,13 @@ namespace PurelySharp.Analyzer
             _entriesBySymbol = entriesBySymbol;
         }
 
+        private bool IsEmpty => _entriesBySymbol.IsEmpty;
+
         public static GeneratedPurityCatalog Current => CurrentCatalog.Value ?? BuiltInCatalog.Value;
 
         public static GeneratedPurityCatalog FromOptions(AnalyzerOptions options, CancellationToken cancellationToken)
         {
-            var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
+            var entriesBySymbol = CreateMutableEntries(BuiltInCatalog.Value);
             foreach (var additionalFile in options.AdditionalFiles)
             {
                 if (!IsSummaryFile(additionalFile.Path))
@@ -67,18 +69,41 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                foreach (var entry in ParseEntries(text!, AdditionalSummarySourcePriority))
-                {
-                    if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
-                    {
-                        builder = ImmutableArray.CreateBuilder<SummaryEntry>();
-                        entriesBySymbol.Add(entry.Symbol, builder);
-                    }
-
-                    builder.Add(entry);
-                }
+                AddParsedEntries(entriesBySymbol, text!, AdditionalSummarySourcePriority);
             }
 
+            return CreateCatalog(entriesBySymbol);
+        }
+
+        private static GeneratedPurityCatalog CreateBuiltInCatalog()
+        {
+            var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
+            LoadBuiltInEntries(entriesBySymbol);
+            return CreateCatalog(entriesBySymbol);
+        }
+
+        public static IDisposable UseCurrent(GeneratedPurityCatalog catalog)
+        {
+            return new Scope(CurrentCatalog.Value, catalog.IsEmpty ? null : catalog);
+        }
+
+        private static Dictionary<string, ImmutableArray<SummaryEntry>.Builder> CreateMutableEntries(
+            GeneratedPurityCatalog catalog)
+        {
+            var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
+            foreach (var entry in catalog._entriesBySymbol)
+            {
+                var builder = ImmutableArray.CreateBuilder<SummaryEntry>(entry.Value.Length);
+                builder.AddRange(entry.Value);
+                entriesBySymbol.Add(entry.Key, builder);
+            }
+
+            return entriesBySymbol;
+        }
+
+        private static GeneratedPurityCatalog CreateCatalog(
+            Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol)
+        {
             if (entriesBySymbol.Count == 0)
             {
                 return Empty;
@@ -88,16 +113,6 @@ namespace PurelySharp.Analyzer
                 item => item.Key,
                 item => item.Value.ToImmutable(),
                 StringComparer.Ordinal));
-        }
-
-        private static GeneratedPurityCatalog CreateBuiltInCatalog()
-        {
-            return Empty;
-        }
-
-        public static IDisposable UseCurrent(GeneratedPurityCatalog catalog)
-        {
-            return new Scope(CurrentCatalog.Value, catalog);
         }
 
         public bool TryGetPurity(IMethodSymbol methodSymbol, Compilation compilation, out PurityEntry classification)
@@ -1539,7 +1554,7 @@ namespace PurelySharp.Analyzer
         {
             private readonly GeneratedPurityCatalog? _previous;
 
-            public Scope(GeneratedPurityCatalog? previous, GeneratedPurityCatalog current)
+            public Scope(GeneratedPurityCatalog? previous, GeneratedPurityCatalog? current)
             {
                 _previous = previous;
                 CurrentCatalog.Value = current;

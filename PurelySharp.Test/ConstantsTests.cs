@@ -2320,6 +2320,29 @@ public static class ThreadingStateCatalogSignatureSamples
         }
 
         [Test]
+        public void TaskResultGetter_IsSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            var source = @"
+using System.Threading.Tasks;
+
+public static class TaskResultCatalogSignatureSamples
+{
+    public static int ReadResult(Task<int> task)
+    {
+        return task.Result;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "TaskResultCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "task.Result"));
+        }
+
+        [Test]
         public void ValueTaskResultConstructor_IsSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var source = @"

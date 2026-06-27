@@ -9817,6 +9817,49 @@ public static class DuplicateReviewedSeedFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeTaskResultSlice_UsesGeneratedImpureEvidence()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                40,
+                2,
+                false,
+                true,
+                "System.Threading.Tasks.Task`1.get_Result");
+
+            var knownImpureRows = summary.RootElement
+                .GetProperty("PurityReport")
+                .GetProperty("CatalogComparison")
+                .GetProperty("KnownImpureMembers")
+                .EnumerateArray()
+                .Select(row => row.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(knownImpureRows, Does.Not.Contain("System.Threading.Tasks.Task<TResult>.Result.get"));
+
+            AssertPurityClassification(
+                summary,
+                "System.Threading.Tasks.Task`1.get_Result()",
+                "impure",
+                "global_state_read",
+                "global_state_write",
+                "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Threading.Tasks.Task`1.get_Result()", "caller_visible");
+            AssertPrimaryCategory(summary, "System.Threading.Tasks.Task`1.get_Result()", "global_state_write");
+
+            var generatedSymbols = summary.RootElement
+                .GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => string.Equals(symbol, "System.Threading.Tasks.Task`1.get_Result()", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[] { "System.Threading.Tasks.Task`1.get_Result()" }));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimePureConstructorsSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(

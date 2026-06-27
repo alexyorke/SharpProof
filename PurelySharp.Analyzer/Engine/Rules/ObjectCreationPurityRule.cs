@@ -379,10 +379,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return false;
             }
 
-            var argumentValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(argument.Value);
-            return argumentValue is IArrayCreationOperation ||
-                argumentValue is ILocalReferenceOperation localReference &&
-                currentState.IsOwnedLocalArraySymbol(localReference.Local);
+            return PurityAnalysisEngine.IsTrackedOwnedArrayValue(argument.Value, currentState);
         }
 
         private static bool IsReadOnlyCollectionConstructor(IObjectCreationOperation objectCreationOperation)
@@ -404,10 +401,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IArgumentOperation argument,
             PurityAnalysisEngine.PurityAnalysisState currentState)
         {
-            var argumentValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(argument.Value);
-            return argumentValue is IArrayCreationOperation ||
-                argumentValue is ILocalReferenceOperation localReference &&
-                currentState.IsOwnedLocalArraySymbol(localReference.Local);
+            return PurityAnalysisEngine.IsTrackedOwnedArrayValue(argument.Value, currentState);
         }
 
     }

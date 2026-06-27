@@ -156,9 +156,6 @@ public static class Constants
 
         "System.IServiceProvider.GetService(System.Type)",
         "System.Text.Encoding.Default.get",
-        "System.Threading.Tasks.Task<TResult>.Result.get",
-
-
         "System.MemoryExtensions.Reverse<T>(System.Span<T>)",
         "System.Exception.Source.set",
 

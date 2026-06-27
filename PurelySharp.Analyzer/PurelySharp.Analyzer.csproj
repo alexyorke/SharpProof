@@ -8,6 +8,7 @@
     <LangVersion>preview</LangVersion> 
     <ImplicitUsings>enable</ImplicitUsings> 
     <NoWarn>$(NoWarn);RS2007;RS1035</NoWarn> 
+    <GeneratedPurityBuiltInSummaryDirectory Condition="'$(GeneratedPurityBuiltInSummaryDirectory)' == ''">$(IntermediateOutputPath)GeneratedPurity</GeneratedPurityBuiltInSummaryDirectory>
   </PropertyGroup>
 
   <ItemGroup>
@@ -47,5 +48,14 @@
       <DependentUpon>DiagnosticMessages.resx</DependentUpon>
     </Compile>
   </ItemGroup>
+
+  <Target Name="IncludeGeneratedPurityBuiltInSummaries" BeforeTargets="CoreCompile">
+    <ItemGroup Condition="Exists('$(GeneratedPurityBuiltInSummaryDirectory)')">
+      <_GeneratedPurityBuiltInSummary Include="$(GeneratedPurityBuiltInSummaryDirectory)\*.PurelySharp.EffectSummary.json" />
+      <EmbeddedResource Include="@(_GeneratedPurityBuiltInSummary)">
+        <LogicalName>PurelySharp.Analyzer.GeneratedPurity.%(Filename)%(Extension)</LogicalName>
+      </EmbeddedResource>
+    </ItemGroup>
+  </Target>
 
 </Project> 

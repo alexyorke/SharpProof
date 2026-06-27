@@ -601,13 +601,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IOperation? sourceOperation,
             PurityAnalysisEngine.PurityAnalysisState currentState)
         {
-            var unwrappedSource = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(sourceOperation);
-            if (unwrappedSource is ILocalReferenceOperation localReference)
-            {
-                return currentState.IsOwnedLocalArraySymbol(localReference.Local);
-            }
-
-            return PurityAnalysisEngine.IsArrayEmptyFactoryOperation(unwrappedSource, out _);
+            return PurityAnalysisEngine.IsTrackedOwnedArrayValue(sourceOperation, currentState);
         }
 
         private static bool IsMemoryExtensionsArrayAsSpan(IMethodSymbol methodSymbol)
@@ -631,10 +625,10 @@ namespace PurelySharp.Analyzer.Engine.Rules
             out ILocalSymbol localSymbol)
         {
             var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
-            if (unwrappedReturnedValue is ILocalReferenceOperation localReference &&
-                currentState.IsOwnedLocalArraySymbol(localReference.Local))
+            if (PurityAnalysisEngine.TryResolveTrackedSymbol(unwrappedReturnedValue, currentState) is ILocalSymbol trackedLocal &&
+                currentState.IsOwnedLocalArraySymbol(trackedLocal))
             {
-                localSymbol = localReference.Local;
+                localSymbol = trackedLocal;
                 return true;
             }
 

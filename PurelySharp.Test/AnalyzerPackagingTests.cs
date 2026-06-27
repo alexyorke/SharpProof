@@ -3,9 +3,11 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using System.Collections.Immutable;
@@ -199,6 +201,39 @@ namespace TestNamespace {
         }
 
         [Test]
+        public void AnalyzerProject_ShouldOnlyReference_GeneratedIntermediateEffectSummaryJsonArtifacts()
+        {
+            var projectPath = Path.Combine(FindRepositoryRoot(), "PurelySharp.Analyzer", "PurelySharp.Analyzer.csproj");
+            var document = XDocument.Load(projectPath);
+
+            var generatedSummaryDirectory = document
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "GeneratedPurityBuiltInSummaryDirectory", StringComparison.Ordinal))
+                .Select(element => element.Value.Trim())
+                .LastOrDefault();
+            Assert.That(generatedSummaryDirectory, Is.EqualTo(@"$(IntermediateOutputPath)GeneratedPurity"));
+
+            var target = document
+                .Descendants()
+                .Single(element =>
+                    string.Equals(element.Name.LocalName, "Target", StringComparison.Ordinal) &&
+                    string.Equals(element.Attribute("Name")?.Value, "IncludeGeneratedPurityBuiltInSummaries", StringComparison.Ordinal));
+            Assert.That(target.Attribute("BeforeTargets")?.Value, Is.EqualTo("CoreCompile"));
+
+            var generatedSummaryInclude = target
+                .Descendants()
+                .Single(element => string.Equals(element.Name.LocalName, "_GeneratedPurityBuiltInSummary", StringComparison.Ordinal))
+                .Attribute("Include")?.Value;
+            Assert.That(generatedSummaryInclude, Is.EqualTo(@"$(GeneratedPurityBuiltInSummaryDirectory)\*.PurelySharp.EffectSummary.json"));
+
+            var embeddedResourceInclude = target
+                .Descendants()
+                .Single(element => string.Equals(element.Name.LocalName, "EmbeddedResource", StringComparison.Ordinal))
+                .Attribute("Include")?.Value;
+            Assert.That(embeddedResourceInclude, Is.EqualTo("@(_GeneratedPurityBuiltInSummary)"));
+        }
+
+        [Test]
         public void Repository_ShouldNotKeep_CheckedInEffectSummaryJsonArtifacts()
         {
             var repositoryRoot = FindRepositoryRoot();
@@ -227,6 +262,10 @@ namespace TestNamespace {
                 .Concat(Directory.EnumerateFiles(repositoryRoot, "*.props", SearchOption.AllDirectories))
                 .Concat(Directory.EnumerateFiles(repositoryRoot, "*.targets", SearchOption.AllDirectories))
                 .Concat(Directory.EnumerateFiles(repositoryRoot, "*.csproj", SearchOption.AllDirectories))
+                .Where(path => !string.Equals(
+                    path,
+                    Path.Combine(repositoryRoot, "PurelySharp.Analyzer", "PurelySharp.Analyzer.csproj"),
+                    StringComparison.OrdinalIgnoreCase))
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
@@ -245,6 +284,91 @@ namespace TestNamespace {
 
             Assert.That(legacyAutomationReferences, Is.Empty,
                 "Build and packaging entrypoints should not wire in legacy effect-summary artifact files or refresh scripts.");
+        }
+
+        [Test]
+        public void GeneratedPurityCatalog_EmptyScope_DoesNotMaskBuiltInFallback()
+        {
+            var catalogType = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly.GetType(
+                "PurelySharp.Analyzer.GeneratedPurityCatalog",
+                throwOnError: true)!;
+            var emptyCatalog = catalogType.GetField("Empty", BindingFlags.Public | BindingFlags.Static)!.GetValue(null)!;
+            var useCurrent = catalogType.GetMethod("UseCurrent", BindingFlags.Public | BindingFlags.Static)!;
+            var currentCatalog = catalogType.GetField("CurrentCatalog", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
+            var valueProperty = currentCatalog.GetType().GetProperty("Value")!;
+
+            using var scope = (IDisposable)useCurrent.Invoke(null, new[] { emptyCatalog })!;
+
+            Assert.That(valueProperty.GetValue(currentCatalog), Is.Null,
+                "An empty scoped catalog should defer to the built-in fallback instead of masking it.");
+        }
+
+        [Test]
+        public void GeneratedPurityCatalog_CreateBuiltInCatalog_LoadsGeneratedAnalyzerDirectorySummary()
+        {
+            var analyzerAssemblyPath = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly.Location;
+            var analyzerAssemblyDirectory = Path.GetDirectoryName(analyzerAssemblyPath);
+            Assert.That(string.IsNullOrWhiteSpace(analyzerAssemblyDirectory), Is.False);
+
+            var summaryPath = Path.Combine(
+                analyzerAssemblyDirectory!,
+                "AnalyzerPackagingTests." + Guid.NewGuid().ToString("N") + ".PurelySharp.EffectSummary.json");
+            var summaryJson = GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                typeof(System.Environment).Assembly.Location,
+                "System.Environment.GetEnvironmentVariable(string)",
+                "pure",
+                "[]");
+
+            try
+            {
+                File.WriteAllText(summaryPath, summaryJson);
+
+                var catalogType = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly.GetType(
+                    "PurelySharp.Analyzer.GeneratedPurityCatalog",
+                    throwOnError: true)!;
+                var createBuiltInCatalog = catalogType.GetMethod("CreateBuiltInCatalog", BindingFlags.NonPublic | BindingFlags.Static)!;
+                var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+                var builtInCatalog = createBuiltInCatalog.Invoke(null, null)!;
+
+                const string source = """
+using System;
+
+public static class TestClass
+{
+    public static string? ReadEnvironmentValue()
+    {
+        return Environment.GetEnvironmentVariable("PATH");
+    }
+}
+""";
+
+                var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+                var compilation = CSharpCompilation.Create(
+                    "GeneratedPurityBuiltInCatalogSmoke",
+                    new[] { syntaxTree },
+                    GetTrustedPlatformReferences(),
+                    new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+                var semanticModel = compilation.GetSemanticModel(syntaxTree);
+                var invocation = syntaxTree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
+                var methodSymbol = (IMethodSymbol)semanticModel.GetSymbolInfo(invocation).Symbol!;
+
+                var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
+                var matched = (bool)tryGetPurity.Invoke(builtInCatalog, args)!;
+                var purityEntry = args[2];
+                var classification = purityEntry == null
+                    ? null
+                    : (string?)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry);
+
+                Assert.That(matched, Is.True, "Built-in generated purity should load summaries emitted beside the analyzer assembly.");
+                Assert.That(classification, Is.EqualTo("pure"));
+            }
+            finally
+            {
+                if (File.Exists(summaryPath))
+                {
+                    File.Delete(summaryPath);
+                }
+            }
         }
 
         [Test]
@@ -282,6 +406,24 @@ namespace TestNamespace {
             }
 
             throw new DirectoryNotFoundException("Could not locate repository root from test directory.");
+        }
+
+        private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
+        {
+            var trustedPlatformAssemblies = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string;
+            if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
+            {
+                return ImmutableArray.Create<MetadataReference>(
+                    MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+                    MetadataReference.CreateFromFile(typeof(Console).Assembly.Location));
+            }
+
+            return trustedPlatformAssemblies
+                .Split(Path.PathSeparator)
+                .Where(path => !string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                .Select(path => MetadataReference.CreateFromFile(path))
+                .Cast<MetadataReference>()
+                .ToImmutableArray();
         }
     }
 }

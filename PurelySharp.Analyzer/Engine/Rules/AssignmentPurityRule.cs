@@ -780,8 +780,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return IsOwnedLocalArrayReference(conversionOperation.Operand, currentState);
             }
 
-            return operation is ILocalReferenceOperation localReference &&
-                   currentState.IsOwnedLocalArraySymbol(localReference.Local);
+            return PurityAnalysisEngine.IsTrackedOwnedArrayValue(operation, currentState);
         }
 
         private static bool IsOwnedFreshMutableObjectReference(
