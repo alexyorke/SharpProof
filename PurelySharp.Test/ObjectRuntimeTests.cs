@@ -67,7 +67,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ObjectEqualsStatic_Diagnostic()
+        public async Task ObjectEqualsStatic_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -76,7 +76,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(object left, object right)
+    public bool TestMethod(object left, object right)
     {
         return object.Equals(left, right);
     }

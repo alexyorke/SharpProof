@@ -87,7 +87,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task AddingNewEventArgsConstructor_Diagnostic()
+        public async Task AddingNewEventArgsConstructor_NoDiagnostic()
         {
             var test = @"
 using System.ComponentModel;
@@ -96,7 +96,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public AddingNewEventArgs {|PS0002:TestMethod|}()
+    public AddingNewEventArgs TestMethod()
     {
         return new AddingNewEventArgs();
     }

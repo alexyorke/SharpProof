@@ -3674,6 +3674,29 @@ public static class ReflectionCtorCatalogSamples
         }
 
         [Test]
+        public void StaticObjectEquals_UsesGeneratedPurity_NotManualCatalogs()
+        {
+            var source = @"
+using System;
+
+public static class ObjectCatalogSignatureSamples
+{
+    public static bool Compare(object left, object right)
+    {
+        return object.Equals(left, right);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "StaticObjectEqualsGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetInvocationSignature(compilation, syntaxTree, "object.Equals(left, right)"));
+        }
+
+        [Test]
         public void TypeReflectionSensitiveInvocationMembers_AreSourcedFromReflectionFallback_NotStaticCatalogs()
         {
             var members = new[]
@@ -5904,6 +5927,29 @@ public static class CancelEventArgsCatalogSignatureSamples
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
             AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "writeArgs.Cancel", preferSetter: true));
+        }
+
+        [Test]
+        public void AddingNewEventArgsConstructorResolvesWithoutManualCatalogRow()
+        {
+            var source = @"
+using System.ComponentModel;
+
+public static class AddingNewEventArgsCatalogSignatureSamples
+{
+    public static AddingNewEventArgs Create()
+    {
+        return new AddingNewEventArgs();
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "AddingNewEventArgsGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new AddingNewEventArgs()"));
         }
 
         [Test]

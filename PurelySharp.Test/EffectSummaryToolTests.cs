@@ -5339,6 +5339,34 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeAddingNewEventArgsConstructor_UsesSdkDerivedPurity()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.ComponentModel.TypeConverter.dll",
+                12,
+                "System.ComponentModel.AddingNewEventArgs..ctor(");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.ComponentModel.AddingNewEventArgs..ctor()", "pure");
+            AssertFreshnessClassification(summary, "System.ComponentModel.AddingNewEventArgs..ctor()", "fresh_owned_object_write");
+            AssertEffectVisibilityClassification(summary, "System.ComponentModel.AddingNewEventArgs..ctor()", "internal_only");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.ComponentModel.AddingNewEventArgs..ctor()"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeRegularExpressionAttributeSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
@@ -10115,6 +10143,34 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(generatedSymbols, Does.Contain("System.ValueTuple.Create(!!0, !!1)"));
             Assert.That(generatedSymbols, Does.Contain("System.ArraySegment`1..ctor(!0[])"));
             Assert.That(generatedSymbols, Does.Contain("System.ArraySegment`1..ctor(!0[], int, int)"));
+        }
+
+        [Test]
+        public async Task EffectSummaryTool_RuntimeObjectEqualsStaticSlice_UsesGeneratedPurityCatalogEntries()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.Private.CoreLib.dll",
+                20,
+                "System.Object.Equals(object, object)");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.Object.Equals(object, object)", "pure");
+            AssertFreshnessClassification(summary, "System.Object.Equals(object, object)", "none");
+            AssertEffectVisibilityClassification(summary, "System.Object.Equals(object, object)", "none");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => string.Equals(symbol, "System.Object.Equals(object, object)", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Is.EqualTo(new[] { "System.Object.Equals(object, object)" }));
         }
 
         [Test]

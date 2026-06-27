@@ -63,7 +63,7 @@ public sealed class TestClass
         }
 
         [Test]
-        public async Task StaticObjectEqualsVirtualDispatch_Diagnostic()
+        public async Task StaticObjectEqualsVirtualDispatch_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -71,7 +71,7 @@ using PurelySharp.Attributes;
 public sealed class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(object left, object right)
+    public bool TestMethod(object left, object right)
     {
         return object.Equals(left, right);
     }

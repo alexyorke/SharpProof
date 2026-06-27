@@ -10426,6 +10426,90 @@ public class TestClass
         }
 
         [Test]
+        public async Task GeneratedPurityCatalog_Resolves_AddingNewEventArgsConstructorAndStaticObjectEqualsAsPureEvidence()
+        {
+            const string source = @"
+using System;
+using System.ComponentModel;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(object left, object right)
+    {
+        _ = new AddingNewEventArgs();
+        return object.Equals(left, right) ? 1 : 0;
+    }
+}";
+
+            var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
+                typeof(System.ComponentModel.AddingNewEventArgs).Assembly.Location,
+                (
+                    "Synthetic.ComponentModel.AddingNewEventArgs.Constructor.PurelySharp.EffectSummary.json",
+                    "System.ComponentModel.AddingNewEventArgs..ctor()",
+                    "System.ComponentModel.AddingNewEventArgs..ctor()",
+                    "pure",
+                    FormatJsonArray("fresh_owned_object_write", "internal_only")))
+                .Concat(CreateSyntheticGeneratedPurityAdditionalFiles(
+                    typeof(object).Assembly.Location,
+                    (
+                        "Synthetic.Object.Equals.Static.PurelySharp.EffectSummary.json",
+                        "System.Object.Equals(object, object)",
+                        "System.Object.Equals(object, object)",
+                        "pure",
+                        FormatJsonArray())))
+                .ToImmutableArray();
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source, additionalFiles: additionalFiles);
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "GeneratedPurityProbe",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences().Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location)),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var trackedMethods = new IMethodSymbol[]
+            {
+                (IMethodSymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<ObjectCreationExpressionSyntax>()
+                        .Single(node => node.ToString() == "new AddingNewEventArgs()"))
+                    .Symbol!,
+                (IMethodSymbol)semanticModel.GetSymbolInfo(
+                    syntaxTree.GetRoot()
+                        .DescendantNodes()
+                        .OfType<InvocationExpressionSyntax>()
+                        .Single(node => node.ToString() == "object.Equals(left, right)"))
+                    .Symbol!,
+            };
+            var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
+            var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
+            var catalog = fromOptions.Invoke(null, new object[] { CreateAnalyzerOptions(additionalFiles: additionalFiles), CancellationToken.None })!;
+            var resolutions = trackedMethods.Select(method =>
+            {
+                var args = new object?[] { method.OriginalDefinition, compilation, null };
+                var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
+                var purityEntry = args[2];
+                var classification = matched
+                    ? (string)purityEntry!.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
+                    : string.Empty;
+                return (matched, classification);
+            }).ToArray();
+
+            Assert.That(
+                diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.False,
+                "Generated purity summary evidence should allow AddingNewEventArgs() and object.Equals(object, object).");
+            Assert.That(resolutions.Select(result => result.matched).ToArray(), Is.EqualTo(new[] { true, true }),
+                "Generated purity catalog should resolve AddingNewEventArgs() and object.Equals(object, object) from synthetic generated evidence.");
+            Assert.That(resolutions.Select(result => result.classification).ToArray(), Is.EqualTo(new[] { "pure", "pure" }),
+                "Generated purity catalog should classify AddingNewEventArgs() and object.Equals(object, object) as pure.");
+        }
+
+        [Test]
         public async Task Ps0002_StringReplaceChar_IsPureFromGeneratedPuritySummary()
         {
             var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
