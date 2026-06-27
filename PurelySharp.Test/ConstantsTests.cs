@@ -3826,6 +3826,7 @@ public static class TypeMetadataCatalogSignatureSamples
     public static bool IsAbstract(Type type) => type.IsAbstract;
     public static bool IsAnsiClass(Type type) => type.IsAnsiClass;
     public static bool IsArray(Type type) => type.IsArray;
+    public static TypeAttributes Attributes(Type type) => type.Attributes;
     public static bool IsAutoClass(Type type) => type.IsAutoClass;
     public static bool IsAutoLayout(Type type) => type.IsAutoLayout;
     public static bool IsByRef(Type type) => type.IsByRef;
@@ -3899,6 +3900,13 @@ public static class TypeMetadataCatalogSignatureSamples
                     "Synthetic.Type.IsArray.PurelySharp.EffectSummary.json",
                     "System.Type.get_IsArray()",
                     "System.Type.IsArray.get",
+                    "pure",
+                    FormatJsonArray()),
+                (
+                    typeof(Type).Assembly.Location,
+                    "Synthetic.Type.Attributes.PurelySharp.EffectSummary.json",
+                    "System.Type.get_Attributes()",
+                    "System.Type.Attributes.get",
                     "pure",
                     FormatJsonArray()),
                 (
@@ -4118,6 +4126,7 @@ public static class TypeMetadataCatalogSignatureSamples
                 ("type.IsAbstract", "System.Type.IsAbstract.get"),
                 ("type.IsAnsiClass", "System.Type.IsAnsiClass.get"),
                 ("type.IsArray", "System.Type.IsArray.get"),
+                ("type.Attributes", "System.Type.Attributes.get"),
                 ("type.IsAutoClass", "System.Type.IsAutoClass.get"),
                 ("type.IsAutoLayout", "System.Type.IsAutoLayout.get"),
                 ("type.IsByRef", "System.Type.IsByRef.get"),
@@ -4198,7 +4207,6 @@ public static class TypeMetadataCatalogSignatureSamples
                 "System.Type.TypeHandle.get",
                 "System.Type.TypeInitializer.get",
                 "System.Type.AssemblyQualifiedName.get",
-                "System.Type.Attributes.get",
                 "System.Type.BaseType.get",
                 "System.Type.ContainsGenericParameters.get",
                 "System.Type.FullName.get",

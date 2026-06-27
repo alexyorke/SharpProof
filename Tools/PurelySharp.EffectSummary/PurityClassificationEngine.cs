@@ -872,6 +872,10 @@ internal static class PurityClassificationEngine
         {
             effectVisibilityClassification = "none";
         }
+        else if (HasPureTypeMetadataValueWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "none";
+        }
         else if (HasPureTypeIdentityWrapperPattern(summary))
         {
             effectVisibilityClassification = "none";
@@ -1019,6 +1023,25 @@ internal static class PurityClassificationEngine
             "System.Type.get_IsInterface()" => CallSitesMatch(
                 callSites,
                 ("System.RuntimeTypeHandle.IsInterface(System.RuntimeType)->bool", false),
+                ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true)),
+            _ => false,
+        };
+    }
+
+    private static bool HasPureTypeMetadataValueWrapperPattern(MethodEffectSummary summary)
+    {
+        if (summary.Fields.Length != 0 ||
+            !CallsOnly(summary, "calls_method", "virtual_call") ||
+            !summary.RootCandidates.All(static root => string.Equals(root, "dynamic_dispatch", StringComparison.Ordinal)))
+        {
+            return false;
+        }
+
+        var callSites = EnumerateCallSites(summary).ToArray();
+        return summary.Symbol switch
+        {
+            "System.Type.get_Attributes()" => CallSitesMatch(
+                callSites,
                 ("System.Type.GetAttributeFlagsImpl()->System.Reflection.TypeAttributes", true)),
             _ => false,
         };

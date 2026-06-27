@@ -530,7 +530,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeAttributes_Diagnostic()
+        public async Task TypeAttributes_NoDiagnostic()
         {
             var test = @"
 using System.Reflection;
@@ -539,7 +539,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public TypeAttributes {|PS0002:TestMethod|}(System.Type type)
+    public TypeAttributes TestMethod(System.Type type)
     {
         return type.Attributes;
     }

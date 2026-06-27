@@ -4748,6 +4748,7 @@ public class TestClass
         _ = type.IsAbstract;
         _ = type.IsAnsiClass;
         _ = type.IsArray;
+        _ = type.Attributes;
         _ = type.IsAutoClass;
         _ = type.IsAutoLayout;
         _ = type.IsByRef;
@@ -4802,6 +4803,7 @@ public class TestClass
                     node.ToString() == "type.IsAbstract" ||
                     node.ToString() == "type.IsAnsiClass" ||
                     node.ToString() == "type.IsArray" ||
+                    node.ToString() == "type.Attributes" ||
                     node.ToString() == "type.IsAutoClass" ||
                     node.ToString() == "type.IsAutoLayout" ||
                     node.ToString() == "type.IsByRef" ||
@@ -4857,6 +4859,7 @@ public class TestClass
             Assert.That(resolutions["type.IsAbstract"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsAnsiClass"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsArray"], Is.EqualTo((true, "pure")));
+            Assert.That(resolutions["type.Attributes"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsAutoClass"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsAutoLayout"], Is.EqualTo((true, "pure")));
             Assert.That(resolutions["type.IsByRef"], Is.EqualTo((true, "pure")));

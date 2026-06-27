@@ -8168,6 +8168,7 @@ public static class DuplicateReviewedSeedFixture
                 20,
                 "System.Type.get_IsAbstract",
                 "System.Type.get_IsArray",
+                "System.Type.get_Attributes",
                 "System.Type.get_IsClass",
                 "System.Type.get_IsInterface",
                 "System.Type.get_IsSealed",
@@ -8183,6 +8184,8 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Type.get_IsAbstract()", "none");
             AssertPurityClassification(summary, "System.Type.get_IsArray()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Type.get_IsArray()", "none");
+            AssertPurityClassification(summary, "System.Type.get_Attributes()", "pure");
+            AssertEffectVisibilityClassification(summary, "System.Type.get_Attributes()", "none");
             AssertPurityClassification(summary, "System.Type.get_IsClass()", "pure");
             AssertEffectVisibilityClassification(summary, "System.Type.get_IsClass()", "none");
             AssertPurityClassification(summary, "System.Type.get_IsInterface()", "pure");
@@ -8199,6 +8202,7 @@ public static class DuplicateReviewedSeedFixture
                 .Where(symbol =>
                     string.Equals(symbol, "System.Type.get_IsAbstract()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Type.get_IsArray()", StringComparison.Ordinal) ||
+                    string.Equals(symbol, "System.Type.get_Attributes()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Type.get_IsClass()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Type.get_IsInterface()", StringComparison.Ordinal) ||
                     string.Equals(symbol, "System.Type.get_IsSealed()", StringComparison.Ordinal) ||
@@ -8210,6 +8214,7 @@ public static class DuplicateReviewedSeedFixture
             {
                 "System.Type.get_IsAbstract()",
                 "System.Type.get_IsArray()",
+                "System.Type.get_Attributes()",
                 "System.Type.get_IsClass()",
                 "System.Type.get_IsInterface()",
                 "System.Type.get_IsSealed()",
