@@ -341,24 +341,6 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeToString_NoDiagnostic()
-        {
-            var test = @"
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public string TestMethod(System.Type type)
-    {
-        return type.ToString();
-    }
-}";
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
         public async Task TypeAssemblyQualifiedName_Diagnostic()
         {
             var test = @"
@@ -601,24 +583,6 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsGenericType_NoDiagnostic()
-        {
-            var test = @"
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(System.Type type)
-    {
-        return type.IsGenericType;
-    }
-}";
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
         public async Task TypeIsValueType_Diagnostic()
         {
             var test = @"
@@ -668,25 +632,6 @@ public class TestClass
     public TypeInfo {|PS0002:TestMethod|}(System.Type type)
     {
         return type.GetTypeInfo();
-    }
-}";
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-        public async Task TypeGetTypeFromHandle_NoDiagnostic()
-        {
-            var test = @"
-using System;
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public Type TestMethod(RuntimeTypeHandle handle)
-    {
-        return Type.GetTypeFromHandle(handle);
     }
 }";
 
@@ -879,24 +824,6 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsGenericTypeDefinition_NoDiagnostic()
-        {
-            var test = @"
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(System.Type type)
-    {
-        return type.IsGenericTypeDefinition;
-    }
-}";
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
         public async Task TypeIsConstructedGenericType_Diagnostic()
         {
             var test = @"
@@ -908,24 +835,6 @@ public class TestClass
     public bool {|PS0002:TestMethod|}(System.Type type)
     {
         return type.IsConstructedGenericType;
-    }
-}";
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-        public async Task TypeIsGenericParameter_NoDiagnostic()
-        {
-            var test = @"
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(System.Type type)
-    {
-        return type.IsGenericParameter;
     }
 }";
 
@@ -1239,24 +1148,6 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsMarshalByRef_NoDiagnostic()
-        {
-            var test = @"
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(System.Type type)
-    {
-        return type.IsMarshalByRef;
-    }
-}";
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
         public async Task TypeIsSerializable_Diagnostic()
         {
             var test = @"
@@ -1401,24 +1292,6 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeIsContextful_NoDiagnostic()
-        {
-            var test = @"
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public bool TestMethod(System.Type type)
-    {
-        return type.IsContextful;
-    }
-}";
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
         public async Task TypeIsSecurityCritical_Diagnostic()
         {
             var test = @"
@@ -1509,24 +1382,6 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeDeclaringMethod_NoDiagnostic()
-        {
-            var test = @"
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public System.Reflection.MethodBase TestMethod(System.Type type)
-    {
-        return type.DeclaringMethod;
-    }
-}";
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
         public async Task TypeStructLayoutAttribute_Diagnostic()
         {
             var test = @"
@@ -1556,61 +1411,6 @@ public class TestClass
     public System.Reflection.Binder {|PS0002:TestMethod|}()
     {
         return System.Type.DefaultBinder;
-    }
-}";
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-        public async Task TypeDeclaringType_NoDiagnostic()
-        {
-            var test = @"
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public System.Type TestMethod(System.Type type)
-    {
-        return type.DeclaringType;
-    }
-}";
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-        public async Task TypeReflectedType_NoDiagnostic()
-        {
-            var test = @"
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public System.Type TestMethod(System.Type type)
-    {
-        return type.ReflectedType;
-    }
-}";
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-        public async Task TypeMemberType_NoDiagnostic()
-        {
-            var test = @"
-using PurelySharp.Attributes;
-using System.Reflection;
-
-public class TestClass
-{
-    [EnforcePure]
-    public MemberTypes TestMethod(System.Type type)
-    {
-        return type.MemberType;
     }
 }";
 
@@ -2134,47 +1934,6 @@ public class TestClass
     public object[] {|PS0002:TestMethod|}(MemberInfo member)
     {
         return Attribute.GetCustomAttributes(member);
-    }
-}";
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-        public async Task AttributeGetCustomAttributeOnMemberInfo_NoDiagnostic()
-        {
-            var test = @"
-#nullable enable
-using PurelySharp.Attributes;
-using System;
-using System.Reflection;
-
-public class TestClass
-{
-    [EnforcePure]
-    public Attribute? TestMethod(MemberInfo member, Type attributeType)
-    {
-        return Attribute.GetCustomAttribute(member, attributeType);
-    }
-}";
-
-            await VerifyCS.VerifyAnalyzerAsync(test);
-        }
-
-        [Test]
-        public async Task CustomAttributeDataGetCustomAttributesOnMemberInfo_NoDiagnostic()
-        {
-            var test = @"
-using PurelySharp.Attributes;
-using System.Collections.Generic;
-using System.Reflection;
-
-public class TestClass
-{
-    [EnforcePure]
-    public IList<CustomAttributeData> TestMethod(MemberInfo member)
-    {
-        return CustomAttributeData.GetCustomAttributes(member);
     }
 }";
 

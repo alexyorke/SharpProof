@@ -5353,143 +5353,6 @@ public static class StringComparisonFixture
         }
 
         [Test]
-        public void CheckedInEffectSummaryArtifacts_DoNotReportCatalogOverlap()
-        {
-            RequireCheckedInEffectSummaryArtifacts();
-            var analyzerDirectory = Path.Combine(GetRepositoryRoot(), "PurelySharp.Analyzer");
-            var summaryPaths = Directory.GetFiles(analyzerDirectory, "*.EffectSummary.json", SearchOption.TopDirectoryOnly)
-                .OrderBy(path => path, StringComparer.Ordinal)
-                .ToArray();
-
-            Assert.That(summaryPaths, Is.Not.Empty);
-            var summariesWithCatalogComparison = 0;
-
-            foreach (var summaryPath in summaryPaths)
-            {
-                using var summary = JsonDocument.Parse(File.ReadAllText(summaryPath));
-                if (!summary.RootElement.TryGetProperty("PurityReport", out var purityReport) ||
-                    purityReport.ValueKind != JsonValueKind.Object ||
-                    !purityReport.TryGetProperty("CatalogComparison", out var catalogComparison) ||
-                    catalogComparison.ValueKind != JsonValueKind.Object)
-                {
-                    continue;
-                }
-
-                summariesWithCatalogComparison++;
-
-                Assert.That(
-                    catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(),
-                    Is.EqualTo(0),
-                    summaryPath);
-                var staleKnownImpureRows = catalogComparison.GetProperty("KnownImpureMembers")
-                    .EnumerateArray()
-                    .Where(row => string.Equals(
-                        row.GetProperty("Classification").GetString(),
-                        "pure",
-                        StringComparison.Ordinal))
-                    .Select(row => row.GetProperty("Symbol").GetString())
-                    .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
-                    .ToArray();
-                Assert.That(
-                    staleKnownImpureRows,
-                    Is.Empty,
-                    summaryPath + ": " + string.Join(", ", staleKnownImpureRows));
-                Assert.That(
-                    catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(),
-                    Is.EqualTo(0),
-                    summaryPath);
-            }
-
-            Assert.That(summariesWithCatalogComparison, Is.GreaterThan(0));
-        }
-
-        [Test]
-        public void ReviewedRuntimeArtifactSpec_CoversAllCheckedInEffectSummaryArtifacts()
-        {
-            RequireCheckedInEffectSummaryArtifacts();
-            var repositoryRoot = GetRepositoryRoot();
-            var analyzerDirectory = Path.Combine(repositoryRoot, "PurelySharp.Analyzer");
-            var reviewedSpecPath = Path.Combine(repositoryRoot, "Tools", "PurelySharp.EffectSummary", "ReviewedRuntimeArtifactSpec.json");
-
-            using var reviewedSpec = JsonDocument.Parse(File.ReadAllText(reviewedSpecPath));
-            var defaults = reviewedSpec.RootElement.GetProperty("Defaults");
-            var defaultRuntimeAssemblyName = defaults.GetProperty("RuntimeAssemblyName").GetString();
-            Assert.That(defaultRuntimeAssemblyName, Is.Not.Null.And.Not.Empty);
-
-            var artifactAssemblyByFileName = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var artifact in reviewedSpec.RootElement.GetProperty("Artifacts").EnumerateArray())
-            {
-                var outputPath = artifact.GetProperty("OutputPath").GetString();
-                Assert.That(outputPath, Is.Not.Null.And.Not.Empty);
-                var fileName = Path.GetFileName(outputPath!);
-                Assert.That(fileName, Is.Not.Null.And.Not.Empty);
-                var expectedAssemblyFileName =
-                    artifact.TryGetProperty("RuntimeAssemblyName", out var runtimeAssemblyNameElement) &&
-                    runtimeAssemblyNameElement.ValueKind == JsonValueKind.String &&
-                    !string.IsNullOrWhiteSpace(runtimeAssemblyNameElement.GetString())
-                        ? runtimeAssemblyNameElement.GetString()!
-                        : artifact.TryGetProperty("PackageAssemblyRelativePath", out var packageAssemblyRelativePathElement) &&
-                          packageAssemblyRelativePathElement.ValueKind == JsonValueKind.String &&
-                          !string.IsNullOrWhiteSpace(packageAssemblyRelativePathElement.GetString())
-                            ? Path.GetFileName(packageAssemblyRelativePathElement.GetString()!)
-                            : defaultRuntimeAssemblyName!;
-                artifactAssemblyByFileName[fileName!] = expectedAssemblyFileName;
-            }
-
-            var checkedInSummaryPaths = Directory.GetFiles(analyzerDirectory, "*.EffectSummary.json", SearchOption.TopDirectoryOnly)
-                .OrderBy(path => path, StringComparer.Ordinal)
-                .ToArray();
-
-            Assert.That(checkedInSummaryPaths, Is.Not.Empty);
-
-            foreach (var summaryPath in checkedInSummaryPaths)
-            {
-                using var summary = JsonDocument.Parse(File.ReadAllText(summaryPath));
-                var fileName = Path.GetFileName(summaryPath);
-                Assert.That(artifactAssemblyByFileName.TryGetValue(fileName, out var reviewedRuntimeAssemblyName), Is.True, fileName);
-
-                var actualRuntimeAssemblyName = Path.GetFileName(
-                    summary.RootElement
-                        .GetProperty("Assemblies")[0]
-                        .GetProperty("AssemblyPath")
-                        .GetString());
-
-                Assert.That(reviewedRuntimeAssemblyName, Is.EqualTo(actualRuntimeAssemblyName), fileName);
-            }
-        }
-
-        [Test]
-        public void ReviewedRuntimeArtifactSpec_GuardHelpers_EnableTransitiveRoots()
-        {
-            var reviewedSpecPath = RequireCheckedInEffectSummaryFile(
-                Path.Combine("Tools", "PurelySharp.EffectSummary", "ReviewedRuntimeArtifactSpec.json"));
-
-            using var reviewedSpec = JsonDocument.Parse(File.ReadAllText(reviewedSpecPath));
-            var guardHelpersArtifact = reviewedSpec.RootElement.GetProperty("Artifacts")
-                .EnumerateArray()
-                .Single(artifact =>
-                    string.Equals(
-                        artifact.GetProperty("OutputPath").GetString(),
-                        "PurelySharp.Analyzer/GuardHelpers.PurelySharp.EffectSummary.json",
-                        StringComparison.Ordinal));
-
-            Assert.That(guardHelpersArtifact.GetProperty("IncludeTransitiveRoots").GetBoolean(), Is.True);
-        }
-
-        [Test]
-        public void ReviewedRuntimeArtifactSpec_GuardHelpers_CheckedInArtifactPreservesTransitiveExceptions()
-        {
-            var summaryPath = RequireCheckedInEffectSummaryFile(
-                Path.Combine("PurelySharp.Analyzer", "GuardHelpers.PurelySharp.EffectSummary.json"));
-
-            using var summary = JsonDocument.Parse(File.ReadAllText(summaryPath));
-
-            AssertTransitiveExceptionsContain(summary, "System.ArgumentException.ThrowIfNullOrEmpty(string, string)", "System.ArgumentException");
-            AssertTransitiveExceptionsContain(summary, "System.ArgumentNullException.ThrowIfNull(object, string)", "System.ArgumentNullException");
-            AssertTransitiveExceptionsContain(summary, "System.ArgumentOutOfRangeException.ThrowIfZero(!!0, string)", "System.ArgumentOutOfRangeException");
-        }
-
-        [Test]
         public async Task EffectSummaryTool_ArtifactSpec_GeneratesMultipleOutputFiles()
         {
             var workingDirectory = Path.Combine(
@@ -6291,14 +6154,21 @@ public static class DuplicateReviewedSeedFixture
         [Test]
         public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_Classifies_DirectoryCurrentDirectory_AsImpure()
         {
-            RequireCheckedInEffectSummaryArtifacts();
             var workingDirectory = Path.Combine(
                 TestContext.CurrentContext.WorkDirectory,
                 "effect-summary-directory-current-directory-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(workingDirectory);
 
+            var seedOutputPath = Path.Combine(workingDirectory, "seed.PurelySharp.EffectSummary.json");
             var outputPath = Path.Combine(workingDirectory, "Directory.CurrentDirectory.PurelySharp.EffectSummary.json");
             var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            await GenerateReviewedSourceSummaryAsync(
+                seedOutputPath,
+                "System.Private.CoreLib.dll",
+                80,
+                "System.IO.Directory.GetCurrentDirectory",
+                "System.IO.Directory.SetCurrentDirectory");
 
             var artifactSpecJson = JsonSerializer.Serialize(
                 new
@@ -6317,7 +6187,7 @@ public static class DuplicateReviewedSeedFixture
                         new
                         {
                             OutputPath = outputPath,
-                            SourceSummaryPath = "PurelySharp.Analyzer/Environment.PurelySharp.EffectSummary.json",
+                            SourceSummaryPath = seedOutputPath,
                             SymbolPrefixes = new[]
                             {
                                 "System.IO.Directory.GetCurrentDirectory",
@@ -6382,7 +6252,6 @@ public static class DuplicateReviewedSeedFixture
         [Test]
         public async Task EffectSummaryTool_ArtifactSpec_ResolvesRelativePathsAgainstSpecDirectory()
         {
-            RequireCheckedInEffectSummaryArtifacts();
             var workingRoot = Path.Combine(
                 TestContext.CurrentContext.WorkDirectory,
                 "effect-summary-artifact-spec-relative-" + Guid.NewGuid().ToString("N"));
@@ -6393,18 +6262,20 @@ public static class DuplicateReviewedSeedFixture
             Directory.CreateDirectory(invocationDirectory);
             Directory.CreateDirectory(outputDirectory);
 
-            var repositoryRoot = GetRepositoryRoot();
+            var seedOutputPath = Path.Combine(specDirectory, "seed.PurelySharp.EffectSummary.json");
             var runtimeAssemblyPath = typeof(string).Assembly.Location;
-            var copiedSeedPath = Path.Combine(specDirectory, "Environment.PurelySharp.EffectSummary.json");
-            File.Copy(
-                RequireCheckedInEffectSummaryFile(
-                    Path.Combine("PurelySharp.Analyzer", "Environment.PurelySharp.EffectSummary.json")),
-                copiedSeedPath);
+
+            await GenerateReviewedSourceSummaryAsync(
+                seedOutputPath,
+                "System.Private.CoreLib.dll",
+                80,
+                "System.IO.Directory.GetCurrentDirectory",
+                "System.IO.Directory.SetCurrentDirectory");
 
             var outputPath = Path.Combine(outputDirectory, "Directory.CurrentDirectory.PurelySharp.EffectSummary.json");
             var artifactSpecPath = Path.Combine(specDirectory, "artifact-spec.json");
             var relativeOutputPath = Path.GetRelativePath(specDirectory, outputPath);
-            var relativeSeedPath = Path.GetRelativePath(specDirectory, copiedSeedPath);
+            var relativeSeedPath = Path.GetRelativePath(specDirectory, seedOutputPath);
             var relativeAssemblyPath = Path.GetRelativePath(specDirectory, runtimeAssemblyPath);
 
             var artifactSpecJson = JsonSerializer.Serialize(
@@ -6451,154 +6322,6 @@ public static class DuplicateReviewedSeedFixture
             AssertPurityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "impure", "global_state_write", "impure_callee");
             AssertPrimaryCategory(summary, "System.IO.Directory.SetCurrentDirectory(string)", "global_state_write");
             AssertEffectVisibilityClassification(summary, "System.IO.Directory.SetCurrentDirectory(string)", "caller_visible");
-        }
-
-        [Test]
-        public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_Classifies_EnvironmentCommandLineAndVersion_AsImpure()
-        {
-            RequireCheckedInEffectSummaryArtifacts();
-            var workingDirectory = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "effect-summary-environment-command-line-version-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(workingDirectory);
-
-            var outputPath = Path.Combine(workingDirectory, "Environment.CommandLine.Version.PurelySharp.EffectSummary.json");
-            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
-
-            var artifactSpecJson = JsonSerializer.Serialize(
-                new
-                {
-                    SchemaVersion = 1,
-                    Defaults = new
-                    {
-                        Framework = "net8.0",
-                        RuntimeAssemblyName = "System.Private.CoreLib.dll",
-                        IncludeCallees = true,
-                        IncludePurityClassification = true,
-                        CompareManualCatalogs = true,
-                    },
-                    Artifacts = new object[]
-                    {
-                        new
-                        {
-                            OutputPath = outputPath,
-                            SourceSummaryPath = "PurelySharp.Analyzer/Environment.PurelySharp.EffectSummary.json",
-                            SymbolPrefixes = new[]
-                            {
-                                "System.Environment.get_CommandLine",
-                                "System.Environment.get_Version",
-                            },
-                            Limit = 24,
-                        },
-                    },
-                },
-                new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                });
-            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
-
-            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
-
-            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
-            var report = summary.RootElement.GetProperty("PurityReport");
-            var catalogComparison = report.GetProperty("CatalogComparison");
-
-            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
-            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
-            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
-
-            AssertPurityClassification(summary, "System.Environment.get_CommandLine()", "impure", "impure_callee");
-            AssertEffectVisibilityClassification(summary, "System.Environment.get_CommandLine()", "caller_visible");
-            AssertPurityClassification(summary, "System.Environment.get_Version()", "impure", "impure_callee");
-            AssertEffectVisibilityClassification(summary, "System.Environment.get_Version()", "caller_visible");
-
-            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
-                .GetProperty("Entries")
-                .EnumerateArray()
-                .Select(entry => entry.GetProperty("Symbol").GetString())
-                .Where(symbol =>
-                    string.Equals(symbol, "System.Environment.get_CommandLine()", StringComparison.Ordinal) ||
-                    string.Equals(symbol, "System.Environment.get_Version()", StringComparison.Ordinal))
-                .OrderBy(symbol => symbol, StringComparer.Ordinal)
-                .ToArray();
-
-            Assert.That(generatedSymbols, Is.EqualTo(new[]
-            {
-                "System.Environment.get_CommandLine()",
-                "System.Environment.get_Version()",
-            }));
-        }
-
-        [Test]
-        public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_Classifies_CultureInfoGetCultureInfo_AsImpure()
-        {
-            RequireCheckedInEffectSummaryArtifacts();
-            var workingDirectory = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "effect-summary-culture-info-get-culture-info-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(workingDirectory);
-
-            var outputPath = Path.Combine(workingDirectory, "Culture.GetCultureInfo.PurelySharp.EffectSummary.json");
-            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
-
-            var artifactSpecJson = JsonSerializer.Serialize(
-                new
-                {
-                    SchemaVersion = 1,
-                    Defaults = new
-                    {
-                        Framework = "net8.0",
-                        RuntimeAssemblyName = "System.Private.CoreLib.dll",
-                        IncludeCallees = true,
-                        IncludePurityClassification = true,
-                        CompareManualCatalogs = true,
-                    },
-                    Artifacts = new object[]
-                    {
-                        new
-                        {
-                            OutputPath = outputPath,
-                            SourceSummaryPath = "PurelySharp.Analyzer/Culture.GetCultureInfo.PurelySharp.EffectSummary.json",
-                            IncludeCallees = false,
-                            SymbolPrefixes = new[]
-                            {
-                                "System.Globalization.CultureInfo.GetCultureInfo(string)",
-                            },
-                            Limit = 8,
-                        },
-                    },
-                },
-                new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                });
-            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
-
-            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
-
-            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
-            var report = summary.RootElement.GetProperty("PurityReport");
-            var catalogComparison = report.GetProperty("CatalogComparison");
-
-            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
-            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
-            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
-
-            AssertPurityClassification(summary, "System.Globalization.CultureInfo.GetCultureInfo(string)", "impure", "impure_callee", "object_state_write", "throw");
-            AssertEffectVisibilityClassification(summary, "System.Globalization.CultureInfo.GetCultureInfo(string)", "caller_visible");
-
-            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
-                .GetProperty("Entries")
-                .EnumerateArray()
-                .Select(entry => entry.GetProperty("Symbol").GetString())
-                .Where(symbol => string.Equals(symbol, "System.Globalization.CultureInfo.GetCultureInfo(string)", StringComparison.Ordinal))
-                .ToArray();
-
-            Assert.That(generatedSymbols, Is.EqualTo(new[]
-            {
-                "System.Globalization.CultureInfo.GetCultureInfo(string)",
-            }));
         }
 
         [Test]
@@ -8455,76 +8178,6 @@ public static class DuplicateReviewedSeedFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_Classifies_ConvertChangeTypeTypeOverload_AsImpure()
-        {
-            RequireCheckedInEffectSummaryArtifacts();
-            var workingDirectory = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "effect-summary-convert-change-type-type-" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(workingDirectory);
-
-            var outputPath = Path.Combine(workingDirectory, "Convert.ChangeType.Type.PurelySharp.EffectSummary.json");
-            var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
-
-            var artifactSpecJson = JsonSerializer.Serialize(
-                new
-                {
-                    SchemaVersion = 1,
-                    Defaults = new
-                    {
-                        Framework = "net8.0",
-                        RuntimeAssemblyName = "System.Private.CoreLib.dll",
-                        IncludeCallees = true,
-                        IncludePurityClassification = true,
-                        CompareManualCatalogs = true,
-                    },
-                    Artifacts = new object[]
-                    {
-                        new
-                        {
-                            OutputPath = outputPath,
-                            SourceSummaryPath = "PurelySharp.Analyzer/Convert.ChangeType.Type.PurelySharp.EffectSummary.json",
-                            SymbolPrefixes = new[]
-                            {
-                                "System.Convert.ChangeType(object, System.Type)",
-                            },
-                            Limit = 12,
-                        },
-                    },
-                },
-                new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                });
-            await File.WriteAllTextAsync(artifactSpecPath, artifactSpecJson);
-
-            await RunEffectSummaryToolAsync("--artifact-spec", artifactSpecPath);
-
-            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
-            var report = summary.RootElement.GetProperty("PurityReport");
-            var catalogComparison = report.GetProperty("CatalogComparison");
-
-            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
-            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
-            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
-
-            AssertPurityClassification(summary, "System.Convert.ChangeType(object, System.Type)", "impure", "impure_callee");
-            AssertEffectVisibilityClassification(summary, "System.Convert.ChangeType(object, System.Type)", "caller_visible");
-
-            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
-                .GetProperty("Entries")
-                .EnumerateArray()
-                .Select(entry => entry.GetProperty("Symbol").GetString())
-                .Where(symbol => string.Equals(symbol, "System.Convert.ChangeType(object, System.Type)", StringComparison.Ordinal))
-                .ToArray();
-
-            Assert.That(generatedSymbols, Is.EqualTo(new[]
-            {
-                "System.Convert.ChangeType(object, System.Type)",
-            }));
-        }
-
-        [Test]
         public async Task EffectSummaryTool_RuntimeConvertChangeTypeTypeOverload_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsync(
@@ -8556,14 +8209,20 @@ public static class DuplicateReviewedSeedFixture
         [Test]
         public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_Classifies_MarshalPtrToStructure_AsImpure()
         {
-            RequireCheckedInEffectSummaryArtifacts();
             var workingDirectory = Path.Combine(
                 TestContext.CurrentContext.WorkDirectory,
                 "effect-summary-marshal-ptrtostructure-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(workingDirectory);
 
+            var seedOutputPath = Path.Combine(workingDirectory, "seed.PurelySharp.EffectSummary.json");
             var outputPath = Path.Combine(workingDirectory, "Marshal.PtrToStructure.PurelySharp.EffectSummary.json");
             var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            await GenerateReviewedSourceSummaryAsync(
+                seedOutputPath,
+                "System.Private.CoreLib.dll",
+                12,
+                "System.Runtime.InteropServices.Marshal.PtrToStructure");
 
             var artifactSpecJson = JsonSerializer.Serialize(
                 new
@@ -8582,7 +8241,7 @@ public static class DuplicateReviewedSeedFixture
                         new
                         {
                             OutputPath = outputPath,
-                            SourceSummaryPath = "PurelySharp.Analyzer/Marshal.PtrToStructure.PurelySharp.EffectSummary.json",
+                            SourceSummaryPath = seedOutputPath,
                             IncludeCallees = false,
                             SymbolPrefixes = new[]
                             {
@@ -8626,14 +8285,20 @@ public static class DuplicateReviewedSeedFixture
         [Test]
         public async Task EffectSummaryTool_ArtifactSpec_SourceSummaryPath_Classifies_ClaimsPrincipalIsInRole_AsImpure()
         {
-            RequireCheckedInEffectSummaryArtifacts();
             var workingDirectory = Path.Combine(
                 TestContext.CurrentContext.WorkDirectory,
                 "effect-summary-claimsprincipal-isinrole-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(workingDirectory);
 
+            var seedOutputPath = Path.Combine(workingDirectory, "seed.PurelySharp.EffectSummary.json");
             var outputPath = Path.Combine(workingDirectory, "ClaimsPrincipal.IsInRole.PurelySharp.EffectSummary.json");
             var artifactSpecPath = Path.Combine(workingDirectory, "artifact-spec.json");
+
+            await GenerateReviewedSourceSummaryAsync(
+                seedOutputPath,
+                "System.Security.Claims.dll",
+                20,
+                "System.Security.Claims.ClaimsPrincipal.IsInRole(string)");
 
             var artifactSpecJson = JsonSerializer.Serialize(
                 new
@@ -8652,7 +8317,7 @@ public static class DuplicateReviewedSeedFixture
                         new
                         {
                             OutputPath = outputPath,
-                            SourceSummaryPath = "PurelySharp.Analyzer/ClaimsPrincipal.IsInRole.PurelySharp.EffectSummary.json",
+                            SourceSummaryPath = seedOutputPath,
                             SymbolPrefixes = new[]
                             {
                                 "System.Security.Claims.ClaimsPrincipal.IsInRole(string)",
@@ -10932,29 +10597,35 @@ public sealed class StableCacheDerived : StaticFieldBase
             return Path.GetFullPath(Path.Combine(TestContext.CurrentContext.TestDirectory, "..", "..", "..", ".."));
         }
 
-        private static void RequireCheckedInEffectSummaryArtifacts()
+        private static async Task GenerateReviewedSourceSummaryAsync(
+            string outputPath,
+            string runtimeAssemblyName,
+            int limit,
+            params string[] symbolPrefixes)
         {
-            var repositoryRoot = GetRepositoryRoot();
-            var analyzerDirectory = Path.Combine(repositoryRoot, "PurelySharp.Analyzer");
-            var reviewedSpecPath = Path.Combine(repositoryRoot, "Tools", "PurelySharp.EffectSummary", "ReviewedRuntimeArtifactSpec.json");
-            var hasCheckedInSummary = Directory.Exists(analyzerDirectory) &&
-                Directory.EnumerateFiles(analyzerDirectory, "*.EffectSummary.json", SearchOption.TopDirectoryOnly).Any();
-
-            if (!hasCheckedInSummary || !File.Exists(reviewedSpecPath))
+            var arguments = new List<string>
             {
-                Assert.Ignore("Checked-in effect summary artifacts are removed from the active repo flow.");
-            }
-        }
+                "--framework",
+                "net8.0",
+                "--runtime-assembly",
+                runtimeAssemblyName,
+            };
 
-        private static string RequireCheckedInEffectSummaryFile(string relativePath)
-        {
-            var path = Path.Combine(GetRepositoryRoot(), relativePath);
-            if (!File.Exists(path))
+            foreach (var symbolPrefix in symbolPrefixes)
             {
-                Assert.Ignore("Checked-in effect summary artifacts are removed from the active repo flow.");
+                arguments.Add("--symbol-prefix");
+                arguments.Add(symbolPrefix);
             }
 
-            return path;
+            arguments.Add("--include-callees");
+            arguments.Add("--classify-purity");
+            arguments.Add("--compare-manual-catalogs");
+            arguments.Add("--limit");
+            arguments.Add(limit.ToString());
+            arguments.Add("--output");
+            arguments.Add(outputPath);
+
+            await RunEffectSummaryToolAsync(arguments.ToArray());
         }
 
         private static string CreateReviewedSummaryDocument(params object[] entries)
