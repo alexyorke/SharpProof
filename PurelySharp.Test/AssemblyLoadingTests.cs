@@ -222,6 +222,29 @@ namespace TestNamespace
         }
 
         [Test]
+        public async Task DynamicMethod_Constructor_Diagnostic()
+        {
+            var test = @"
+using System;
+using System.Reflection.Emit;
+using PurelySharp.Attributes;
+
+namespace TestNamespace
+{
+    public class TestClass
+    {
+        [EnforcePure]
+        public DynamicMethod {|PS0002:TestMethod|}()
+        {
+            return new DynamicMethod(""PurelySharp"", typeof(void), Type.EmptyTypes);
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task AssemblyName_GetAssemblyName_Diagnostic()
         {
             var test = @"

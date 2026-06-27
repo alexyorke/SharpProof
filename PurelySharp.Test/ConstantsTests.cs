@@ -3367,6 +3367,33 @@ public static class StopwatchCatalogSignatureSamples
         }
 
         [Test]
+        public void ReflectionNamespaceConstructors_AreSourcedFromNamespaceFallback_NotStaticCatalogs()
+        {
+            const string source = @"
+using System;
+using System.Reflection;
+using System.Reflection.Emit;
+
+public static class ReflectionCtorCatalogSamples
+{
+    public static object Create()
+    {
+        _ = new AssemblyName(""PurelySharp"");
+        return new DynamicMethod(""PurelySharp"", typeof(void), Type.EmptyTypes);
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ReflectionCtorCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new AssemblyName(\"PurelySharp\")"));
+            AssertNotInManualCatalogs(GetObjectCreationSignature(compilation, syntaxTree, "new DynamicMethod(\"PurelySharp\", typeof(void), Type.EmptyTypes)"));
+        }
+
+        [Test]
         public void TypeGetTypeAndObjectEquals_AreSourcedFromSemanticRules_NotStaticCatalogs()
         {
             var members = new[]

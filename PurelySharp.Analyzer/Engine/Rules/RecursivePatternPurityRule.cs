@@ -24,16 +24,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 }
             }
 
-            foreach (var child in operation.ChildOperations)
-            {
-                var childResult = PurityAnalysisEngine.CheckSingleOperation(child, context, currentState);
-                if (!childResult.IsPure)
-                {
-                    return childResult;
-                }
-            }
-
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            return PatternPurityRuleHelpers.CheckChildOperationsArePure(operation, context, currentState);
         }
     }
 }

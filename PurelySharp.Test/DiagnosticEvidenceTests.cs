@@ -9996,7 +9996,6 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Reflection.AssemblyName.GetAssemblyName"));
         }
 
-        [Test]
         public async Task Ps0002_ImmutableQueueDequeue_UsesGeneratedPurityCatalogSource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
