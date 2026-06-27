@@ -1221,27 +1221,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 : null;
         }
 
-        private static string GetCatalogHitCategory(ISymbol symbol)
-        {
-            var containingType = symbol.ContainingType?.ToDisplayString() ?? string.Empty;
-            var containingNamespace = symbol.ContainingNamespace?.ToDisplayString() ?? string.Empty;
-
-            if (containingNamespace.StartsWith("System.Reflection", StringComparison.Ordinal) ||
-                containingType.StartsWith("System.Reflection.", StringComparison.Ordinal) ||
-                containingType == "System.Type" ||
-                containingType == "System.Runtime.Loader.AssemblyLoadContext" ||
-                containingType == "System.Environment" ||
-                containingType == "System.DateTime" ||
-                containingType == "System.DateTimeOffset" ||
-                containingType == "System.TimeProvider" ||
-                containingType == "System.TimeZoneInfo" ||
-                containingType == "System.Diagnostics.Stopwatch")
-            {
-                return "reflection_environment_source";
-            }
-
-            return "catalog_hit";
-        }
+        private static string GetCatalogHitCategory(ISymbol symbol) =>
+            PurityAnalysisEngine.GetKnownImpureCatalogHitCategory(symbol);
 
         private static ImmutableArray<IMethodSymbol> ResolvePotentialGetterTargets(
             IPropertySymbol propertySymbol,
