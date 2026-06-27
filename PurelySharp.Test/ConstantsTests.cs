@@ -70,6 +70,19 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void RandomMembers_AreSourcedFromSemanticRules_NotStaticCatalogs()
+        {
+            Assert.That(Constants.KnownImpureTypeNames, Does.Not.Contain("System.Random"));
+            AssertNotInManualCatalogs("System.Random.Shared.get");
+            AssertNotInManualCatalogs("System.Random.Next()");
+            AssertNotInManualCatalogs("System.Random.Next(int)");
+            AssertNotInManualCatalogs("System.Random.NextDouble()");
+            AssertNotInManualCatalogs("System.Random.NextInt64()");
+            AssertNotInManualCatalogs("System.Random.NextInt64(long)");
+            AssertNotInManualCatalogs("System.Random.NextInt64(long, long)");
+        }
+
+        [Test]
         public void GeneratedPathHelpers_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             var members = new[]

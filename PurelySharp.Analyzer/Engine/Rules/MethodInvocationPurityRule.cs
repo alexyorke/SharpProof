@@ -1049,6 +1049,20 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(invocationOperation.Syntax);
             }
 
+            var originalDefinition = invokedMethodSymbol.OriginalDefinition;
+            var knownImpureMemberSource = PurityAnalysisEngine.GetKnownImpureMemberSource(originalDefinition);
+            if (string.Equals(knownImpureMemberSource, "random_semantic_rule", StringComparison.Ordinal))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                    invocationOperation.Syntax,
+                    PurityAnalysisEngine.PurityEvidence.Create(
+                        GetCatalogHitCategory(originalDefinition),
+                        nameof(MethodInvocationPurityRule),
+                        invocationOperation,
+                        symbol: originalDefinition,
+                        catalogSource: knownImpureMemberSource));
+            }
+
             if (TryCheckArrayInterfaceGetEnumeratorPurity(invocationOperation, context, out var arrayEnumeratorResult))
             {
                 return arrayEnumeratorResult;

@@ -19,7 +19,6 @@ public static class Constants
 
     public static readonly ImmutableHashSet<string> KnownImpureTypeNames = ImmutableHashSet.Create(
         StringComparer.Ordinal,
-        "System.Random",
         "System.Timers.Timer"
 
 
@@ -189,12 +188,6 @@ public static class Constants
         "System.Net.Sockets.Socket.Receive(byte[])",
         "System.Net.Sockets.Socket.Send(byte[])",
         "System.Net.WebClient.DownloadString(string)",
-        "System.Random.Next()",
-        "System.Random.Next(int)",
-        "System.Random.NextDouble()",
-        "System.Random.NextInt64()",
-        "System.Random.NextInt64(long)",
-        "System.Random.NextInt64(long, long)",
         "System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(object)",
         "System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(System.RuntimeTypeHandle)",
         "System.Runtime.GCSettings.IsServerGC.get",
@@ -202,7 +195,6 @@ public static class Constants
         "System.Runtime.InteropServices.Marshal.FreeHGlobal(System.IntPtr)",
         "System.Runtime.InteropServices.Marshal.StructureToPtr(object, System.IntPtr, bool)",
 
-        "System.Random.Shared.get",
         "System.Security.Cryptography.RandomNumberGenerator.GetBytes(byte[])",
         "System.CodeDom.Compiler.CodeDomProvider.CreateProvider(string)",
         "System.CodeDom.Compiler.CompilerResults.Errors.get",

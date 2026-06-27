@@ -364,6 +364,12 @@ namespace PurelySharp.Analyzer.Engine
 				return "known_impure";
 			}
 
+			if (IsRandomSemanticImpure(symbol))
+			{
+				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: Random semantic rule matched: {symbol.ToDisplayString()}");
+				return "random_semantic_rule";
+			}
+
 			if (IsAssemblyLoadContextSemanticImpure(symbol))
 			{
 				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: AssemblyLoadContext semantic rule matched: {symbol.ToDisplayString()}");
@@ -441,6 +447,45 @@ namespace PurelySharp.Analyzer.Engine
 			}
 
 			return null;
+		}
+
+		private static bool IsRandomSemanticImpure(ISymbol symbol)
+		{
+			if (!IsExactRandomType(symbol.ContainingType))
+			{
+				return false;
+			}
+
+			if (symbol is IPropertySymbol propertySymbol)
+			{
+				return propertySymbol.IsStatic &&
+					string.Equals(propertySymbol.Name, "Shared", StringComparison.Ordinal);
+			}
+
+			if (symbol is not IMethodSymbol methodSymbol ||
+				methodSymbol.IsImplicitlyDeclared)
+			{
+				return false;
+			}
+
+			if (methodSymbol.MethodKind == MethodKind.Constructor)
+			{
+				return true;
+			}
+
+			if (methodSymbol.AssociatedSymbol is IPropertySymbol associatedPropertySymbol)
+			{
+				return associatedPropertySymbol.IsStatic &&
+					string.Equals(associatedPropertySymbol.Name, "Shared", StringComparison.Ordinal);
+			}
+
+			return methodSymbol.MethodKind == MethodKind.Ordinary;
+		}
+
+		private static bool IsExactRandomType(INamedTypeSymbol? typeSymbol)
+		{
+			return typeSymbol != null &&
+				string.Equals(typeSymbol.OriginalDefinition.ToDisplayString(), "System.Random", StringComparison.Ordinal);
 		}
 
 		private static bool IsAssemblyLoadContextSemanticImpure(ISymbol symbol)
