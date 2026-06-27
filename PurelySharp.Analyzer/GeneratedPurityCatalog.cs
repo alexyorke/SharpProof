@@ -315,8 +315,8 @@ namespace PurelySharp.Analyzer
                     yield return new SummaryEntry(
                         symbol.Trim(),
                         purityEntry,
-                        SummaryAssemblyIdentity.FromFlatJson(entryElement),
-                        SummaryMethodIdentity.FromFlatJson(entryElement),
+                        SummaryAssemblyIdentity.FromJson(entryElement),
+                        SummaryMethodIdentity.FromJson(entryElement),
                         sourcePriority);
                 }
 
@@ -1361,10 +1361,6 @@ namespace PurelySharp.Analyzer
                     moduleVersionId?.Trim());
             }
 
-            public static SummaryAssemblyIdentity? FromFlatJson(JsonElement entryElement)
-            {
-                return FromJson(entryElement);
-            }
         }
 
         private sealed class SummaryMethodIdentity
@@ -1420,10 +1416,6 @@ namespace PurelySharp.Analyzer
                 return new SummaryMethodIdentity(metadataToken?.Trim(), methodBodySha256?.Trim());
             }
 
-            public static SummaryMethodIdentity? FromFlatJson(JsonElement entryElement)
-            {
-                return FromJson(entryElement);
-            }
         }
 
         private sealed class ActualMethodIdentity
