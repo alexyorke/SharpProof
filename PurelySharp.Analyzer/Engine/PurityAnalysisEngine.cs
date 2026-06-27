@@ -4472,7 +4472,7 @@ namespace PurelySharp.Analyzer.Engine
             var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
             if (targetMethod == null ||
                 targetMethod.ContainingType?.ToDisplayString() != "System.Convert" ||
-                (targetMethod.Name != "ToDouble" && targetMethod.Name != "ToSingle") ||
+                !IsCurrentCultureSensitiveConvertNumericMethodName(targetMethod.Name) ||
                 targetMethod.Parameters.Length != 1 ||
                 invocationOperation.Arguments.Length != 1)
             {
@@ -4480,6 +4480,22 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             return targetMethod.Parameters[0].Type.SpecialType == SpecialType.System_String;
+        }
+
+        private static bool IsCurrentCultureSensitiveConvertNumericMethodName(string methodName)
+        {
+            return methodName is
+                "ToByte" or
+                "ToDecimal" or
+                "ToDouble" or
+                "ToInt16" or
+                "ToInt32" or
+                "ToInt64" or
+                "ToSByte" or
+                "ToSingle" or
+                "ToUInt16" or
+                "ToUInt32" or
+                "ToUInt64";
         }
 
         private static bool IsCurrentCultureSensitiveDateLikeParseOrFormatInvocation(IInvocationOperation invocationOperation)

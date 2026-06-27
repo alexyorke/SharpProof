@@ -1874,7 +1874,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToByte_String_CurrentCulture_NoDiagnostic()
+        public async Task ConvertToByte_String_CurrentCulture_Diagnostic()
         {
             var test = @"
 #nullable enable
@@ -1884,7 +1884,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public byte TestMethod(string value)
+    public byte {|PS0002:TestMethod|}(string value)
     {
         return Convert.ToByte(value);
     }
@@ -1974,7 +1974,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToSByte_String_CurrentCulture_NoDiagnostic()
+        public async Task ConvertToSByte_String_CurrentCulture_Diagnostic()
         {
             var test = @"
 #nullable enable
@@ -1984,7 +1984,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public sbyte TestMethod(string value)
+    public sbyte {|PS0002:TestMethod|}(string value)
     {
         return Convert.ToSByte(value);
     }
@@ -2014,7 +2014,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToInt32_String_CurrentCulture_NoDiagnostic()
+        public async Task ConvertToInt32_String_CurrentCulture_Diagnostic()
         {
             var test = @"
 #nullable enable
@@ -2024,7 +2024,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public int TestMethod(string value)
+    public int {|PS0002:TestMethod|}(string value)
     {
         return Convert.ToInt32(value);
     }
@@ -2054,7 +2054,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToInt64_String_CurrentCulture_NoDiagnostic()
+        public async Task ConvertToInt64_String_CurrentCulture_Diagnostic()
         {
             var test = @"
 #nullable enable
@@ -2064,7 +2064,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public long TestMethod(string value)
+    public long {|PS0002:TestMethod|}(string value)
     {
         return Convert.ToInt64(value);
     }
@@ -2094,7 +2094,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToInt16_String_CurrentCulture_NoDiagnostic()
+        public async Task ConvertToInt16_String_CurrentCulture_Diagnostic()
         {
             var test = @"
 #nullable enable
@@ -2104,7 +2104,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public short TestMethod(string value)
+    public short {|PS0002:TestMethod|}(string value)
     {
         return Convert.ToInt16(value);
     }
@@ -2134,7 +2134,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToUInt16_String_CurrentCulture_NoDiagnostic()
+        public async Task ConvertToUInt16_String_CurrentCulture_Diagnostic()
         {
             var test = @"
 #nullable enable
@@ -2144,7 +2144,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public ushort TestMethod(string value)
+    public ushort {|PS0002:TestMethod|}(string value)
     {
         return Convert.ToUInt16(value);
     }
@@ -2174,7 +2174,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToUInt32_String_CurrentCulture_NoDiagnostic()
+        public async Task ConvertToUInt32_String_CurrentCulture_Diagnostic()
         {
             var test = @"
 #nullable enable
@@ -2184,7 +2184,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public uint TestMethod(string value)
+    public uint {|PS0002:TestMethod|}(string value)
     {
         return Convert.ToUInt32(value);
     }
@@ -2214,7 +2214,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task ConvertToUInt64_String_CurrentCulture_NoDiagnostic()
+        public async Task ConvertToUInt64_String_CurrentCulture_Diagnostic()
         {
             var test = @"
 #nullable enable
@@ -2224,13 +2224,51 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public ulong TestMethod(string value)
+    public ulong {|PS0002:TestMethod|}(string value)
     {
         return Convert.ToUInt64(value);
     }
 }";
 
             await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        [TestCase("byte", "Convert.ToByte(value)", "System.Convert.ToByte")]
+        [TestCase("decimal", "Convert.ToDecimal(value)", "System.Convert.ToDecimal")]
+        [TestCase("short", "Convert.ToInt16(value)", "System.Convert.ToInt16")]
+        [TestCase("int", "Convert.ToInt32(value)", "System.Convert.ToInt32")]
+        [TestCase("long", "Convert.ToInt64(value)", "System.Convert.ToInt64")]
+        [TestCase("sbyte", "Convert.ToSByte(value)", "System.Convert.ToSByte")]
+        [TestCase("ushort", "Convert.ToUInt16(value)", "System.Convert.ToUInt16")]
+        [TestCase("uint", "Convert.ToUInt32(value)", "System.Convert.ToUInt32")]
+        [TestCase("ulong", "Convert.ToUInt64(value)", "System.Convert.ToUInt64")]
+        public async Task ConvertNumericString_UsesCurrentCultureSemanticSource(
+            string returnType,
+            string expression,
+            string expectedSymbol)
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync($$"""
+#nullable enable
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public {{returnType}} TestMethod(string value)
+    {
+        return {{expression}};
+    }
+}
+""");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("catalog_hit"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("current_culture_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain(expectedSymbol));
         }
 
         [Test]
