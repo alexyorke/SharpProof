@@ -233,20 +233,13 @@ namespace TestNamespace {
                 .Attribute("Include")?.Value;
             Assert.That(alreadyNamedInclude, Is.EqualTo(@"$(GeneratedPurityArtifactSourceDirectory)\*.PurelySharp.EffectSummary.json"));
 
-            var needsSuffixItem = stageTarget
-                .Descendants()
-                .Single(element => string.Equals(element.Name.LocalName, "_GeneratedPurityArtifactNeedsSuffix", StringComparison.Ordinal));
-            Assert.That(needsSuffixItem.Attribute("Include")?.Value, Is.EqualTo(@"$(GeneratedPurityArtifactSourceDirectory)\*.json"));
-            Assert.That(needsSuffixItem.Attribute("Exclude")?.Value, Is.EqualTo("@(_GeneratedPurityArtifactAlreadyNamed)"));
-
-            var stageCopyWithSuffix = stageTarget
+            var stageCopies = stageTarget
                 .Descendants()
                 .Where(element => string.Equals(element.Name.LocalName, "Copy", StringComparison.Ordinal))
-                .Skip(1)
-                .Single();
-            Assert.That(
-                stageCopyWithSuffix.Attribute("DestinationFiles")?.Value,
-                Is.EqualTo(@"@(_GeneratedPurityArtifactNeedsSuffix->'$(GeneratedPurityBuiltInSummaryDirectory)\%(Filename).PurelySharp.EffectSummary.json')"));
+                .ToArray();
+            Assert.That(stageCopies, Has.Length.EqualTo(1));
+            Assert.That(stageCopies[0].Attribute("SourceFiles")?.Value, Is.EqualTo("@(_GeneratedPurityArtifactAlreadyNamed)"));
+            Assert.That(stageCopies[0].Attribute("DestinationFolder")?.Value, Is.EqualTo("$(GeneratedPurityBuiltInSummaryDirectory)"));
 
             var includeTarget = document
                 .Descendants()

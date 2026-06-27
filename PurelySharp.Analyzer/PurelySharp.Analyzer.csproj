@@ -53,23 +53,17 @@
   <Target Name="StageGeneratedPurityBuiltInSummaries" BeforeTargets="AssignTargetPaths">
     <ItemGroup Condition="Exists('$(GeneratedPurityArtifactSourceDirectory)')">
       <_GeneratedPurityArtifactAlreadyNamed Include="$(GeneratedPurityArtifactSourceDirectory)\*.PurelySharp.EffectSummary.json" />
-      <_GeneratedPurityArtifactNeedsSuffix Include="$(GeneratedPurityArtifactSourceDirectory)\*.json"
-                                           Exclude="@(_GeneratedPurityArtifactAlreadyNamed)" />
     </ItemGroup>
 
     <RemoveDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)"
                Condition="Exists('$(GeneratedPurityBuiltInSummaryDirectory)')" />
     <MakeDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)"
-             Condition="'@(_GeneratedPurityArtifactAlreadyNamed)' != '' or '@(_GeneratedPurityArtifactNeedsSuffix)' != ''" />
+             Condition="'@(_GeneratedPurityArtifactAlreadyNamed)' != ''" />
 
     <Copy SourceFiles="@(_GeneratedPurityArtifactAlreadyNamed)"
           DestinationFolder="$(GeneratedPurityBuiltInSummaryDirectory)"
           SkipUnchangedFiles="true"
           Condition="'@(_GeneratedPurityArtifactAlreadyNamed)' != ''" />
-    <Copy SourceFiles="@(_GeneratedPurityArtifactNeedsSuffix)"
-          DestinationFiles="@(_GeneratedPurityArtifactNeedsSuffix->'$(GeneratedPurityBuiltInSummaryDirectory)\%(Filename).PurelySharp.EffectSummary.json')"
-          SkipUnchangedFiles="true"
-          Condition="'@(_GeneratedPurityArtifactNeedsSuffix)' != ''" />
   </Target>
 
   <Target Name="IncludeGeneratedPurityBuiltInSummaries"

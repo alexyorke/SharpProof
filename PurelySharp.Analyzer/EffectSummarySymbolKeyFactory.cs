@@ -64,6 +64,32 @@ namespace PurelySharp.Analyzer
             return keys;
         }
 
+        internal static ImmutableArray<string> GetMethodSymbolKeysWithAlternateContainingType(
+            IMethodSymbol methodSymbol,
+            string alternateContainingType)
+        {
+            var originalContainingType = methodSymbol.ContainingType?.ToDisplayString(EffectSummaryContainingTypeFormat);
+            if (string.IsNullOrWhiteSpace(originalContainingType))
+            {
+                return ImmutableArray<string>.Empty;
+            }
+
+            var originalPrefix = originalContainingType + ".";
+            var alternatePrefix = alternateContainingType + ".";
+            var keys = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+            foreach (var key in GetMethodSymbolKeys(methodSymbol))
+            {
+                if (!key.StartsWith(originalPrefix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                AddSymbolKey(keys, alternatePrefix + key.Substring(originalPrefix.Length));
+            }
+
+            return keys.ToImmutableArray();
+        }
+
         internal static string GetMetadataDefinitionExactMethodKey(IMethodSymbol methodSymbol)
         {
             return CreateMetadataDefinitionExactSummaryKey(methodSymbol);

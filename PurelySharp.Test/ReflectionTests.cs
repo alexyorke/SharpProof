@@ -880,6 +880,44 @@ public class TestClass
         }
 
         [Test]
+        public async Task TypeIsConstructedGenericType_OnTypeOfClosedGeneric_NoDiagnostic()
+        {
+            var test = @"
+using System.Collections.Generic;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod()
+    {
+        return typeof(List<int>).IsConstructedGenericType;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task TypeIsConstructedGenericType_OnTypeFromHandle_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(RuntimeTypeHandle handle)
+    {
+        return Type.GetTypeFromHandle(handle).IsConstructedGenericType;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task TypeIsNested_NoDiagnostic()
         {
             var test = @"

@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 3,
-  "GeneratedAtUtc": "2026-06-27T17:00:31.5546705+00:00",
+  "GeneratedAtUtc": "2026-06-27T17:10:45.8161628+00:00",
   "Assemblies": [
     {
       "AssemblyName": "System.Private.CoreLib",
@@ -8,7 +8,7 @@
       "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
       "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
       "MethodCount": 34519,
-      "EmittedMethodCount": 53,
+      "EmittedMethodCount": 55,
       "Methods": [
         {
           "Symbol": "System.RuntimeType.get_IsEnum()",
@@ -89,6 +89,69 @@
             "HasUnsupportedEffects": false,
             "FreshnessClassification": "none",
             "EffectVisibilityClassification": "none"
+          }
+        },
+        {
+          "Symbol": "System.RuntimeType.get_IsConstructedGenericType()",
+          "ExactSymbolKey": "System.RuntimeType.get_IsConstructedGenericType()-\u003Ebool",
+          "MetadataToken": "0x060007A5",
+          "RelativeVirtualAddress": 6845532,
+          "MethodBodySha256": "ef9c48cbee8a4fcae2233350c9e644384c53b8cbdd03e72272dcbba96b63b198",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060007A5|il:ef9c48cbee8a4fcae2233350c9e644384c53b8cbdd03e72272dcbba96b63b198",
+          "Effects": [
+            "calls_method"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [
+            "System.GC.KeepAlive(object)-\u003Evoid",
+            "System.Runtime.CompilerServices.MethodTable.get_IsConstructedGenericType()-\u003Ebool",
+            "System.Runtime.CompilerServices.TypeHandle.AsMethodTable()-\u003ESystem.Runtime.CompilerServices.MethodTable*",
+            "System.Runtime.CompilerServices.TypeHandle.get_IsTypeDesc()-\u003Ebool",
+            "System.RuntimeType.GetNativeTypeHandle()-\u003ESystem.Runtime.CompilerServices.TypeHandle"
+          ],
+          "Fields": [],
+          "CallSites": [
+            {
+              "ExactSymbolKey": "System.GC.KeepAlive(object)-\u003Evoid",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Runtime.CompilerServices.MethodTable.get_IsConstructedGenericType()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Runtime.CompilerServices.TypeHandle.AsMethodTable()-\u003ESystem.Runtime.CompilerServices.MethodTable*",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.Runtime.CompilerServices.TypeHandle.get_IsTypeDesc()-\u003Ebool",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            },
+            {
+              "ExactSymbolKey": "System.RuntimeType.GetNativeTypeHandle()-\u003ESystem.Runtime.CompilerServices.TypeHandle",
+              "UsesDynamicDispatch": false,
+              "ArgumentEvidence": []
+            }
+          ],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": true,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "fresh_owned_object_write",
+            "EffectVisibilityClassification": "internal_only"
           }
         },
         {
@@ -1695,6 +1758,39 @@
           }
         },
         {
+          "Symbol": "System.Runtime.CompilerServices.MethodTable.get_IsConstructedGenericType()",
+          "ExactSymbolKey": "System.Runtime.CompilerServices.MethodTable.get_IsConstructedGenericType()-\u003Ebool",
+          "MetadataToken": "0x0600645B",
+          "RelativeVirtualAddress": 7898948,
+          "MethodBodySha256": "bcee6bcc84c65f56f86eb17e1e2acc5c24c6aa0070000265be934c539a8010f7",
+          "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600645B|il:bcee6bcc84c65f56f86eb17e1e2acc5c24c6aa0070000265be934c539a8010f7",
+          "Effects": [
+            "reads_instance_field"
+          ],
+          "RootCandidates": [],
+          "TransitiveRootCandidates": [],
+          "ThrownExceptionTypes": [],
+          "TransitiveThrownExceptionTypes": [],
+          "ThrownExceptionSourcePaths": [],
+          "TransitiveThrownExceptionSourcePaths": [],
+          "Calls": [],
+          "Fields": [
+            "System.Runtime.CompilerServices.MethodTable.Flags"
+          ],
+          "CallSites": [],
+          "TransitiveThrownExceptionEdges": [],
+          "PurityClassification": {
+            "Classification": "pure",
+            "Categories": [],
+            "FirstBlockingCallChain": [],
+            "HasFreshArrayAllocationEvidence": false,
+            "HasFreshObjectAllocationEvidence": false,
+            "HasUnsupportedEffects": false,
+            "FreshnessClassification": "none",
+            "EffectVisibilityClassification": "none"
+          }
+        },
+        {
           "Symbol": "System.RuntimeTypeHandle.ContainsGenericVariables()",
           "ExactSymbolKey": "System.RuntimeTypeHandle.ContainsGenericVariables()-\u003Ebool",
           "MetadataToken": "0x060006B0",
@@ -2335,8 +2431,8 @@
   ],
   "PurityReport": {
     "SchemaVersion": 3,
-    "MethodCount": 53,
-    "PureCount": 38,
+    "MethodCount": 55,
+    "PureCount": 40,
     "ImpureCount": 4,
     "ConservativeUnknownCount": 11,
     "CatalogComparison": {
@@ -2410,6 +2506,26 @@
         "HasUnsupportedEffects": true,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "unknown"
+      },
+      {
+        "Symbol": "System.Runtime.CompilerServices.MethodTable.get_IsConstructedGenericType()",
+        "ExactSymbolKey": "System.Runtime.CompilerServices.MethodTable.get_IsConstructedGenericType()-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x0600645B|il:bcee6bcc84c65f56f86eb17e1e2acc5c24c6aa0070000265be934c539a8010f7",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x0600645B",
+        "MethodBodySha256": "bcee6bcc84c65f56f86eb17e1e2acc5c24c6aa0070000265be934c539a8010f7",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": false,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "none",
+        "EffectVisibilityClassification": "none"
       },
       {
         "Symbol": "System.Runtime.CompilerServices.TypeHandle.AsMethodTable()",
@@ -2510,6 +2626,26 @@
         "HasUnsupportedEffects": false,
         "FreshnessClassification": "none",
         "EffectVisibilityClassification": "none"
+      },
+      {
+        "Symbol": "System.RuntimeType.get_IsConstructedGenericType()",
+        "ExactSymbolKey": "System.RuntimeType.get_IsConstructedGenericType()-\u003Ebool",
+        "CacheKey": "mvid:3e106481-9524-4ebf-a276-c71cb5b3f877|token:0x060007A5|il:ef9c48cbee8a4fcae2233350c9e644384c53b8cbdd03e72272dcbba96b63b198",
+        "AssemblyName": "System.Private.CoreLib",
+        "AssemblyPath": "C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App\\8.0.28\\System.Private.CoreLib.dll",
+        "AssemblySha256": "7f48a9493a1d9f6c64a51c3ec357cf8534874ea62240a54c2a1570a5913148a4",
+        "ModuleVersionId": "3e106481-9524-4ebf-a276-c71cb5b3f877",
+        "MetadataToken": "0x060007A5",
+        "MethodBodySha256": "ef9c48cbee8a4fcae2233350c9e644384c53b8cbdd03e72272dcbba96b63b198",
+        "Classification": "pure",
+        "PrimaryCategory": "generated_purity_summary",
+        "Categories": [],
+        "FirstBlockingCallChain": [],
+        "HasFreshArrayAllocationEvidence": false,
+        "HasFreshObjectAllocationEvidence": true,
+        "HasUnsupportedEffects": false,
+        "FreshnessClassification": "fresh_owned_object_write",
+        "EffectVisibilityClassification": "internal_only"
       },
       {
         "Symbol": "System.RuntimeType.get_IsEnum()",

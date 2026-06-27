@@ -1148,6 +1148,46 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 ? exactReceiverType
                 : GetKnownReceiverType(propertyReferenceOperation.Instance);
 
+            if (hasExactReceiverType && knownReceiverType != null)
+            {
+                var exactGetter = PurityAnalysisEngine.ResolvePropertyAccessorTargetForConcreteReceiver(
+                    propertyReferenceOperation.Property,
+                    knownReceiverType,
+                    preferSetter: false);
+                if (exactGetter != null)
+                {
+                    var getterResult = PurityAnalysisEngine.GetCalleePurity(exactGetter, context);
+                    return getterResult.IsPure
+                        ? PurityAnalysisEngine.PurityAnalysisResult.Pure
+                        : getterResult.WithCallee(exactGetter, propertyReferenceOperation.Syntax);
+                }
+            }
+
+            if (propertyReferenceOperation.Property.GetMethod is { } runtimeBackedGetter &&
+                PurityAnalysisEngine.IsKnownSystemTypeRuntimeReceiver(propertyReferenceOperation.Instance) &&
+                GeneratedPurityCatalog.Current.TryGetSystemTypeRuntimeImplementationPurity(
+                    runtimeBackedGetter.OriginalDefinition,
+                    context.SemanticModel.Compilation,
+                    out var runtimeImplementationPurity))
+            {
+                if (runtimeImplementationPurity.IsPure)
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                }
+
+                if (runtimeImplementationPurity.IsNonPure)
+                {
+                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                        propertyReferenceOperation.Syntax,
+                        PurityAnalysisEngine.PurityEvidence.Create(
+                            runtimeImplementationPurity.PrimaryCategory,
+                            nameof(PropertyReferencePurityRule),
+                            propertyReferenceOperation,
+                            symbol: runtimeBackedGetter,
+                            catalogSource: "generated_purity_summary"));
+                }
+            }
+
             if (!hasExactReceiverType &&
                 CanDispatchToUnknownGetterTarget(
                     propertyReferenceOperation.Property,
@@ -1267,12 +1307,13 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (knownReceiverType != null && hasExactReceiverType)
             {
-                AddGetterForReceiverType(knownReceiverType, targetProperty, targets);
-                if (targets.Count == 0 &&
-                    targetProperty.GetMethod != null &&
-                    !targetProperty.GetMethod.IsAbstract)
+                var exactGetter = PurityAnalysisEngine.ResolvePropertyAccessorTargetForConcreteReceiver(
+                    targetProperty,
+                    knownReceiverType,
+                    preferSetter: false);
+                if (exactGetter != null)
                 {
-                    targets.Add(targetProperty.GetMethod.OriginalDefinition);
+                    targets.Add(exactGetter.OriginalDefinition);
                 }
 
                 return targets.ToImmutableArray();

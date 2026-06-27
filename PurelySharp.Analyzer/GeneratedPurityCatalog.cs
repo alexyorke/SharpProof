@@ -197,6 +197,30 @@ namespace PurelySharp.Analyzer
             return TryGetPurity(staticConstructor.OriginalDefinition, compilation, out classification);
         }
 
+        internal bool TryGetSystemTypeRuntimeImplementationPurity(
+            IMethodSymbol methodSymbol,
+            Compilation compilation,
+            out PurityEntry classification)
+        {
+            classification = default;
+            if (methodSymbol == null ||
+                methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true ||
+                !string.Equals(methodSymbol.ContainingType?.ToDisplayString(), "System.Type", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var runtimeMethodKeys = EffectSummarySymbolKeyFactory.GetMethodSymbolKeysWithAlternateContainingType(
+                methodSymbol.OriginalDefinition,
+                "System.RuntimeType");
+            if (runtimeMethodKeys.IsDefaultOrEmpty)
+            {
+                return false;
+            }
+
+            return TryGetTrustedPurityByMethodKeys(methodSymbol.ContainingAssembly, runtimeMethodKeys, compilation, out classification);
+        }
+
 		private static int CompareTrustedPurityEntries(SummaryEntry left, SummaryEntry right)
 		{
 			var sourcePriorityComparison = left.SourcePriority.CompareTo(right.SourcePriority);
