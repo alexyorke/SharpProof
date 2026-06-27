@@ -8583,7 +8583,28 @@ public class TestClass
     }
 }";
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
+                typeof(ICollection<>).Assembly.Location,
+                (
+                    "Synthetic.InterfaceCollectionLookup.Contains.PurelySharp.EffectSummary.json",
+                    "System.Collections.Generic.ICollection`1.Contains(!0)",
+                    "System.Collections.Generic.ICollection<T>.Contains(T)",
+                    "conservative_unknown",
+                    FormatJsonArray("abstract", "metadata_only_or_external", "no_il_body")),
+                (
+                    "Synthetic.InterfaceCollectionLookup.IndexOf.PurelySharp.EffectSummary.json",
+                    "System.Collections.Generic.IList`1.IndexOf(!0)",
+                    "System.Collections.Generic.IList<T>.IndexOf(T)",
+                    "conservative_unknown",
+                    FormatJsonArray("abstract", "metadata_only_or_external", "no_il_body")),
+                (
+                    "Synthetic.InterfaceCollectionLookup.Count.PurelySharp.EffectSummary.json",
+                    "System.Collections.Generic.ICollection`1.get_Count()",
+                    "System.Collections.Generic.ICollection<T>.Count.get",
+                    "conservative_unknown",
+                    FormatJsonArray("abstract", "metadata_only_or_external", "no_il_body")));
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source, additionalFiles: additionalFiles);
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var compilation = CSharpCompilation.Create(
                 "GeneratedPurityProbe",
@@ -8621,7 +8642,7 @@ public class TestClass
             var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
             var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
             var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-            var catalog = fromOptions.Invoke(null, new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
+            var catalog = fromOptions.Invoke(null, new object[] { CreateAnalyzerOptions(additionalFiles: additionalFiles), CancellationToken.None })!;
             var classifications = trackedMembers.ToDictionary(
                 entry => entry.Label,
                 entry =>
@@ -8672,7 +8693,40 @@ public class TestClass
     }
 }";
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
+                typeof(ICollection<>).Assembly.Location,
+                (
+                    "Synthetic.InterfaceCollectionMutators.Add.PurelySharp.EffectSummary.json",
+                    "System.Collections.Generic.ICollection`1.Add(!0)",
+                    "System.Collections.Generic.ICollection<T>.Add(T)",
+                    "conservative_unknown",
+                    FormatJsonArray("abstract", "metadata_only_or_external", "no_il_body")),
+                (
+                    "Synthetic.InterfaceCollectionMutators.Remove.PurelySharp.EffectSummary.json",
+                    "System.Collections.Generic.ICollection`1.Remove(!0)",
+                    "System.Collections.Generic.ICollection<T>.Remove(T)",
+                    "conservative_unknown",
+                    FormatJsonArray("abstract", "metadata_only_or_external", "no_il_body")),
+                (
+                    "Synthetic.InterfaceCollectionMutators.Clear.PurelySharp.EffectSummary.json",
+                    "System.Collections.Generic.ICollection`1.Clear()",
+                    "System.Collections.Generic.ICollection<T>.Clear()",
+                    "conservative_unknown",
+                    FormatJsonArray("abstract", "metadata_only_or_external", "no_il_body")),
+                (
+                    "Synthetic.InterfaceCollectionMutators.Insert.PurelySharp.EffectSummary.json",
+                    "System.Collections.Generic.IList`1.Insert(int, !0)",
+                    "System.Collections.Generic.IList<T>.Insert(int, T)",
+                    "conservative_unknown",
+                    FormatJsonArray("abstract", "metadata_only_or_external", "no_il_body")),
+                (
+                    "Synthetic.InterfaceCollectionMutators.RemoveAt.PurelySharp.EffectSummary.json",
+                    "System.Collections.Generic.IList`1.RemoveAt(int)",
+                    "System.Collections.Generic.IList<T>.RemoveAt(int)",
+                    "conservative_unknown",
+                    FormatJsonArray("abstract", "metadata_only_or_external", "no_il_body")));
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source, additionalFiles: additionalFiles);
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var compilation = CSharpCompilation.Create(
                 "GeneratedPurityProbe",
@@ -8726,7 +8780,7 @@ public class TestClass
             var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
             var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
             var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-            var catalog = fromOptions.Invoke(null, new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
+            var catalog = fromOptions.Invoke(null, new object[] { CreateAnalyzerOptions(additionalFiles: additionalFiles), CancellationToken.None })!;
             var classifications = trackedMembers.ToDictionary(
                 entry => entry.Label,
                 entry =>
@@ -8768,7 +8822,22 @@ public class TestClass
     }
 }";
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
+            var additionalFiles = CreateSyntheticGeneratedPurityAdditionalFiles(
+                typeof(IEnumerable<>).Assembly.Location,
+                (
+                    "Synthetic.InterfaceEnumeratorContracts.GetEnumerator.PurelySharp.EffectSummary.json",
+                    "System.Collections.Generic.IEnumerable`1.GetEnumerator()",
+                    "System.Collections.Generic.IEnumerable<T>.GetEnumerator()",
+                    "conservative_unknown",
+                    FormatJsonArray("abstract", "metadata_only_or_external", "no_il_body")),
+                (
+                    "Synthetic.InterfaceEnumeratorContracts.Current.PurelySharp.EffectSummary.json",
+                    "System.Collections.Generic.IEnumerator`1.get_Current()",
+                    "System.Collections.Generic.IEnumerator<T>.Current.get",
+                    "conservative_unknown",
+                    FormatJsonArray("abstract", "metadata_only_or_external", "no_il_body")));
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(source, additionalFiles: additionalFiles);
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var compilation = CSharpCompilation.Create(
                 "GeneratedPurityProbe",
@@ -8798,7 +8867,7 @@ public class TestClass
             var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
             var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
             var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-            var catalog = fromOptions.Invoke(null, new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
+            var catalog = fromOptions.Invoke(null, new object[] { CreateAnalyzerOptions(additionalFiles: additionalFiles), CancellationToken.None })!;
             var classifications = trackedMembers.ToDictionary(
                 entry => entry.Label,
                 entry =>
@@ -13927,7 +13996,7 @@ public class TestClass
             ImmutableArray<AdditionalText>? additionalFiles = null,
             bool includeCheckedInEffectSummaries = false)
         {
-            if (includeCheckedInEffectSummaries || ContainsEffectSummaryAdditionalFiles(additionalFiles))
+            if (includeCheckedInEffectSummaries)
             {
                 Assert.Ignore("Effect summary JSON analysis is dormant during active analyzer development.");
             }
@@ -13957,7 +14026,8 @@ public class TestClass
             ImmutableDictionary<string, string>? globalOptions = null,
             bool allowUnsafe = false,
             ImmutableArray<AdditionalText>? additionalFiles = null,
-            ImmutableArray<MetadataReference>? additionalMetadataReferences = null)
+            ImmutableArray<MetadataReference>? additionalMetadataReferences = null,
+            bool includeCheckedInEffectSummaries = false)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var references = GetTrustedPlatformReferences()
@@ -13976,7 +14046,7 @@ public class TestClass
             var analyzerOptions = CreateAnalyzerOptions(
                 globalOptions,
                 additionalFiles,
-                includeCheckedInEffectSummaries: !additionalFiles.HasValue);
+                includeCheckedInEffectSummaries: includeCheckedInEffectSummaries || !additionalFiles.HasValue);
 
             var compilationWithAnalyzers = compilation.WithAnalyzers(
                 ImmutableArray.Create<DiagnosticAnalyzer>(new PurelySharpAnalyzer()),
@@ -13995,24 +14065,20 @@ public class TestClass
             return CreateAnalyzerOptions(includeCheckedInEffectSummaries: true);
         }
 
-        private static bool ContainsEffectSummaryAdditionalFiles(ImmutableArray<AdditionalText>? additionalFiles)
+        private static ImmutableArray<AdditionalText> CreateSyntheticGeneratedPurityAdditionalFiles(
+            string assemblyPath,
+            params (string FileName, string ActualMethodLookupSymbol, string DisplaySymbol, string Classification, string CategoriesJson)[] entries)
         {
-            if (!additionalFiles.HasValue)
-            {
-                return false;
-            }
-
-            foreach (var additionalFile in additionalFiles.Value)
-            {
-                var fileName = Path.GetFileName(additionalFile.Path);
-                if (string.Equals(fileName, "PurelySharp.EffectSummary.json", StringComparison.OrdinalIgnoreCase) ||
-                    fileName.EndsWith(".PurelySharp.EffectSummary.json", StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return entries
+                .Select(entry => (AdditionalText)new InMemoryAdditionalText(
+                    entry.FileName,
+                    CreatePuritySummaryJson(
+                        assemblyPath,
+                        entry.ActualMethodLookupSymbol,
+                        entry.Classification,
+                        entry.CategoriesJson,
+                        entry.DisplaySymbol)))
+                .ToImmutableArray();
         }
 
         private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
