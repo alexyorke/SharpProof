@@ -1491,7 +1491,10 @@ internal static class AssemblyEffectSummarizer
                 ModuleVersionId: moduleVersionId,
                 MethodCount: reader.MethodDefinitions.Count,
                 EmittedMethodCount: 0,
-                Methods: Array.Empty<MethodEffectSummary>());
+                Methods: Array.Empty<MethodEffectSummary>())
+            {
+                ClassificationMethods = Array.Empty<MethodEffectSummary>()
+            };
         }
 
         var staticFieldFacts = BuildStaticFieldFacts(
@@ -1543,7 +1546,10 @@ internal static class AssemblyEffectSummarizer
             ModuleVersionId: moduleVersionId,
             MethodCount: reader.MethodDefinitions.Count,
             EmittedMethodCount: summaries.Length,
-            Methods: summaries);
+            Methods: summaries)
+        {
+            ClassificationMethods = allSummaries.ToArray()
+        };
     }
 
     private static HashSet<MethodDefinitionHandle>? GetMethodHandlesToSummarize(
@@ -5458,7 +5464,11 @@ internal sealed record AssemblyEffectReport(
     string ModuleVersionId,
     int MethodCount,
     int EmittedMethodCount,
-    MethodEffectSummary[] Methods);
+    MethodEffectSummary[] Methods)
+{
+    [JsonIgnore]
+    public MethodEffectSummary[] ClassificationMethods { get; init; } = Array.Empty<MethodEffectSummary>();
+}
 
 internal sealed record MethodEffectSummary(
     string Symbol,

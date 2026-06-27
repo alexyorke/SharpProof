@@ -5841,6 +5841,29 @@ public static class CoreComponentModelAttributeConstructorCatalogSignatureSample
         }
 
         [Test]
+        public void CancelEventArgsCancelSetterResolvesWithoutManualCatalogRow()
+        {
+            var source = @"
+using System.ComponentModel;
+
+public static class CancelEventArgsCatalogSignatureSamples
+{
+    public static void Write(CancelEventArgs writeArgs)
+    {
+        writeArgs.Cancel = true;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "CancelEventArgsGeneratedCatalogResolution",
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            AssertNotInManualCatalogs(GetPropertySignature(compilation, syntaxTree, "writeArgs.Cancel", preferSetter: true));
+        }
+
+        [Test]
         public void RegularExpressionAttributeConstructorGeneratedPurityEntryResolvesAgainstNet80References()
         {
             var source = @"

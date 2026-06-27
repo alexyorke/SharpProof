@@ -5200,6 +5200,33 @@ public static class StringComparisonFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_RuntimeCancelEventArgsSetter_UsesSdkDerivedPurity()
+        {
+            using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
+                "System.ComponentModel.dll",
+                12,
+                "System.ComponentModel.CancelEventArgs.set_Cancel");
+
+            var report = summary.RootElement.GetProperty("PurityReport");
+            var catalogComparison = report.GetProperty("CatalogComparison");
+            Assert.That(catalogComparison.GetProperty("KnownPureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownImpureMembers").GetArrayLength(), Is.EqualTo(0));
+            Assert.That(catalogComparison.GetProperty("KnownFreshOwnedArrayReturningMembers").GetArrayLength(), Is.EqualTo(0));
+
+            AssertPurityClassification(summary, "System.ComponentModel.CancelEventArgs.set_Cancel(bool)", "impure", "object_state_write");
+            AssertEffectVisibilityClassification(summary, "System.ComponentModel.CancelEventArgs.set_Cancel(bool)", "caller_visible");
+
+            var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
+                .GetProperty("Entries")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("Symbol").GetString())
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .ToArray();
+
+            Assert.That(generatedSymbols, Does.Contain("System.ComponentModel.CancelEventArgs.set_Cancel(bool)"));
+        }
+
+        [Test]
         public async Task EffectSummaryTool_RuntimeRegularExpressionAttributeSlice_UsesGeneratedImpureEvidence()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
@@ -9037,7 +9064,9 @@ public static class DuplicateReviewedSeedFixture
                 "System.Array.Fill(!!0[], !!0, int, int)",
                 "System.Array.Resize(ref !!0[], int)",
                 "System.Span`1.Clear()",
-                "System.Span`1.Fill(!0)");
+                "System.Span`1.CopyTo",
+                "System.Span`1.Fill(!0)",
+                "System.Span`1.TryCopyTo");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -9153,8 +9182,12 @@ public static class DuplicateReviewedSeedFixture
             AssertEffectVisibilityClassification(summary, "System.Array.Resize(ref !!0[], int)", "caller_visible");
             AssertPurityClassification(summary, "System.Span`1.Clear()", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Span`1.Clear()", "caller_visible");
+            AssertPurityClassification(summary, "System.Span`1.CopyTo(System.Span`1<!0>)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Span`1.CopyTo(System.Span`1<!0>)", "caller_visible");
             AssertPurityClassification(summary, "System.Span`1.Fill(!0)", "impure", "impure_callee");
             AssertEffectVisibilityClassification(summary, "System.Span`1.Fill(!0)", "caller_visible");
+            AssertPurityClassification(summary, "System.Span`1.TryCopyTo(System.Span`1<!0>)", "impure", "impure_callee");
+            AssertEffectVisibilityClassification(summary, "System.Span`1.TryCopyTo(System.Span`1<!0>)", "caller_visible");
 
             var generatedSymbols = summary.RootElement.GetProperty("GeneratedPurityCatalog")
                 .GetProperty("Entries")
@@ -9174,7 +9207,9 @@ public static class DuplicateReviewedSeedFixture
             Assert.That(generatedSymbols, Does.Contain("System.Array.Fill(!!0[], !!0, int, int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Array.Resize(ref !!0[], int)"));
             Assert.That(generatedSymbols, Does.Contain("System.Span`1.Clear()"));
+            Assert.That(generatedSymbols, Does.Contain("System.Span`1.CopyTo(System.Span`1<!0>)"));
             Assert.That(generatedSymbols, Does.Contain("System.Span`1.Fill(!0)"));
+            Assert.That(generatedSymbols, Does.Contain("System.Span`1.TryCopyTo(System.Span`1<!0>)"));
         }
 
         [Test]

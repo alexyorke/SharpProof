@@ -103,7 +103,6 @@ public static class Constants
         "System.Collections.ObjectModel.KeyedCollection<TKey, TItem>.Remove(TKey)",
         "System.ComponentModel.AddingNewEventArgs.AddingNewEventArgs()",
         "System.ComponentModel.CancelEventArgs.Cancel.get",
-        "System.ComponentModel.CancelEventArgs.Cancel.set",
         "System.ComponentModel.INotifyPropertyChanged.PropertyChanged",
         "System.Drawing.Bitmap.Bitmap(int, int)",
         "System.Linq.Queryable.Count<TSource>(System.Linq.IQueryable<TSource>)",

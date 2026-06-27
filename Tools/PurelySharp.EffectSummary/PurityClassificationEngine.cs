@@ -120,7 +120,10 @@ internal static class PurityClassificationEngine
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
         IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries)
     {
-        var bySymbol = assembly.Methods
+        var classificationMethods = assembly.ClassificationMethods.Length == 0
+            ? assembly.Methods
+            : assembly.ClassificationMethods;
+        var bySymbol = classificationMethods
             .GroupBy(method => method.ExactSymbolKey, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
         var memo = new Dictionary<string, MethodPurityClassification>(StringComparer.Ordinal);
