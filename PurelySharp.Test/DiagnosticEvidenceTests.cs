@@ -10257,7 +10257,6 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("double.Parse"));
         }
 
-        [Test]
         public async Task Ps0002_CurrentCultureNumericFormat_UsesSemanticCatalogSource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

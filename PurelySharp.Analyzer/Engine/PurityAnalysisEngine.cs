@@ -4430,7 +4430,7 @@ namespace PurelySharp.Analyzer.Engine
             if (targetMethod == null ||
                 !IsCultureSensitiveNumericType(targetMethod.ContainingType))
             {
-                return false;
+                return IsCurrentCultureSensitiveConvertNumericInvocation(invocationOperation);
             }
 
             if (targetMethod.Name == "Parse" &&
@@ -4465,6 +4465,21 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             return false;
+        }
+
+        private static bool IsCurrentCultureSensitiveConvertNumericInvocation(IInvocationOperation invocationOperation)
+        {
+            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
+            if (targetMethod == null ||
+                targetMethod.ContainingType?.ToDisplayString() != "System.Convert" ||
+                targetMethod.Name != "ToDouble" ||
+                targetMethod.Parameters.Length != 1 ||
+                invocationOperation.Arguments.Length != 1)
+            {
+                return false;
+            }
+
+            return targetMethod.Parameters[0].Type.SpecialType == SpecialType.System_String;
         }
 
         private static bool IsCurrentCultureSensitiveDateLikeParseOrFormatInvocation(IInvocationOperation invocationOperation)
