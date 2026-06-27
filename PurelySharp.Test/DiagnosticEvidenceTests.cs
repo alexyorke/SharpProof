@@ -21,7 +21,6 @@ using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 using PurelySharp.Analyzer;
 using static PurelySharp.Test.AnalyzerTestHost;
-using DiskAdditionalText = PurelySharp.Test.AnalyzerTestHost.DiskAdditionalText;
 using InMemoryAdditionalText = PurelySharp.Test.AnalyzerTestHost.InMemoryAdditionalText;
 
 namespace PurelySharp.Test
@@ -29,9 +28,6 @@ namespace PurelySharp.Test
     [TestFixture]
     public class DiagnosticEvidenceTests
     {
-        private static readonly Lazy<ImmutableArray<AdditionalText>> CheckedInEffectSummaryAdditionalFiles =
-            new Lazy<ImmutableArray<AdditionalText>>(CreateCheckedInEffectSummaryAdditionalFiles);
-
         [Test]
         public async Task Ps0002_KnownImpureCatalogHit_IncludesStructuredEvidence()
         {
@@ -14500,11 +14496,6 @@ public class TestClass
             return "[\"" + string.Join("\", \"", values) + "\"]";
         }
 
-        private static string FormatJsonStringOrNull(string? value)
-        {
-            return value == null ? "null" : "\"" + value + "\"";
-        }
-
         private static AssemblyIdentity GetAssemblyIdentity(string assemblyPath)
         {
             using var stream = File.OpenRead(assemblyPath);
@@ -14576,37 +14567,6 @@ public class TestClass
 
         private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences() =>
             AnalyzerTestHost.GetTrustedPlatformReferences();
-
-        private static ImmutableArray<AdditionalText> CreateCheckedInEffectSummaryAdditionalFiles()
-        {
-            var analyzerDirectory = Path.Combine(FindRepositoryRoot(), "PurelySharp.Analyzer");
-            var summaryPaths = Directory
-                .EnumerateFiles(analyzerDirectory, "*.PurelySharp.EffectSummary.json", SearchOption.TopDirectoryOnly)
-                .Concat(new[] { Path.Combine(analyzerDirectory, "PurelySharp.EffectSummary.json") })
-                .Where(File.Exists)
-                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-                .ToImmutableArray();
-
-            return summaryPaths
-                .Select(path => (AdditionalText)new DiskAdditionalText(path))
-                .ToImmutableArray();
-        }
-
-        private static string FindRepositoryRoot()
-        {
-            var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
-            while (directory != null)
-            {
-                if (Directory.Exists(Path.Combine(directory.FullName, "PurelySharp.Analyzer")))
-                {
-                    return directory.FullName;
-                }
-
-                directory = directory.Parent;
-            }
-
-            throw new DirectoryNotFoundException("Could not locate repository root from test directory.");
-        }
 
         private sealed record AssemblyIdentity(string AssemblyName, string AssemblySha256, string ModuleVersionId);
         private sealed record MethodIdentity(string MetadataToken, string? MethodBodySha256, string ExactSymbolKey);

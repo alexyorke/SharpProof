@@ -3932,37 +3932,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            if (IsTrustedGeneratedPureDefaultComparerSingleton(value, context))
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            if (IsTrustedGeneratedPureStringComparerSingleton(value, context))
-            {
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            var foundImplementation = false;
-            foreach (var comparisonMethod in EnumerateComparerImplementations(value.Type))
-            {
-                foundImplementation = true;
-                var comparisonPurity = PurityAnalysisEngine.GetCalleePurity(comparisonMethod.OriginalDefinition, context);
-                if (!comparisonPurity.IsPure)
-                {
-                    return comparisonPurity.WithCallee(comparisonMethod, invocationOperation.Syntax);
-                }
-            }
-
-            if (!foundImplementation && IsUnresolvedComparerDispatch(value.Type))
-            {
-                return PurityAnalysisEngine.ImpureResult(
-                    invocationOperation,
-                    "unknown_external_call",
-                    nameof(MethodInvocationPurityRule),
-                    PurityAnalysisEngine.TryResolveSymbol(value) ?? invocationOperation.TargetMethod);
-            }
-
-            return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            return AnalyzeComparerValuePurity(
+                value,
+                context,
+                invocationOperation.Syntax,
+                invocationOperation,
+                invocationOperation.TargetMethod);
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckLinqComparerArgumentPurity(
@@ -3980,6 +3955,27 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            return AnalyzeComparerValuePurity(
+                value,
+                context,
+                value.Syntax,
+                argument,
+                argument.Parameter);
+        }
+
+        private static PurityAnalysisEngine.PurityAnalysisResult AnalyzeComparerValuePurity(
+            IOperation value,
+            PurityAnalysisContext context,
+            SyntaxNode impureCalleeSyntax,
+            IOperation unresolvedDispatchOperation,
+            ISymbol? unresolvedDispatchSymbol)
+        {
+            var comparerType = value.Type;
+            if (comparerType == null)
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             if (IsTrustedGeneratedPureDefaultComparerSingleton(value, context))
             {
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -3991,23 +3987,23 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             var foundImplementation = false;
-            foreach (var comparisonMethod in EnumerateComparerImplementations(value.Type))
+            foreach (var comparisonMethod in EnumerateComparerImplementations(comparerType))
             {
                 foundImplementation = true;
                 var comparisonPurity = PurityAnalysisEngine.GetCalleePurity(comparisonMethod.OriginalDefinition, context);
                 if (!comparisonPurity.IsPure)
                 {
-                    return comparisonPurity.WithCallee(comparisonMethod, value.Syntax);
+                    return comparisonPurity.WithCallee(comparisonMethod, impureCalleeSyntax);
                 }
             }
 
-            if (!foundImplementation && IsUnresolvedComparerDispatch(value.Type))
+            if (!foundImplementation && IsUnresolvedComparerDispatch(comparerType))
             {
                 return PurityAnalysisEngine.ImpureResult(
-                    argument,
+                    unresolvedDispatchOperation,
                     "unknown_external_call",
                     nameof(MethodInvocationPurityRule),
-                    PurityAnalysisEngine.TryResolveSymbol(value) ?? argument.Parameter);
+                    PurityAnalysisEngine.TryResolveSymbol(value) ?? unresolvedDispatchSymbol);
             }
 
             return PurityAnalysisEngine.PurityAnalysisResult.Pure;

@@ -882,13 +882,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return false;
         }
 
-        private static bool IsAnalyzerOwnedArraySpanSource(
-            IOperation? sourceOperation,
-            PurityAnalysisEngine.PurityAnalysisState currentState)
-        {
-            return PurityAnalysisEngine.IsTrackedOwnedArrayValue(sourceOperation, currentState);
-        }
-
         private static bool IsMemoryExtensionsArrayAsSpan(IMethodSymbol methodSymbol)
         {
             return methodSymbol.Name == "AsSpan" &&

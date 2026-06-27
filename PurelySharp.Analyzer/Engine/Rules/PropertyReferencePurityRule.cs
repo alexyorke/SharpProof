@@ -1283,14 +1283,15 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 : getterResult.WithCallee(getterSymbol, propertyReferenceOperation.Syntax);
         }
 
-        private static INamedTypeSymbol? GetTrackedLocalReceiverType(
-            IOperation? instanceOperation,
-            PurityAnalysisEngine.PurityAnalysisState currentState,
-            Compilation compilation)
+        private static INamedTypeSymbol? GetKnownReceiverType(IOperation? instanceOperation)
         {
-            return PurityAnalysisEngine.TryResolveKnownConcreteType(instanceOperation, currentState, compilation, out var concreteType)
-                ? concreteType
-                : null;
+            var unwrapped = PurityAnalysisEngine.SkipImplicitConversions(instanceOperation);
+            if (unwrapped is IObjectCreationOperation objectCreationOperation)
+            {
+                return objectCreationOperation.Type as INamedTypeSymbol;
+            }
+
+            return unwrapped?.Type as INamedTypeSymbol;
         }
 
         private static string GetCatalogHitCategory(ISymbol symbol) =>
@@ -1378,17 +1379,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return targets.ToImmutableArray();
-        }
-
-        private static INamedTypeSymbol? GetKnownReceiverType(IOperation? instanceOperation)
-        {
-            var unwrapped = PurityAnalysisEngine.SkipImplicitConversions(instanceOperation);
-            if (unwrapped is IObjectCreationOperation objectCreationOperation)
-            {
-                return objectCreationOperation.Type as INamedTypeSymbol;
-            }
-
-            return unwrapped?.Type as INamedTypeSymbol;
         }
 
         private static void AddGetterForReceiverType(
