@@ -80,7 +80,8 @@ namespace PurelySharp.Analyzer.Engine
 
 			var methodSymbol = symbol as IMethodSymbol ??
 				(symbol is IPropertySymbol propertySymbol ? propertySymbol.GetMethod : null);
-			if (TryGetGeneratedPureMethod(methodSymbol, compilation, out var generatedSignature, out _))
+			if (TryGetGeneratedMethodPurity(methodSymbol, compilation, out var generatedSignature, out var generatedClassification) &&
+				generatedClassification.IsPure)
 			{
 				PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Known pure based on generated catalog match '{generatedSignature}' for {symbol.ToDisplayString()}");
 				return true;
@@ -103,13 +104,13 @@ namespace PurelySharp.Analyzer.Engine
 			}
 
 			PurityAnalysisEngine.LogDebug($"    [IsKnownPure] Checking HashSet.Contains for signature: \"{signature}\"");
-			bool isKnownPure = MatchesKnownPureSignature(signature);
+			bool isKnownPure = MatchesConfiguredKnownPureSignature(signature);
 			PurityAnalysisEngine.LogDebug($"    [IsKnownPure] HashSet.Contains result: {isKnownPure}");
 
 			if (!isKnownPure && symbol is IMethodSymbol genericMethod && genericMethod.IsGenericMethod)
 			{
 				signature = genericMethod.ConstructedFrom.ToDisplayString();
-				isKnownPure = MatchesKnownPureSignature(signature);
+				isKnownPure = MatchesConfiguredKnownPureSignature(signature);
 			}
 			else if (!isKnownPure && symbol is IPropertySymbol genericProperty && genericProperty.ContainingType.IsGenericType)
 			{
@@ -121,7 +122,7 @@ namespace PurelySharp.Analyzer.Engine
 				{
 					signature = $"{genericProperty.ContainingType.ConstructedFrom.ToDisplayString()}.{genericProperty.Name}.get";
 				}
-				isKnownPure = MatchesKnownPureSignature(signature);
+				isKnownPure = MatchesConfiguredKnownPureSignature(signature);
 			}
 
 			if (isKnownPure)
@@ -225,11 +226,6 @@ namespace PurelySharp.Analyzer.Engine
 				string.Equals(displayName, "System.UInt128", StringComparison.Ordinal);
 		}
 
-		private static bool MatchesKnownPureSignature(string signature)
-		{
-			return MatchesSignature(ExtraPureMethods, NormalizeSignatures(ExtraPureMethods), signature);
-		}
-
 		private static bool MatchesConfiguredKnownPureSignature(string signature)
 		{
 			return MatchesSignature(ExtraPureMethods, NormalizeSignatures(ExtraPureMethods), signature);
@@ -255,20 +251,6 @@ namespace PurelySharp.Analyzer.Engine
 
 			signature = methodSymbol.OriginalDefinition.ToDisplayString();
 			return true;
-		}
-
-		private static bool TryGetGeneratedPureMethod(
-			IMethodSymbol? methodSymbol,
-			Compilation? compilation,
-			out string signature,
-			out GeneratedPurityCatalog.PurityEntry classification)
-		{
-			if (!TryGetGeneratedMethodPurity(methodSymbol, compilation, out signature, out classification))
-			{
-				return false;
-			}
-
-			return classification.IsPure;
 		}
 
 		private static bool MatchesSignature(
