@@ -83,8 +83,6 @@ namespace PurelySharp.Analyzer
                 }
             }
 
-            LoadBuiltInEntries(entriesBySymbol);
-
             if (entriesBySymbol.Count == 0)
             {
                 return Empty;
@@ -98,17 +96,7 @@ namespace PurelySharp.Analyzer
 
         private static GeneratedPurityCatalog CreateBuiltInCatalog()
         {
-            var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
-            LoadBuiltInEntries(entriesBySymbol);
-            if (entriesBySymbol.Count == 0)
-            {
-                return Empty;
-            }
-
-            return new GeneratedPurityCatalog(entriesBySymbol.ToImmutableDictionary(
-                item => item.Key,
-                item => item.Value.ToImmutable(),
-                StringComparer.Ordinal));
+            return Empty;
         }
 
         public static IDisposable UseCurrent(GeneratedPurityCatalog catalog)

@@ -5,9 +5,11 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using PurelySharp.Analyzer.Engine;
 using PurelySharp.Analyzer;
@@ -17,6 +19,9 @@ namespace PurelySharp.Test
     [TestFixture]
     public class ConstantsTests
     {
+        private static readonly Lazy<ImmutableArray<AdditionalText>> CheckedInEffectSummaryAdditionalFiles =
+            new Lazy<ImmutableArray<AdditionalText>>(CreateCheckedInEffectSummaryAdditionalFiles);
+
         [Test]
         public void StaticConstructor_DoesNotThrow_WhenInitialized()
         {
@@ -5200,16 +5205,67 @@ public static class DecimalNegateCatalogSignatureSamples
         private static (bool matched, string classification) GetGeneratedPurityClassification(IMethodSymbol methodSymbol, Compilation compilation)
         {
             var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.GeneratedPurityCatalog", throwOnError: true)!;
-            var currentProperty = catalogType.GetProperty("Current", BindingFlags.Public | BindingFlags.Static)!;
+            var fromOptions = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
             var tryGetPurity = catalogType.GetMethod("TryGetPurity", BindingFlags.Public | BindingFlags.Instance)!;
-            var currentCatalog = currentProperty.GetValue(null)!;
+            var catalog = fromOptions.Invoke(null, new object[] { CreateGeneratedPurityAnalyzerOptions(), default(CancellationToken) })!;
             var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
-            var matched = (bool)tryGetPurity.Invoke(currentCatalog, args)!;
+            var matched = (bool)tryGetPurity.Invoke(catalog, args)!;
             var purityEntry = args[2];
             var classification = matched
                 ? (string)purityEntry!.GetType().GetProperty("Classification")!.GetValue(purityEntry)!
                 : string.Empty;
             return (matched, classification);
+        }
+
+        private static AnalyzerOptions CreateGeneratedPurityAnalyzerOptions()
+        {
+            return new AnalyzerOptions(CheckedInEffectSummaryAdditionalFiles.Value);
+        }
+
+        private static ImmutableArray<AdditionalText> CreateCheckedInEffectSummaryAdditionalFiles()
+        {
+            var analyzerDirectory = Path.Combine(FindRepositoryRoot(), "PurelySharp.Analyzer");
+            var summaryPaths = Directory
+                .EnumerateFiles(analyzerDirectory, "*.PurelySharp.EffectSummary.json", SearchOption.TopDirectoryOnly)
+                .Concat(new[] { Path.Combine(analyzerDirectory, "PurelySharp.EffectSummary.json") })
+                .Where(File.Exists)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToImmutableArray();
+
+            return summaryPaths
+                .Select(path => (AdditionalText)new DiskAdditionalText(path))
+                .ToImmutableArray();
+        }
+
+        private static string FindRepositoryRoot()
+        {
+            var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+            while (directory != null)
+            {
+                if (Directory.Exists(Path.Combine(directory.FullName, "PurelySharp.Analyzer")))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+
+            throw new DirectoryNotFoundException("Could not locate repository root from test directory.");
+        }
+
+        private sealed class DiskAdditionalText : AdditionalText
+        {
+            public DiskAdditionalText(string path)
+            {
+                Path = path;
+            }
+
+            public override string Path { get; }
+
+            public override Microsoft.CodeAnalysis.Text.SourceText GetText(CancellationToken cancellationToken = default)
+            {
+                return Microsoft.CodeAnalysis.Text.SourceText.From(File.ReadAllText(Path));
+            }
         }
 
         private static string GetInvocationSignature(Compilation compilation, SyntaxTree syntaxTree, string expressionText)

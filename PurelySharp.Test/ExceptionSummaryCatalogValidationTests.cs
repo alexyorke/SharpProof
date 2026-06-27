@@ -28,7 +28,7 @@ namespace PurelySharp.Test
         public async Task Ps0010_EffectSummary_WithMatchingAssemblyIdentity_IsTrusted()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
                 coreLib,
                 "System.ArgumentNullException.ThrowIfNull(object, string)"));
 
@@ -58,10 +58,24 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public async Task Ps0010_EffectSummary_DefaultOff_IsIgnored()
+        {
+            var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                CreateLibraryCallSource(),
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new InMemoryAdditionalText(
+                        "PurelySharp.EffectSummary.json",
+                        CreateEffectSummaryJson(coreLib, "System.ArgumentNullException.ThrowIfNull(object, string)"))));
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_EffectSummary_WithMismatchedAssemblyIdentity_IsIgnored()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
                 coreLib,
                 "System.ArgumentNullException.ThrowIfNull(object, string)",
                 "0000000000000000000000000000000000000000000000000000000000000000",
@@ -74,7 +88,7 @@ namespace PurelySharp.Test
         public async Task Ps0010_EffectSummary_WithIncompleteAssemblyIdentity_IsIgnored()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
                 coreLib,
                 "System.ArgumentNullException.ThrowIfNull(object, string)",
                 string.Empty,
@@ -87,7 +101,7 @@ namespace PurelySharp.Test
         public async Task Ps0010_EffectSummary_WithMismatchedMetadataToken_IsIgnored()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
                 coreLib,
                 "System.ArgumentNullException.ThrowIfNull(object, string)",
                 metadataToken: "0x06000001"));
@@ -100,7 +114,7 @@ namespace PurelySharp.Test
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
             var methodIdentity = GetMethodIdentity(coreLib.AssemblyPath, "System.ArgumentNullException.ThrowIfNull(object, string)");
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(CreateLibraryCallSource(), CreateEffectSummaryJson(
                 coreLib,
                 "System.ArgumentNullException.ThrowIfNull(object, string)",
                 metadataToken: methodIdentity.MetadataToken,
@@ -113,7 +127,7 @@ namespace PurelySharp.Test
         public async Task Ps0010_EffectSummary_WithSuffixedSummaryFileName_IsTrusted()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 CreateLibraryCallSource(),
                 CreateEffectSummaryJson(coreLib, "System.ArgumentNullException.ThrowIfNull(object, string)"),
                 "runtime.PurelySharp.EffectSummary.json");
@@ -128,7 +142,7 @@ namespace PurelySharp.Test
         public async Task Ps0010_EffectSummary_MergesDirectAndTransitiveExceptionTypes()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 CreateLibraryCallSource(),
                 CreateEffectSummaryJson(
                     coreLib,
@@ -147,7 +161,7 @@ namespace PurelySharp.Test
         public async Task Ps0010_EffectSummary_WithMalformedMethodEntry_IsIgnored()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 CreateLibraryCallSource(),
                 CreateMalformedEffectSummaryJson(coreLib.AssemblyName, coreLib.AssemblySha256, coreLib.ModuleVersionId));
 
@@ -158,7 +172,7 @@ namespace PurelySharp.Test
         public async Task Ps0010_EffectSummary_WithWrongSymbol_IsIgnored()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 CreateLibraryCallSource(),
                 CreateEffectSummaryJson(
                     coreLib,
@@ -172,7 +186,7 @@ namespace PurelySharp.Test
         public async Task Ps0010_EffectSummary_MergesAcrossMultipleSummaryFiles()
         {
             var coreLib = GetAssemblyIdentity(typeof(ArgumentNullException).Assembly.Location);
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 CreateLibraryCallSource(),
                 ("PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(
@@ -224,7 +238,7 @@ public static class GenericBoundary
             var methodSymbol = boundaryType.GetMembers("EchoOrThrow").OfType<IMethodSymbol>().Single();
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -282,7 +296,7 @@ public sealed class ConstructorBoundary
             var constructorSymbol = boundaryType.InstanceConstructors.Single(ctor => ctor.Parameters.Length == 1);
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 public class TestClass
 {
@@ -353,7 +367,7 @@ public sealed class PropertyBoundary
                 .GetMethod!;
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 public class TestClass
 {
@@ -409,7 +423,7 @@ public readonly struct OperatorBoundary
                 fixture.AssemblyPath,
                 "OperatorBoundary.op_Addition(OperatorBoundary, OperatorBoundary)");
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 public class TestClass
 {
@@ -455,7 +469,7 @@ public static class OutBoundary
                 fixture.AssemblyPath,
                 "OutBoundary.ParseOrThrow(string, ref int)");
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 public class TestClass
 {
@@ -509,7 +523,7 @@ public static class SummaryBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryGenerated", boundarySource);
             var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 public class TestClass
 {
@@ -581,7 +595,7 @@ public class TestClass
                 includeTransitiveRoots: true,
                 maxDepth: 1,
                 "SummaryBoundary.Outer");
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(callerSource, summaryJson, references);
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(callerSource, summaryJson, references);
 
             var expectedSourceChain = "SummaryBoundary.Outer(string) -> SummaryBoundary.Middle(string) -> SummaryBoundary.Inner(string) -> SummaryBoundary.Leaf(string)";
 
@@ -648,7 +662,7 @@ public class TestClass
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
             const string expectedSourceChain = "SummaryBoundary.Outer(string) -> SummaryBoundary.Middle(string) -> SummaryBoundary.Inner(string) -> SummaryBoundary.Leaf(string)";
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 callerSource,
                 CreateEffectSummaryJson(
                     identity,
@@ -722,7 +736,7 @@ public class TestClass
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
             const string expectedSourceChain = "SummaryBoundary.Outer(string) -> SummaryBoundary.Middle(string) -> SummaryBoundary.Inner(string) -> SummaryBoundary.Leaf(string)";
 
-            var legacyDiagnostics = await GetAnalyzerDiagnosticsAsync(
+            var legacyDiagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 callerSource,
                 CreateEffectSummaryJson(
                     identity,
@@ -733,7 +747,7 @@ public class TestClass
                         $$"""[ { "ExceptionType": "System.InvalidOperationException", "SourcePath": "{{expectedSourceChain}}" } ]"""),
                 references);
 
-            var edgeDiagnostics = await GetAnalyzerDiagnosticsAsync(
+            var edgeDiagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 callerSource,
                 CreateEffectSummaryJson(
                     identity,
@@ -798,7 +812,7 @@ public class TestClass
             var references = ImmutableArray.Create<MetadataReference>(MetadataReference.CreateFromFile(fixture.AssemblyPath));
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 callerSource,
                 CreateEffectSummaryJson(
                     identity,
@@ -833,7 +847,7 @@ public static class SummaryBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryCommonExceptions", boundarySource);
             var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 public class TestClass
 {
@@ -879,7 +893,7 @@ public static class SummaryBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryCaughtException", boundarySource);
             var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 public class TestClass
 {
@@ -913,7 +927,7 @@ public static class SummaryBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryCaughtByTrueFilter", boundarySource);
             var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -957,7 +971,7 @@ public static class SummaryBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryContradictoryFilter", boundarySource);
             var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -1012,7 +1026,7 @@ public static class SummaryBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryRethrowException", boundarySource);
             var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 public class TestClass
 {
@@ -1060,7 +1074,7 @@ public static class SummaryBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryCaughtRethrowException", boundarySource);
             var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 public class TestClass
 {
@@ -1102,7 +1116,7 @@ public static class SummaryBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryFinallyShadowedDirect", boundarySource);
             var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 public class TestClass
 {
@@ -1148,7 +1162,7 @@ public static class SummaryBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("SummaryBoundaryFinallyShadowedTransitive", boundarySource);
             var summaryJson = await RunEffectSummaryJsonAsync(fixture.AssemblyPath, includeTransitiveRoots: true);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 public class TestClass
 {
@@ -1177,7 +1191,7 @@ public static class PureBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("GeneratedPureBoundary", boundarySource);
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -1225,7 +1239,7 @@ public static class ImpureBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("GeneratedImpureBoundary", boundarySource);
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -1275,7 +1289,7 @@ public static class ImpureBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("GeneratedImpureBoundaryAffineGuard", boundarySource);
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -1317,7 +1331,7 @@ public class TestClass
         {
             var identity = GetAssemblyIdentity(typeof(System.Net.WebUtility).Assembly.Location);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 using System.Net;
@@ -1353,7 +1367,7 @@ public class TestClass
         {
             var identity = GetAssemblyIdentity(typeof(System.Environment).Assembly.Location);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -1423,6 +1437,39 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_EffectSummary_DefaultOff_DoesNotOverrideKnownImpureEnvironmentMethod()
+        {
+            var identity = GetAssemblyIdentity(typeof(System.Environment).Assembly.Location);
+
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                """
+using System;
+
+public sealed class EnforcePureAttribute : Attribute { }
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod()
+    {
+        return Environment.GetEnvironmentVariable("PATH");
+    }
+}
+""",
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new AnalyzerTestHost.InMemoryAdditionalText(
+                        "PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            identity,
+                            "System.Environment.GetEnvironmentVariable(string)",
+                            "pure",
+                            """[]"""))));
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.PurityNotVerifiedId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.Not.EqualTo("generated_purity_summary"));
+        }
+
+        [Test]
         public async Task Ps0002_EffectSummary_WithTrustedGeneratedPureConstructorClassification_SuppressesUnknownExternalCall()
         {
             const string boundarySource = """
@@ -1440,7 +1487,7 @@ public sealed class PureConstructorBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("GeneratedPureConstructorBoundary", boundarySource);
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -1491,7 +1538,7 @@ public sealed class ConfiguredConstructorBoundary
                 fixture.AssemblyPath,
                 "ConfiguredConstructorBoundary..ctor(int)");
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -1547,7 +1594,7 @@ public sealed class ImpureConstructorBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("GeneratedImpureConstructorBoundary", boundarySource);
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -1584,7 +1631,7 @@ public class TestClass
         {
             var identity = GetAssemblyIdentity(typeof(System.Text.StringBuilder).Assembly.Location);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 using System.Text;
@@ -1634,7 +1681,7 @@ public sealed class PureGetterBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("GeneratedPureGetterBoundary", boundarySource);
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -1686,7 +1733,7 @@ public sealed class ImpureGetterBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("GeneratedImpureGetterBoundary", boundarySource);
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -1723,7 +1770,7 @@ public class TestClass
         {
             var identity = GetAssemblyIdentity(typeof(System.Threading.Thread).Assembly.Location);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 using System.Threading;
@@ -1774,7 +1821,7 @@ public sealed class ConfiguredFormattingBoundary
                 fixture.AssemblyPath,
                 "ConfiguredFormattingBoundary.ToString()");
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -1826,7 +1873,7 @@ public sealed class GeneratedListPatternBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("GeneratedPureListPatternBoundary", boundarySource);
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -1876,7 +1923,7 @@ public sealed class GeneratedListPatternBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("GeneratedImpureListPatternBoundary", boundarySource);
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -1936,7 +1983,7 @@ public readonly struct PureOperatorBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("GeneratedPureOperatorBoundary", boundarySource);
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -1991,7 +2038,7 @@ public struct ImpureOperatorBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("GeneratedImpureOperatorBoundary", boundarySource);
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -2045,7 +2092,7 @@ public readonly struct PureConversionBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("GeneratedPureConversionBoundary", boundarySource);
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -2100,7 +2147,7 @@ public struct ImpureConversionBoundary
             await using var fixture = await CreateFixtureAssemblyAsync("GeneratedImpureConversionBoundary", boundarySource);
             var identity = GetAssemblyIdentity(fixture.AssemblyPath);
 
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+            var diagnostics = await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
                 """
 using System;
 
@@ -2148,7 +2195,7 @@ public class TestClass
                 ImmutableArray.Create<AdditionalText>(new InMemoryAdditionalText(
                     "PurelySharp.EffectSummary.json",
                     CreateEffectSummaryJson(coreLib, "System.ArgumentNullException.ThrowIfNull(object, string)"))),
-                new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
+                new TestAnalyzerConfigOptionsProvider(CreateEffectSummaryJsonEnabledGlobalOptions()));
 
             var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.ExceptionSummaryCatalog", throwOnError: true)!;
             var fromOptionsMethod = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
@@ -2240,7 +2287,7 @@ public class TestClass
   }
 ]
 """))),
-                new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty));
+                new TestAnalyzerConfigOptionsProvider(CreateEffectSummaryJsonEnabledGlobalOptions()));
 
             var catalogType = typeof(PurelySharpAnalyzer).Assembly.GetType("PurelySharp.Analyzer.ExceptionSummaryCatalog", throwOnError: true)!;
             var fromOptionsMethod = catalogType.GetMethod("FromOptions", BindingFlags.Public | BindingFlags.Static)!;
@@ -2734,6 +2781,73 @@ public class TestClass
                     reportSuppressedDiagnostics: false));
 
             return await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
+        }
+
+        private static ImmutableDictionary<string, string> CreateEffectSummaryJsonEnabledGlobalOptions(
+            ImmutableDictionary<string, string>? globalOptions = null)
+        {
+            var analyzerGlobalOptions = globalOptions ?? ImmutableDictionary<string, string>.Empty;
+            return analyzerGlobalOptions.SetItem("purelysharp_enable_effect_summary_json", "true");
+        }
+
+        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
+            string source,
+            string effectSummaryJson,
+            ImmutableArray<MetadataReference> additionalReferences,
+            string additionalFilePath = "PurelySharp.EffectSummary.json")
+        {
+            return await GetAnalyzerDiagnosticsAsync(
+                source,
+                new[] { (additionalFilePath, effectSummaryJson) },
+                additionalReferences,
+                CreateEffectSummaryJsonEnabledGlobalOptions());
+        }
+
+        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
+            string source,
+            string effectSummaryJson,
+            string additionalFilePath = "PurelySharp.EffectSummary.json")
+        {
+            return await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
+                source,
+                effectSummaryJson,
+                ImmutableArray<MetadataReference>.Empty,
+                additionalFilePath);
+        }
+
+        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
+            string source,
+            params (string Path, string Text)[] effectSummaryFiles)
+        {
+            return await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
+                source,
+                effectSummaryFiles,
+                ImmutableArray<MetadataReference>.Empty);
+        }
+
+        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
+            string source,
+            (string Path, string Text)[] effectSummaryFiles,
+            ImmutableArray<MetadataReference> additionalReferences)
+        {
+            return await GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
+                source,
+                effectSummaryFiles,
+                additionalReferences,
+                null);
+        }
+
+        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsWithEffectSummaryJsonEnabledAsync(
+            string source,
+            (string Path, string Text)[] effectSummaryFiles,
+            ImmutableArray<MetadataReference> additionalReferences,
+            ImmutableDictionary<string, string>? globalOptions)
+        {
+            return await GetAnalyzerDiagnosticsAsync(
+                source,
+                effectSummaryFiles,
+                additionalReferences,
+                CreateEffectSummaryJsonEnabledGlobalOptions(globalOptions));
         }
 
         private static async Task<FixtureAssembly> CreateFixtureAssemblyAsync(string assemblyName, string source)

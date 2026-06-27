@@ -63,7 +63,7 @@ namespace PurelySharp.Analyzer.Configuration
                 GetValues(options, ConfigKeys.SuggestMissingEnforcePureNamespaceFilters));
             bool emitExplanations = GetBool(options, ConfigKeys.EmitExplanations);
             bool reportExceptions = GetBool(options, ConfigKeys.ReportExceptions);
-            bool enableEffectSummaryJson = GetBoolOrDefaultTrue(options, ConfigKeys.EnableEffectSummaryJson);
+            bool enableEffectSummaryJson = GetBool(options, ConfigKeys.EnableEffectSummaryJson);
             return new AnalyzerConfiguration(impureMethods, pureMethods, impureNamespaces, impureTypes, debug, suggestMissing, missingPuritySuggestions, emitExplanations, reportExceptions, enableEffectSummaryJson, GetPurityProfile(options));
         }
 
@@ -191,20 +191,36 @@ namespace PurelySharp.Analyzer.Configuration
             return false;
         }
 
-        /// <summary>Returns false only when the key is set to a falsey value; missing key => true.</summary>
         private static bool GetBoolOrDefaultTrue(AnalyzerOptions options, string key)
         {
             try
             {
                 var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
                 if (!global.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value))
+                {
                     return true;
-                if (bool.TryParse(value.Trim(), out var b)) return b;
+                }
+
+                if (bool.TryParse(value.Trim(), out var parsed))
+                {
+                    return parsed;
+                }
+
                 var lowered = value.Trim().ToLowerInvariant();
-                if (lowered == "0" || lowered == "false" || lowered == "no" || lowered == "off") return false;
-                if (lowered == "1" || lowered == "true" || lowered == "yes" || lowered == "on") return true;
+                if (lowered == "0" || lowered == "false" || lowered == "no" || lowered == "off")
+                {
+                    return false;
+                }
+
+                if (lowered == "1" || lowered == "true" || lowered == "yes" || lowered == "on")
+                {
+                    return true;
+                }
             }
-            catch { }
+            catch
+            {
+            }
+
             return true;
         }
 
