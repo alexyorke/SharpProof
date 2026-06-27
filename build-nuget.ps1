@@ -1,8 +1,7 @@
 param(
 	[string]$Configuration = 'Release',
 	[string]$OutputDir = 'artifacts/nuget',
-	[string]$InstallProject = '',
-	[switch]$RefreshEffectSummaries
+	[string]$InstallProject = ''
 )
 
 Set-StrictMode -Version Latest
@@ -29,14 +28,6 @@ try {
 	}
 	New-Item -ItemType Directory -Force -Path $outFull | Out-Null
 	Get-ChildItem -Path $outFull -Filter *.nupkg -File -ErrorAction SilentlyContinue | Remove-Item -Force
-
-	if ($RefreshEffectSummaries) {
-		Write-Host "Refreshing generated effect summary artifacts..." -ForegroundColor Cyan
-		& (Join-Path $repoRoot 'scripts\Update-EffectSummaries.ps1') -Configuration $Configuration
-		if ($LASTEXITCODE -ne 0) {
-			throw "Effect summary regeneration failed with exit code $LASTEXITCODE"
-		}
-	}
 
 	Write-Host "Building solution ($Configuration)..." -ForegroundColor Cyan
 	Invoke-DotnetInRepo @('build', '-c', $Configuration)

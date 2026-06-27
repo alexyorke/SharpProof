@@ -31,16 +31,19 @@ if (-not (Test-Path $projectPath)) {
 
 Push-Location $repoRoot
 try {
+    Write-Host 'Manual legacy flow: refreshing checked-in effect-summary artifacts.' -ForegroundColor Yellow
+    Write-Host 'This script is not part of the default build or NuGet packaging entrypoints.' -ForegroundColor Yellow
+
     Write-Host 'Building effect summary tool...' -ForegroundColor Cyan
     & $dotnetWrapper -MemoryLimitMb $MemoryLimitMb -DotnetArgs @('build', $projectPath, '-c', $Configuration, '-m:20', '--no-restore')
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to build effect summary tool."
     }
 
-    Write-Host 'Regenerating checked-in effect summary artifacts...' -ForegroundColor Cyan
+    Write-Host 'Regenerating legacy checked-in effect summary artifacts...' -ForegroundColor Cyan
     & $dotnetWrapper -MemoryLimitMb $MemoryLimitMb -DotnetArgs @('run', '--project', $projectPath, '-c', $Configuration, '--no-build', '--', '--artifact-spec', $artifactSpecPath)
     if ($LASTEXITCODE -ne 0) {
-        throw "Failed to regenerate checked-in effect summary artifacts."
+        throw "Failed to regenerate legacy checked-in effect summary artifacts."
     }
 }
 finally {
