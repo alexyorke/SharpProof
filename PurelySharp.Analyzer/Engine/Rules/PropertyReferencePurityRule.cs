@@ -104,7 +104,9 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: knownImpureMemberSource));
             }
 
-            if (hasTrustedGeneratedPurity && generatedPurity.IsPure)
+            if (propertySymbol.IsStatic &&
+                hasTrustedGeneratedPurity &&
+                generatedPurity.IsPure)
             {
                 PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter '{getterSymbol.ToDisplayString()}' is trusted pure from generated purity summary.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;

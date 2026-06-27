@@ -163,6 +163,28 @@ namespace TestNamespace {
         }
 
         [Test]
+        public void AnalyzerProject_ShouldNotCopyOrEmbed_EffectSummaryJsonArtifacts()
+        {
+            var projectPath = Path.Combine(FindRepositoryRoot(), "PurelySharp.Analyzer", "PurelySharp.Analyzer.csproj");
+            var document = XDocument.Load(projectPath);
+            var effectSummaryItems = document
+                .Descendants()
+                .Where(element =>
+                    string.Equals(element.Name.LocalName, "None", StringComparison.Ordinal) ||
+                    string.Equals(element.Name.LocalName, "EmbeddedResource", StringComparison.Ordinal))
+                .Select(element => new
+                {
+                    ItemName = element.Name.LocalName,
+                    Include = element.Attribute("Include")?.Value ?? string.Empty
+                })
+                .Where(item => item.Include.EndsWith("PurelySharp.EffectSummary.json", StringComparison.Ordinal))
+                .ToArray();
+
+            Assert.That(effectSummaryItems, Is.Empty,
+                "The analyzer project should not copy or embed built-in effect-summary JSON artifacts.");
+        }
+
+        [Test]
         public void AttributesPackage_ShouldUseReleaseReadyNuGetMetadata()
         {
             var projectPath = Path.Combine(FindRepositoryRoot(), "PurelySharp.Attributes", "PurelySharp.Attributes.csproj");
