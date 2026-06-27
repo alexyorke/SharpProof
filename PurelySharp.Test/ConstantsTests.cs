@@ -3350,6 +3350,14 @@ public static class StopwatchCatalogSignatureSamples
                 "System.Reflection.MemberInfo.GetCustomAttributes(bool)",
                 "System.Reflection.Module.Assembly.get",
                 "System.Reflection.PropertyInfo.PropertyType.get",
+                "System.Reflection.AssemblyName.GetAssemblyName(string)",
+                "System.Reflection.Assembly.CustomAttributes.get",
+                "System.Reflection.Assembly.DefinedTypes.get",
+                "System.Reflection.Assembly.ManifestModule.get",
+                "System.Reflection.Emit.AssemblyBuilder.DefineDynamicModule(string)",
+                "System.Reflection.Emit.ILGenerator.Emit(System.Reflection.Emit.OpCode)",
+                "System.Reflection.MethodBase.IsStatic.get",
+                "System.Reflection.Module.ModuleVersionId.get",
             };
 
             foreach (var member in members)

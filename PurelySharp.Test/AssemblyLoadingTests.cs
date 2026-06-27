@@ -244,6 +244,50 @@ namespace TestNamespace
         }
 
         [Test]
+        public async Task AssemblyBuilder_DefineDynamicModule_Diagnostic()
+        {
+            var test = @"
+using System.Reflection.Emit;
+using PurelySharp.Attributes;
+
+namespace TestNamespace
+{
+    public class TestClass
+    {
+        [EnforcePure]
+        public ModuleBuilder {|PS0002:TestMethod|}(AssemblyBuilder builder)
+        {
+            return builder.DefineDynamicModule(""DynamicModule"");
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ILGenerator_Emit_Diagnostic()
+        {
+            var test = @"
+using System.Reflection.Emit;
+using PurelySharp.Attributes;
+
+namespace TestNamespace
+{
+    public class TestClass
+    {
+        [EnforcePure]
+        public void {|PS0002:TestMethod|}(ILGenerator il)
+        {
+            il.Emit(OpCodes.Ret);
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task AssemblyLoadContext_Default_Diagnostic()
         {
             var test = @"

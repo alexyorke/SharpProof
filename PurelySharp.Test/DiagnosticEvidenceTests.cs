@@ -9972,6 +9972,31 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_AssemblyNameGetAssemblyName_UsesNamespaceFallbackAfterMemberCatalogRemoval()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Reflection;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public AssemblyName TestMethod(string path)
+    {
+        return AssemblyName.GetAssemblyName(path);
+    }
+}",
+                additionalFiles: ImmutableArray<AdditionalText>.Empty);
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("reflection_environment_source"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("known_impure_namespace_or_type"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Reflection.AssemblyName.GetAssemblyName"));
+        }
+
+        [Test]
         public async Task Ps0002_ImmutableQueueDequeue_UsesGeneratedPurityCatalogSource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
