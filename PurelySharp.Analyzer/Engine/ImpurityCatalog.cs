@@ -364,6 +364,12 @@ namespace PurelySharp.Analyzer.Engine
 				return "known_impure";
 			}
 
+			if (IsAssemblyLoadContextSemanticImpure(symbol))
+			{
+				PurityAnalysisEngine.LogDebug($"Helper IsKnownImpure: AssemblyLoadContext semantic rule matched: {symbol.ToDisplayString()}");
+				return "assembly_load_context_semantic_rule";
+			}
+
 			string signature = symbol.OriginalDefinition.ToDisplayString();
 			if (symbol.Kind == SymbolKind.Property)
 			{
@@ -435,6 +441,39 @@ namespace PurelySharp.Analyzer.Engine
 			}
 
 			return null;
+		}
+
+		private static bool IsAssemblyLoadContextSemanticImpure(ISymbol symbol)
+		{
+			if (!string.Equals(
+				symbol.ContainingType?.ToDisplayString(),
+				"System.Runtime.Loader.AssemblyLoadContext",
+				StringComparison.Ordinal))
+			{
+				return false;
+			}
+
+			if (symbol is IPropertySymbol propertySymbol)
+			{
+				return propertySymbol.Name is "All" or "Default" or "CurrentContextualReflectionContext";
+			}
+
+			if (symbol is not IMethodSymbol methodSymbol)
+			{
+				return false;
+			}
+
+			if (methodSymbol.AssociatedSymbol is IPropertySymbol associatedPropertySymbol)
+			{
+				return associatedPropertySymbol.Name is "All" or "Default" or "CurrentContextualReflectionContext";
+			}
+
+			return methodSymbol.Name switch
+			{
+				"GetLoadContext" => methodSymbol.IsStatic && methodSymbol.Parameters.Length == 1,
+				"EnterContextualReflection" => true,
+				_ => methodSymbol.Name.StartsWith("LoadFrom", StringComparison.Ordinal)
+			};
 		}
 
 		public static bool IsInImpureNamespaceOrType(ISymbol symbol)

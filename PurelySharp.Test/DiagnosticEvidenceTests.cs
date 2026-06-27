@@ -10498,6 +10498,55 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_AssemblyLoadContextDefault_UsesSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Runtime.Loader;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public AssemblyLoadContext TestMethod()
+    {
+        return AssemblyLoadContext.Default;
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("reflection_environment_source"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("assembly_load_context_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Runtime.Loader.AssemblyLoadContext.Default"));
+        }
+
+        [Test]
+        public async Task Ps0002_AssemblyLoadContextLoadFromAssemblyPath_UsesSemanticRuleSource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.Reflection;
+using System.Runtime.Loader;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public Assembly TestMethod(AssemblyLoadContext context, string path)
+    {
+        return context.LoadFromAssemblyPath(path);
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("reflection_environment_source"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("assembly_load_context_semantic_rule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Runtime.Loader.AssemblyLoadContext.LoadFromAssemblyPath"));
+        }
+
+        [Test]
         public async Task GeneratedPuritySummary_Allows_TypeToString_WhenMetadataEvidenceIsPure()
         {
             const string metadataSymbol = "System.Type.ToString()";

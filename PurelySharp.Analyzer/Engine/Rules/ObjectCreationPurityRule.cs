@@ -159,6 +159,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             IMethodSymbol? constructorSymbol = objectCreationOperation.Constructor;
+            var constructorWasProvenPure = false;
             if (constructorSymbol != null)
             {
                 PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Checking Constructor: {constructorSymbol.ToDisplayString()}");
@@ -230,6 +231,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' determined IMPURE by recursive check. Result: Impure.");
                     return constructorPurity;
                 }
+
+                constructorWasProvenPure = true;
                 PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' determined PURE by recursive check. Trusting result.");
             }
             else
@@ -272,6 +275,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (objectCreationOperation.Type != null && PurityAnalysisEngine.IsInImpureNamespaceOrType(objectCreationOperation.Type))
             {
+                if (constructorWasProvenPure)
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Object creation '{objectCreationOperation.Syntax}' has a constructor that was proven pure. Skipping impure namespace/type fallback.");
+                    return PurityAnalysisResult.Pure;
+                }
+
                 if (constructorSymbol != null &&
                     (PurityAnalysisEngine.HasPureExternalAttribute(constructorSymbol) ||
                      PurityAnalysisEngine.IsPureEnforced(

@@ -3127,6 +3127,30 @@ public static class StopwatchCatalogSignatureSamples
         }
 
         [Test]
+        public void AssemblyLoadContextMembers_AreSourcedFromSemanticRules_NotStaticCatalogs()
+        {
+            var members = new[]
+            {
+                "System.Runtime.Loader.AssemblyLoadContext.All.get",
+                "System.Runtime.Loader.AssemblyLoadContext.CurrentContextualReflectionContext.get",
+                "System.Runtime.Loader.AssemblyLoadContext.Default.get",
+                "System.Runtime.Loader.AssemblyLoadContext.EnterContextualReflection()",
+                "System.Runtime.Loader.AssemblyLoadContext.EnterContextualReflection(System.Reflection.Assembly?)",
+                "System.Runtime.Loader.AssemblyLoadContext.GetLoadContext(System.Reflection.Assembly)",
+                "System.Runtime.Loader.AssemblyLoadContext.LoadFromAssemblyName(System.Reflection.AssemblyName)",
+                "System.Runtime.Loader.AssemblyLoadContext.LoadFromAssemblyPath(string)",
+                "System.Runtime.Loader.AssemblyLoadContext.LoadFromNativeImagePath(string, string?)",
+                "System.Runtime.Loader.AssemblyLoadContext.LoadFromStream(System.IO.Stream)",
+                "System.Runtime.Loader.AssemblyLoadContext.LoadFromStream(System.IO.Stream, System.IO.Stream?)",
+            };
+
+            foreach (var member in members)
+            {
+                AssertNotInManualCatalogs(member);
+            }
+        }
+
+        [Test]
         public void StringComparerInvocationMethods_AreSourcedFromGeneratedPurityEvidence_NotStaticCatalogs()
         {
             AssertNotInManualCatalogs("System.StringComparer.InvariantCultureIgnoreCase.Compare(string, string)");

@@ -484,6 +484,58 @@ public class TestClass
             await verifier.RunAsync();
         }
 
+        [Test]
+        public async Task SourcePureConstructorInImpureNamespace_DoesNotPoisonCaller()
+        {
+            var verifier = CreateVerifier(@"
+using PurelySharp.Attributes;
+
+namespace System.IO
+{
+    public sealed class SourceTrustedConstructedSdk
+    {
+        public {|PS0004:SourceTrustedConstructedSdk|}()
+        {
+        }
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public object Caller() => new System.IO.SourceTrustedConstructedSdk();
+}");
+
+            await verifier.RunAsync();
+        }
+
+        [Test]
+        public async Task SourceImpureConstructorInImpureNamespace_RemainsImpureAtCallSite()
+        {
+            var verifier = CreateVerifier(@"
+using System;
+using PurelySharp.Attributes;
+
+namespace System.IO
+{
+    public sealed class SourceImpureConstructedSdk
+    {
+        public SourceImpureConstructedSdk()
+        {
+            _ = DateTime.Now;
+        }
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public object {|PS0002:Caller|}() => new System.IO.SourceImpureConstructedSdk();
+}");
+
+            await verifier.RunAsync();
+        }
+
         private static VerifyCS.Test CreateVerifier(string source)
         {
             var verifier = new VerifyCS.Test
