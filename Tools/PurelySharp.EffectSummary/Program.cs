@@ -2151,7 +2151,7 @@ internal static class AssemblyEffectSummarizer
             return true;
         }
 
-        var normalizedKey = NormalizeConstructedReceiverType(exactSymbolKey);
+        var normalizedKey = EffectSummaryExactSymbolKeyNormalizer.NormalizeConstructedReceiverType(exactSymbolKey);
         if (!string.Equals(normalizedKey, exactSymbolKey, StringComparison.Ordinal) &&
             bySymbol.TryGetValue(normalizedKey, out var normalizedSummary) &&
             normalizedSummary is not null)
@@ -5249,92 +5249,6 @@ internal static class AssemblyEffectSummarizer
         {
             return DecodeTypeSpecification(reader, handle);
         }
-    }
-
-    private static string NormalizeConstructedReceiverType(string exactSymbolKey)
-    {
-        var signatureStart = exactSymbolKey.IndexOf('(');
-        if (signatureStart <= 0)
-        {
-            return exactSymbolKey;
-        }
-
-        var methodSeparator = -1;
-        var genericDepth = 0;
-        for (var i = 0; i < signatureStart; i++)
-        {
-            var current = exactSymbolKey[i];
-            if (current == '<')
-            {
-                genericDepth++;
-                continue;
-            }
-
-            if (current == '>')
-            {
-                if (genericDepth > 0)
-                {
-                    genericDepth--;
-                }
-
-                continue;
-            }
-
-            if (current == '.' && genericDepth == 0)
-            {
-                methodSeparator = i;
-            }
-        }
-
-        if (methodSeparator <= 0)
-        {
-            return exactSymbolKey;
-        }
-
-        var receiverType = exactSymbolKey[..methodSeparator];
-        var normalizedReceiverType = StripGenericInstantiations(receiverType);
-        if (string.Equals(receiverType, normalizedReceiverType, StringComparison.Ordinal))
-        {
-            return exactSymbolKey;
-        }
-
-        return normalizedReceiverType + exactSymbolKey[methodSeparator..];
-    }
-
-    private static string StripGenericInstantiations(string text)
-    {
-        if (text.IndexOf('<') < 0)
-        {
-            return text;
-        }
-
-        var builder = new StringBuilder(text.Length);
-        var genericDepth = 0;
-        foreach (var current in text)
-        {
-            if (current == '<')
-            {
-                genericDepth++;
-                continue;
-            }
-
-            if (current == '>')
-            {
-                if (genericDepth > 0)
-                {
-                    genericDepth--;
-                }
-
-                continue;
-            }
-
-            if (genericDepth == 0)
-            {
-                builder.Append(current);
-            }
-        }
-
-        return builder.ToString();
     }
 
     internal readonly record struct KnownThrownExceptionSite(int InstructionOffset, string ExceptionType);

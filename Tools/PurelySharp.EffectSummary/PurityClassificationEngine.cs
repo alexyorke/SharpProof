@@ -2885,7 +2885,7 @@ internal static class PurityClassificationEngine
             return true;
         }
 
-        var normalizedCall = NormalizeConstructedReceiverType(call);
+        var normalizedCall = EffectSummaryExactSymbolKeyNormalizer.NormalizeConstructedReceiverType(call);
         if (!string.Equals(normalizedCall, call, StringComparison.Ordinal) &&
             bySymbol.TryGetValue(normalizedCall, out resolvedCallSummary!))
         {
@@ -2992,7 +2992,7 @@ internal static class PurityClassificationEngine
             return true;
         }
 
-        var normalizedCall = NormalizeConstructedReceiverType(call);
+        var normalizedCall = EffectSummaryExactSymbolKeyNormalizer.NormalizeConstructedReceiverType(call);
         if (!string.Equals(normalizedCall, call, StringComparison.Ordinal) &&
             externalGeneratedPurityEntries.TryGetValue(normalizedCall, out resolvedEntry!))
         {
@@ -3103,92 +3103,6 @@ internal static class PurityClassificationEngine
         return callSymbol.Contains(".set_", StringComparison.Ordinal) ||
             callSymbol.Contains(".Set", StringComparison.Ordinal) ||
             callSymbol.Contains("<Set", StringComparison.Ordinal);
-    }
-
-    private static string NormalizeConstructedReceiverType(string exactSymbolKey)
-    {
-        var signatureStart = exactSymbolKey.IndexOf('(');
-        if (signatureStart <= 0)
-        {
-            return exactSymbolKey;
-        }
-
-        var methodSeparator = -1;
-        var genericDepth = 0;
-        for (var i = 0; i < signatureStart; i++)
-        {
-            var current = exactSymbolKey[i];
-            if (current == '<')
-            {
-                genericDepth++;
-                continue;
-            }
-
-            if (current == '>')
-            {
-                if (genericDepth > 0)
-                {
-                    genericDepth--;
-                }
-
-                continue;
-            }
-
-            if (current == '.' && genericDepth == 0)
-            {
-                methodSeparator = i;
-            }
-        }
-
-        if (methodSeparator <= 0)
-        {
-            return exactSymbolKey;
-        }
-
-        var receiverType = exactSymbolKey[..methodSeparator];
-        var normalizedReceiverType = StripGenericInstantiations(receiverType);
-        if (string.Equals(receiverType, normalizedReceiverType, StringComparison.Ordinal))
-        {
-            return exactSymbolKey;
-        }
-
-        return normalizedReceiverType + exactSymbolKey[methodSeparator..];
-    }
-
-    private static string StripGenericInstantiations(string text)
-    {
-        if (text.IndexOf('<') < 0)
-        {
-            return text;
-        }
-
-        var builder = new StringBuilder(text.Length);
-        var genericDepth = 0;
-        foreach (var current in text)
-        {
-            if (current == '<')
-            {
-                genericDepth++;
-                continue;
-            }
-
-            if (current == '>')
-            {
-                if (genericDepth > 0)
-                {
-                    genericDepth--;
-                }
-
-                continue;
-            }
-
-            if (genericDepth == 0)
-            {
-                builder.Append(current);
-            }
-        }
-
-        return builder.ToString();
     }
 
     private static bool HasFreshArrayAllocationEvidence(MethodEffectSummary? summary)
