@@ -1210,8 +1210,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "PureBoundary.Double(int)",
                             "pure",
                             """[]"""))
@@ -1258,8 +1258,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "ImpureBoundary.Next()",
                             "impure",
                             """[ "global_state_write" ]"""))
@@ -1313,8 +1313,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "ImpureBoundary.Next()",
                             "impure",
                             """[ "global_state_write" ]"""))
@@ -1351,8 +1351,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "System.Net.WebUtility.HtmlEncode(string)",
                             "impure",
                             """[ "global_state_write" ]"""))
@@ -1386,8 +1386,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "System.Environment.GetEnvironmentVariable(string)",
                             "pure",
                             """[]"""))
@@ -1422,8 +1422,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "System.Environment.GetEnvironmentVariable(string)",
                             "pure",
                             """[]"""))
@@ -1460,8 +1460,8 @@ public class TestClass
                 additionalFiles: ImmutableArray.Create<AdditionalText>(
                     new AnalyzerTestHost.InMemoryAdditionalText(
                         "PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "System.Environment.GetEnvironmentVariable(string)",
                             "pure",
                             """[]"""))));
@@ -1506,8 +1506,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "PureConstructorBoundary..ctor(int)",
                             "pure",
                             """[]""",
@@ -1557,8 +1557,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "ConfiguredConstructorBoundary..ctor(int)",
                             "pure",
                             """[]""",
@@ -1613,8 +1613,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "ImpureConstructorBoundary..ctor(int)",
                             "impure",
                             """[ "global_state_write" ]""",
@@ -1651,8 +1651,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "System.Text.StringBuilder..ctor()",
                             "impure",
                             """[ "global_state_write" ]""",
@@ -1700,8 +1700,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "PureGetterBoundary.get_Value()",
                             "pure",
                             """[]""",
@@ -1752,8 +1752,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "ImpureGetterBoundary.get_Value()",
                             "impure",
                             """[ "global_state_write" ]""",
@@ -1790,8 +1790,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "System.Threading.Thread.get_CurrentThread()",
                             "pure",
                             """[]"""))
@@ -1840,8 +1840,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "ConfiguredFormattingBoundary.ToString()",
                             "pure",
                             """[]"""))
@@ -1892,14 +1892,14 @@ public class TestClass
                 new[]
                 {
                     ("length.PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "GeneratedListPatternBoundary.get_Length()",
                             "pure",
                             """[]""")),
                     ("indexer.PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "GeneratedListPatternBoundary.get_Item(int)",
                             "pure",
                             """[]"""))
@@ -1942,14 +1942,14 @@ public class TestClass
                 new[]
                 {
                     ("length.PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "GeneratedListPatternBoundary.get_Length()",
                             "impure",
                             """[ "global_state_write" ]""")),
                     ("indexer.PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "GeneratedListPatternBoundary.get_Item(int)",
                             "pure",
                             """[]"""))
@@ -2002,8 +2002,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "PureOperatorBoundary.op_Addition(PureOperatorBoundary, PureOperatorBoundary)",
                             "pure",
                             """[]"""))
@@ -2057,8 +2057,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "ImpureOperatorBoundary.op_Addition(ImpureOperatorBoundary, ImpureOperatorBoundary)",
                             "impure",
                             """[ "global_state_write" ]"""))
@@ -2111,8 +2111,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "PureConversionBoundary.op_Explicit(PureConversionBoundary)",
                             "pure",
                             """[]"""))
@@ -2166,8 +2166,8 @@ public class TestClass
                 new[]
                 {
                     ("PurelySharp.EffectSummary.json",
-                        CreatePuritySummaryJson(
-                            identity,
+                        GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                            identity.AssemblyPath,
                             "ImpureConversionBoundary.op_Explicit(ImpureConversionBoundary)",
                             "impure",
                             """[ "global_state_write" ]"""))
@@ -2465,82 +2465,6 @@ public class TestClass
           "TransitiveThrownExceptionTypes": [],
           "Calls": [],
           "Fields": []
-        }
-      ]
-    }
-  ]
-}
-""";
-        }
-
-        private static string CreatePuritySummaryJson(
-            AssemblyIdentity assemblyIdentity,
-            string actualMethodLookupSymbol,
-            string classification,
-            string categoriesJson,
-            string? symbolOverride = null)
-        {
-            var methodIdentity = GetMethodIdentity(assemblyIdentity.AssemblyPath, actualMethodLookupSymbol);
-            var symbol = symbolOverride ?? actualMethodLookupSymbol;
-
-            return $$"""
-{
-  "SchemaVersion": 2,
-  "GeneratedPurityCatalog": {
-    "SchemaVersion": 1,
-    "Entries": [
-      {
-        "Symbol": "{{symbol}}",
-        "ExactSymbolKey": "{{methodIdentity.ExactSymbolKey}}",
-        "CacheKey": "validation-test",
-        "AssemblyName": "{{assemblyIdentity.AssemblyName}}",
-        "AssemblyPath": "{{assemblyIdentity.AssemblyPath.Replace("\\", "\\\\")}}",
-        "AssemblySha256": "{{assemblyIdentity.AssemblySha256}}",
-        "ModuleVersionId": "{{assemblyIdentity.ModuleVersionId}}",
-        "MetadataToken": "{{methodIdentity.MetadataToken}}",
-        "MethodBodySha256": {{FormatJsonStringOrNull(methodIdentity.MethodBodySha256)}},
-        "Classification": "{{classification}}",
-        "Categories": {{categoriesJson}},
-        "FirstBlockingCallChain": [],
-        "HasFreshArrayAllocationEvidence": false,
-        "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
-        "FreshnessClassification": "none"
-      }
-    ]
-  },
-  "Assemblies": [
-    {
-      "AssemblyName": "{{assemblyIdentity.AssemblyName}}",
-      "AssemblyPath": "{{assemblyIdentity.AssemblyPath.Replace("\\", "\\\\")}}",
-      "AssemblySha256": "{{assemblyIdentity.AssemblySha256}}",
-      "ModuleVersionId": "{{assemblyIdentity.ModuleVersionId}}",
-      "MethodCount": 1,
-      "EmittedMethodCount": 1,
-      "Methods": [
-        {
-          "Symbol": "{{symbol}}",
-          "ExactSymbolKey": "{{methodIdentity.ExactSymbolKey}}",
-          "MetadataToken": "{{methodIdentity.MetadataToken}}",
-          "RelativeVirtualAddress": 0,
-          "MethodBodySha256": {{FormatJsonStringOrNull(methodIdentity.MethodBodySha256)}},
-          "CacheKey": "validation-test",
-          "Effects": [],
-          "RootCandidates": [],
-          "TransitiveRootCandidates": [],
-          "ThrownExceptionTypes": [],
-          "TransitiveThrownExceptionTypes": [],
-          "Calls": [],
-          "Fields": [],
-          "PurityClassification": {
-            "Classification": "{{classification}}",
-            "Categories": {{categoriesJson}},
-            "FirstBlockingCallChain": [],
-            "HasFreshArrayAllocationEvidence": false,
-            "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
-            "FreshnessClassification": "none"
-          }
         }
       ]
     }

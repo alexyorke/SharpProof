@@ -13758,74 +13758,12 @@ public class TestClass
             string categoriesJson,
             string? symbolOverride = null)
         {
-            var assemblyIdentity = GetAssemblyIdentity(assemblyPath);
-            var methodIdentity = GetMethodIdentity(assemblyPath, actualMethodLookupSymbol);
-            var symbol = symbolOverride ?? actualMethodLookupSymbol;
-
-            return $$"""
-{
-  "SchemaVersion": 2,
-  "GeneratedPurityCatalog": {
-    "SchemaVersion": 1,
-    "Entries": [
-      {
-        "Symbol": "{{symbol}}",
-        "ExactSymbolKey": "{{methodIdentity.ExactSymbolKey}}",
-        "CacheKey": "diagnostic-evidence-test",
-        "AssemblyName": "{{assemblyIdentity.AssemblyName}}",
-        "AssemblyPath": "{{assemblyPath.Replace("\\", "\\\\")}}",
-        "AssemblySha256": "{{assemblyIdentity.AssemblySha256}}",
-        "ModuleVersionId": "{{assemblyIdentity.ModuleVersionId}}",
-        "MetadataToken": "{{methodIdentity.MetadataToken}}",
-        "MethodBodySha256": {{FormatJsonStringOrNull(methodIdentity.MethodBodySha256)}},
-        "Classification": "{{classification}}",
-        "Categories": {{categoriesJson}},
-        "FirstBlockingCallChain": [],
-        "HasFreshArrayAllocationEvidence": false,
-        "HasFreshObjectAllocationEvidence": false,
-        "HasUnsupportedEffects": false,
-        "FreshnessClassification": "none"
-      }
-    ]
-  },
-  "Assemblies": [
-    {
-      "AssemblyName": "{{assemblyIdentity.AssemblyName}}",
-      "AssemblyPath": "{{assemblyPath.Replace("\\", "\\\\")}}",
-      "AssemblySha256": "{{assemblyIdentity.AssemblySha256}}",
-      "ModuleVersionId": "{{assemblyIdentity.ModuleVersionId}}",
-      "MethodCount": 1,
-      "EmittedMethodCount": 1,
-      "Methods": [
-        {
-          "Symbol": "{{symbol}}",
-          "ExactSymbolKey": "{{methodIdentity.ExactSymbolKey}}",
-          "MetadataToken": "{{methodIdentity.MetadataToken}}",
-          "RelativeVirtualAddress": 0,
-          "MethodBodySha256": {{FormatJsonStringOrNull(methodIdentity.MethodBodySha256)}},
-          "CacheKey": "diagnostic-evidence-test",
-          "Effects": [],
-          "RootCandidates": [],
-          "TransitiveRootCandidates": [],
-          "ThrownExceptionTypes": [],
-          "TransitiveThrownExceptionTypes": [],
-          "Calls": [],
-          "Fields": [],
-          "PurityClassification": {
-            "Classification": "{{classification}}",
-            "Categories": {{categoriesJson}},
-            "FirstBlockingCallChain": [],
-            "HasFreshArrayAllocationEvidence": false,
-            "HasFreshObjectAllocationEvidence": false,
-            "HasUnsupportedEffects": false,
-            "FreshnessClassification": "none"
-          }
-        }
-      ]
-    }
-  ]
-}
-""";
+            return GeneratedPurityTestSupport.CreatePuritySummaryJson(
+                assemblyPath,
+                actualMethodLookupSymbol,
+                classification,
+                categoriesJson,
+                symbolOverride);
         }
 
         private static MethodIdentity GetMethodIdentity(string assemblyPath, string symbol)
@@ -14069,16 +14007,14 @@ public class TestClass
             string assemblyPath,
             params (string FileName, string ActualMethodLookupSymbol, string DisplaySymbol, string Classification, string CategoriesJson)[] entries)
         {
-            return entries
-                .Select(entry => (AdditionalText)new InMemoryAdditionalText(
+            return GeneratedPurityTestSupport.CreateSyntheticGeneratedPurityAdditionalFiles(
+                entries.Select(entry => (
+                    assemblyPath,
                     entry.FileName,
-                    CreatePuritySummaryJson(
-                        assemblyPath,
-                        entry.ActualMethodLookupSymbol,
-                        entry.Classification,
-                        entry.CategoriesJson,
-                        entry.DisplaySymbol)))
-                .ToImmutableArray();
+                    entry.ActualMethodLookupSymbol,
+                    entry.DisplaySymbol,
+                    entry.Classification,
+                    entry.CategoriesJson)).ToArray());
         }
 
         private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
