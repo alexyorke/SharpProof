@@ -131,19 +131,16 @@ namespace PurelySharp.Analyzer.Engine.Smt
 
             var argument = invocationExpression.ArgumentList.Arguments[0].Expression;
             var constantValue = semanticModel.GetConstantValue(argument, cancellationToken);
-            if (constantValue.HasValue)
+            if (constantValue is { HasValue: true, Value: null })
             {
-                if (constantValue.Value == null)
-                {
-                    formula = new SmtBooleanConstant(true);
-                    return true;
-                }
+                formula = new SmtBooleanConstant(true);
+                return true;
+            }
 
-                if (constantValue.Value is string stringValue)
-                {
-                    formula = new SmtBooleanConstant(stringValue.Length == 0);
-                    return true;
-                }
+            if (TryGetKnownStringLength(argument, semanticModel, cancellationToken, out var knownStringLength))
+            {
+                formula = new SmtBooleanConstant(knownStringLength == 0);
+                return true;
             }
 
             var argumentTypeInfo = semanticModel.GetTypeInfo(argument, cancellationToken);
@@ -167,6 +164,44 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 new SmtBinaryFormula(SmtBinaryOperator.Equal, argumentFormula, new SmtNullConstant()),
                 new SmtBinaryFormula(SmtBinaryOperator.Equal, lengthFormula, new SmtIntegerConstant(0)));
             return true;
+        }
+
+        public static bool TryGetKnownStringLength(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out int length)
+        {
+            expression = UnwrapExpression(expression);
+            var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
+            if (constantValue is { HasValue: true, Value: string stringValue })
+            {
+                length = stringValue.Length;
+                return true;
+            }
+
+            if (IsStringEmptyMemberAccess(expression, semanticModel, cancellationToken))
+            {
+                length = 0;
+                return true;
+            }
+
+            length = default;
+            return false;
+        }
+
+        private static bool IsStringEmptyMemberAccess(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return expression is MemberAccessExpressionSyntax memberAccess &&
+                memberAccess.Name.Identifier.ValueText == "Empty" &&
+                semanticModel.GetSymbolInfo(memberAccess, cancellationToken).Symbol is IFieldSymbol
+                {
+                    IsStatic: true,
+                    ContainingType.SpecialType: SpecialType.System_String
+                };
         }
 
         public static bool TryCollectBranchAssumptions(
@@ -800,6 +835,13 @@ namespace PurelySharp.Analyzer.Engine.Smt
             if (memberSymbol is not IPropertySymbol and not IFieldSymbol)
             {
                 return false;
+            }
+
+            if (memberSymbol.Name == "Length" &&
+                TryGetKnownStringLength(memberAccess.Expression, semanticModel, cancellationToken, out var stringLength))
+            {
+                formula = new SmtIntegerConstant(stringLength);
+                return true;
             }
 
             if (!TryTranslateValue(memberAccess.Expression, semanticModel, cancellationToken, out var receiver, getSymbolVersion) ||

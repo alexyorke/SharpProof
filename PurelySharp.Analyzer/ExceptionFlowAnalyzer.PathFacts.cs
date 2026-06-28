@@ -569,10 +569,9 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             out SmtFormula formula)
         {
-            var constantValue = semanticModel.GetConstantValue(valueExpression, cancellationToken);
-            if (constantValue is { HasValue: true, Value: string stringValue })
+            if (CSharpConditionToFormula.TryGetKnownStringLength(valueExpression, semanticModel, cancellationToken, out var stringLength))
             {
-                formula = new SmtIntegerConstant(stringValue.Length);
+                formula = new SmtIntegerConstant(stringLength);
                 return true;
             }
 
