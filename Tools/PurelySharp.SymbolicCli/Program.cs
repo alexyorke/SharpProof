@@ -41,6 +41,7 @@ try
     {
         Console.WriteLine($"{result.FilePath}:{result.Line}:{result.Column}");
         Console.WriteLine($"Node: {result.NodeKind}");
+        Console.WriteLine($"Merged invariant: {result.MergedInvariantText}");
         if (options.CheckReachability)
         {
             Console.WriteLine($"Reachability: {result.Reachability}");

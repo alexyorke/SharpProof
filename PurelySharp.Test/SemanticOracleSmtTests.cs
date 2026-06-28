@@ -1206,6 +1206,7 @@ public class TestClass
 
             Assert.That(result.NodeKind, Is.EqualTo("ReturnStatement"));
             Assert.That(result.Facts, Is.Not.Empty);
+            Assert.That(result.MergedInvariantText, Does.Contain("And"));
             Assert.That(result.Facts.Any(fact => fact.Contains("LessThan", StringComparison.Ordinal)), Is.True);
             Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThanOrEqual", StringComparison.Ordinal)), Is.True);
         }
@@ -1242,6 +1243,8 @@ public class TestClass
 
             Assert.That(analysis.PathConditions, Is.Not.Empty);
             Assert.That(analysis.PathConditions.Any(condition => condition is SmtBinaryFormula), Is.True);
+            Assert.That(analysis.MergedInvariant, Is.InstanceOf<SmtBinaryFormula>());
+            Assert.That(analysis.MergedInvariantText, Does.Contain("GreaterThan"));
             Assert.That(analysis.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal)), Is.True);
             Assert.That(analysis.Reachability, Is.EqualTo(SymbolicReachability.NotChecked));
         }
@@ -1274,6 +1277,8 @@ public class TestClass
             Assert.That(result.Analysis, Is.Not.Null);
             Assert.That(result.PathConditions, Is.Not.Empty);
             Assert.That(result.PathConditions.Any(condition => condition is SmtBinaryFormula), Is.True);
+            Assert.That(result.MergedInvariant, Is.SameAs(result.Analysis.MergedInvariant));
+            Assert.That(result.MergedInvariantText, Is.EqualTo(result.Analysis.MergedInvariantText));
             Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal)), Is.True);
             Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.NotChecked));
         }

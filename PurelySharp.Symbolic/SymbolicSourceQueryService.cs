@@ -379,7 +379,8 @@ namespace PurelySharp.Symbolic
                 query.Analysis.Reachability,
                 query.Analysis.ReachabilityReason,
                 conditionProofs,
-                SymbolicSmtDiagnostics.FromService(smtAnalysis));
+                SymbolicSmtDiagnostics.FromService(smtAnalysis),
+                query.Analysis.MergedInvariantText);
         }
 
         public SymbolicSourceQueryResult QuerySyntaxTreeAtPosition(
@@ -426,7 +427,8 @@ namespace PurelySharp.Symbolic
                 query.Analysis.Reachability,
                 query.Analysis.ReachabilityReason,
                 conditionProofs,
-                SymbolicSmtDiagnostics.FromService(smtAnalysis));
+                SymbolicSmtDiagnostics.FromService(smtAnalysis),
+                query.Analysis.MergedInvariantText);
         }
 
         public SymbolicProgramPointQueryResult AnalyzeSyntaxTree(
@@ -1003,7 +1005,8 @@ namespace PurelySharp.Symbolic
             SymbolicReachability reachability = SymbolicReachability.NotChecked,
             string reachabilityReason = "reachability_not_checked",
             IReadOnlyList<SymbolicConditionProofResult>? conditionProofs = null,
-            SymbolicSmtDiagnostics? smtDiagnostics = null)
+            SymbolicSmtDiagnostics? smtDiagnostics = null,
+            string? mergedInvariantText = null)
         {
             FilePath = filePath;
             Line = line;
@@ -1012,6 +1015,7 @@ namespace PurelySharp.Symbolic
             NodeSpanStart = nodeSpanStart;
             NodeKind = nodeKind;
             Facts = facts;
+            MergedInvariantText = mergedInvariantText ?? FormatMergedInvariantText(facts);
             Reachability = reachability;
             ReachabilityReason = reachabilityReason;
             ConditionProofs = conditionProofs ?? Array.Empty<SymbolicConditionProofResult>();
@@ -1032,6 +1036,8 @@ namespace PurelySharp.Symbolic
 
         public IReadOnlyList<string> Facts { get; }
 
+        public string MergedInvariantText { get; }
+
         public SymbolicReachability Reachability { get; }
 
         public string ReachabilityReason { get; }
@@ -1039,6 +1045,21 @@ namespace PurelySharp.Symbolic
         public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; }
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+
+        private static string FormatMergedInvariantText(IReadOnlyList<string> facts)
+        {
+            if (facts.Count == 0)
+            {
+                return "true";
+            }
+
+            if (facts.Count == 1)
+            {
+                return facts[0];
+            }
+
+            return string.Join(" && ", facts.Select(static fact => "(" + fact + ")"));
+        }
     }
 
     public sealed class SymbolicProgramPointQueryResult
@@ -1078,6 +1099,10 @@ namespace PurelySharp.Symbolic
         public IReadOnlyList<SmtFormula> PathConditions => Analysis.PathConditions;
 
         public IReadOnlyList<string> Facts => Analysis.Facts;
+
+        public SmtFormula MergedInvariant => Analysis.MergedInvariant;
+
+        public string MergedInvariantText => Analysis.MergedInvariantText;
 
         public SymbolicReachability Reachability => Analysis.Reachability;
 
