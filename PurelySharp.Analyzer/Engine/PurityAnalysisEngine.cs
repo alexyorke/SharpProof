@@ -4323,6 +4323,11 @@ namespace PurelySharp.Analyzer.Engine
                 return true;
             }
 
+            if (TryCreateCollectionExpressionLengthFormula(valueExpression, out formula))
+            {
+                return true;
+            }
+
             if (IsArrayEmptyInvocation(valueExpression, semanticModel, cancellationToken))
             {
                 formula = new SmtIntegerConstant(0);
@@ -4343,6 +4348,21 @@ namespace PurelySharp.Analyzer.Engine
 
             formula = null!;
             return false;
+        }
+
+        private static bool TryCreateCollectionExpressionLengthFormula(
+            ExpressionSyntax valueExpression,
+            out SmtFormula formula)
+        {
+            if (valueExpression is not CollectionExpressionSyntax collectionExpression ||
+                collectionExpression.Elements.Any(static element => element is not ExpressionElementSyntax))
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtIntegerConstant(collectionExpression.Elements.Count);
+            return true;
         }
 
         private static ExpressionSyntax UnwrapSmtFactExpression(ExpressionSyntax expression)

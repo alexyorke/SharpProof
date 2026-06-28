@@ -528,14 +528,46 @@ namespace PurelySharp.Analyzer
                 return true;
             }
 
+            if (TryCreateCollectionExpressionLengthFormula(valueExpression, out formula))
+            {
+                return true;
+            }
+
             if (IsArrayEmptyInvocation(valueExpression, semanticModel, cancellationToken))
             {
                 formula = new SmtIntegerConstant(0);
                 return true;
             }
 
+            if (CSharpConditionToFormula.TryTranslateValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverFormula,
+                    getSymbolVersion: null) &&
+                receiverFormula is SmtVariable { Kind: SmtValueKind.Reference })
+            {
+                formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
+                return true;
+            }
+
             formula = null!;
             return false;
+        }
+
+        private static bool TryCreateCollectionExpressionLengthFormula(
+            ExpressionSyntax valueExpression,
+            out SmtFormula formula)
+        {
+            if (valueExpression is not CollectionExpressionSyntax collectionExpression ||
+                collectionExpression.Elements.Any(static element => element is not ExpressionElementSyntax))
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtIntegerConstant(collectionExpression.Elements.Count);
+            return true;
         }
 
         private static bool IsArrayEmptyInvocation(
