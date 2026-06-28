@@ -236,6 +236,11 @@ namespace PurelySharp.Symbolic
             if (statement is ExpressionStatementSyntax expressionStatement &&
                 expressionStatement.Expression is AssignmentExpressionSyntax assignment)
             {
+                if (TryHandleTupleDeconstructionDeclaration(assignment, semanticModel, cancellationToken, facts))
+                {
+                    return;
+                }
+
                 if (TryHandleTupleAssignment(assignment, semanticModel, cancellationToken, facts))
                 {
                     return;
@@ -555,6 +560,47 @@ namespace PurelySharp.Symbolic
             }
 
             fact = CreateAssignedValueFact(targetFormula, valueFormula);
+            return true;
+        }
+
+        private static bool TryHandleTupleDeconstructionDeclaration(
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                UnwrapExpression(assignment.Left) is not DeclarationExpressionSyntax declarationExpression ||
+                declarationExpression.Designation is not ParenthesizedVariableDesignationSyntax leftDesignation ||
+                UnwrapExpression(assignment.Right) is not TupleExpressionSyntax rightTuple ||
+                rightTuple.Arguments.Count != leftDesignation.Variables.Count)
+            {
+                return false;
+            }
+
+            var targetSymbols = new List<ISymbol>();
+            foreach (var variableDesignation in leftDesignation.Variables)
+            {
+                if (variableDesignation is not SingleVariableDesignationSyntax singleVariableDesignation ||
+                    singleVariableDesignation.Identifier.ValueText == "_" ||
+                    semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is not ILocalSymbol localSymbol)
+                {
+                    return true;
+                }
+
+                targetSymbols.Add(localSymbol.OriginalDefinition);
+            }
+
+            for (var index = 0; index < targetSymbols.Count; index++)
+            {
+                AddAssignedValueFacts(
+                    targetSymbols[index],
+                    rightTuple.Arguments[index].Expression,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
+
             return true;
         }
 
