@@ -34,6 +34,7 @@ namespace PurelySharp.Analyzer
 
             var pathConditions = new List<SmtFormula>();
             AddPriorAssignmentPathConditions(useNode, semanticModel, cancellationToken, pathConditions);
+            AddSharedAncestorPathConditions(useNode, semanticModel, cancellationToken, pathConditions);
             foreach (var ifStatement in useNode.Ancestors().OfType<IfStatementSyntax>())
             {
                 if (ifStatement.Statement.Span.Contains(useNode.SpanStart) &&
@@ -163,6 +164,7 @@ namespace PurelySharp.Analyzer
         {
             var pathConditions = new List<SmtFormula>();
             AddPriorAssignmentPathConditions(useNode, semanticModel, cancellationToken, pathConditions);
+            AddSharedAncestorPathConditions(useNode, semanticModel, cancellationToken, pathConditions);
 
             foreach (var ifStatement in useNode.Ancestors().OfType<IfStatementSyntax>())
             {
@@ -187,6 +189,18 @@ namespace PurelySharp.Analyzer
             AddExpressionBranchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
             AddPrecedingGuardConditions(invalidatedSymbols, useNode, semanticModel, cancellationToken, pathConditions);
             return pathConditions;
+        }
+
+        private static void AddSharedAncestorPathConditions(
+            SyntaxNode useNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
+        {
+            foreach (var condition in SymbolicProgramPointFacts.CollectAncestorReachabilityConditions(useNode, semanticModel, cancellationToken))
+            {
+                pathConditions.Add(condition);
+            }
         }
 
         private static void AddExpressionBranchPathConditions(

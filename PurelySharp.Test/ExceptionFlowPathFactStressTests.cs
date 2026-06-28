@@ -151,7 +151,14 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+            Assert.That(
+                diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId),
+                Is.False,
+                string.Join(
+                    "; ",
+                    diagnostics
+                        .Where(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId)
+                        .Select(d => d.Properties[PurelySharpDiagnostics.ExceptionTypesProperty])));
         }
 
         [Test]
@@ -1314,6 +1321,30 @@ public class TestClass
             _ when index >= 0 && index < values.Length => values[index],
             _ => 0
         };
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_CatchFilterNonZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        try
+        {
+            return 0;
+        }
+        catch (InvalidOperationException) when (divisor != 0)
+        {
+            return 10 / divisor;
+        }
     }
 }");
 
