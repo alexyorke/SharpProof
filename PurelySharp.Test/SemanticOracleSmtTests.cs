@@ -2313,6 +2313,65 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalesceAssignmentNonNullLiteral()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        value ??= ""safe"";
+        return value.Length;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "CoalesceAssignmentNonNullLiteral.cs",
+                FindLine(source, "return value.Length;"),
+                16,
+                "value != null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesCoalesceAssignmentGuardedFallbackNullBranchUnreachable()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string value, string fallback)
+    {
+        if (fallback == null)
+        {
+            return 0;
+        }
+
+        value ??= fallback;
+        if (value == null)
+        {
+            return 1;
+        }
+
+        return value.Length;
+    }
+}";
+            var result = new SymbolicSourceQueryService().AnalyzeSource(
+                source,
+                "CoalesceAssignmentGuardedFallback.cs",
+                FindLine(source, "return 1;"),
+                20,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(result.PathConditions, Is.Not.Empty);
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+            Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_QuerySource_CollectsConditionalThrowAssignmentFacts()
         {
             const string source = @"

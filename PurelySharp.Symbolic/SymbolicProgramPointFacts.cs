@@ -996,6 +996,10 @@ namespace PurelySharp.Symbolic
                     {
                         AddAssignedValueFacts(originalAssignedSymbol, assignment.Right, semanticModel, cancellationToken, facts);
                     }
+                    else if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression))
+                    {
+                        AddCoalesceAssignmentFacts(originalAssignedSymbol, assignment.Right, semanticModel, cancellationToken, facts);
+                    }
                     else if (previousAssignedValue != null &&
                              TryCreateCompoundAssignmentFact(
                                  originalAssignedSymbol,
@@ -2044,6 +2048,79 @@ namespace PurelySharp.Symbolic
             {
                 AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
+        }
+
+        private static void AddCoalesceAssignmentFacts(
+            ISymbol assignedSymbol,
+            ExpressionSyntax rightExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (!TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula) ||
+                targetFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return;
+            }
+
+            if (IsDefinitelyNonNullReferenceValue(rightExpression, semanticModel, cancellationToken))
+            {
+                facts.Add(new SmtBinaryFormula(
+                    SmtBinaryOperator.NotEqual,
+                    targetFormula,
+                    new SmtNullConstant()));
+                return;
+            }
+
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    rightExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var rightFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) ||
+                rightFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return;
+            }
+
+            var targetNonNull = new SmtBinaryFormula(
+                SmtBinaryOperator.NotEqual,
+                targetFormula,
+                new SmtNullConstant());
+            var targetEqualsRight = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                targetFormula,
+                rightFormula);
+            facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Or, targetNonNull, targetEqualsRight));
+        }
+
+        private static bool IsDefinitelyNonNullReferenceValue(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapExpression(expression);
+            var type = semanticModel.GetTypeInfo(expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(expression, cancellationToken).Type;
+            if (type?.IsReferenceType != true)
+            {
+                return false;
+            }
+
+            var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
+            if (constantValue is { HasValue: true, Value: not null })
+            {
+                return true;
+            }
+
+            return expression is ObjectCreationExpressionSyntax or
+                AnonymousObjectCreationExpressionSyntax or
+                ArrayCreationExpressionSyntax or
+                ImplicitArrayCreationExpressionSyntax or
+                CollectionExpressionSyntax or
+                InterpolatedStringExpressionSyntax or
+                TypeOfExpressionSyntax;
         }
 
         private static bool TryGetThrowGuardedValue(
