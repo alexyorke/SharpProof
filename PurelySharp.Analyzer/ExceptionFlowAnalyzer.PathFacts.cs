@@ -145,11 +145,9 @@ namespace PurelySharp.Analyzer
                 }
 
                 if (statement is IfStatementSyntax ifStatement &&
-                    ifStatement.Else == null &&
-                    StatementDefinitelyExits(ifStatement.Statement) &&
                     !IsSymbolAssignedBetween(block, ifStatement.Span.End, useNode.SpanStart, symbol, semanticModel, cancellationToken))
                 {
-                    TryAddPathCondition(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, pathConditions);
+                    AddCompletedIfStatementFacts(ifStatement, symbol, semanticModel, cancellationToken, pathConditions);
                 }
             }
         }
@@ -355,11 +353,9 @@ namespace PurelySharp.Analyzer
                 }
 
                 if (statement is IfStatementSyntax ifStatement &&
-                    ifStatement.Else == null &&
-                    StatementDefinitelyExits(ifStatement.Statement) &&
                     !AnySymbolAssignedBetween(block, ifStatement.Span.End, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
                 {
-                    TryAddPathCondition(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, pathConditions);
+                    AddCompletedIfStatementFacts(ifStatement, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
                 }
             }
         }
@@ -424,6 +420,58 @@ namespace PurelySharp.Analyzer
                     yield return (block, statement);
                 }
             }
+        }
+
+        private static bool AnyConditionSymbolMutatedInStatement(
+            ExpressionSyntax condition,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var conditionSymbols = GetReferencedLocalAndParameterSymbols(condition, semanticModel, cancellationToken);
+            if (conditionSymbols.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var node in statement.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+            {
+                foreach (var symbol in conditionSymbols)
+                {
+                    if (MutatesSymbol(node, symbol, semanticModel, cancellationToken))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static IReadOnlyList<ISymbol> GetReferencedLocalAndParameterSymbols(
+            SyntaxNode root,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var symbols = new List<ISymbol>();
+            foreach (var node in root.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+            {
+                if (node is not ExpressionSyntax expression)
+                {
+                    continue;
+                }
+
+                var symbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
+                if (symbol != null &&
+                    symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
+                {
+                    symbols.Add(symbol);
+                }
+            }
+
+            return symbols;
         }
 
         private static void AddPriorStatementFacts(
@@ -523,6 +571,74 @@ namespace PurelySharp.Analyzer
                 {
                     RemoveFactsReferencingSymbol(facts, mutatedSymbol);
                 }
+            }
+
+            if (statement is IfStatementSyntax ifStatement)
+            {
+                AddCompletedIfStatementFacts(ifStatement, semanticModel, cancellationToken, facts);
+            }
+        }
+
+        private static void AddCompletedIfStatementFacts(
+            IfStatementSyntax ifStatement,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (StatementDefinitelyExits(ifStatement.Statement) &&
+                (ifStatement.Else?.Statement == null ||
+                 !AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Else.Statement, semanticModel, cancellationToken)))
+            {
+                CSharpConditionToFormula.TryCollectBranchAssumptions(
+                    ifStatement.Condition,
+                    branchWhenTrue: false,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
+
+            if (ifStatement.Else?.Statement is { } elseStatement &&
+                StatementDefinitelyExits(elseStatement) &&
+                !AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken))
+            {
+                CSharpConditionToFormula.TryCollectBranchAssumptions(
+                    ifStatement.Condition,
+                    branchWhenTrue: true,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
+        }
+
+        private static void AddCompletedIfStatementFacts(
+            IfStatementSyntax ifStatement,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            AddCompletedIfStatementFacts(ifStatement, new[] { symbol }, semanticModel, cancellationToken, facts);
+        }
+
+        private static void AddCompletedIfStatementFacts(
+            IfStatementSyntax ifStatement,
+            IReadOnlyCollection<ISymbol> invalidatedSymbols,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (StatementDefinitelyExits(ifStatement.Statement) &&
+                (ifStatement.Else?.Statement == null ||
+                 !AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Else.Statement, semanticModel, cancellationToken)))
+            {
+                TryAddPathCondition(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, facts);
+            }
+
+            if (ifStatement.Else?.Statement is { } elseStatement &&
+                StatementDefinitelyExits(elseStatement) &&
+                !AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken))
+            {
+                TryAddPathCondition(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, facts);
             }
         }
 

@@ -1099,6 +1099,92 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsIfElseThenExitFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (divisor == 0)
+        {
+            return 0;
+        }
+        else
+        {
+        }
+
+        return 10 / divisor;
+    }
+}",
+                "return 10 / divisor;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
+                                           fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("divisor", StringComparison.Ordinal) &&
+                                           fact.Contains("0", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicInvariantService_CollectsIfElseElseExitFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (divisor == 0)
+        {
+        }
+        else
+        {
+            return 0;
+        }
+
+        return 10 / divisor;
+    }
+}",
+                "return 10 / divisor;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("divisor", StringComparison.Ordinal) &&
+                                           fact.Contains("0", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicInvariantService_IfElseSurvivingMutationSuppressesStaleFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (divisor == 0)
+        {
+            return 0;
+        }
+        else
+        {
+            divisor = 0;
+        }
+
+        return 10 / divisor;
+    }
+}",
+                "return 10 / divisor;");
+
+            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
+                                           fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("divisor", StringComparison.Ordinal) &&
+                                           fact.Contains("0", StringComparison.Ordinal)), Is.False);
+        }
+
+        [Test]
         public void SymbolicInvariantService_TupleAssignmentSwapInvalidatesTargetFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -2884,6 +2970,34 @@ public class TestClass
         }
 
         return 0;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_IfElseElseExitImpliesZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (divisor == 0)
+        {
+        }
+        else
+        {
+            return 0;
+        }
+
+        return 10 / divisor;
     }
 }");
 

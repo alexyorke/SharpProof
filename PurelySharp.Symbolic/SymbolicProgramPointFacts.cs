@@ -196,6 +196,83 @@ namespace PurelySharp.Symbolic
             };
         }
 
+        private static bool AnyConditionSymbolMutatedInStatement(
+            ExpressionSyntax condition,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var conditionSymbols = GetReferencedLocalAndParameterSymbols(condition, semanticModel, cancellationToken);
+            if (conditionSymbols.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var node in statement.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+            {
+                if (node is AssignmentExpressionSyntax tupleAssignment &&
+                    UnwrapExpression(tupleAssignment.Left) is TupleExpressionSyntax leftTuple &&
+                    leftTuple.Arguments.Any(argument =>
+                        ExpressionReferencesAnySymbol(argument.Expression, conditionSymbols, semanticModel, cancellationToken)))
+                {
+                    return true;
+                }
+
+                var mutatedExpression = node switch
+                {
+                    AssignmentExpressionSyntax assignment => assignment.Left,
+                    PrefixUnaryExpressionSyntax prefixUnary
+                        when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) || prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
+                        prefixUnary.Operand,
+                    PostfixUnaryExpressionSyntax postfixUnary
+                        when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) || postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
+                        postfixUnary.Operand,
+                    ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) => argument.Expression,
+                    _ => null
+                };
+
+                if (mutatedExpression == null)
+                {
+                    continue;
+                }
+
+                var mutatedSymbol = semanticModel.GetSymbolInfo(mutatedExpression, cancellationToken).Symbol?.OriginalDefinition;
+                if (mutatedSymbol != null &&
+                    conditionSymbols.Any(symbol => SymbolEqualityComparer.Default.Equals(symbol, mutatedSymbol)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static IReadOnlyList<ISymbol> GetReferencedLocalAndParameterSymbols(
+            SyntaxNode root,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var symbols = new List<ISymbol>();
+            foreach (var node in root.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+            {
+                if (node is not ExpressionSyntax expression)
+                {
+                    continue;
+                }
+
+                var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol?.OriginalDefinition;
+                if (symbol is ILocalSymbol or IParameterSymbol &&
+                    symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
+                {
+                    symbols.Add(symbol);
+                }
+            }
+
+            return symbols;
+        }
+
         private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(SyntaxNode site)
         {
             for (SyntaxNode? current = site; current != null; current = current.Parent)
@@ -299,13 +376,37 @@ namespace PurelySharp.Symbolic
             }
 
             RemoveFactsInvalidatedByNestedMutations(statement, semanticModel, cancellationToken, facts);
-            if (statement is IfStatementSyntax ifStatement &&
-                ifStatement.Else == null &&
-                StatementDefinitelyExits(ifStatement.Statement))
+            if (statement is IfStatementSyntax ifStatement)
+            {
+                AddCompletedIfStatementFacts(ifStatement, semanticModel, cancellationToken, facts);
+            }
+        }
+
+        private static void AddCompletedIfStatementFacts(
+            IfStatementSyntax ifStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (StatementDefinitelyExits(ifStatement.Statement) &&
+                (ifStatement.Else?.Statement == null ||
+                 !AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Else.Statement, semanticModel, cancellationToken)))
             {
                 AddBranchConditionFacts(
                     ifStatement.Condition,
                     branchWhenTrue: false,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
+
+            if (ifStatement.Else?.Statement is { } elseStatement &&
+                StatementDefinitelyExits(elseStatement) &&
+                !AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken))
+            {
+                AddBranchConditionFacts(
+                    ifStatement.Condition,
+                    branchWhenTrue: true,
                     semanticModel,
                     cancellationToken,
                     facts);
