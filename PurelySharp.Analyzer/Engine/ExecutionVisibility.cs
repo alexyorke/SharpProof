@@ -55,13 +55,13 @@ namespace PurelySharp.Analyzer.Engine
             {
                 if (ancestor is IfStatementSyntax ifStatement)
                 {
-                    if (IsConditionAlwaysFalseUsingSmt(ifStatement.Condition, semanticModel, cancellationToken, smtAnalysis) &&
+                    if (IsConditionAlwaysFalseAt(ifStatement.Condition, ifStatement, semanticModel, cancellationToken, smtAnalysis) &&
                         ifStatement.Statement.Span.Contains(syntaxNode.SpanStart))
                     {
                         return true;
                     }
 
-                    if (IsConditionAlwaysTrueUsingSmt(ifStatement.Condition, semanticModel, cancellationToken, smtAnalysis) &&
+                    if (IsConditionAlwaysTrueAt(ifStatement.Condition, ifStatement, semanticModel, cancellationToken, smtAnalysis) &&
                         ifStatement.Else?.Statement.Span.Contains(syntaxNode.SpanStart) == true)
                     {
                         return true;
@@ -69,13 +69,13 @@ namespace PurelySharp.Analyzer.Engine
                 }
                 else if (ancestor is ConditionalExpressionSyntax conditionalExpression)
                 {
-                    if (IsConditionAlwaysFalseUsingSmt(conditionalExpression.Condition, semanticModel, cancellationToken, smtAnalysis) &&
+                    if (IsConditionAlwaysFalseAt(conditionalExpression.Condition, conditionalExpression, semanticModel, cancellationToken, smtAnalysis) &&
                         conditionalExpression.WhenTrue.Span.Contains(syntaxNode.SpanStart))
                     {
                         return true;
                     }
 
-                    if (IsConditionAlwaysTrueUsingSmt(conditionalExpression.Condition, semanticModel, cancellationToken, smtAnalysis) &&
+                    if (IsConditionAlwaysTrueAt(conditionalExpression.Condition, conditionalExpression, semanticModel, cancellationToken, smtAnalysis) &&
                         conditionalExpression.WhenFalse.Span.Contains(syntaxNode.SpanStart))
                     {
                         return true;
@@ -95,14 +95,14 @@ namespace PurelySharp.Analyzer.Engine
                 {
                     if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression) &&
                         binaryExpression.Right.Span.Contains(syntaxNode.SpanStart) &&
-                        IsConditionAlwaysFalseUsingSmt(binaryExpression.Left, semanticModel, cancellationToken, smtAnalysis))
+                        IsConditionAlwaysFalseAt(binaryExpression.Left, binaryExpression, semanticModel, cancellationToken, smtAnalysis))
                     {
                         return true;
                     }
 
                     if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression) &&
                         binaryExpression.Right.Span.Contains(syntaxNode.SpanStart) &&
-                        IsConditionAlwaysTrueUsingSmt(binaryExpression.Left, semanticModel, cancellationToken, smtAnalysis))
+                        IsConditionAlwaysTrueAt(binaryExpression.Left, binaryExpression, semanticModel, cancellationToken, smtAnalysis))
                     {
                         return true;
                     }
@@ -120,7 +120,7 @@ namespace PurelySharp.Analyzer.Engine
                 else if (ancestor is WhileStatementSyntax whileStatement)
                 {
                     if (whileStatement.Statement.Span.Contains(syntaxNode.SpanStart) &&
-                        IsConditionAlwaysFalseUsingSmt(whileStatement.Condition, semanticModel, cancellationToken, smtAnalysis))
+                        IsConditionAlwaysFalseAt(whileStatement.Condition, whileStatement, semanticModel, cancellationToken, smtAnalysis))
                     {
                         return true;
                     }
@@ -230,7 +230,7 @@ namespace PurelySharp.Analyzer.Engine
                 return IsConditionAlwaysFalseUsingSmt(forStatement.Condition, semanticModel, cancellationToken, smtAnalysis);
             }
 
-            var pathConditions = new List<SmtFormula>();
+            var pathConditions = CollectPriorAssignmentFacts(forStatement, semanticModel, cancellationToken);
             foreach (var initializerFact in CollectForInitializerFacts(forStatement, semanticModel, cancellationToken))
             {
                 pathConditions.Add(initializerFact);
@@ -238,6 +238,169 @@ namespace PurelySharp.Analyzer.Engine
 
             CSharpConditionToFormula.TryCollectDomainFacts(forStatement.Condition, semanticModel, cancellationToken, pathConditions);
             return IsBranchConditionUnreachable(formula, pathConditions, smtAnalysis);
+        }
+
+        private static bool IsConditionAlwaysFalseAt(
+            ExpressionSyntax expression,
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return EvaluateKnownBoolean(
+                expression,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                CollectPriorAssignmentFacts(site, semanticModel, cancellationToken)) == KnownBooleanValue.False;
+        }
+
+        private static bool IsConditionAlwaysTrueAt(
+            ExpressionSyntax expression,
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return EvaluateKnownBoolean(
+                expression,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis,
+                CollectPriorAssignmentFacts(site, semanticModel, cancellationToken)) == KnownBooleanValue.True;
+        }
+
+        private static List<SmtFormula> CollectPriorAssignmentFacts(
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var facts = new List<SmtFormula>();
+            foreach (var containingBlock in EnumerateContainingBlocks(site).Reverse())
+            {
+                if (IsLoopBodyBlock(containingBlock.Block))
+                {
+                    RemoveFactsInvalidatedByNestedMutations(containingBlock.Block, semanticModel, cancellationToken, facts);
+                }
+
+                foreach (var statement in containingBlock.Block.Statements)
+                {
+                    if (ReferenceEquals(statement, containingBlock.ContainingStatement))
+                    {
+                        break;
+                    }
+
+                    AddPriorStatementFacts(statement, semanticModel, cancellationToken, facts);
+                }
+            }
+
+            return facts;
+        }
+
+        private static bool IsLoopBodyBlock(BlockSyntax block)
+        {
+            return block.Parent switch
+            {
+                WhileStatementSyntax whileStatement => ReferenceEquals(whileStatement.Statement, block),
+                ForStatementSyntax forStatement => ReferenceEquals(forStatement.Statement, block),
+                ForEachStatementSyntax forEachStatement => ReferenceEquals(forEachStatement.Statement, block),
+                DoStatementSyntax doStatement => ReferenceEquals(doStatement.Statement, block),
+                _ => false
+            };
+        }
+
+        private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(SyntaxNode site)
+        {
+            for (SyntaxNode? current = site; current != null; current = current.Parent)
+            {
+                if (current is StatementSyntax statement &&
+                    statement.Parent is BlockSyntax block)
+                {
+                    yield return (block, statement);
+                }
+            }
+        }
+
+        private static void AddPriorStatementFacts(
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (statement is LocalDeclarationStatementSyntax localDeclaration)
+            {
+                foreach (var declarator in localDeclaration.Declaration.Variables)
+                {
+                    if (declarator.Initializer == null)
+                    {
+                        continue;
+                    }
+
+                    RemoveFactsInvalidatedByNestedMutations(declarator.Initializer.Value, semanticModel, cancellationToken, facts);
+                    if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
+                    {
+                        AddForInitializerFact(localSymbol, declarator.Initializer.Value, semanticModel, cancellationToken, facts);
+                    }
+                }
+
+                return;
+            }
+
+            if (statement is ExpressionStatementSyntax expressionStatement &&
+                expressionStatement.Expression is AssignmentExpressionSyntax assignment)
+            {
+                RemoveFactsInvalidatedByNestedMutations(assignment.Left, semanticModel, cancellationToken, facts);
+                RemoveFactsInvalidatedByNestedMutations(assignment.Right, semanticModel, cancellationToken, facts);
+
+                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
+                if (assignedSymbol is ILocalSymbol or IParameterSymbol)
+                {
+                    RemoveFactsReferencingSymbol(facts, assignedSymbol.OriginalDefinition);
+                    if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+                    {
+                        AddForInitializerFact(assignedSymbol.OriginalDefinition, assignment.Right, semanticModel, cancellationToken, facts);
+                    }
+                }
+
+                return;
+            }
+
+            RemoveFactsInvalidatedByNestedMutations(statement, semanticModel, cancellationToken, facts);
+        }
+
+        private static void RemoveFactsInvalidatedByNestedMutations(
+            SyntaxNode root,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            foreach (var node in root.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !IsNestedCallableBoundary(candidate)))
+            {
+                var mutatedExpression = node switch
+                {
+                    AssignmentExpressionSyntax assignment => assignment.Left,
+                    PrefixUnaryExpressionSyntax prefixUnary
+                        when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) || prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
+                        prefixUnary.Operand,
+                    PostfixUnaryExpressionSyntax postfixUnary
+                        when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) || postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
+                        postfixUnary.Operand,
+                    ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) => argument.Expression,
+                    _ => null
+                };
+
+                if (mutatedExpression == null)
+                {
+                    continue;
+                }
+
+                var mutatedSymbol = semanticModel.GetSymbolInfo(mutatedExpression, cancellationToken).Symbol;
+                if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
+                {
+                    RemoveFactsReferencingSymbol(facts, mutatedSymbol.OriginalDefinition);
+                }
+            }
         }
 
         private static IEnumerable<SmtFormula> CollectForInitializerFacts(
@@ -494,7 +657,8 @@ namespace PurelySharp.Analyzer.Engine
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            SmtAnalysisService? smtAnalysis)
+            SmtAnalysisService? smtAnalysis,
+            IReadOnlyCollection<SmtFormula>? pathConditions = null)
         {
             expression = UnwrapExpression(expression);
             var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
@@ -506,15 +670,15 @@ namespace PurelySharp.Analyzer.Engine
             if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
                 prefixUnary.IsKind(SyntaxKind.LogicalNotExpression))
             {
-                return Negate(EvaluateKnownBoolean(prefixUnary.Operand, semanticModel, cancellationToken, smtAnalysis));
+                return Negate(EvaluateKnownBoolean(prefixUnary.Operand, semanticModel, cancellationToken, smtAnalysis, pathConditions));
             }
 
             if (expression is BinaryExpressionSyntax binaryExpression)
             {
                 if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression))
                 {
-                    var left = EvaluateKnownBoolean(binaryExpression.Left, semanticModel, cancellationToken, smtAnalysis);
-                    var right = EvaluateKnownBoolean(binaryExpression.Right, semanticModel, cancellationToken, smtAnalysis);
+                    var left = EvaluateKnownBoolean(binaryExpression.Left, semanticModel, cancellationToken, smtAnalysis, pathConditions);
+                    var right = EvaluateKnownBoolean(binaryExpression.Right, semanticModel, cancellationToken, smtAnalysis, pathConditions);
                     if (left == KnownBooleanValue.False || right == KnownBooleanValue.False)
                     {
                         return KnownBooleanValue.False;
@@ -525,13 +689,13 @@ namespace PurelySharp.Analyzer.Engine
                         return KnownBooleanValue.True;
                     }
 
-                    return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken, smtAnalysis);
+                    return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken, smtAnalysis, pathConditions);
                 }
 
                 if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression))
                 {
-                    var left = EvaluateKnownBoolean(binaryExpression.Left, semanticModel, cancellationToken, smtAnalysis);
-                    var right = EvaluateKnownBoolean(binaryExpression.Right, semanticModel, cancellationToken, smtAnalysis);
+                    var left = EvaluateKnownBoolean(binaryExpression.Left, semanticModel, cancellationToken, smtAnalysis, pathConditions);
+                    var right = EvaluateKnownBoolean(binaryExpression.Right, semanticModel, cancellationToken, smtAnalysis, pathConditions);
                     if (left == KnownBooleanValue.True || right == KnownBooleanValue.True)
                     {
                         return KnownBooleanValue.True;
@@ -542,18 +706,18 @@ namespace PurelySharp.Analyzer.Engine
                         return KnownBooleanValue.False;
                     }
 
-                    return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken, smtAnalysis);
+                    return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken, smtAnalysis, pathConditions);
                 }
 
-                return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken, smtAnalysis);
+                return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken, smtAnalysis, pathConditions);
             }
 
             if (expression is IsPatternExpressionSyntax isPatternExpression)
             {
-                return EvaluateWithSmtFallback(isPatternExpression, semanticModel, cancellationToken, smtAnalysis);
+                return EvaluateWithSmtFallback(isPatternExpression, semanticModel, cancellationToken, smtAnalysis, pathConditions);
             }
 
-            return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken, smtAnalysis);
+            return EvaluateWithSmtFallback(expression, semanticModel, cancellationToken, smtAnalysis, pathConditions);
         }
 
         private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
@@ -591,15 +755,16 @@ namespace PurelySharp.Analyzer.Engine
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            SmtAnalysisService? smtAnalysis)
+            SmtAnalysisService? smtAnalysis,
+            IReadOnlyCollection<SmtFormula>? pathConditions = null)
         {
             if (!CSharpConditionToFormula.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||
                 formula == null)
             {
-                return EvaluateBranchAssumptionFeasibility(expression, semanticModel, cancellationToken, smtAnalysis);
+                return EvaluateBranchAssumptionFeasibility(expression, semanticModel, cancellationToken, smtAnalysis, pathConditions);
             }
 
-            var domainFacts = new List<SmtFormula>();
+            var domainFacts = pathConditions?.ToList() ?? new List<SmtFormula>();
             CSharpConditionToFormula.TryCollectDomainFacts(expression, semanticModel, cancellationToken, domainFacts);
 
             if (IsBranchConditionUnreachable(formula, domainFacts, smtAnalysis))
@@ -619,9 +784,10 @@ namespace PurelySharp.Analyzer.Engine
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            SmtAnalysisService? smtAnalysis)
+            SmtAnalysisService? smtAnalysis,
+            IReadOnlyCollection<SmtFormula>? pathConditions = null)
         {
-            var trueBranchFacts = new List<SmtFormula>();
+            var trueBranchFacts = pathConditions?.ToList() ?? new List<SmtFormula>();
             if (CSharpConditionToFormula.TryCollectBranchAssumptions(
                     expression,
                     branchWhenTrue: true,
@@ -633,7 +799,7 @@ namespace PurelySharp.Analyzer.Engine
                 return KnownBooleanValue.False;
             }
 
-            var falseBranchFacts = new List<SmtFormula>();
+            var falseBranchFacts = pathConditions?.ToList() ?? new List<SmtFormula>();
             if (CSharpConditionToFormula.TryCollectBranchAssumptions(
                     expression,
                     branchWhenTrue: false,

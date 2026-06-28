@@ -218,6 +218,156 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_PriorLocalAssignment_PrunesUnreachableIfBranch()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var value = 0;
+        if (value != 0)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_PriorLocalAssignment_PrunesUnreachableElseBranch()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var value = 0;
+        if (value == 0)
+        {
+            return 1;
+        }
+        else
+        {
+            return 2;
+        }
+    }
+}",
+                    "return 2;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_PriorReassignment_UsesLatestFact()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var value = 0;
+        value = 1;
+        if (value == 0)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_MutationBeforeBranch_InvalidatesPriorFact()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var value = 0;
+        value++;
+        if (value != 0)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LoopBodyMutation_InvalidatesPreLoopFact()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod(bool keepGoing)
+    {
+        var value = 0;
+        while (keepGoing)
+        {
+            if (value != 0)
+            {
+                return 1;
+            }
+
+            value = 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LoopWithoutMutation_PreservesPreLoopFact()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod(bool keepGoing)
+    {
+        var value = 0;
+        while (keepGoing)
+        {
+            if (value != 0)
+            {
+                return 1;
+            }
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_UlongZeroContradiction_IsAlwaysFalse()
         {
             Assert.That(
