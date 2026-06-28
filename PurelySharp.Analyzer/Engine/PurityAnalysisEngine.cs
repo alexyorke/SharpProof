@@ -2226,8 +2226,78 @@ namespace PurelySharp.Analyzer.Engine
 
         private static bool BranchTrueUsesConditionalSuccessor(IOperation? branchValue)
         {
-            return branchValue?.Syntax is ExpressionSyntax expressionSyntax &&
-                !ShouldAnalyzeExplicitConditionBranchValue(expressionSyntax);
+            if (branchValue?.Syntax is not ExpressionSyntax expressionSyntax)
+            {
+                return false;
+            }
+
+            return !TryFindContainingCondition(expressionSyntax, out var conditionSyntax) ||
+                HasOddLogicalNotAncestor(expressionSyntax, conditionSyntax);
+        }
+
+        private static bool TryFindContainingCondition(ExpressionSyntax branchValueSyntax, out ExpressionSyntax conditionSyntax)
+        {
+            foreach (var ancestor in branchValueSyntax.AncestorsAndSelf())
+            {
+                if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.IfStatementSyntax ifStatement)
+                {
+                    conditionSyntax = ifStatement.Condition;
+                    return true;
+                }
+
+                if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.ConditionalExpressionSyntax conditionalExpression)
+                {
+                    conditionSyntax = conditionalExpression.Condition;
+                    return true;
+                }
+
+                if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.WhileStatementSyntax whileStatement)
+                {
+                    conditionSyntax = whileStatement.Condition;
+                    return true;
+                }
+
+                if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.DoStatementSyntax doStatement)
+                {
+                    conditionSyntax = doStatement.Condition;
+                    return true;
+                }
+
+                if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.ForStatementSyntax forStatement)
+                {
+                    if (forStatement.Condition != null)
+                    {
+                        conditionSyntax = forStatement.Condition;
+                        return true;
+                    }
+
+                    break;
+                }
+
+                if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.WhenClauseSyntax whenClause)
+                {
+                    conditionSyntax = whenClause.Condition;
+                    return true;
+                }
+            }
+
+            conditionSyntax = null!;
+            return false;
+        }
+
+        private static bool HasOddLogicalNotAncestor(ExpressionSyntax branchValueSyntax, ExpressionSyntax conditionSyntax)
+        {
+            var logicalNotCount = 0;
+            for (SyntaxNode? current = branchValueSyntax; current != null && !ReferenceEquals(current, conditionSyntax); current = current.Parent)
+            {
+                if (current.Parent is Microsoft.CodeAnalysis.CSharp.Syntax.PrefixUnaryExpressionSyntax prefixUnary &&
+                    prefixUnary.IsKind(SyntaxKind.LogicalNotExpression))
+                {
+                    logicalNotCount++;
+                }
+            }
+
+            return logicalNotCount % 2 == 1;
         }
 
         private static bool TryCreateSuccessorState(
@@ -3920,6 +3990,7 @@ namespace PurelySharp.Analyzer.Engine
                             writtenLocalSymbols,
                             valueOperation,
                             currentState,
+                            context.SemanticModel,
                             context.SemanticModel.Compilation);
                         nextState = ApplyAssignedDelegateTargets(
                             nextState,
@@ -3944,6 +4015,12 @@ namespace PurelySharp.Analyzer.Engine
                     if (targetSymbol is IParameterSymbol assignmentParameterSymbol)
                     {
                         nextState = nextState.WithIncrementedSmtSymbolVersion(assignmentParameterSymbol);
+                        nextState = AddAssignedValueFact(
+                            nextState,
+                            assignmentParameterSymbol,
+                            valueOperation,
+                            currentState,
+                            context.SemanticModel);
                     }
 
                     nextState = ApplyWrittenLocalStateUpdates(
@@ -3951,6 +4028,7 @@ namespace PurelySharp.Analyzer.Engine
                         writtenLocalSymbols,
                         valueOperation,
                         currentState,
+                        context.SemanticModel,
                         context.SemanticModel.Compilation);
                     nextState = ApplyAssignedDelegateTargets(
                         nextState,
@@ -4071,6 +4149,13 @@ namespace PurelySharp.Analyzer.Engine
                                         LogDebug($"    [ATF-DEL-VAR] Updated map for {declaredSymbol.Name} with {valueTargets.Value.MethodSymbols.Count} targets. New Map Count: {nextState.DelegateTargetMap.Count}");
                                     }
                                 }
+
+                                nextState = AddAssignedValueFact(
+                                    nextState,
+                                    declaredSymbol,
+                                    initializerValue,
+                                    nextState,
+                                    context.SemanticModel);
                             }
                         }
                     }
@@ -4080,11 +4165,110 @@ namespace PurelySharp.Analyzer.Engine
             return nextState;
         }
 
+        private static PurityAnalysisState AddAssignedValueFact(
+            PurityAnalysisState currentState,
+            ISymbol targetSymbol,
+            IOperation? valueOperation,
+            PurityAnalysisState valueState,
+            SemanticModel semanticModel)
+        {
+            if (valueOperation?.Syntax is not ExpressionSyntax valueExpression ||
+                !TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetFormula) ||
+                !CSharpConditionToFormula.TryTranslateValue(
+                    valueExpression,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var valueFormula,
+                    valueState.GetSmtSymbolVersion) ||
+                valueFormula == null ||
+                !CanCompareSmtValues(targetFormula, valueFormula))
+            {
+                return currentState;
+            }
+
+            var assignedFact = CreateAssignedValueFact(targetFormula, valueFormula);
+            return currentState.WithPathConditions(currentState.PathConditions.Add(assignedFact));
+        }
+
+        private static SmtFormula CreateAssignedValueFact(SmtFormula targetFormula, SmtFormula valueFormula)
+        {
+            if (targetFormula.Kind == SmtValueKind.Bool &&
+                valueFormula is SmtBooleanConstant booleanConstant)
+            {
+                return booleanConstant.Value
+                    ? targetFormula
+                    : new SmtUnaryFormula(SmtUnaryOperator.Not, targetFormula);
+            }
+
+            return new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, valueFormula);
+        }
+
+        private static bool TryCreateSymbolSmtValue(
+            ISymbol symbol,
+            PurityAnalysisState currentState,
+            out SmtFormula formula)
+        {
+            var type = symbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                _ => null
+            };
+
+            if (type == null)
+            {
+                formula = null!;
+                return false;
+            }
+
+            var variableName = GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion);
+            if (type.SpecialType == SpecialType.System_Boolean)
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Bool);
+                return true;
+            }
+
+            if (IsSmtIntegralType(type))
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Int);
+                return true;
+            }
+
+            if (type.IsReferenceType)
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Reference);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool CanCompareSmtValues(SmtFormula left, SmtFormula right)
+        {
+            return left.Kind == right.Kind ||
+                left is SmtNullConstant && right.Kind == SmtValueKind.Reference ||
+                right is SmtNullConstant && left.Kind == SmtValueKind.Reference;
+        }
+
+        private static bool IsSmtIntegralType(ITypeSymbol typeSymbol)
+        {
+            return typeSymbol.SpecialType is
+                SpecialType.System_SByte or
+                SpecialType.System_Byte or
+                SpecialType.System_Int16 or
+                SpecialType.System_UInt16 or
+                SpecialType.System_Int32 or
+                SpecialType.System_UInt32 or
+                SpecialType.System_Int64;
+        }
+
         private static PurityAnalysisState ApplyWrittenLocalStateUpdates(
             PurityAnalysisState currentState,
             ILocalSymbol[] writtenLocalSymbols,
             IOperation valueOperation,
             PurityAnalysisState valueState,
+            SemanticModel semanticModel,
             Compilation compilation)
         {
             var nextState = currentState;
@@ -4092,6 +4276,12 @@ namespace PurelySharp.Analyzer.Engine
             foreach (var writtenLocalSymbol in writtenLocalSymbols)
             {
                 nextState = nextState.WithIncrementedSmtSymbolVersion(writtenLocalSymbol);
+                nextState = AddAssignedValueFact(
+                    nextState,
+                    writtenLocalSymbol,
+                    valueOperation,
+                    valueState,
+                    semanticModel);
 
                 if (TryResolveKnownConcreteType(valueOperation, valueState, compilation, out var concreteType))
                 {

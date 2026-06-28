@@ -406,7 +406,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 (right is SmtNullConstant && left.Kind == SmtValueKind.Reference);
         }
 
-        private static bool TryTranslateValue(
+        public static bool TryTranslateValue(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
