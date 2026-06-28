@@ -415,6 +415,90 @@ namespace PurelySharp.Symbolic
                     cancellationToken,
                     facts);
             }
+
+            AddCompletedIfElseMergedFacts(ifStatement, semanticModel, cancellationToken, facts);
+        }
+
+        private static void AddCompletedIfElseMergedFacts(
+            IfStatementSyntax ifStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (ifStatement.Else?.Statement is not { } elseStatement ||
+                StatementDefinitelyExits(ifStatement.Statement) ||
+                StatementDefinitelyExits(elseStatement))
+            {
+                return;
+            }
+
+            var currentFacts = facts.ToArray();
+            var trueBranchFacts = CollectCompletedBranchFacts(
+                currentFacts,
+                ifStatement.Condition,
+                branchWhenTrue: true,
+                ifStatement.Statement,
+                semanticModel,
+                cancellationToken);
+            var falseBranchFacts = CollectCompletedBranchFacts(
+                currentFacts,
+                ifStatement.Condition,
+                branchWhenTrue: false,
+                elseStatement,
+                semanticModel,
+                cancellationToken);
+            var existingKeys = new HashSet<string>(facts.Select(GetFormulaKey), StringComparer.Ordinal);
+            var falseBranchKeys = new HashSet<string>(falseBranchFacts.Select(GetFormulaKey), StringComparer.Ordinal);
+
+            foreach (var fact in trueBranchFacts)
+            {
+                var key = GetFormulaKey(fact);
+                if (existingKeys.Contains(key) || !falseBranchKeys.Contains(key))
+                {
+                    continue;
+                }
+
+                facts.Add(fact);
+                existingKeys.Add(key);
+            }
+        }
+
+        private static List<SmtFormula> CollectCompletedBranchFacts(
+            IEnumerable<SmtFormula> currentFacts,
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            StatementSyntax branchStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var branchFacts = new List<SmtFormula>(currentFacts);
+            AddBranchConditionFacts(condition, branchWhenTrue, semanticModel, cancellationToken, branchFacts);
+            foreach (var statement in EnumerateBranchStatements(branchStatement))
+            {
+                AddPriorStatementFacts(statement, semanticModel, cancellationToken, branchFacts);
+            }
+
+            return branchFacts;
+        }
+
+        private static IEnumerable<StatementSyntax> EnumerateBranchStatements(StatementSyntax branchStatement)
+        {
+            if (branchStatement is BlockSyntax block)
+            {
+                foreach (var statement in block.Statements)
+                {
+                    yield return statement;
+                }
+
+                yield break;
+            }
+
+            yield return branchStatement;
+        }
+
+        private static string GetFormulaKey(SmtFormula formula)
+        {
+            return formula.ToString() ?? string.Empty;
         }
 
         private static void AddCompletedLoopStatementFacts(

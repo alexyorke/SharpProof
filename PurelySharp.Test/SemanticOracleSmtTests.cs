@@ -1553,6 +1553,67 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_MergesIdenticalIfElseAssignmentFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var divisor = 0;
+        if (flag)
+        {
+            divisor = 1;
+        }
+        else
+        {
+            divisor = 1;
+        }
+
+        return 10 / divisor;
+    }
+}",
+                "return 10 / divisor;");
+
+            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("divisor", StringComparison.Ordinal) &&
+                                           fact.Contains("1", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicInvariantService_DoesNotMergeDivergentIfElseAssignmentFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var divisor = 0;
+        if (flag)
+        {
+            divisor = 1;
+        }
+        else
+        {
+            divisor = 2;
+        }
+
+        return 10 / divisor;
+    }
+}",
+                "return 10 / divisor;");
+
+            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("divisor", StringComparison.Ordinal) &&
+                                           fact.Contains("1", StringComparison.Ordinal)), Is.False);
+            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("divisor", StringComparison.Ordinal) &&
+                                           fact.Contains("2", StringComparison.Ordinal)), Is.False);
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsDefaultLiteralAssignmentFacts()
         {
             var facts = CollectProgramPointFacts(
