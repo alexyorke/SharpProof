@@ -36,6 +36,48 @@ public static class SourcePredicates
 ";
 
         [Test]
+        public void SymbolicSourceQueryService_QueryFile_RequestApiProvesImplication()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value <= 0)
+        {
+            return 1;
+        }
+
+        return value;
+    }
+}";
+            var filePath = Path.Combine(
+                Path.GetTempPath(),
+                "PurelySharp.SymbolicFileQuery." + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(filePath, source);
+
+            try
+            {
+                var query = new SymbolicFileQuery(
+                    filePath,
+                    FindLine(source, "return value;"),
+                    16,
+                    AnalyzerTestHost.GetTrustedPlatformReferences(),
+                    new[] { "value > 0" });
+
+                var result = new SymbolicSourceQueryService().QueryFile(
+                    query,
+                    smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+                Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+            }
+            finally
+            {
+                File.Delete(filePath);
+            }
+        }
+
+        [Test]
         public void Oracle_ContradictoryIntegerCondition_IsUnsatisfiable()
         {
             var context = AnalyzerTestHost.CreateConditionContext("int x", "x > 0 && x < 0");

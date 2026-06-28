@@ -28,6 +28,26 @@ namespace PurelySharp.Symbolic
         }
 
         public SymbolicSourceQueryResult QueryFile(
+            SymbolicFileQuery query,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null)
+        {
+            if (query == null)
+            {
+                throw new ArgumentNullException(nameof(query));
+            }
+
+            return QueryFile(
+                query.FilePath,
+                query.Line,
+                query.Column,
+                query.References.IsDefaultOrEmpty ? null : query.References,
+                cancellationToken,
+                smtAnalysis,
+                query.ImpliedConditions);
+        }
+
+        public SymbolicSourceQueryResult QueryFile(
             string filePath,
             int line,
             int column = 1,
@@ -55,6 +75,25 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 smtAnalysis,
                 impliedConditions);
+        }
+
+        public SymbolicProgramPointQueryResult AnalyzeFile(
+            SymbolicFileQuery query,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null)
+        {
+            if (query == null)
+            {
+                throw new ArgumentNullException(nameof(query));
+            }
+
+            return AnalyzeFile(
+                query.FilePath,
+                query.Line,
+                query.Column,
+                query.References.IsDefaultOrEmpty ? null : query.References,
+                cancellationToken,
+                smtAnalysis);
         }
 
         public SymbolicProgramPointQueryResult AnalyzeFile(
@@ -642,6 +681,50 @@ namespace PurelySharp.Symbolic
 
             public SymbolicProgramPointAnalysis Analysis { get; }
         }
+    }
+
+    public sealed class SymbolicFileQuery
+    {
+        public SymbolicFileQuery(
+            string filePath,
+            int line,
+            int column = 1,
+            IEnumerable<MetadataReference>? references = null,
+            IEnumerable<string>? impliedConditions = null)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                throw new ArgumentException("File path is required.", nameof(filePath));
+            }
+
+            if (line <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(line), "Line must be positive.");
+            }
+
+            if (column <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(column), "Column must be positive.");
+            }
+
+            FilePath = filePath;
+            Line = line;
+            Column = column;
+            References = references?.ToImmutableArray() ?? ImmutableArray<MetadataReference>.Empty;
+            ImpliedConditions = impliedConditions?
+                .Where(static condition => !string.IsNullOrWhiteSpace(condition))
+                .ToImmutableArray() ?? ImmutableArray<string>.Empty;
+        }
+
+        public string FilePath { get; }
+
+        public int Line { get; }
+
+        public int Column { get; }
+
+        public ImmutableArray<MetadataReference> References { get; }
+
+        public ImmutableArray<string> ImpliedConditions { get; }
     }
 
     public sealed class SymbolicSourceQueryResult

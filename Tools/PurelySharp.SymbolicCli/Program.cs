@@ -17,13 +17,13 @@ try
         : null;
 
     var queryService = new SymbolicSourceQueryService();
-    var result = queryService.QueryFile(
+    var query = new SymbolicFileQuery(
         options.FilePath,
         options.Line,
         options.Column,
         options.CreateReferences(),
-        smtAnalysis: smtAnalysis,
-        impliedConditions: options.ImpliedConditions);
+        options.ImpliedConditions);
+    var result = queryService.QueryFile(query, smtAnalysis: smtAnalysis);
 
     if (options.Json)
     {
