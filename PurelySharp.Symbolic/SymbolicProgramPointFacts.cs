@@ -1015,6 +1015,7 @@ namespace PurelySharp.Symbolic
                     }
                 }
 
+                AddElementAssignmentFact(assignment, semanticModel, cancellationToken, facts);
                 return;
             }
 
@@ -2234,6 +2235,43 @@ namespace PurelySharp.Symbolic
 
             formula = null;
             return false;
+        }
+
+        private static void AddElementAssignmentFact(
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                UnwrapExpression(assignment.Left) is not ElementAccessExpressionSyntax elementAccess)
+            {
+                return;
+            }
+
+            var receiverSymbols = GetReferencedLocalAndParameterSymbols(elementAccess.Expression, semanticModel, cancellationToken);
+            if (ExpressionReferencesAnySymbol(assignment.Right, receiverSymbols, semanticModel, cancellationToken) ||
+                !CSharpConditionToFormula.TryTranslateValue(
+                    elementAccess,
+                    semanticModel,
+                    cancellationToken,
+                    out var targetFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) ||
+                targetFormula == null ||
+                !TryTranslateAssignedValueExpression(
+                    assignment.Right,
+                    semanticModel,
+                    cancellationToken,
+                    assignedSymbol: null,
+                    out var valueFormula) ||
+                valueFormula == null ||
+                !CanCompareSmtValues(targetFormula, valueFormula))
+            {
+                return;
+            }
+
+            facts.Add(CreateAssignedValueFact(targetFormula, valueFormula));
         }
 
         private static bool TryTranslateFiniteElementAccessValue(

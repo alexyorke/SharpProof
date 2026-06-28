@@ -2637,7 +2637,7 @@ public class TestClass
         }
 
         [Test]
-        public void SymbolicSourceQueryService_QuerySource_DoesNotReuseListPatternElementFactAfterElementMutation()
+        public void SymbolicSourceQueryService_QuerySource_UsesArrayElementWriteFactAfterElementMutation()
         {
             const string source = @"
 public class TestClass
@@ -2656,14 +2656,17 @@ public class TestClass
 }";
             var result = new SymbolicSourceQueryService().QuerySource(
                 source,
-                "QuerySourceArrayElementReadAfterElementMutation.cs",
+                "QuerySourceArrayElementWriteThenRead.cs",
                 FindLine(source, "return 10 / divisor;"),
                 13,
                 AnalyzerTestHost.GetTrustedPlatformReferences(),
                 smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
                 impliedConditions: new[] { "divisor != 0" });
 
-            Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                                 fact.Contains("[0]", StringComparison.Ordinal) &&
+                                                 fact.Contains("0", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse));
         }
 
         [Test]
@@ -6205,6 +6208,27 @@ public class TestClass
 }");
 
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_ArrayElementWriteThenReadZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        values[0] = 0;
+        var divisor = values[0];
+        return 10 / divisor;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
         }
 
         [Test]

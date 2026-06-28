@@ -417,21 +417,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             ICollection<SmtFormula> pathConditions)
         {
-            var facts = new List<SmtFormula>();
-            foreach (var containingBlock in EnumerateContainingBlocks(useNode).Reverse())
-            {
-                foreach (var statement in containingBlock.Block.Statements)
-                {
-                    if (ReferenceEquals(statement, containingBlock.ContainingStatement))
-                    {
-                        break;
-                    }
-
-                    AddPriorStatementFacts(statement, semanticModel, cancellationToken, facts);
-                }
-            }
-
-            foreach (var fact in facts)
+            foreach (var fact in SymbolicProgramPointFacts.CollectPriorAssignmentFacts(useNode, semanticModel, cancellationToken))
             {
                 pathConditions.Add(fact);
             }
