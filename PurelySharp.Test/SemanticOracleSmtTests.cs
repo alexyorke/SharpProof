@@ -60,6 +60,21 @@ public static class SourcePredicates
         return value >= 10 && value <= 20;
     }
 
+    public static bool IsValidIndex(int[] values, int index)
+    {
+        if (values == null)
+        {
+            return false;
+        }
+
+        if (index < 0)
+        {
+            return false;
+        }
+
+        return index < values.Length;
+    }
+
     public static bool IsPositive(int value) => value > 0;
 
     public static bool IsZeroWithGuard(int value)
@@ -1504,6 +1519,34 @@ public class TestClass
                 FindLine(source, "return value.Length;"),
                 13,
                 "value != null && value.Length > 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesMultiGuardSourcePredicateIndexFacts()
+        {
+            var source = SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        if (SourcePredicates.IsValidIndex(values, index))
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "MultiGuardSourcePredicateIndexFacts.cs",
+                FindLine(source, "return values[index];"),
+                13,
+                "values != null && index >= 0 && index < values.Length",
                 new SmtAnalysisService(SmtAnalysisOptions.Default),
                 AnalyzerTestHost.GetTrustedPlatformReferences());
 
@@ -4881,6 +4924,17 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_SourceMultiGuardIndexPredicateContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "int[] values, int index",
+                    "SourcePredicates.IsValidIndex(values, index) && (values == null || index < 0 || index >= values.Length)",
+                    SourcePredicateSource),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_SourcePositivePredicateArgumentExpression_IsAlwaysFalse()
         {
             Assert.That(
@@ -6613,6 +6667,31 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_SourceMultiGuardIndexPredicateContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int[] values, int index)
+    {
+        if (SourcePredicates.IsValidIndex(values, index) &&
+            (values == null || index < 0 || index >= values.Length))
+        {
+            Console.WriteLine(index);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_SourceBooleanPropertyContradictoryImpureCall_DoesNotReport()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
@@ -7940,6 +8019,28 @@ public class TestClass
 
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_SourceMultiGuardIndexPredicateInRange_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        if (SourcePredicates.IsValidIndex(values, index))
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
 
         [Test]

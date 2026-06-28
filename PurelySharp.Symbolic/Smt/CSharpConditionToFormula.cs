@@ -667,25 +667,82 @@ namespace PurelySharp.Symbolic.Smt
                 }
             }
 
-            if (remainingStatementCount == 2 &&
-                statements[statementIndex] is IfStatementSyntax leadingIf &&
-                leadingIf.Else == null &&
-                statements[statementIndex + 1] is ReturnStatementSyntax finalReturnStatement &&
-                finalReturnStatement.Expression != null &&
-                TryGetSingleReturnExpression(leadingIf.Statement, out var earlyReturn))
-            {
-                return TryTranslateReturnedBooleanConditional(
-                    leadingIf.Condition,
-                    earlyReturn,
-                    finalReturnStatement.Expression,
+            if (remainingStatementCount >= 2 &&
+                TryTranslateGuardReturnChain(
+                    statements,
+                    statementIndex,
+                    substitutions,
                     semanticModel,
                     cancellationToken,
                     inlineDepth,
-                    substitutions,
-                    out formula);
+                    out formula))
+            {
+                return true;
             }
 
             return false;
+        }
+
+        private static bool TryTranslateGuardReturnChain(
+            SyntaxList<StatementSyntax> statements,
+            int statementIndex,
+            IReadOnlyList<SmtVariableSubstitution> substitutions,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            int inlineDepth,
+            out SmtFormula? formula)
+        {
+            formula = null;
+            if (statements[statements.Count - 1] is not ReturnStatementSyntax finalReturnStatement ||
+                finalReturnStatement.Expression == null)
+            {
+                return false;
+            }
+
+            var guards = new List<(ExpressionSyntax Condition, ExpressionSyntax ReturnExpression)>();
+            for (var index = statementIndex; index < statements.Count - 1; index++)
+            {
+                if (statements[index] is not IfStatementSyntax guard ||
+                    guard.Else != null ||
+                    !TryGetSingleReturnExpression(guard.Statement, out var guardReturn))
+                {
+                    return false;
+                }
+
+                guards.Add((guard.Condition, guardReturn));
+            }
+
+            if (guards.Count == 0 ||
+                !TryTranslate(
+                    finalReturnStatement.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion: null,
+                    inlineDepth) ||
+                formula is not { Kind: SmtValueKind.Bool })
+            {
+                formula = null;
+                return false;
+            }
+
+            for (var index = guards.Count - 1; index >= 0; index--)
+            {
+                var guard = guards[index];
+                if (!TryTranslate(guard.Condition, semanticModel, cancellationToken, out var conditionFormula, getSymbolVersion: null, inlineDepth) ||
+                    conditionFormula is not { Kind: SmtValueKind.Bool } ||
+                    !TryTranslate(guard.ReturnExpression, semanticModel, cancellationToken, out var guardReturnFormula, getSymbolVersion: null, inlineDepth) ||
+                    guardReturnFormula is not { Kind: SmtValueKind.Bool })
+                {
+                    formula = null;
+                    return false;
+                }
+
+                formula = new SmtConditionalFormula(conditionFormula, guardReturnFormula, formula, SmtValueKind.Bool);
+            }
+
+            formula = SubstituteVariables(formula, substitutions);
+            return true;
         }
 
         private static bool TryCollectLocalDeclarationSubstitutions(
