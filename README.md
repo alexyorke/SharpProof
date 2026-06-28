@@ -283,6 +283,8 @@ dotnet run --project Tools/PurelySharp.SymbolicCli -- --file src\Example.cs --li
 dotnet run --project Tools/PurelySharp.SymbolicCli -- --file src\Example.cs --line 42 --reference bin\Debug\net8.0\SomeLibrary.dll
 ```
 
+The reusable API lives in `PurelySharp.Symbolic`. `SymbolicSourceQueryService` is the source-line invariant query entrypoint, and `PurelySharp.Symbolic.Smt.SmtAnalysisService` owns bounded Z3 classification, caching, query budgets, and conservative fallback behavior shared by the analyzer and standalone tooling.
+
 For framework and library calibration, `Tools/PurelySharp.EffectSummary` can now emit implementation-derived purity classifications in its own JSON output. This is the preferred starting point for reviewing which manual pure entries are still justified by the current runtime implementation before changing analyzer behavior.
 
 ## CI Usage

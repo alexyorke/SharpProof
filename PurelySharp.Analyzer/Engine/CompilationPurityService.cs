@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis;
 using PurelySharp.Analyzer.Engine.Analysis;
-using PurelySharp.Analyzer.Engine.Smt;
+using PurelySharp.Symbolic.Smt;
 
 namespace PurelySharp.Analyzer.Engine
 {

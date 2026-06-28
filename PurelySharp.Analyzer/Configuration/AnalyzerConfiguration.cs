@@ -2,7 +2,7 @@ using System;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
-using PurelySharp.Analyzer.Engine.Smt;
+using PurelySharp.Symbolic.Smt;
 
 namespace PurelySharp.Analyzer.Configuration
 {

@@ -10,7 +10,6 @@ using System.Collections.Immutable;
 using System;
 using System.IO;
 using System.Globalization;
-using PurelySharp.Analyzer.Engine.Smt;
 using PurelySharp.Analyzer.Engine.Rules;
 using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;

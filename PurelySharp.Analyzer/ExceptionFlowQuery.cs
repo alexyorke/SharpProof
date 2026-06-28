@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Analyzer.Engine;
-using PurelySharp.Analyzer.Engine.Smt;
+using PurelySharp.Symbolic.Smt;
 
 namespace PurelySharp.Analyzer
 {

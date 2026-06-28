@@ -5,24 +5,30 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using SearchLib.Purity;
 using SearchLib.Smt;
 
-namespace PurelySharp.Analyzer.Engine.Smt
+namespace PurelySharp.Symbolic.Smt
 {
-    internal sealed class SmtAnalysisService
+    public sealed class SmtAnalysisService
     {
         private readonly ConcurrentDictionary<string, PurityProofResult> _queryCache = new(StringComparer.Ordinal);
         private readonly Stopwatch _budgetClock = Stopwatch.StartNew();
         private readonly object _solverLock = new();
+        private int _executedQueryCount;
         private bool _solverUnavailable;
 
         public SmtAnalysisService(SmtAnalysisOptions options)
         {
-            Options = options;
+            Options = options ?? throw new ArgumentNullException(nameof(options));
         }
 
         public SmtAnalysisOptions Options { get; }
+
+        public int ExecutedQueryCount => _executedQueryCount;
+
+        public int CacheEntryCount => _queryCache.Count;
 
         public PurityProofResult Classify(PurityProofQuery query)
         {
@@ -70,6 +76,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
             {
                 lock (_solverLock)
                 {
+                    Interlocked.Increment(ref _executedQueryCount);
                     using var search = new PurityProofSearch();
                     return search.Classify(query, Options.QueryTimeout);
                 }

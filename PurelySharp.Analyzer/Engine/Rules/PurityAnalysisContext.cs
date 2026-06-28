@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading;
-using PurelySharp.Analyzer.Engine.Smt;
+using PurelySharp.Symbolic.Smt;
 
 namespace PurelySharp.Analyzer.Engine.Rules
 {

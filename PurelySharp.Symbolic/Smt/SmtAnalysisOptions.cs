@@ -1,15 +1,15 @@
 using System;
 
-namespace PurelySharp.Analyzer.Engine.Smt
+namespace PurelySharp.Symbolic.Smt
 {
-    internal enum SmtAnalysisMode
+    public enum SmtAnalysisMode
     {
         Off,
         Bounded,
         Deep,
     }
 
-    internal sealed class SmtAnalysisOptions
+    public sealed class SmtAnalysisOptions
     {
         public static readonly SmtAnalysisOptions Default = new(
             SmtAnalysisMode.Bounded,
