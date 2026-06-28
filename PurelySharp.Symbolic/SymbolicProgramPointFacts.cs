@@ -2246,9 +2246,7 @@ namespace PurelySharp.Symbolic
             formula = null;
             valueExpression = UnwrapExpression(valueExpression);
             if (valueExpression is not ElementAccessExpressionSyntax elementAccess ||
-                elementAccess.ArgumentList.Arguments.Count != 1 ||
-                !TryGetIntegralConstant(elementAccess.ArgumentList.Arguments[0].Expression, semanticModel, cancellationToken, out var index) ||
-                index < 0)
+                elementAccess.ArgumentList.Arguments.Count != 1)
             {
                 return false;
             }
@@ -2264,12 +2262,17 @@ namespace PurelySharp.Symbolic
                     out elementExpressions);
 
             if (!hasFiniteElements ||
-                index >= elementExpressions.Length)
+                !TryGetFiniteElementIndex(
+                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    elementExpressions.Length,
+                    semanticModel,
+                    cancellationToken,
+                    out var index))
             {
                 return false;
             }
 
-            var elementExpression = elementExpressions[(int)index];
+            var elementExpression = elementExpressions[index];
             if (assignedSymbol != null &&
                 ExpressionReferencesSymbol(elementExpression, assignedSymbol, semanticModel, cancellationToken))
             {
@@ -2282,6 +2285,41 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 assignedSymbol,
                 out formula);
+        }
+
+        private static bool TryGetFiniteElementIndex(
+            ExpressionSyntax indexExpression,
+            int elementCount,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out int index)
+        {
+            indexExpression = UnwrapExpression(indexExpression);
+            if (indexExpression is PrefixUnaryExpressionSyntax fromEndIndex &&
+                fromEndIndex.OperatorToken.IsKind(SyntaxKind.CaretToken))
+            {
+                if (!TryGetIntegralConstant(fromEndIndex.Operand, semanticModel, cancellationToken, out var offset) ||
+                    offset <= 0 ||
+                    offset > elementCount)
+                {
+                    index = 0;
+                    return false;
+                }
+
+                index = elementCount - (int)offset;
+                return true;
+            }
+
+            if (!TryGetIntegralConstant(indexExpression, semanticModel, cancellationToken, out var ordinaryIndex) ||
+                ordinaryIndex < 0 ||
+                ordinaryIndex >= elementCount)
+            {
+                index = 0;
+                return false;
+            }
+
+            index = (int)ordinaryIndex;
+            return true;
         }
 
         private static void AddTupleElementAssignedValueFacts(

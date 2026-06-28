@@ -2806,6 +2806,55 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesInlineFiniteArrayFromEndElementAssignedNonZeroValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = (new[] { 1, 2 })[^1];
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "InlineFiniteArrayFromEndElementAssignedNonZeroValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                20,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesPriorFiniteArrayFromEndElementAssignedNonZeroValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = new[] { 1, 2 };
+        var divisor = values[^1];
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "PriorFiniteArrayFromEndElementAssignedNonZeroValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                20,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalFiniteArrayElementAssignedNonZeroValue()
         {
             const string source = @"
@@ -5883,6 +5932,39 @@ public class TestClass
     {
         var values = new[] { 1, 2 };
         var divisor = values[0];
+        return 10 / divisor;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_InlineFiniteArrayFromEndElementAssignedNonZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = (new[] { 1, 2 })[^1];
+        return 10 / divisor;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_PriorFiniteArrayFromEndElementAssignedNonZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = new[] { 1, 2 };
+        var divisor = values[^1];
         return 10 / divisor;
     }
 }");
