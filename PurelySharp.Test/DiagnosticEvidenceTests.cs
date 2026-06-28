@@ -96,6 +96,55 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_TypeDescriptorGetConverter_UsesGeneratedPuritySummarySource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+using System.ComponentModel;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public TypeConverter TestMethod(Type type)
+    {
+        return TypeDescriptor.GetConverter(type);
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.ComponentModel.TypeDescriptor.GetConverter"));
+        }
+
+        [Test]
+        public async Task Ps0002_TypeDescriptorGetProperties_UsesGeneratedPuritySummarySource()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System.ComponentModel;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public PropertyDescriptorCollection TestMethod(object value)
+    {
+        return TypeDescriptor.GetProperties(value);
+    }
+}");
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.ComponentModel.TypeDescriptor.GetProperties"));
+        }
+
+        [Test]
         public async Task Ps0002_RandomConstructor_UsesRandomSemanticRuleSource()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

@@ -335,6 +335,13 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void TypeDescriptorHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.ComponentModel.TypeDescriptor.GetConverter(System.Type)");
+            AssertNotInManualCatalogs("System.ComponentModel.TypeDescriptor.GetProperties(object)");
+        }
+
+        [Test]
         public void EnvironmentPathStateHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             var source = @"

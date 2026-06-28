@@ -35,8 +35,6 @@ public static class Constants
         "System.Collections.Queue.Synchronized(System.Collections.Queue)",
         "System.Text.RegularExpressions.Regex.Split(string, string)",
         "System.Text.RegularExpressions.Regex.Split(string)",
-        "System.ComponentModel.TypeDescriptor.GetConverter(System.Type)",
-        "System.ComponentModel.TypeDescriptor.GetProperties(object)",
         "object.GetHashCode()",
         "System.Enum.GetName(System.Type, object)",
         "System.Enum.IsDefined(System.Type, object)",
