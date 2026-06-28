@@ -56,6 +56,7 @@ namespace SearchLib.Smt
                 SmtBinaryFormula binaryFormula => EncodeBinary(binaryFormula),
                 SmtIntegerUnaryTerm integerUnaryTerm => EncodeIntegerUnary(integerUnaryTerm),
                 SmtIntegerBinaryTerm integerBinaryTerm => EncodeIntegerBinary(integerBinaryTerm),
+                SmtConditionalFormula conditionalFormula => EncodeConditional(conditionalFormula),
                 _ => throw new InvalidOperationException("Unsupported SMT formula node."),
             };
         }
@@ -103,6 +104,14 @@ namespace SearchLib.Smt
                 SmtIntegerBinaryOperator.Multiply => _context.MkMul(EncodeInteger(term.Left), EncodeInteger(term.Right)),
                 _ => throw new InvalidOperationException("Unsupported SMT integer binary operator."),
             };
+        }
+
+        private Expr EncodeConditional(SmtConditionalFormula formula)
+        {
+            return _context.MkITE(
+                EncodeCondition(formula.Condition),
+                Encode(formula.WhenTrue),
+                Encode(formula.WhenFalse));
         }
 
         private ArithExpr EncodeInteger(SmtFormula formula)

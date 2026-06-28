@@ -838,6 +838,10 @@ namespace PurelySharp.Analyzer.Engine
                     case SmtIntegerBinaryTerm binary:
                         return ReferencesSmtVariable(binary.Left, variablePrefix) ||
                             ReferencesSmtVariable(binary.Right, variablePrefix);
+                    case SmtConditionalFormula conditional:
+                        return ReferencesSmtVariable(conditional.Condition, variablePrefix) ||
+                            ReferencesSmtVariable(conditional.WhenTrue, variablePrefix) ||
+                            ReferencesSmtVariable(conditional.WhenFalse, variablePrefix);
                     default:
                         return false;
                 }

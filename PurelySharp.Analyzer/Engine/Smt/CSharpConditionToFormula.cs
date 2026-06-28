@@ -40,8 +40,25 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 return true;
             }
 
+            if (expression is ConditionalExpressionSyntax conditionalExpression &&
+                TryTranslateValue(conditionalExpression, semanticModel, cancellationToken, out var conditionalValue, getSymbolVersion) &&
+                conditionalValue is { Kind: SmtValueKind.Bool })
+            {
+                formula = conditionalValue;
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax binaryExpression)
             {
+                if (binaryExpression.IsKind(SyntaxKind.IsExpression) &&
+                    binaryExpression.Right is TypeSyntax &&
+                    TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var typeTestValue, getSymbolVersion) &&
+                    typeTestValue is { Kind: SmtValueKind.Reference })
+                {
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, typeTestValue, new SmtNullConstant());
+                    return true;
+                }
+
                 if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression) &&
                     TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftAnd, getSymbolVersion) &&
                     TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightAnd, getSymbolVersion) &&
@@ -243,7 +260,85 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 }
             }
 
+            if (pattern is RecursivePatternSyntax recursivePattern)
+            {
+                return TryTranslateRecursivePattern(value, recursivePattern, semanticModel, cancellationToken, out formula, getSymbolVersion);
+            }
+
+            if (pattern is DeclarationPatternSyntax or TypePatternSyntax)
+            {
+                if (value.Kind != SmtValueKind.Reference)
+                {
+                    return false;
+                }
+
+                formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtNullConstant());
+                return true;
+            }
+
             return false;
+        }
+
+        private static bool TryTranslateRecursivePattern(
+            SmtFormula value,
+            RecursivePatternSyntax recursivePattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null;
+            SmtFormula? current = value.Kind == SmtValueKind.Reference
+                ? new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtNullConstant())
+                : null;
+
+            var subpatterns = recursivePattern.PropertyPatternClause?.Subpatterns;
+            if (subpatterns == null || subpatterns.Value.Count == 0)
+            {
+                formula = current;
+                return formula != null;
+            }
+
+            foreach (var subpattern in subpatterns.Value)
+            {
+                if (!TryTranslatePropertySubpattern(value, subpattern, semanticModel, cancellationToken, out var subpatternFormula, getSymbolVersion) ||
+                    subpatternFormula == null)
+                {
+                    return false;
+                }
+
+                current = current == null
+                    ? subpatternFormula
+                    : new SmtBinaryFormula(SmtBinaryOperator.And, current, subpatternFormula);
+            }
+
+            formula = current;
+            return formula != null;
+        }
+
+        private static bool TryTranslatePropertySubpattern(
+            SmtFormula receiver,
+            SubpatternSyntax subpattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null;
+            if (subpattern.NameColon?.Name == null)
+            {
+                return false;
+            }
+
+            var memberSymbol = semanticModel.GetSymbolInfo(subpattern.NameColon.Name, cancellationToken).Symbol;
+            if (!TryGetMemberType(memberSymbol, out var memberType) ||
+                !TryCreateMemberFormula(receiver, memberSymbol!.Name, memberType, out var memberValue) ||
+                memberValue == null)
+            {
+                return false;
+            }
+
+            return TryTranslatePattern(memberValue, subpattern.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion);
         }
 
         private static bool TryTranslateComparison(
@@ -341,6 +436,34 @@ namespace PurelySharp.Analyzer.Engine.Smt
                     formula = new SmtIntegerConstant(integralValue);
                     return true;
                 }
+            }
+
+            if (expression is ConditionalExpressionSyntax conditionalExpression &&
+                TryTranslate(conditionalExpression.Condition, semanticModel, cancellationToken, out var conditionFormula, getSymbolVersion) &&
+                conditionFormula != null &&
+                TryTranslateValue(conditionalExpression.WhenTrue, semanticModel, cancellationToken, out var whenTrueFormula, getSymbolVersion) &&
+                whenTrueFormula != null &&
+                TryTranslateValue(conditionalExpression.WhenFalse, semanticModel, cancellationToken, out var whenFalseFormula, getSymbolVersion) &&
+                whenFalseFormula != null &&
+                whenTrueFormula.Kind == whenFalseFormula.Kind)
+            {
+                formula = new SmtConditionalFormula(conditionFormula, whenTrueFormula, whenFalseFormula, whenTrueFormula.Kind);
+                return true;
+            }
+
+            if (expression is BinaryExpressionSyntax coalesceExpression &&
+                coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                TryTranslateValue(coalesceExpression.Left, semanticModel, cancellationToken, out var coalesceLeft, getSymbolVersion) &&
+                coalesceLeft is { Kind: SmtValueKind.Reference } &&
+                TryTranslateValue(coalesceExpression.Right, semanticModel, cancellationToken, out var coalesceRight, getSymbolVersion) &&
+                coalesceRight is { Kind: SmtValueKind.Reference })
+            {
+                formula = new SmtConditionalFormula(
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, coalesceLeft, new SmtNullConstant()),
+                    coalesceLeft,
+                    coalesceRight,
+                    SmtValueKind.Reference);
+                return true;
             }
 
             if (TryTranslateIntegralTerm(expression, semanticModel, cancellationToken, out formula, getSymbolVersion))
@@ -479,26 +602,52 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 return false;
             }
 
-            var memberName = receiver + "." + memberSymbol.Name;
+            return TryCreateMemberFormula(receiver, memberSymbol.Name, type, out formula);
+        }
+
+        private static bool TryCreateMemberFormula(
+            SmtFormula receiver,
+            string memberName,
+            ITypeSymbol type,
+            out SmtFormula? formula)
+        {
+            formula = null;
+            var variableName = receiver + "." + memberName;
             if (type.SpecialType == SpecialType.System_Boolean)
             {
-                formula = new SmtVariable(memberName, SmtValueKind.Bool);
+                formula = new SmtVariable(variableName, SmtValueKind.Bool);
                 return true;
             }
 
             if (IsIntegralType(type))
             {
-                formula = new SmtVariable(memberName, SmtValueKind.Int);
+                formula = new SmtVariable(variableName, SmtValueKind.Int);
                 return true;
             }
 
             if (type.IsReferenceType)
             {
-                formula = new SmtVariable(memberName, SmtValueKind.Reference);
+                formula = new SmtVariable(variableName, SmtValueKind.Reference);
                 return true;
             }
 
             return false;
+        }
+
+        private static bool TryGetMemberType(ISymbol? memberSymbol, out ITypeSymbol type)
+        {
+            switch (memberSymbol)
+            {
+                case IPropertySymbol propertySymbol:
+                    type = propertySymbol.Type;
+                    return true;
+                case IFieldSymbol fieldSymbol:
+                    type = fieldSymbol.Type;
+                    return true;
+                default:
+                    type = null!;
+                    return false;
+            }
         }
 
         private static string GetVariableName(ISymbol symbol, Func<ISymbol, int>? getSymbolVersion)

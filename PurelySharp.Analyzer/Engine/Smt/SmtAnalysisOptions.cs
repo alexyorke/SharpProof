@@ -13,10 +13,10 @@ namespace PurelySharp.Analyzer.Engine.Smt
     {
         public static readonly SmtAnalysisOptions Default = new(
             SmtAnalysisMode.Bounded,
-            TimeSpan.FromMilliseconds(250),
-            TimeSpan.FromMilliseconds(2000),
-            maxPathConditions: 96,
-            maxExpressionNodes: 512);
+            TimeSpan.FromMilliseconds(750),
+            TimeSpan.FromMilliseconds(5000),
+            maxPathConditions: 192,
+            maxExpressionNodes: 2048);
 
         public SmtAnalysisOptions(
             SmtAnalysisMode mode,

@@ -132,6 +132,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 SmtBinaryFormula binary => 1 + CountFormulaNodes(binary.Left) + CountFormulaNodes(binary.Right),
                 SmtIntegerUnaryTerm unary => 1 + CountFormulaNodes(unary.Operand),
                 SmtIntegerBinaryTerm binary => 1 + CountFormulaNodes(binary.Left) + CountFormulaNodes(binary.Right),
+                SmtConditionalFormula conditional => 1 + CountFormulaNodes(conditional.Condition) + CountFormulaNodes(conditional.WhenTrue) + CountFormulaNodes(conditional.WhenFalse),
                 _ => 1,
             };
         }

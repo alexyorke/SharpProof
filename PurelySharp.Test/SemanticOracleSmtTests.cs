@@ -45,6 +45,28 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void Oracle_ConditionalExpressionContradiction_IsUnsatisfiable()
+        {
+            var context = AnalyzerTestHost.CreateConditionContext("bool flag, int x, int y", "(flag ? x : y) == 10 && flag && x != 10");
+            using var oracle = new SmtPathOracle();
+
+            Assert.That(
+                oracle.IsSatisfiable(context.Expression, context.SemanticModel, TimeSpan.FromMilliseconds(250)),
+                Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void Oracle_CoalesceExpressionContradiction_IsUnsatisfiable()
+        {
+            var context = AnalyzerTestHost.CreateConditionContext("string value, string fallback", "(value ?? fallback) == null && value != null");
+            using var oracle = new SmtPathOracle();
+
+            Assert.That(
+                oracle.IsSatisfiable(context.Expression, context.SemanticModel, TimeSpan.FromMilliseconds(250)),
+                Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void Oracle_NullGuardImpliesNotNullComparison()
         {
             var context = AnalyzerTestHost.CreateConditionImplicationContext("string s", "s != null", "s != null");
@@ -97,6 +119,83 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ExecutionVisibility_ConditionalExpressionContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("bool flag, int x, int y", "(flag ? x : y) == 5 && flag && x != 5"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_PropertyPatternContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "text is { Length: > 3 } && text.Length <= 3"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_DeclarationPatternImpliesNonNull_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("object value", "value is string && value == null"),
+                Is.True);
+        }
+
+        [Test]
+        public void SmtConfiguration_BoundedDefaults_UseExpandedBudgets()
+        {
+            var options = ReadSmtOptions(ImmutableDictionary<string, string>.Empty);
+
+            Assert.That(options.Mode, Is.EqualTo("Bounded"));
+            Assert.That(options.TimeoutMs, Is.EqualTo(750));
+            Assert.That(options.MethodBudgetMs, Is.EqualTo(5000));
+            Assert.That(options.MaxPathConditions, Is.EqualTo(192));
+            Assert.That(options.MaxExpressionNodes, Is.EqualTo(2048));
+        }
+
+        [Test]
+        public void SmtConfiguration_DeepMode_UsesDeepFallbackBudgets()
+        {
+            var options = ReadSmtOptions(
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_smt_mode", "deep"));
+
+            Assert.That(options.Mode, Is.EqualTo("Deep"));
+            Assert.That(options.TimeoutMs, Is.EqualTo(2000));
+            Assert.That(options.MethodBudgetMs, Is.EqualTo(15000));
+            Assert.That(options.MaxPathConditions, Is.EqualTo(512));
+            Assert.That(options.MaxExpressionNodes, Is.EqualTo(8192));
+        }
+
+        [Test]
+        public void SmtConfiguration_ExplicitOverrides_WinOverDeepFallbacks()
+        {
+            var options = ReadSmtOptions(
+                ImmutableDictionary<string, string>.Empty
+                    .Add("purelysharp_smt_mode", "deep")
+                    .Add("purelysharp_smt_timeout_ms", "321")
+                    .Add("purelysharp_smt_method_budget_ms", "4321")
+                    .Add("purelysharp_smt_max_path_conditions", "123")
+                    .Add("purelysharp_smt_max_expression_nodes", "4567"));
+
+            Assert.That(options.Mode, Is.EqualTo("Deep"));
+            Assert.That(options.TimeoutMs, Is.EqualTo(321));
+            Assert.That(options.MethodBudgetMs, Is.EqualTo(4321));
+            Assert.That(options.MaxPathConditions, Is.EqualTo(123));
+            Assert.That(options.MaxExpressionNodes, Is.EqualTo(4567));
+        }
+
+        [Test]
+        public void SmtConfiguration_OffMode_DisablesService()
+        {
+            var options = ReadSmtOptions(
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_smt_mode", "off"));
+
+            Assert.That(options.Mode, Is.EqualTo("Off"));
+            Assert.That(options.IsEnabled, Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_ContradictoryGuardedImpureCall_DoesNotReport()
         {
             Assert.That(
@@ -115,6 +214,72 @@ public class TestClass
         if (x > 0 && x < 0)
         {
             Console.WriteLine(x);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_ConditionalExpressionContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(bool flag, int x, int y)
+    {
+        if ((flag ? x : y) == 5 && flag && x != 5)
+        {
+            Console.WriteLine(x);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_PropertyPatternContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (text is { Length: > 3 } && text.Length <= 3)
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_TypePatternContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(object value)
+    {
+        if (value is string && value == null)
+        {
+            Console.WriteLine(value);
         }
     }
 }");
@@ -563,6 +728,26 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_TypePatternExcludesNullReceiver_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(object value)
+    {
+        if (value is string text)
+        {
+            return text.Length;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_PartialConjunctiveGuardImpliesNullReceiver_ReportsNullReference()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"
@@ -744,5 +929,36 @@ public class TestClass
 
             return (bool)method.Invoke(null, new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
         }
+
+        private static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions)
+        {
+            var analyzerOptions = AnalyzerTestHost.CreateAnalyzerOptions(globalOptions);
+            var configurationType = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly
+                .GetType("PurelySharp.Analyzer.Configuration.AnalyzerConfiguration", throwOnError: true)!;
+            var fromOptions = configurationType.GetMethod(
+                "FromOptions",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+            var configuration = fromOptions.Invoke(null, new object?[] { analyzerOptions })!;
+            var smtOptions = configurationType.GetProperty("SmtOptions")!.GetValue(configuration)!;
+            var smtOptionsType = smtOptions.GetType();
+            var queryTimeout = (TimeSpan)smtOptionsType.GetProperty("QueryTimeout")!.GetValue(smtOptions)!;
+            var methodBudget = (TimeSpan)smtOptionsType.GetProperty("MethodBudget")!.GetValue(smtOptions)!;
+
+            return new SmtOptionsSnapshot(
+                smtOptionsType.GetProperty("Mode")!.GetValue(smtOptions)!.ToString()!,
+                (int)queryTimeout.TotalMilliseconds,
+                (int)methodBudget.TotalMilliseconds,
+                (int)smtOptionsType.GetProperty("MaxPathConditions")!.GetValue(smtOptions)!,
+                (int)smtOptionsType.GetProperty("MaxExpressionNodes")!.GetValue(smtOptions)!,
+                (bool)smtOptionsType.GetProperty("IsEnabled")!.GetValue(smtOptions)!);
+        }
+
+        private readonly record struct SmtOptionsSnapshot(
+            string Mode,
+            int TimeoutMs,
+            int MethodBudgetMs,
+            int MaxPathConditions,
+            int MaxExpressionNodes,
+            bool IsEnabled);
     }
 }

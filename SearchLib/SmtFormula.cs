@@ -53,4 +53,6 @@ namespace SearchLib.Smt
     public sealed record SmtIntegerUnaryTerm(SmtIntegerUnaryOperator Operator, SmtFormula Operand) : SmtFormula(SmtValueKind.Int);
 
     public sealed record SmtIntegerBinaryTerm(SmtIntegerBinaryOperator Operator, SmtFormula Left, SmtFormula Right) : SmtFormula(SmtValueKind.Int);
+
+    public sealed record SmtConditionalFormula(SmtFormula Condition, SmtFormula WhenTrue, SmtFormula WhenFalse, SmtValueKind ResultKind) : SmtFormula(ResultKind);
 }

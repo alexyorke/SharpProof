@@ -39,8 +39,25 @@ namespace PurelySharp.Test.Smt
                 return true;
             }
 
+            if (expression is ConditionalExpressionSyntax conditionalExpression &&
+                TryTranslateValue(conditionalExpression, semanticModel, cancellationToken, out var conditionalValue) &&
+                conditionalValue.Kind == SmtValueKind.Bool)
+            {
+                formula = conditionalValue;
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax binaryExpression)
             {
+                if (binaryExpression.IsKind(SyntaxKind.IsExpression) &&
+                    binaryExpression.Right is TypeSyntax &&
+                    TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var typeTestValue) &&
+                    typeTestValue.Kind == SmtValueKind.Reference)
+                {
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, typeTestValue, new SmtNullConstant());
+                    return true;
+                }
+
                 if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression) &&
                     TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftAnd) &&
                     TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightAnd))
@@ -262,6 +279,31 @@ namespace PurelySharp.Test.Smt
                     formula = new SmtIntegerConstant(integralValue);
                     return true;
                 }
+            }
+
+            if (expression is ConditionalExpressionSyntax conditionalExpression &&
+                TryTranslate(conditionalExpression.Condition, semanticModel, cancellationToken, out var conditionFormula) &&
+                TryTranslateValue(conditionalExpression.WhenTrue, semanticModel, cancellationToken, out var whenTrueFormula) &&
+                TryTranslateValue(conditionalExpression.WhenFalse, semanticModel, cancellationToken, out var whenFalseFormula) &&
+                whenTrueFormula.Kind == whenFalseFormula.Kind)
+            {
+                formula = new SmtConditionalFormula(conditionFormula, whenTrueFormula, whenFalseFormula, whenTrueFormula.Kind);
+                return true;
+            }
+
+            if (expression is BinaryExpressionSyntax coalesceExpression &&
+                coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                TryTranslateValue(coalesceExpression.Left, semanticModel, cancellationToken, out var coalesceLeft) &&
+                coalesceLeft.Kind == SmtValueKind.Reference &&
+                TryTranslateValue(coalesceExpression.Right, semanticModel, cancellationToken, out var coalesceRight) &&
+                coalesceRight.Kind == SmtValueKind.Reference)
+            {
+                formula = new SmtConditionalFormula(
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, coalesceLeft, new SmtNullConstant()),
+                    coalesceLeft,
+                    coalesceRight,
+                    SmtValueKind.Reference);
+                return true;
             }
 
             if (TryTranslateIntegralTerm(expression, semanticModel, cancellationToken, out formula))
