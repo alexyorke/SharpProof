@@ -1098,6 +1098,66 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsSwitchStatementExitingSectionExclusionFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        switch (value)
+        {
+            case 0:
+                return 0;
+        }
+
+        return 10 / value;
+    }
+}",
+                "return 10 / value;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
+                                           fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("value", StringComparison.Ordinal) &&
+                                           fact.Contains("0", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicInvariantService_SwitchContinuingMutationSuppressesStaleSectionCondition()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        switch (value)
+        {
+            case 0:
+                return 0;
+            default:
+                value = 0;
+                break;
+        }
+
+        return value;
+    }
+}",
+                "return value;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("value", StringComparison.Ordinal) &&
+                                           fact.Contains("0", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
+                                           fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("value", StringComparison.Ordinal) &&
+                                           fact.Contains("0", StringComparison.Ordinal)), Is.False);
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsSwitchExpressionArmFacts()
         {
             var facts = CollectExpressionProgramPointFacts(
@@ -2821,6 +2881,35 @@ public class TestClass
                 AnalyzerTestHost.GetTrustedPlatformReferences());
 
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementExitingSectionExclusion()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        switch (value)
+        {
+            case 0:
+                return 0;
+        }
+
+        return 10 / value;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "SwitchStatementExitingSectionExclusion.cs",
+                FindLine(source, "return 10 / value;"),
+                13,
+                "value != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
         }
 
         [Test]
@@ -7125,6 +7214,65 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_SwitchStatementExitingCasePostCondition_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int x)
+    {
+        switch (x)
+        {
+            case 0:
+                return;
+        }
+
+        if (x == 0)
+        {
+            Console.WriteLine(x);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_SwitchStatementContinuingMutationDoesNotUseStalePostCondition_Reports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int x)
+    {
+        switch (x)
+        {
+            case 0:
+                return;
+            default:
+                x = 0;
+                break;
+        }
+
+        if (x == 0)
+        {
+            Console.WriteLine(x);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
+        }
+
+        [Test]
         public async Task Ps0002_SwitchExpressionContradictoryPatternGuardedImpureCall_DoesNotReport()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
@@ -8545,6 +8693,56 @@ public class TestClass
 }");
 
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_SwitchStatementExitingCaseExcludesZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        switch (divisor)
+        {
+            case 0:
+                return 0;
+        }
+
+        return 10 / divisor;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_SwitchStatementContinuingMutationReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        switch (divisor)
+        {
+            case 0:
+                return 0;
+            default:
+                divisor = 0;
+                break;
+        }
+
+        return 10 / divisor;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
         }
 
         [Test]

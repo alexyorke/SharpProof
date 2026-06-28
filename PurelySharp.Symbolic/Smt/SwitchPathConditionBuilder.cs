@@ -14,7 +14,8 @@ namespace PurelySharp.Symbolic.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula formula,
-            Func<ISymbol, int>? getSymbolVersion = null)
+            Func<ISymbol, int>? getSymbolVersion = null,
+            bool includePatternBindings = true)
         {
             formula = null!;
             var labelConditions = new List<SmtFormula>();
@@ -44,6 +45,7 @@ namespace PurelySharp.Symbolic.Smt
                     label,
                     semanticModel,
                     cancellationToken,
+                    includePatternBindings,
                     out var labelCondition,
                     getSymbolVersion))
                 {

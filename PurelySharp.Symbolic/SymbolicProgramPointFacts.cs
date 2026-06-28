@@ -1409,12 +1409,15 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             ICollection<SmtFormula> facts)
         {
+            AddCompletedSwitchExitExclusionFacts(switchStatement, semanticModel, cancellationToken, facts);
+
             if (!switchStatement.Sections.Any(static section => section.Labels.Any(static label => label is DefaultSwitchLabelSyntax)))
             {
                 return;
             }
 
             var branches = new List<SwitchBranchFacts>();
+            var conditionSymbols = GetSwitchConditionSymbols(switchStatement, semanticModel, cancellationToken);
             foreach (var section in switchStatement.Sections)
             {
                 if (!SectionBreaksFromSwitch(section, switchStatement))
@@ -1432,8 +1435,18 @@ namespace PurelySharp.Symbolic
                     return;
                 }
 
+                var sectionMutatesConditionSymbols = SectionMutatesAnySymbolBeforeSwitchBreak(
+                    section,
+                    switchStatement,
+                    conditionSymbols,
+                    semanticModel,
+                    cancellationToken);
                 var sectionFacts = new List<SmtFormula>(factsBeforeStatement);
-                sectionFacts.Add(sectionCondition);
+                if (!sectionMutatesConditionSymbols)
+                {
+                    sectionFacts.Add(sectionCondition);
+                }
+
                 foreach (var statement in section.Statements)
                 {
                     if (statement is BreakStatementSyntax breakStatement &&
@@ -1445,7 +1458,7 @@ namespace PurelySharp.Symbolic
                     AddPriorStatementFacts(statement, semanticModel, cancellationToken, sectionFacts);
                 }
 
-                branches.Add(new SwitchBranchFacts(sectionCondition, sectionFacts));
+                branches.Add(new SwitchBranchFacts(sectionCondition, sectionFacts, sectionMutatesConditionSymbols));
             }
 
             if (branches.Count == 0)
@@ -1454,7 +1467,147 @@ namespace PurelySharp.Symbolic
             }
 
             AddIdenticalSwitchBranchFacts(branches, facts);
-            AddConditionalSwitchBranchFacts(branches, facts.ToArray(), facts);
+            if (branches.All(static branch => !branch.ConditionSymbolsMutated))
+            {
+                AddConditionalSwitchBranchFacts(branches, facts.ToArray(), facts);
+            }
+        }
+
+        private static void AddCompletedSwitchExitExclusionFacts(
+            SwitchStatementSyntax switchStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (SwitchContinuingSectionsMutateConditionSymbols(switchStatement, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            foreach (var section in switchStatement.Sections)
+            {
+                if (!SectionDefinitelyExitsFromSwitch(section, switchStatement) ||
+                    !SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
+                        switchStatement.Expression,
+                        section,
+                        semanticModel,
+                        cancellationToken,
+                        out var sectionCondition,
+                        getSymbolVersion: null,
+                        includePatternBindings: false))
+                {
+                    continue;
+                }
+
+                facts.Add(new SmtUnaryFormula(SmtUnaryOperator.Not, sectionCondition));
+            }
+        }
+
+        private static bool SwitchContinuingSectionsMutateConditionSymbols(
+            SwitchStatementSyntax switchStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var conditionSymbols = GetSwitchConditionSymbols(switchStatement, semanticModel, cancellationToken);
+            if (conditionSymbols.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var section in switchStatement.Sections)
+            {
+                if (SectionDefinitelyExitsFromSwitch(section, switchStatement))
+                {
+                    continue;
+                }
+
+                if (SectionMutatesAnySymbolBeforeSwitchBreak(
+                    section,
+                    switchStatement,
+                    conditionSymbols,
+                    semanticModel,
+                    cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool SectionMutatesAnySymbolBeforeSwitchBreak(
+            SwitchSectionSyntax section,
+            SwitchStatementSyntax switchStatement,
+            IReadOnlyCollection<ISymbol> symbols,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (symbols.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var statement in section.Statements)
+            {
+                if (statement is BreakStatementSyntax breakStatement &&
+                    BreakTargetsSwitch(breakStatement, switchStatement))
+                {
+                    break;
+                }
+
+                if (symbols.Any(symbol => StatementMutatesSymbol(statement, symbol, semanticModel, cancellationToken)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static IReadOnlyList<ISymbol> GetSwitchConditionSymbols(
+            SwitchStatementSyntax switchStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var symbols = new List<ISymbol>();
+            AddReferencedSymbols(switchStatement.Expression, semanticModel, cancellationToken, symbols);
+            foreach (var section in switchStatement.Sections)
+            {
+                foreach (var label in section.Labels)
+                {
+                    switch (label)
+                    {
+                        case CaseSwitchLabelSyntax caseLabel:
+                            AddReferencedSymbols(caseLabel.Value, semanticModel, cancellationToken, symbols);
+                            break;
+                        case CasePatternSwitchLabelSyntax patternLabel:
+                            AddReferencedSymbols(patternLabel.Pattern, semanticModel, cancellationToken, symbols);
+                            if (patternLabel.WhenClause != null)
+                            {
+                                AddReferencedSymbols(patternLabel.WhenClause.Condition, semanticModel, cancellationToken, symbols);
+                            }
+
+                            break;
+                    }
+                }
+            }
+
+            return symbols;
+        }
+
+        private static void AddReferencedSymbols(
+            SyntaxNode root,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<ISymbol> symbols)
+        {
+            foreach (var symbol in GetReferencedLocalAndParameterSymbols(root, semanticModel, cancellationToken))
+            {
+                if (symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
+                {
+                    symbols.Add(symbol);
+                }
+            }
         }
 
         private static void AddIdenticalSwitchBranchFacts(
@@ -1570,6 +1723,33 @@ namespace PurelySharp.Symbolic
                 BreakTargetsSwitch(breakStatement, switchStatement);
         }
 
+        private static bool SectionDefinitelyExitsFromSwitch(
+            SwitchSectionSyntax section,
+            SwitchStatementSyntax switchStatement)
+        {
+            return section.Statements.Count > 0 &&
+                StatementDefinitelyExitsFromSwitch(section.Statements[section.Statements.Count - 1], switchStatement);
+        }
+
+        private static bool StatementDefinitelyExitsFromSwitch(
+            StatementSyntax statement,
+            SwitchStatementSyntax switchStatement)
+        {
+            statement = UnwrapSingleStatementBlock(statement);
+            return statement switch
+            {
+                ReturnStatementSyntax => true,
+                ThrowStatementSyntax => true,
+                BreakStatementSyntax breakStatement => !BreakTargetsSwitch(breakStatement, switchStatement),
+                ContinueStatementSyntax => true,
+                BlockSyntax block when block.Statements.Count > 0 => StatementDefinitelyExitsFromSwitch(block.Statements[block.Statements.Count - 1], switchStatement),
+                IfStatementSyntax ifStatement when ifStatement.Else != null =>
+                    StatementDefinitelyExitsFromSwitch(ifStatement.Statement, switchStatement) &&
+                    StatementDefinitelyExitsFromSwitch(ifStatement.Else.Statement, switchStatement),
+                _ => false
+            };
+        }
+
         private static bool BreakTargetsSwitch(
             BreakStatementSyntax breakStatement,
             SwitchStatementSyntax switchStatement)
@@ -1593,15 +1773,18 @@ namespace PurelySharp.Symbolic
 
         private sealed class SwitchBranchFacts
         {
-            public SwitchBranchFacts(SmtFormula condition, IReadOnlyList<SmtFormula> facts)
+            public SwitchBranchFacts(SmtFormula condition, IReadOnlyList<SmtFormula> facts, bool conditionSymbolsMutated)
             {
                 Condition = condition;
                 Facts = facts;
+                ConditionSymbolsMutated = conditionSymbolsMutated;
             }
 
             public SmtFormula Condition { get; }
 
             public IReadOnlyList<SmtFormula> Facts { get; }
+
+            public bool ConditionSymbolsMutated { get; }
         }
 
         private static void AddCompletedLoopStatementFacts(
