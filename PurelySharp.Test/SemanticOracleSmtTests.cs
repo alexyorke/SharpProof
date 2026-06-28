@@ -638,6 +638,46 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsCoalesceRightNullFact()
+        {
+            var facts = CollectExpressionProgramPointFacts(
+                @"
+public class TestClass
+{
+    public string TestMethod(string first, string second)
+    {
+        return first ?? second;
+    }
+}",
+                "second");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("first", StringComparison.Ordinal) &&
+                                           fact.Contains("Null", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicInvariantService_CollectsConditionalAccessNonNullFact()
+        {
+            var facts = CollectExpressionProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int? TestMethod(string value)
+    {
+        return value?.Length;
+    }
+}",
+                "Length");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("NotEqual", StringComparison.Ordinal) &&
+                                           fact.Contains("value", StringComparison.Ordinal) &&
+                                           fact.Contains("Null", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_UlongZeroContradiction_IsAlwaysFalse()
         {
             Assert.That(

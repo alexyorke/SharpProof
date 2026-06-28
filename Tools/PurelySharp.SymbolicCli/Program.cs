@@ -70,19 +70,10 @@ catch (ArgumentException ex)
 static SyntaxNode FindQueryNode(SyntaxNode root, int position)
 {
     var token = root.FindToken(position);
-    var switchArm = token.Parent?
-        .AncestorsAndSelf()
-        .OfType<SwitchExpressionArmSyntax>()
-        .FirstOrDefault(arm => arm.Expression.Span.Contains(position));
-    if (switchArm != null)
+    var expressionContextNode = FindExpressionContextNode(token, position);
+    if (expressionContextNode != null)
     {
-        return switchArm.Expression
-            .DescendantNodesAndSelf()
-            .Where(node => node.Span.Contains(position))
-            .OfType<ExpressionSyntax>()
-            .OrderBy(node => node.Span.Length)
-            .FirstOrDefault()
-            ?? switchArm.Expression;
+        return expressionContextNode;
     }
 
     return root
@@ -93,6 +84,42 @@ static SyntaxNode FindQueryNode(SyntaxNode root, int position)
         .FirstOrDefault()
         ?? token.Parent
         ?? root;
+}
+
+static SyntaxNode? FindExpressionContextNode(SyntaxToken token, int position)
+{
+    foreach (var node in token.Parent?.AncestorsAndSelf() ?? Enumerable.Empty<SyntaxNode>())
+    {
+        switch (node)
+        {
+            case SwitchExpressionArmSyntax switchArm when switchArm.Expression.Span.Contains(position):
+                return FindInnermostExpression(switchArm.Expression, position);
+            case ConditionalExpressionSyntax conditionalExpression when conditionalExpression.WhenTrue.Span.Contains(position):
+                return FindInnermostExpression(conditionalExpression.WhenTrue, position);
+            case ConditionalExpressionSyntax conditionalExpression when conditionalExpression.WhenFalse.Span.Contains(position):
+                return FindInnermostExpression(conditionalExpression.WhenFalse, position);
+            case BinaryExpressionSyntax binaryExpression
+                when binaryExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                     binaryExpression.Right.Span.Contains(position):
+                return FindInnermostExpression(binaryExpression.Right, position);
+            case ConditionalAccessExpressionSyntax conditionalAccess
+                when conditionalAccess.WhenNotNull.Span.Contains(position):
+                return FindInnermostExpression(conditionalAccess.WhenNotNull, position);
+        }
+    }
+
+    return null;
+}
+
+static ExpressionSyntax FindInnermostExpression(ExpressionSyntax expression, int position)
+{
+    return expression
+        .DescendantNodesAndSelf()
+        .Where(node => node.Span.Contains(position))
+        .OfType<ExpressionSyntax>()
+        .OrderBy(node => node.Span.Length)
+        .FirstOrDefault()
+        ?? expression;
 }
 
 static int GetPosition(SyntaxTree syntaxTree, int line, int column)

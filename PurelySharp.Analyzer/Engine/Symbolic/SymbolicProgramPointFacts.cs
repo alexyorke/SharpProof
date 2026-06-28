@@ -82,6 +82,25 @@ namespace PurelySharp.Analyzer.Engine.Symbolic
                     {
                         AddReachabilityCondition(builder, binaryExpressionSyntax.Left, mustBeTrue: false, semanticModel, cancellationToken);
                     }
+                    else if (binaryExpressionSyntax.IsKind(SyntaxKind.CoalesceExpression))
+                    {
+                        AddReferenceNullCondition(
+                            builder,
+                            binaryExpressionSyntax.Left,
+                            isNull: true,
+                            semanticModel,
+                            cancellationToken);
+                    }
+                }
+                else if (ancestor is ConditionalAccessExpressionSyntax conditionalAccessExpressionSyntax &&
+                         conditionalAccessExpressionSyntax.WhenNotNull.Span.Contains(syntaxNode.SpanStart))
+                {
+                    AddReferenceNullCondition(
+                        builder,
+                        conditionalAccessExpressionSyntax.Expression,
+                        isNull: false,
+                        semanticModel,
+                        cancellationToken);
                 }
                 else if (ancestor is WhileStatementSyntax whileStatementSyntax &&
                          whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
@@ -270,6 +289,30 @@ namespace PurelySharp.Analyzer.Engine.Symbolic
                 semanticModel,
                 cancellationToken,
                 facts);
+        }
+
+        private static void AddReferenceNullCondition(
+            ICollection<SmtFormula> facts,
+            ExpressionSyntax expressionSyntax,
+            bool isNull,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    expressionSyntax,
+                    semanticModel,
+                    cancellationToken,
+                    out var formula,
+                    getSymbolVersion: null) ||
+                formula is not { Kind: SmtValueKind.Reference })
+            {
+                return;
+            }
+
+            facts.Add(new SmtBinaryFormula(
+                isNull ? SmtBinaryOperator.Equal : SmtBinaryOperator.NotEqual,
+                formula,
+                new SmtNullConstant()));
         }
 
         private static bool StatementDefinitelyExits(StatementSyntax statement)
