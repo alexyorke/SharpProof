@@ -157,6 +157,8 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken)
         {
             var pathConditions = new List<SmtFormula>();
+            AddPriorAssignmentPathConditions(useNode, semanticModel, cancellationToken, pathConditions);
+
             foreach (var ifStatement in useNode.Ancestors().OfType<IfStatementSyntax>())
             {
                 if (ifStatement.Statement.Span.Contains(useNode.SpanStart) &&
@@ -234,6 +236,324 @@ namespace PurelySharp.Analyzer
             return symbols;
         }
 
+        private static void AddPriorAssignmentPathConditions(
+            SyntaxNode useNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
+        {
+            var facts = new List<SmtFormula>();
+            foreach (var containingBlock in EnumerateContainingBlocks(useNode).Reverse())
+            {
+                foreach (var statement in containingBlock.Block.Statements)
+                {
+                    if (ReferenceEquals(statement, containingBlock.ContainingStatement))
+                    {
+                        break;
+                    }
+
+                    AddPriorStatementFacts(statement, semanticModel, cancellationToken, facts);
+                }
+            }
+
+            foreach (var fact in facts)
+            {
+                pathConditions.Add(fact);
+            }
+        }
+
+        private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(SyntaxNode useNode)
+        {
+            for (SyntaxNode? current = useNode; current != null; current = current.Parent)
+            {
+                if (current is StatementSyntax statement &&
+                    statement.Parent is BlockSyntax block)
+                {
+                    yield return (block, statement);
+                }
+            }
+        }
+
+        private static void AddPriorStatementFacts(
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (statement is LocalDeclarationStatementSyntax localDeclaration)
+            {
+                foreach (var declarator in localDeclaration.Declaration.Variables)
+                {
+                    if (declarator.Initializer == null)
+                    {
+                        continue;
+                    }
+
+                    RemoveFactsInvalidatedByNestedMutations(declarator.Initializer.Value, semanticModel, cancellationToken, facts);
+                    if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol localSymbol)
+                    {
+                        continue;
+                    }
+
+                    AddAssignedValueFacts(localSymbol, declarator.Initializer.Value, semanticModel, cancellationToken, facts);
+                }
+
+                return;
+            }
+
+            if (statement is ExpressionStatementSyntax expressionStatement &&
+                expressionStatement.Expression is AssignmentExpressionSyntax assignment)
+            {
+                RemoveFactsInvalidatedByNestedMutations(assignment.Left, semanticModel, cancellationToken, facts);
+                RemoveFactsInvalidatedByNestedMutations(assignment.Right, semanticModel, cancellationToken, facts);
+
+                if (TryGetMutatedLocalOrParameterSymbol(assignment, semanticModel, cancellationToken, out var assignedSymbol))
+                {
+                    RemoveFactsReferencingSymbol(facts, assignedSymbol);
+                    if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+                    {
+                        AddAssignedValueFacts(assignedSymbol, assignment.Right, semanticModel, cancellationToken, facts);
+                    }
+                }
+
+                return;
+            }
+
+            foreach (var node in statement.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+            {
+                if (TryGetMutatedLocalOrParameterSymbol(node, semanticModel, cancellationToken, out var mutatedSymbol))
+                {
+                    RemoveFactsReferencingSymbol(facts, mutatedSymbol);
+                }
+            }
+        }
+
+        private static void AddAssignedValueFacts(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            RemoveFactsReferencingSymbol(facts, targetSymbol);
+
+            if (TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) &&
+                !ExpressionReferencesSymbol(valueExpression, targetSymbol, semanticModel, cancellationToken) &&
+                CSharpConditionToFormula.TryTranslateValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueFormula,
+                    getSymbolVersion: null) &&
+                valueFormula != null &&
+                CanCompareSmtValues(targetFormula, valueFormula))
+            {
+                facts.Add(CreateAssignedValueFact(targetFormula, valueFormula));
+            }
+
+            if (TryCreateArrayLengthFormula(targetSymbol, out var targetLengthFormula) &&
+                !ExpressionReferencesSymbol(valueExpression, targetSymbol, semanticModel, cancellationToken) &&
+                TryCreateArrayLengthValueFormula(valueExpression, semanticModel, cancellationToken, out var valueLengthFormula))
+            {
+                facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula));
+            }
+        }
+
+        private static void RemoveFactsInvalidatedByNestedMutations(
+            SyntaxNode root,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            foreach (var node in root.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+            {
+                if (TryGetMutatedLocalOrParameterSymbol(node, semanticModel, cancellationToken, out var mutatedSymbol))
+                {
+                    RemoveFactsReferencingSymbol(facts, mutatedSymbol);
+                }
+            }
+        }
+
+        private static bool TryCreateSymbolSmtValue(ISymbol symbol, out SmtFormula formula)
+        {
+            var type = symbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                _ => null
+            };
+
+            if (type == null)
+            {
+                formula = null!;
+                return false;
+            }
+
+            var variableName = GetSmtVariableName(symbol);
+            if (type.SpecialType == SpecialType.System_Boolean)
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Bool);
+                return true;
+            }
+
+            if (IsSearchLibIntegralType(type))
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Int);
+                return true;
+            }
+
+            if (IsReferenceType(type))
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Reference);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryCreateArrayLengthFormula(ISymbol symbol, out SmtFormula formula)
+        {
+            if (symbol is ILocalSymbol { Type: IArrayTypeSymbol { Rank: 1 } } or
+                IParameterSymbol { Type: IArrayTypeSymbol { Rank: 1 } })
+            {
+                var receiverFormula = new SmtVariable(GetSmtVariableName(symbol), SmtValueKind.Reference);
+                formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryCreateArrayLengthValueFormula(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            valueExpression = UnwrapFactExpression(valueExpression);
+            var valueType = semanticModel.GetTypeInfo(valueExpression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(valueExpression, cancellationToken).Type;
+            if (valueType is not IArrayTypeSymbol { Rank: 1 })
+            {
+                formula = null!;
+                return false;
+            }
+
+            if (valueExpression is ArrayCreationExpressionSyntax arrayCreation)
+            {
+                if (arrayCreation.Type.RankSpecifiers.Count == 1 &&
+                    arrayCreation.Type.RankSpecifiers[0].Sizes.Count == 1 &&
+                    !arrayCreation.Type.RankSpecifiers[0].Sizes[0].IsKind(SyntaxKind.OmittedArraySizeExpression) &&
+                    CSharpConditionToFormula.TryTranslateValue(
+                        arrayCreation.Type.RankSpecifiers[0].Sizes[0],
+                        semanticModel,
+                        cancellationToken,
+                        out var sizeFormula,
+                        getSymbolVersion: null) &&
+                    sizeFormula is { Kind: SmtValueKind.Int })
+                {
+                    formula = sizeFormula;
+                    return true;
+                }
+
+                if (arrayCreation.Initializer != null)
+                {
+                    formula = new SmtIntegerConstant(arrayCreation.Initializer.Expressions.Count);
+                    return true;
+                }
+            }
+
+            if (valueExpression is ImplicitArrayCreationExpressionSyntax implicitArrayCreation)
+            {
+                formula = new SmtIntegerConstant(implicitArrayCreation.Initializer.Expressions.Count);
+                return true;
+            }
+
+            if (IsArrayEmptyInvocation(valueExpression, semanticModel, cancellationToken))
+            {
+                formula = new SmtIntegerConstant(0);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool IsArrayEmptyInvocation(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            return valueExpression is InvocationExpressionSyntax invocation &&
+                semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol
+                {
+                    Name: "Empty",
+                    IsStatic: true,
+                    ContainingType.SpecialType: SpecialType.System_Array
+                };
+        }
+
+        private static SmtFormula CreateAssignedValueFact(SmtFormula targetFormula, SmtFormula valueFormula)
+        {
+            if (targetFormula.Kind == SmtValueKind.Bool &&
+                valueFormula is SmtBooleanConstant booleanConstant)
+            {
+                return booleanConstant.Value
+                    ? targetFormula
+                    : new SmtUnaryFormula(SmtUnaryOperator.Not, targetFormula);
+            }
+
+            return new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, valueFormula);
+        }
+
+        private static bool CanCompareSmtValues(SmtFormula left, SmtFormula right)
+        {
+            return left.Kind == right.Kind ||
+                left is SmtNullConstant && right.Kind == SmtValueKind.Reference ||
+                right is SmtNullConstant && left.Kind == SmtValueKind.Reference;
+        }
+
+        private static void RemoveFactsReferencingSymbol(List<SmtFormula> facts, ISymbol symbol)
+        {
+            var variablePrefix = GetSmtVariableName(symbol);
+            for (var index = facts.Count - 1; index >= 0; index--)
+            {
+                if (ReferencesSmtVariable(facts[index], variablePrefix))
+                {
+                    facts.RemoveAt(index);
+                }
+            }
+        }
+
+        private static bool ReferencesSmtVariable(SmtFormula formula, string variablePrefix)
+        {
+            switch (formula)
+            {
+                case SmtVariable variable:
+                    return variable.Name.Contains(variablePrefix, System.StringComparison.Ordinal);
+                case SmtUnaryFormula unary:
+                    return ReferencesSmtVariable(unary.Operand, variablePrefix);
+                case SmtBinaryFormula binary:
+                    return ReferencesSmtVariable(binary.Left, variablePrefix) ||
+                        ReferencesSmtVariable(binary.Right, variablePrefix);
+                case SmtIntegerUnaryTerm integerUnary:
+                    return ReferencesSmtVariable(integerUnary.Operand, variablePrefix);
+                case SmtIntegerBinaryTerm integerBinary:
+                    return ReferencesSmtVariable(integerBinary.Left, variablePrefix) ||
+                        ReferencesSmtVariable(integerBinary.Right, variablePrefix);
+                case SmtConditionalFormula conditional:
+                    return ReferencesSmtVariable(conditional.Condition, variablePrefix) ||
+                        ReferencesSmtVariable(conditional.WhenTrue, variablePrefix) ||
+                        ReferencesSmtVariable(conditional.WhenFalse, variablePrefix);
+                default:
+                    return false;
+            }
+        }
+
         private static ISymbol? GetLocalOrParameterSymbol(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
@@ -273,6 +593,25 @@ namespace PurelySharp.Analyzer
         {
             var expressionSymbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
             return expressionSymbol != null && SymbolEqualityComparer.Default.Equals(expressionSymbol, symbol);
+        }
+
+        private static bool ExpressionReferencesSymbol(
+            SyntaxNode root,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            foreach (var node in root.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+            {
+                if (node is ExpressionSyntax expression &&
+                    ExpressionMatchesSymbol(expression, symbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool ExpressionMatchesFact(
@@ -480,6 +819,41 @@ namespace PurelySharp.Analyzer
                     ExpressionMatchesSymbol(argument.Expression, symbol, semanticModel, cancellationToken),
                 _ => false
             };
+        }
+
+        private static bool TryGetMutatedLocalOrParameterSymbol(
+            SyntaxNode node,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out ISymbol symbol)
+        {
+            symbol = null!;
+            ExpressionSyntax? mutatedExpression = node switch
+            {
+                AssignmentExpressionSyntax assignment => assignment.Left,
+                PrefixUnaryExpressionSyntax prefixUnary
+                    when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) || prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
+                    prefixUnary.Operand,
+                PostfixUnaryExpressionSyntax postfixUnary
+                    when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) || postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
+                    postfixUnary.Operand,
+                ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) => argument.Expression,
+                _ => null
+            };
+
+            if (mutatedExpression == null)
+            {
+                return false;
+            }
+
+            var candidate = GetLocalOrParameterSymbol(mutatedExpression, semanticModel, cancellationToken);
+            if (candidate == null)
+            {
+                return false;
+            }
+
+            symbol = candidate;
+            return true;
         }
 
         private static bool StatementDefinitelyExits(StatementSyntax statement)
