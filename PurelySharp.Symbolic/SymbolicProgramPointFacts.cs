@@ -994,7 +994,10 @@ namespace PurelySharp.Symbolic
                 {
                     var originalAssignedSymbol = assignedSymbol.OriginalDefinition;
                     var coalesceAssignmentIsKnownNoOp = assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
-                        IsKnownNonNullReferenceSymbol(facts, originalAssignedSymbol);
+                        (IsKnownNonNullReferenceSymbol(facts, originalAssignedSymbol) ||
+                         IsKnownNullableHasValueSymbol(facts, originalAssignedSymbol));
+                    var coalesceAssignmentIsKnownNullableNoValue = assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
+                        IsKnownNullableNoValueSymbol(facts, originalAssignedSymbol);
                     if (!coalesceAssignmentIsKnownNoOp)
                     {
                         RemoveFactsReferencingSymbol(facts, originalAssignedSymbol);
@@ -1008,7 +1011,14 @@ namespace PurelySharp.Symbolic
                     {
                         if (!coalesceAssignmentIsKnownNoOp)
                         {
-                            AddCoalesceAssignmentFacts(originalAssignedSymbol, assignment.Right, previousAssignedValue, semanticModel, cancellationToken, facts);
+                            if (coalesceAssignmentIsKnownNullableNoValue)
+                            {
+                                AddAssignedValueFacts(originalAssignedSymbol, assignment.Right, semanticModel, cancellationToken, facts);
+                            }
+                            else
+                            {
+                                AddCoalesceAssignmentFacts(originalAssignedSymbol, assignment.Right, previousAssignedValue, semanticModel, cancellationToken, facts);
+                            }
                         }
                     }
                     else if (previousAssignedValue != null &&
@@ -2518,6 +2528,7 @@ namespace PurelySharp.Symbolic
             if (!TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula) ||
                 targetFormula is not { Kind: SmtValueKind.Reference })
             {
+                AddNullableCoalesceAssignmentFacts(assignedSymbol, rightExpression, semanticModel, cancellationToken, facts);
                 return;
             }
 
@@ -2557,6 +2568,40 @@ namespace PurelySharp.Symbolic
                 targetFormula,
                 rightFormula);
             facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Or, targetNonNull, targetEqualsRight));
+        }
+
+        private static void AddNullableCoalesceAssignmentFacts(
+            ISymbol assignedSymbol,
+            ExpressionSyntax rightExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (!TryCreateNullableHasValueFormula(assignedSymbol, out var targetHasValue) ||
+                !TryGetNullableUnderlyingType(GetSymbolType(assignedSymbol), out var underlyingType))
+            {
+                return;
+            }
+
+            if (TryCreateNullableStateFormulas(
+                    rightExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var rightHasValue,
+                    out _) &&
+                rightHasValue is SmtBooleanConstant { Value: true })
+            {
+                facts.Add(targetHasValue);
+            }
+            else if (TryTranslateNullableWrappedValueForUnderlyingType(
+                         rightExpression,
+                         underlyingType,
+                         semanticModel,
+                         cancellationToken,
+                         out _))
+            {
+                facts.Add(targetHasValue);
+            }
         }
 
         private static bool IsDefinitelyNonNullReferenceValue(
@@ -2882,6 +2927,21 @@ namespace PurelySharp.Symbolic
                     facts.Add(CreateAssignedValueFact(targetValue, valueFormula));
                 }
             }
+            else if (TryGetNullableUnderlyingType(GetSymbolType(assignedSymbol), out var underlyingType) &&
+                     TryTranslateNullableWrappedValueForUnderlyingType(
+                         valueExpression,
+                         underlyingType,
+                         semanticModel,
+                         cancellationToken,
+                         out var wrappedValueFormula))
+            {
+                facts.Add(targetHasValue);
+
+                if (CanCompareSmtValues(targetValue, wrappedValueFormula))
+                {
+                    facts.Add(CreateAssignedValueFact(targetValue, wrappedValueFormula));
+                }
+            }
         }
 
         private static bool TryCreateNullableStateFormulas(
@@ -2954,6 +3014,39 @@ namespace PurelySharp.Symbolic
 
             hasValueFormula = null!;
             valueFormula = null;
+            return false;
+        }
+
+        private static bool TryTranslateNullableWrappedValueForUnderlyingType(
+            ExpressionSyntax valueExpression,
+            ITypeSymbol underlyingType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula valueFormula)
+        {
+            valueExpression = UnwrapExpression(valueExpression);
+            var typeInfo = semanticModel.GetTypeInfo(valueExpression, cancellationToken);
+            if (!SymbolEqualityComparer.Default.Equals(typeInfo.ConvertedType, underlyingType) &&
+                !SymbolEqualityComparer.Default.Equals(typeInfo.Type, underlyingType))
+            {
+                valueFormula = null!;
+                return false;
+            }
+
+            if (CSharpConditionToFormula.TryTranslateValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedValue,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                translatedValue != null)
+            {
+                valueFormula = translatedValue;
+                return true;
+            }
+
+            valueFormula = null!;
             return false;
         }
 
@@ -3381,6 +3474,67 @@ namespace PurelySharp.Symbolic
                     IsFormulaPair(targetFormula, new SmtNullConstant(), equalLeft, equalRight))
                 {
                     return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsKnownNullableHasValueSymbol(List<SmtFormula> facts, ISymbol symbol)
+        {
+            return TryGetKnownNullableHasValueState(facts, symbol, out var hasValue) && hasValue;
+        }
+
+        private static bool IsKnownNullableNoValueSymbol(List<SmtFormula> facts, ISymbol symbol)
+        {
+            return TryGetKnownNullableHasValueState(facts, symbol, out var hasValue) && !hasValue;
+        }
+
+        private static bool TryGetKnownNullableHasValueState(List<SmtFormula> facts, ISymbol symbol, out bool hasValue)
+        {
+            hasValue = false;
+            if (!TryCreateNullableHasValueFormula(symbol, out var targetHasValue))
+            {
+                return false;
+            }
+
+            for (var index = facts.Count - 1; index >= 0; index--)
+            {
+                if (Equals(facts[index], targetHasValue))
+                {
+                    hasValue = true;
+                    return true;
+                }
+
+                if (facts[index] is SmtUnaryFormula
+                    {
+                        Operator: SmtUnaryOperator.Not,
+                        Operand: var operand
+                    } &&
+                    Equals(operand, targetHasValue))
+                {
+                    hasValue = false;
+                    return true;
+                }
+
+                if (facts[index] is SmtBinaryFormula
+                    {
+                        Operator: SmtBinaryOperator.Equal,
+                        Left: var equalLeft,
+                        Right: var equalRight
+                    })
+                {
+                    if (Equals(equalLeft, targetHasValue) && equalRight is SmtBooleanConstant rightConstant)
+                    {
+                        hasValue = rightConstant.Value;
+                        return true;
+                    }
+
+                    if (Equals(equalRight, targetHasValue) && equalLeft is SmtBooleanConstant leftConstant)
+                    {
+                        hasValue = leftConstant.Value;
+                        return true;
+                    }
                 }
             }
 

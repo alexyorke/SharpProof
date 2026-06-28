@@ -2527,6 +2527,86 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullDominatedNullableCoalesceAssignmentValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int? maybe = null;
+        maybe ??= 5;
+        return maybe.Value;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "NullDominatedNullableCoalesceAssignmentValue.cs",
+                FindLine(source, "return maybe.Value;"),
+                16,
+                "maybe.Value == 5",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_PreservesKnownHasValueNullableCoalesceAssignmentValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int? maybe = 7;
+        maybe ??= 5;
+        return maybe.Value;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "KnownHasValueNullableCoalesceAssignmentValue.cs",
+                FindLine(source, "return maybe.Value;"),
+                16,
+                "maybe.Value == 7",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesNullableCoalesceAssignmentNoValueBranchUnreachable()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int? maybe)
+    {
+        maybe ??= 5;
+        if (!maybe.HasValue)
+        {
+            return 0;
+        }
+
+        return maybe.Value;
+    }
+}";
+            var result = new SymbolicSourceQueryService().AnalyzeSource(
+                source,
+                "NullableCoalesceAssignmentNoValueBranch.cs",
+                FindLine(source, "return 0;"),
+                20,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(result.PathConditions, Is.Not.Empty);
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+            Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_QuerySource_CollectsConditionalThrowAssignmentFacts()
         {
             const string source = @"
@@ -5118,6 +5198,92 @@ public class TestClass
                     diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
                     diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
                     symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_NullDominatedNullableCoalesceAssignmentContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        int? maybe = null;
+        maybe ??= 5;
+        if (!maybe.HasValue || maybe.Value != 5)
+        {
+            Console.ReadLine();
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_KnownHasValueNullableCoalesceAssignmentContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        int? maybe = 7;
+        maybe ??= 5;
+        if (!maybe.HasValue || maybe.Value != 7)
+        {
+            Console.ReadLine();
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_NullableCoalesceAssignmentFallbackHasValueContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int? maybe)
+    {
+        maybe ??= 5;
+        if (!maybe.HasValue)
+        {
+            Console.ReadLine();
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
                 Is.False);
         }
 
