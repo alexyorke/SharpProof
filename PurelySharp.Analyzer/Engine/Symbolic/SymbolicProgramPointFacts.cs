@@ -204,6 +204,17 @@ namespace PurelySharp.Analyzer.Engine.Symbolic
             }
 
             RemoveFactsInvalidatedByNestedMutations(statement, semanticModel, cancellationToken, facts);
+            if (statement is IfStatementSyntax ifStatement &&
+                ifStatement.Else == null &&
+                StatementDefinitelyExits(ifStatement.Statement))
+            {
+                AddBranchConditionFacts(
+                    ifStatement.Condition,
+                    branchWhenTrue: false,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
         }
 
         private static void AddReachabilityCondition(
@@ -213,15 +224,49 @@ namespace PurelySharp.Analyzer.Engine.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            if (!CSharpConditionToFormula.TryTranslate(expressionSyntax, semanticModel, cancellationToken, out var formula) ||
-                formula == null)
+            AddBranchConditionFacts(expressionSyntax, mustBeTrue, semanticModel, cancellationToken, builder);
+        }
+
+        private static void AddBranchConditionFacts(
+            ExpressionSyntax expressionSyntax,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            CSharpConditionToFormula.TryCollectBranchAssumptions(
+                expressionSyntax,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                facts);
+        }
+
+        private static bool StatementDefinitelyExits(StatementSyntax statement)
+        {
+            statement = UnwrapSingleStatementBlock(statement);
+            return statement switch
             {
-                return;
+                ReturnStatementSyntax => true,
+                ThrowStatementSyntax => true,
+                BreakStatementSyntax => true,
+                ContinueStatementSyntax => true,
+                BlockSyntax block when block.Statements.Count > 0 => StatementDefinitelyExits(block.Statements[block.Statements.Count - 1]),
+                IfStatementSyntax ifStatement when ifStatement.Else != null =>
+                    StatementDefinitelyExits(ifStatement.Statement) &&
+                    StatementDefinitelyExits(ifStatement.Else.Statement),
+                _ => false
+            };
+        }
+
+        private static StatementSyntax UnwrapSingleStatementBlock(StatementSyntax statement)
+        {
+            while (statement is BlockSyntax { Statements.Count: 1 } block)
+            {
+                statement = block.Statements[0];
             }
 
-            builder.Add(mustBeTrue
-                ? formula
-                : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
+            return statement;
         }
 
         private static void RemoveFactsInvalidatedByNestedMutations(

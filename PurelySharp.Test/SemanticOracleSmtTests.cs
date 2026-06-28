@@ -564,6 +564,30 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsPriorEarlyExitGuardFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        if (index < 0 || index >= values.Length)
+        {
+            return 0;
+        }
+
+        return values[index];
+    }
+}",
+                "return values[index];");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("LessThan", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains("GreaterThanOrEqual", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_UlongZeroContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -1534,6 +1558,33 @@ public class TestClass
         if ((x == 0 || x == 1) && x != 0 && x != 1)
         {
             Console.WriteLine(x);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_EarlyExitGuardContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int[] values, int index)
+    {
+        if (index < 0 || index >= values.Length)
+        {
+            return;
+        }
+
+        if (index < 0 || index >= values.Length)
+        {
+            Console.WriteLine(index);
         }
     }
 }");
