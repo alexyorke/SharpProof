@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using PurelySharp.Analyzer;
 using PurelySharp.Symbolic;
+using PurelySharp.Symbolic.Smt;
 using PurelySharp.Test.Smt;
 using SearchLib.Smt;
 
@@ -868,6 +869,102 @@ public class TestClass
             Assert.That(result.Facts, Is.Not.Empty);
             Assert.That(result.Facts.Any(fact => fact.Contains("LessThan", StringComparison.Ordinal)), Is.True);
             Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThanOrEqual", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicInvariantService_AnalyzeAt_ExposesTypedPathConditions()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "SymbolicProgramPointAnalysisHost",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var statement = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<ReturnStatementSyntax>()
+                .Single(node => node.Expression?.ToString() == "value");
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(statement, semanticModel, cancellationToken: CancellationToken.None);
+
+            Assert.That(analysis.PathConditions, Is.Not.Empty);
+            Assert.That(analysis.PathConditions.Any(condition => condition is SmtBinaryFormula), Is.True);
+            Assert.That(analysis.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal)), Is.True);
+            Assert.That(analysis.Reachability, Is.EqualTo(SymbolicReachability.NotChecked));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_QuerySource_DoesNotCheckReachabilityByDefault()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "QuerySourceReachabilityDefault.cs",
+                FindLine(source, "return value;"),
+                13,
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(result.Facts, Is.Not.Empty);
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.NotChecked));
+            Assert.That(result.ReachabilityReason, Is.EqualTo("reachability_not_checked"));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_QuerySource_WithSmt_ClassifiesContradictoryProgramPointUnreachable()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            if (value <= 0)
+            {
+                return value;
+            }
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "QuerySourceReachabilitySmt.cs",
+                FindLine(source, "return value;"),
+                17,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(result.Facts, Is.Not.Empty);
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+            Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
         }
 
         [Test]

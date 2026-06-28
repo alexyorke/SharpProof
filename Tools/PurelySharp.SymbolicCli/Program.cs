@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using PurelySharp.Symbolic;
+using PurelySharp.Symbolic.Smt;
 
 var options = SymbolicCliOptions.Parse(args);
 if (options.ShowHelp || options.FilePath == null)
@@ -11,11 +12,16 @@ if (options.ShowHelp || options.FilePath == null)
 
 try
 {
+    var smtAnalysis = options.CheckReachability
+        ? new SmtAnalysisService(SmtAnalysisOptions.Default)
+        : null;
+
     var result = new SymbolicSourceQueryService().QueryFile(
         options.FilePath,
         options.Line,
         options.Column,
-        options.CreateReferences());
+        options.CreateReferences(),
+        smtAnalysis: smtAnalysis);
 
     if (options.Json)
     {
@@ -25,6 +31,12 @@ try
     {
         Console.WriteLine($"{result.FilePath}:{result.Line}:{result.Column}");
         Console.WriteLine($"Node: {result.NodeKind}");
+        if (options.CheckReachability)
+        {
+            Console.WriteLine($"Reachability: {result.Reachability}");
+            Console.WriteLine($"Reachability reason: {result.ReachabilityReason}");
+        }
+
         Console.WriteLine("Facts:");
         if (result.Facts.Count == 0)
         {
@@ -58,6 +70,8 @@ Options:
   --line <n>          1-based source line to query.
   --column <n>        1-based source column to query. Default: 1.
   --reference <path>  Metadata reference path. Can be repeated.
+  --check-reachability
+                      Use bounded SMT to classify whether the queried program point is reachable.
   --json              Emit JSON instead of text.
 """;
 
@@ -70,6 +84,8 @@ Options:
     public List<string> ReferencePaths { get; } = new();
 
     public bool Json { get; private set; }
+
+    public bool CheckReachability { get; private set; }
 
     public bool ShowHelp { get; private set; }
 
@@ -100,6 +116,9 @@ Options:
                     break;
                 case "--json":
                     options.Json = true;
+                    break;
+                case "--check-reachability":
+                    options.CheckReachability = true;
                     break;
                 default:
                     throw new ArgumentException($"Unknown option '{arg}'.");

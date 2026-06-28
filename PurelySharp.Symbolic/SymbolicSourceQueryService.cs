@@ -7,6 +7,7 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using PurelySharp.Symbolic.Smt;
 
 namespace PurelySharp.Symbolic
 {
@@ -29,7 +30,8 @@ namespace PurelySharp.Symbolic
             int line,
             int column = 1,
             IEnumerable<MetadataReference>? references = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null)
         {
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -47,7 +49,8 @@ namespace PurelySharp.Symbolic
                 line,
                 column,
                 references,
-                cancellationToken);
+                cancellationToken,
+                smtAnalysis);
         }
 
         public SymbolicSourceQueryResult QuerySource(
@@ -56,7 +59,8 @@ namespace PurelySharp.Symbolic
             int line,
             int column = 1,
             IEnumerable<MetadataReference>? references = null,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null)
         {
             if (sourceText == null)
             {
@@ -79,7 +83,7 @@ namespace PurelySharp.Symbolic
                 new[] { syntaxTree },
                 referenceArray,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-            return QuerySyntaxTree(syntaxTree, compilation, line, column, cancellationToken);
+            return QuerySyntaxTree(syntaxTree, compilation, line, column, cancellationToken, smtAnalysis);
         }
 
         public SymbolicSourceQueryResult QuerySyntaxTree(
@@ -87,7 +91,8 @@ namespace PurelySharp.Symbolic
             Compilation compilation,
             int line,
             int column = 1,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null)
         {
             if (syntaxTree == null)
             {
@@ -103,9 +108,9 @@ namespace PurelySharp.Symbolic
             var root = syntaxTree.GetRoot(cancellationToken);
             var position = GetPosition(syntaxTree, line, column, cancellationToken);
             var node = FindQueryNode(root, position);
-            var snapshot = node is ForStatementSyntax forStatement
-                ? _invariantService.GetForInitialEntryInvariants(forStatement, semanticModel, cancellationToken)
-                : _invariantService.GetInvariantsAt(node, semanticModel, cancellationToken);
+            var analysis = node is ForStatementSyntax forStatement
+                ? _invariantService.AnalyzeForInitialEntry(forStatement, semanticModel, smtAnalysis, cancellationToken)
+                : _invariantService.AnalyzeAt(node, semanticModel, smtAnalysis, cancellationToken);
 
             return new SymbolicSourceQueryResult(
                 syntaxTree.FilePath,
@@ -114,7 +119,9 @@ namespace PurelySharp.Symbolic
                 position,
                 node.SpanStart,
                 node.Kind().ToString(),
-                snapshot.Facts);
+                analysis.Facts,
+                analysis.Reachability,
+                analysis.ReachabilityReason);
         }
 
         private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
@@ -229,7 +236,9 @@ namespace PurelySharp.Symbolic
             int position,
             int nodeSpanStart,
             string nodeKind,
-            IReadOnlyList<string> facts)
+            IReadOnlyList<string> facts,
+            SymbolicReachability reachability = SymbolicReachability.NotChecked,
+            string reachabilityReason = "reachability_not_checked")
         {
             FilePath = filePath;
             Line = line;
@@ -238,6 +247,8 @@ namespace PurelySharp.Symbolic
             NodeSpanStart = nodeSpanStart;
             NodeKind = nodeKind;
             Facts = facts;
+            Reachability = reachability;
+            ReachabilityReason = reachabilityReason;
         }
 
         public string FilePath { get; }
@@ -253,5 +264,9 @@ namespace PurelySharp.Symbolic
         public string NodeKind { get; }
 
         public IReadOnlyList<string> Facts { get; }
+
+        public SymbolicReachability Reachability { get; }
+
+        public string ReachabilityReason { get; }
     }
 }
