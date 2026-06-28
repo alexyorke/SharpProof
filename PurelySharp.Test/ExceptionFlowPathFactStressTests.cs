@@ -325,6 +325,46 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_WhileConditionZeroDivisor_ReportsDivideByZeroException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        while (divisor == 0)
+        {
+            return value / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+        }
+
+        [Test]
+        public async Task Ps0010_WhileConditionNullReceiver_ReportsNullReferenceException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        while (value == null)
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
+        }
+
+        [Test]
         public async Task Ps0010_NegativeArrayIndex_ReportsIndexOutOfRangeException()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"
@@ -458,6 +498,87 @@ public class TestClass
 }");
 
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+        }
+
+        [Test]
+        public async Task Ps0010_WhileConditionUpperBoundIndex_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        while (index >= values.Length)
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+        }
+
+        [Test]
+        public async Task Ps0010_ForConditionUpperBoundIndex_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        for (; index >= values.Length; index++)
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+        }
+
+        [Test]
+        public async Task Ps0010_LoopConditionIndexReassignedBeforeUse_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        while (index >= values.Length)
+        {
+            index = 0;
+            return values[index];
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_WhileFalseBodyIndexOutOfRange_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        while (values.Length < 0)
+        {
+            return values[-1];
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
 
         [Test]

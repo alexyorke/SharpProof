@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using PurelySharp.Analyzer;
 using PurelySharp.Test.Smt;
@@ -146,6 +148,73 @@ public static class SourcePredicates
             Assert.That(
                 IsConditionAlwaysFalse("int x", "x + 1 <= 0 && x >= 0"),
                 Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_WhileFalseBody_IsStaticallyUnreachable()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        while (1 > 2)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_ForFalseBody_IsStaticallyUnreachable()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        for (var index = 0; index < 0; index++)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_ForInitializerReassignment_UsesLatestFact()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int index;
+        for (index = 0, index = 1; index == 1; index++)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.False);
         }
 
         [Test]
@@ -2241,6 +2310,26 @@ public class TestClass
                 .GetMethod("IsConditionAlwaysTrue", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
 
             return (bool)method.Invoke(null, new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
+        }
+
+        private static bool IsStatementUnreachable(string source, string statementText)
+        {
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "StatementReachabilityHost",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var statement = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<StatementSyntax>()
+                .Single(node => string.Equals(node.ToString(), statementText, StringComparison.Ordinal));
+            var method = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly
+                .GetType("PurelySharp.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!
+                .GetMethod("IsInStaticallyUnreachableBranch", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+
+            return (bool)method.Invoke(null, new object?[] { statement, semanticModel, CancellationToken.None })!;
         }
 
         private static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions)

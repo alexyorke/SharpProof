@@ -49,6 +49,7 @@ namespace PurelySharp.Analyzer
             }
 
             AddSwitchPathConditions(useNode, new[] { symbol }, semanticModel, cancellationToken, pathConditions);
+            AddLoopPathConditions(useNode, new[] { symbol }, semanticModel, cancellationToken, pathConditions);
             AddPrecedingGuardConditions(symbol, useNode, semanticModel, cancellationToken, pathConditions);
             return pathConditions.Count > 0 && PathConditionsImplyFact(pathConditions, factFormula, smtAnalysis);
         }
@@ -177,8 +178,40 @@ namespace PurelySharp.Analyzer
             }
 
             AddSwitchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
+            AddLoopPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
             AddPrecedingGuardConditions(invalidatedSymbols, useNode, semanticModel, cancellationToken, pathConditions);
             return pathConditions;
+        }
+
+        private static void AddLoopPathConditions(
+            SyntaxNode useNode,
+            IReadOnlyCollection<ISymbol> invalidatedSymbols,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
+        {
+            foreach (var whileStatement in useNode.Ancestors().OfType<WhileStatementSyntax>())
+            {
+                if (!whileStatement.Statement.Span.Contains(useNode.SpanStart) ||
+                    AnySymbolAssignedBeforeUse(whileStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                TryAddPathCondition(whileStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
+            }
+
+            foreach (var forStatement in useNode.Ancestors().OfType<ForStatementSyntax>())
+            {
+                if (forStatement.Condition == null ||
+                    !forStatement.Statement.Span.Contains(useNode.SpanStart) ||
+                    AnySymbolAssignedBeforeUse(forStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                TryAddPathCondition(forStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
+            }
         }
 
         private static void AddSwitchPathConditions(

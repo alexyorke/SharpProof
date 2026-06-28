@@ -117,6 +117,23 @@ namespace PurelySharp.Analyzer.Engine
                         }
                     }
                 }
+                else if (ancestor is WhileStatementSyntax whileStatement)
+                {
+                    if (whileStatement.Statement.Span.Contains(syntaxNode.SpanStart) &&
+                        IsConditionAlwaysFalseUsingSmt(whileStatement.Condition, semanticModel, cancellationToken, smtAnalysis))
+                    {
+                        return true;
+                    }
+                }
+                else if (ancestor is ForStatementSyntax forStatement)
+                {
+                    if (forStatement.Condition != null &&
+                        forStatement.Statement.Span.Contains(syntaxNode.SpanStart) &&
+                        IsForInitialEntryConditionAlwaysFalseUsingSmt(forStatement, semanticModel, cancellationToken, smtAnalysis))
+                    {
+                        return true;
+                    }
+                }
                 else if (ancestor is SwitchStatementSyntax switchStatement &&
                          IsInUnreachableSwitchStatementSection(syntaxNode, switchStatement, semanticModel, cancellationToken, smtAnalysis))
                 {
@@ -194,6 +211,231 @@ namespace PurelySharp.Analyzer.Engine
 
             var proofResult = smtAnalysis.Classify(query);
             return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
+        }
+
+        private static bool IsForInitialEntryConditionAlwaysFalseUsingSmt(
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            if (forStatement.Condition == null)
+            {
+                return false;
+            }
+
+            if (!CSharpConditionToFormula.TryTranslate(forStatement.Condition, semanticModel, cancellationToken, out var formula) ||
+                formula == null)
+            {
+                return IsConditionAlwaysFalseUsingSmt(forStatement.Condition, semanticModel, cancellationToken, smtAnalysis);
+            }
+
+            var pathConditions = new List<SmtFormula>();
+            foreach (var initializerFact in CollectForInitializerFacts(forStatement, semanticModel, cancellationToken))
+            {
+                pathConditions.Add(initializerFact);
+            }
+
+            CSharpConditionToFormula.TryCollectDomainFacts(forStatement.Condition, semanticModel, cancellationToken, pathConditions);
+            return IsBranchConditionUnreachable(formula, pathConditions, smtAnalysis);
+        }
+
+        private static IEnumerable<SmtFormula> CollectForInitializerFacts(
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var facts = new List<SmtFormula>();
+            if (forStatement.Declaration != null)
+            {
+                foreach (var declarator in forStatement.Declaration.Variables)
+                {
+                    if (declarator.Initializer != null &&
+                        semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
+                    {
+                        AddForInitializerFact(localSymbol, declarator.Initializer.Value, semanticModel, cancellationToken, facts);
+                    }
+                }
+            }
+
+            foreach (var initializer in forStatement.Initializers)
+            {
+                if (initializer is not AssignmentExpressionSyntax assignment ||
+                    !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+                {
+                    continue;
+                }
+
+                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
+                if (assignedSymbol is ILocalSymbol or IParameterSymbol)
+                {
+                    AddForInitializerFact(assignedSymbol.OriginalDefinition, assignment.Right, semanticModel, cancellationToken, facts);
+                }
+            }
+
+            return facts;
+        }
+
+        private static void AddForInitializerFact(
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            RemoveFactsReferencingSymbol(facts, assignedSymbol);
+            if (!ExpressionReferencesSymbol(valueExpression, assignedSymbol, semanticModel, cancellationToken) &&
+                TryCreateAssignedValueFact(assignedSymbol, valueExpression, semanticModel, cancellationToken, out var fact))
+            {
+                facts.Add(fact);
+            }
+        }
+
+        private static bool TryCreateAssignedValueFact(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula fact)
+        {
+            fact = null!;
+            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) ||
+                !CSharpConditionToFormula.TryTranslateValue(valueExpression, semanticModel, cancellationToken, out var valueFormula, getSymbolVersion: null, inlineDepth: 0) ||
+                valueFormula == null ||
+                !CanCompareSmtValues(targetFormula, valueFormula))
+            {
+                return false;
+            }
+
+            fact = CreateAssignedValueFact(targetFormula, valueFormula);
+            return true;
+        }
+
+        private static bool TryCreateSymbolSmtValue(ISymbol symbol, out SmtFormula formula)
+        {
+            var type = symbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                _ => null
+            };
+
+            if (type == null)
+            {
+                formula = null!;
+                return false;
+            }
+
+            var variableName = GetSmtVariableName(symbol);
+            if (type.SpecialType == SpecialType.System_Boolean)
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Bool);
+                return true;
+            }
+
+            if (IsIntegralType(type))
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Int);
+                return true;
+            }
+
+            if (type.IsReferenceType)
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Reference);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static SmtFormula CreateAssignedValueFact(SmtFormula targetFormula, SmtFormula valueFormula)
+        {
+            if (targetFormula.Kind == SmtValueKind.Bool &&
+                valueFormula is SmtBooleanConstant booleanConstant)
+            {
+                return booleanConstant.Value
+                    ? targetFormula
+                    : new SmtUnaryFormula(SmtUnaryOperator.Not, targetFormula);
+            }
+
+            return new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, valueFormula);
+        }
+
+        private static bool CanCompareSmtValues(SmtFormula left, SmtFormula right)
+        {
+            return left.Kind == right.Kind ||
+                left is SmtNullConstant && right.Kind == SmtValueKind.Reference ||
+                right is SmtNullConstant && left.Kind == SmtValueKind.Reference;
+        }
+
+        private static string GetSmtVariableName(ISymbol symbol)
+        {
+            var firstLocation = symbol.Locations.FirstOrDefault();
+            var start = firstLocation?.SourceSpan.Start ?? 0;
+            return symbol.Name + "#" + start.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static void RemoveFactsReferencingSymbol(List<SmtFormula> facts, ISymbol symbol)
+        {
+            var variablePrefix = GetSmtVariableName(symbol);
+            for (var index = facts.Count - 1; index >= 0; index--)
+            {
+                if (ReferencesSmtVariable(facts[index], variablePrefix))
+                {
+                    facts.RemoveAt(index);
+                }
+            }
+        }
+
+        private static bool ReferencesSmtVariable(SmtFormula formula, string variablePrefix)
+        {
+            switch (formula)
+            {
+                case SmtVariable variable:
+                    return variable.Name.Contains(variablePrefix, StringComparison.Ordinal);
+                case SmtUnaryFormula unary:
+                    return ReferencesSmtVariable(unary.Operand, variablePrefix);
+                case SmtBinaryFormula binary:
+                    return ReferencesSmtVariable(binary.Left, variablePrefix) ||
+                        ReferencesSmtVariable(binary.Right, variablePrefix);
+                case SmtIntegerUnaryTerm integerUnary:
+                    return ReferencesSmtVariable(integerUnary.Operand, variablePrefix);
+                case SmtIntegerBinaryTerm integerBinary:
+                    return ReferencesSmtVariable(integerBinary.Left, variablePrefix) ||
+                        ReferencesSmtVariable(integerBinary.Right, variablePrefix);
+                case SmtConditionalFormula conditional:
+                    return ReferencesSmtVariable(conditional.Condition, variablePrefix) ||
+                        ReferencesSmtVariable(conditional.WhenTrue, variablePrefix) ||
+                        ReferencesSmtVariable(conditional.WhenFalse, variablePrefix);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool ExpressionReferencesSymbol(
+            SyntaxNode root,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var node in root.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !IsNestedCallableBoundary(candidate)))
+            {
+                if (node is not ExpressionSyntax expression)
+                {
+                    continue;
+                }
+
+                var expressionSymbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
+                if (expressionSymbol != null &&
+                    SymbolEqualityComparer.Default.Equals(expressionSymbol.OriginalDefinition, symbol))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public static bool IsConditionAlwaysTrue(
@@ -424,6 +666,19 @@ namespace PurelySharp.Analyzer.Engine
             Unknown,
             False,
             True
+        }
+
+        private static bool IsIntegralType(ITypeSymbol typeSymbol)
+        {
+            return typeSymbol.SpecialType is
+                SpecialType.System_SByte or
+                SpecialType.System_Byte or
+                SpecialType.System_Int16 or
+                SpecialType.System_UInt16 or
+                SpecialType.System_Int32 or
+                SpecialType.System_UInt32 or
+                SpecialType.System_Int64 or
+                SpecialType.System_UInt64;
         }
 
     }
