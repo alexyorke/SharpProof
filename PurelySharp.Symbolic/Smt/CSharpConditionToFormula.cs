@@ -568,6 +568,59 @@ namespace PurelySharp.Symbolic.Smt
             return formulas.Count > originalCount;
         }
 
+        public static bool TryTranslateBuiltInElementAccessInRange(
+            ElementAccessExpressionSyntax elementAccess,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            formula = null!;
+            if (elementAccess.ArgumentList.Arguments.Count != 1)
+            {
+                return false;
+            }
+
+            var receiverType = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).Type;
+            if (receiverType is not IArrayTypeSymbol { Rank: 1 } &&
+                receiverType?.SpecialType != SpecialType.System_String)
+            {
+                return false;
+            }
+
+            if (!TryCreateBuiltInElementAccessLengthFormula(
+                    elementAccess.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var lengthFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                !TryCreateEffectiveBuiltInIndexFormula(
+                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    lengthFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out var indexFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            var lowerBound = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                indexFormula,
+                new SmtIntegerConstant(0));
+            var upperBound = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThan,
+                indexFormula,
+                lengthFormula);
+            formula = new SmtBinaryFormula(SmtBinaryOperator.And, lowerBound, upperBound);
+            return true;
+        }
+
         public static bool TryCollectDomainFacts(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
@@ -1100,6 +1153,197 @@ namespace PurelySharp.Symbolic.Smt
         {
             return valueType is IArrayTypeSymbol { Rank: 1 } ||
                 valueType?.SpecialType == SpecialType.System_String;
+        }
+
+        private static bool TryCreateBuiltInElementAccessLengthFormula(
+            ExpressionSyntax receiverExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            receiverExpression = UnwrapExpression(receiverExpression);
+            var receiverType = semanticModel.GetTypeInfo(receiverExpression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(receiverExpression, cancellationToken).Type;
+            if (receiverType is IArrayTypeSymbol { Rank: 1 } &&
+                TryCreateArrayLengthFormula(receiverExpression, semanticModel, cancellationToken, out lengthFormula, getSymbolVersion, inlineDepth))
+            {
+                return true;
+            }
+
+            if (TryGetKnownStringLength(receiverExpression, semanticModel, cancellationToken, out var knownStringLength))
+            {
+                lengthFormula = new SmtIntegerConstant(knownStringLength);
+                return true;
+            }
+
+            if (!TryTranslateValue(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                receiverFormula is not { Kind: SmtValueKind.Reference })
+            {
+                lengthFormula = null!;
+                return false;
+            }
+
+            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+            if (!TryCreateMemberFormula(receiverFormula, "Length", intType, out var candidate) ||
+                candidate is not { Kind: SmtValueKind.Int })
+            {
+                lengthFormula = null!;
+                return false;
+            }
+
+            lengthFormula = candidate;
+            return true;
+        }
+
+        private static bool TryCreateArrayLengthFormula(
+            ExpressionSyntax receiverExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            if (receiverExpression is ArrayCreationExpressionSyntax arrayCreation)
+            {
+                if (arrayCreation.Type.RankSpecifiers.Count == 1 &&
+                    arrayCreation.Type.RankSpecifiers[0].Sizes.Count == 1 &&
+                    !arrayCreation.Type.RankSpecifiers[0].Sizes[0].IsKind(SyntaxKind.OmittedArraySizeExpression) &&
+                    TryTranslateValue(
+                        arrayCreation.Type.RankSpecifiers[0].Sizes[0],
+                        semanticModel,
+                        cancellationToken,
+                        out var sizeFormula,
+                        getSymbolVersion,
+                        inlineDepth) &&
+                    sizeFormula is { Kind: SmtValueKind.Int })
+                {
+                    lengthFormula = sizeFormula;
+                    return true;
+                }
+
+                if (arrayCreation.Initializer != null)
+                {
+                    lengthFormula = new SmtIntegerConstant(arrayCreation.Initializer.Expressions.Count);
+                    return true;
+                }
+            }
+
+            if (receiverExpression is ImplicitArrayCreationExpressionSyntax implicitArrayCreation)
+            {
+                lengthFormula = new SmtIntegerConstant(implicitArrayCreation.Initializer.Expressions.Count);
+                return true;
+            }
+
+            if (TryCreateCollectionExpressionLengthFormula(receiverExpression, out lengthFormula))
+            {
+                return true;
+            }
+
+            if (IsArrayEmptyInvocation(receiverExpression, semanticModel, cancellationToken))
+            {
+                lengthFormula = new SmtIntegerConstant(0);
+                return true;
+            }
+
+            lengthFormula = null!;
+            return false;
+        }
+
+        private static bool TryCreateCollectionExpressionLengthFormula(
+            ExpressionSyntax receiverExpression,
+            out SmtFormula lengthFormula)
+        {
+            if (receiverExpression is not CollectionExpressionSyntax collectionExpression ||
+                collectionExpression.Elements.Any(static element => element is not ExpressionElementSyntax))
+            {
+                lengthFormula = null!;
+                return false;
+            }
+
+            lengthFormula = new SmtIntegerConstant(collectionExpression.Elements.Count);
+            return true;
+        }
+
+        private static bool IsArrayEmptyInvocation(
+            ExpressionSyntax receiverExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return receiverExpression is InvocationExpressionSyntax invocation &&
+                semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol
+                {
+                    Name: "Empty",
+                    IsStatic: true,
+                    ContainingType.SpecialType: SpecialType.System_Array
+                };
+        }
+
+        private static bool TryCreateEffectiveBuiltInIndexFormula(
+            ExpressionSyntax indexExpression,
+            SmtFormula lengthFormula,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula indexFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            indexExpression = UnwrapElementAccessIndexExpression(indexExpression);
+            if (indexExpression is PrefixUnaryExpressionSyntax fromEndIndex &&
+                fromEndIndex.OperatorToken.IsKind(SyntaxKind.CaretToken))
+            {
+                if (!TryTranslateValue(
+                        fromEndIndex.Operand,
+                        semanticModel,
+                        cancellationToken,
+                        out var fromEndOffset,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    fromEndOffset is not { Kind: SmtValueKind.Int })
+                {
+                    indexFormula = null!;
+                    return false;
+                }
+
+                indexFormula = new SmtIntegerBinaryTerm(
+                    SmtIntegerBinaryOperator.Subtract,
+                    lengthFormula,
+                    fromEndOffset);
+                return true;
+            }
+
+            if (!TryTranslateValue(
+                    indexExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var ordinaryIndex,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                ordinaryIndex is not { Kind: SmtValueKind.Int })
+            {
+                indexFormula = null!;
+                return false;
+            }
+
+            indexFormula = ordinaryIndex;
+            return true;
+        }
+
+        private static ExpressionSyntax UnwrapElementAccessIndexExpression(ExpressionSyntax expression)
+        {
+            while (expression is ParenthesizedExpressionSyntax parenthesized)
+            {
+                expression = parenthesized.Expression;
+            }
+
+            return expression;
         }
 
         private static bool IsBuiltInNonNegativeLengthAccess(

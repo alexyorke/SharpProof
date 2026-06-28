@@ -7,6 +7,7 @@ using PurelySharp.Analyzer;
 using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
 using PurelySharp.Test.Smt;
+using SearchLib.Purity;
 using SearchLib.Smt;
 
 
@@ -134,6 +135,55 @@ public static class SourcePredicates
             Assert.That(
                 oracle.Implies(context.PathCondition, context.Conclusion, context.SemanticModel, TimeSpan.FromMilliseconds(50)),
                 Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void CSharpConditionToFormula_ElementAccessInRange_TranslatesFromEndIndex()
+        {
+            var source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values.Length > 0)
+        {
+            return values[^1];
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ElementAccessInRangeHost",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var root = syntaxTree.GetRoot();
+            var guard = root.DescendantNodes().OfType<IfStatementSyntax>().Single().Condition;
+            var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
+
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+                    elementAccess,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var inRangeFormula),
+                Is.True);
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslate(
+                    guard,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var guardFormula),
+                Is.True);
+            Assert.That(guardFormula, Is.Not.Null);
+
+            var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
+                .ClassifyImplication(new[] { guardFormula! }, inRangeFormula);
+
+            Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
         }
 
         [Test]

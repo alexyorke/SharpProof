@@ -730,6 +730,22 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_DirectArrayCreationUpperBound_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        return (new int[4])[4];
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
         public async Task Ps0010_LocalArrayCreationSymbolicUpperBound_ReportsIndexOutOfRangeException()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"
