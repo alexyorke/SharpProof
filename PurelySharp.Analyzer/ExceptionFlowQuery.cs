@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Analyzer.Engine;
+using PurelySharp.Analyzer.Engine.Smt;
 
 namespace PurelySharp.Analyzer
 {
@@ -24,7 +25,8 @@ namespace PurelySharp.Analyzer
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken,
             IMethodSymbol methodSymbol,
-            ExceptionSummaryCatalog exceptionSummaryCatalog)
+            ExceptionSummaryCatalog exceptionSummaryCatalog,
+            SmtAnalysisService smtAnalysis)
         {
             var visitedMethods = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default)
             {
@@ -37,7 +39,8 @@ namespace PurelySharp.Analyzer
                 cancellationToken,
                 methodSymbol,
                 exceptionSummaryCatalog,
-                visitedMethods);
+                visitedMethods,
+                smtAnalysis);
         }
 
         private static MethodExceptionQueryResult AnalyzeMethod(
@@ -46,7 +49,8 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             IMethodSymbol methodSymbol,
             ExceptionSummaryCatalog exceptionSummaryCatalog,
-            HashSet<IMethodSymbol> visitedMethods)
+            HashSet<IMethodSymbol> visitedMethods,
+            SmtAnalysisService smtAnalysis)
         {
             var siteEntries = CollectUncaughtExceptionSiteEntries(
                     methodNode,
@@ -54,7 +58,8 @@ namespace PurelySharp.Analyzer
                     cancellationToken,
                     methodSymbol,
                     exceptionSummaryCatalog,
-                    visitedMethods)
+                    visitedMethods,
+                    smtAnalysis)
                 .ToImmutableArray();
 
             var exceptionEvidence = new ExceptionEvidenceSet();
@@ -72,11 +77,12 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             IMethodSymbol methodSymbol,
             ExceptionSummaryCatalog exceptionSummaryCatalog,
-            HashSet<IMethodSymbol> visitedMethods)
+            HashSet<IMethodSymbol> visitedMethods,
+            SmtAnalysisService smtAnalysis)
         {
             foreach (var throwNode in ExceptionFlowAnalyzer.GetThrowNodes(methodNode))
             {
-                if (IsInStaticallyUnreachableBranch(throwNode, semanticModel, cancellationToken))
+                if (IsInStaticallyUnreachableBranch(throwNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
                 }
@@ -87,7 +93,7 @@ namespace PurelySharp.Analyzer
                 }
 
                 var exceptionType = ExceptionFlowAnalyzer.GetThrownExceptionType(throwNode, semanticModel, cancellationToken);
-                if (IsCaughtWithinMethod(throwNode, exceptionType, methodNode, semanticModel, cancellationToken))
+                if (IsCaughtWithinMethod(throwNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
                 }
@@ -104,7 +110,7 @@ namespace PurelySharp.Analyzer
 
             foreach (var calleeCallSite in ExceptionFlowAnalyzer.GetCalleeCallSites(methodNode, semanticModel, cancellationToken))
             {
-                if (IsInStaticallyUnreachableBranch(calleeCallSite.CallSite, semanticModel, cancellationToken))
+                if (IsInStaticallyUnreachableBranch(calleeCallSite.CallSite, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
                 }
@@ -120,9 +126,10 @@ namespace PurelySharp.Analyzer
                              semanticModel.Compilation,
                              cancellationToken,
                              exceptionSummaryCatalog,
-                             visitedMethods))
+                             visitedMethods,
+                             smtAnalysis))
                 {
-                    if (IsCaughtWithinMethod(calleeCallSite.CallSite, exception.Type, methodNode, semanticModel, cancellationToken))
+                    if (IsCaughtWithinMethod(calleeCallSite.CallSite, exception.Type, methodNode, semanticModel, cancellationToken, smtAnalysis))
                     {
                         continue;
                     }
@@ -131,9 +138,9 @@ namespace PurelySharp.Analyzer
                 }
             }
 
-            foreach (var divideByZeroNode in ExceptionFlowAnalyzer.GetDefiniteDivideByZeroNodes(methodNode, semanticModel, cancellationToken))
+            foreach (var divideByZeroNode in ExceptionFlowAnalyzer.GetDefiniteDivideByZeroNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(divideByZeroNode, semanticModel, cancellationToken))
+                if (IsInStaticallyUnreachableBranch(divideByZeroNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
                 }
@@ -144,7 +151,7 @@ namespace PurelySharp.Analyzer
                 }
 
                 var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.DivideByZeroException");
-                if (IsCaughtWithinMethod(divideByZeroNode, exceptionType, methodNode, semanticModel, cancellationToken))
+                if (IsCaughtWithinMethod(divideByZeroNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
                 }
@@ -159,9 +166,9 @@ namespace PurelySharp.Analyzer
                         "binary_operator"));
             }
 
-            foreach (var nullDereferenceNode in ExceptionFlowAnalyzer.GetDefiniteNullDereferenceNodes(methodNode, semanticModel, cancellationToken))
+            foreach (var nullDereferenceNode in ExceptionFlowAnalyzer.GetDefiniteNullDereferenceNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
-                if (IsInStaticallyUnreachableBranch(nullDereferenceNode, semanticModel, cancellationToken))
+                if (IsInStaticallyUnreachableBranch(nullDereferenceNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
                 }
@@ -172,7 +179,7 @@ namespace PurelySharp.Analyzer
                 }
 
                 var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.NullReferenceException");
-                if (IsCaughtWithinMethod(nullDereferenceNode, exceptionType, methodNode, semanticModel, cancellationToken))
+                if (IsCaughtWithinMethod(nullDereferenceNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
                 }
@@ -193,7 +200,8 @@ namespace PurelySharp.Analyzer
             Compilation compilation,
             System.Threading.CancellationToken cancellationToken,
             ExceptionSummaryCatalog exceptionSummaryCatalog,
-            HashSet<IMethodSymbol> visitedMethods)
+            HashSet<IMethodSymbol> visitedMethods,
+            SmtAnalysisService smtAnalysis)
         {
             var originalDefinition = invokedMethod.OriginalDefinition;
             if (!visitedMethods.Add(originalDefinition))
@@ -218,7 +226,8 @@ namespace PurelySharp.Analyzer
                     cancellationToken,
                     invokedMethod,
                     exceptionSummaryCatalog,
-                    visitedMethods);
+                    visitedMethods,
+                    smtAnalysis);
 
                 var invokedMethodDisplay = GetExceptionSourceMethodDisplay(invokedMethod.OriginalDefinition);
                 return result.ExceptionEvidence.EnumerateEntries()
@@ -251,9 +260,10 @@ namespace PurelySharp.Analyzer
             Compilation compilation,
             System.Threading.CancellationToken cancellationToken,
             ExceptionSummaryCatalog exceptionSummaryCatalog,
-            HashSet<IMethodSymbol> visitedMethods)
+            HashSet<IMethodSymbol> visitedMethods,
+            SmtAnalysisService smtAnalysis)
         {
-            foreach (var exception in CollectSourceCalleeExceptions(invokedMethod, compilation, cancellationToken, exceptionSummaryCatalog, visitedMethods))
+            foreach (var exception in CollectSourceCalleeExceptions(invokedMethod, compilation, cancellationToken, exceptionSummaryCatalog, visitedMethods, smtAnalysis))
             {
                 yield return exception;
             }
@@ -524,7 +534,8 @@ namespace PurelySharp.Analyzer
             ITypeSymbol? exceptionType,
             SyntaxNode methodNode,
             SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
         {
             foreach (var tryStatement in throwNode.Ancestors().OfType<TryStatementSyntax>())
             {
@@ -538,7 +549,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                if (tryStatement.Catches.Any(catchClause => CatchesException(catchClause, exceptionType, semanticModel, cancellationToken)))
+                if (tryStatement.Catches.Any(catchClause => CatchesException(catchClause, exceptionType, semanticModel, cancellationToken, smtAnalysis)))
                 {
                     return true;
                 }
@@ -555,25 +566,27 @@ namespace PurelySharp.Analyzer
         private static bool IsInStaticallyUnreachableBranch(
             SyntaxNode node,
             SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
         {
-            return ExecutionVisibility.IsInStaticallyUnreachableBranch(node, semanticModel, cancellationToken);
+            return ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(node, semanticModel, cancellationToken, smtAnalysis);
         }
 
         private static bool CatchesException(
             CatchClauseSyntax catchClause,
             ITypeSymbol? exceptionType,
             SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
         {
             if (catchClause.Filter != null)
             {
-                if (ExecutionVisibility.IsConditionAlwaysFalse(catchClause.Filter.FilterExpression, semanticModel, cancellationToken))
+                if (ExecutionVisibility.IsConditionAlwaysFalseUsingSmt(catchClause.Filter.FilterExpression, semanticModel, cancellationToken, smtAnalysis))
                 {
                     return false;
                 }
 
-                if (!ExecutionVisibility.IsConditionAlwaysTrue(catchClause.Filter.FilterExpression, semanticModel, cancellationToken))
+                if (!ExecutionVisibility.IsConditionAlwaysTrueUsingSmt(catchClause.Filter.FilterExpression, semanticModel, cancellationToken, smtAnalysis))
                 {
                     return false;
                 }

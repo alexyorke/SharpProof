@@ -21,14 +21,18 @@ namespace PurelySharp.Analyzer.Engine
 
     internal partial class PurityAnalysisEngine
     {
-        private static readonly TimeSpan SmtTimeout = TimeSpan.FromMilliseconds(25);
         private readonly CompilationPurityService? _purityService;
+        private readonly SmtAnalysisService _smtAnalysis;
 
-        public PurityAnalysisEngine() { }
+        public PurityAnalysisEngine()
+        {
+            _smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+        }
 
         public PurityAnalysisEngine(CompilationPurityService? purityService)
         {
             _purityService = purityService;
+            _smtAnalysis = purityService?.SmtAnalysis ?? new SmtAnalysisService(SmtAnalysisOptions.Default);
         }
 
 
@@ -281,6 +285,7 @@ namespace PurelySharp.Analyzer.Engine
             public ImmutableHashSet<ISymbol> OwnedLocalArraySymbols { get; }
             public ImmutableHashSet<ISymbol> DefinitelyNullLocalSymbols { get; }
             public ImmutableDictionary<ISymbol, INamedTypeSymbol> LocalConcreteTypes { get; }
+            public ImmutableDictionary<ISymbol, int> SmtSymbolVersions { get; }
             public ImmutableArray<SmtFormula> PathConditions { get; }
 
 
@@ -294,6 +299,7 @@ namespace PurelySharp.Analyzer.Engine
                 ImmutableHashSet<ISymbol>? definitelyNullLocalSymbols = null,
                 PurityEvidence firstImpurityEvidence = default,
                 ImmutableDictionary<ISymbol, INamedTypeSymbol>? localConcreteTypes = null,
+                ImmutableDictionary<ISymbol, int>? smtSymbolVersions = null,
                 ImmutableDictionary<CaptureId, INamedTypeSymbol>? flowCaptureConcreteTypes = null,
                 ImmutableArray<SmtFormula>? pathConditions = null,
                 ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null,
@@ -312,6 +318,7 @@ namespace PurelySharp.Analyzer.Engine
                 OwnedLocalArraySymbols = ownedLocalArraySymbols ?? ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default);
                 DefinitelyNullLocalSymbols = definitelyNullLocalSymbols ?? ImmutableHashSet.Create<ISymbol>(SymbolEqualityComparer.Default);
                 LocalConcreteTypes = localConcreteTypes ?? ImmutableDictionary.Create<ISymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
+                SmtSymbolVersions = smtSymbolVersions ?? ImmutableDictionary.Create<ISymbol, int>(SymbolEqualityComparer.Default);
                 PathConditions = pathConditions ?? ImmutableArray<SmtFormula>.Empty;
             }
 
@@ -350,7 +357,7 @@ namespace PurelySharp.Analyzer.Engine
                 var mergedOwnedLocalArrays = IntersectOwnedLocalArraySymbolsAcrossAll(stateList.Select(s => s.OwnedLocalArraySymbols));
                 var mergedDefinitelyNullLocals = IntersectOwnedLocalArraySymbolsAcrossAll(stateList.Select(s => s.DefinitelyNullLocalSymbols));
                 var mergedLocalConcreteTypes = IntersectLocalConcreteTypesAcrossAll(stateList.Select(s => s.LocalConcreteTypes));
-                return new PurityAnalysisState(mergedImpurity, firstImpureNode, mergedTargets, mergedCaptures, mergedCaptureTargets, mergedOwnedLocalArrays, mergedDefinitelyNullLocals, firstEvidence, localConcreteTypes: mergedLocalConcreteTypes, flowCaptureConcreteTypes: mergedCaptureConcreteTypes, pathConditions: MergePathConditionsAcrossAll(stateList.Select(s => s.PathConditions)), flowCaptureSymbols: mergedCaptureSymbols, ownedArrayFlowCaptures: mergedOwnedArrayFlowCaptures);
+                return new PurityAnalysisState(mergedImpurity, firstImpureNode, mergedTargets, mergedCaptures, mergedCaptureTargets, mergedOwnedLocalArrays, mergedDefinitelyNullLocals, firstEvidence, localConcreteTypes: mergedLocalConcreteTypes, smtSymbolVersions: MergeSmtSymbolVersionsAcrossAll(stateList.Select(s => s.SmtSymbolVersions)), flowCaptureConcreteTypes: mergedCaptureConcreteTypes, pathConditions: MergePathConditionsAcrossAll(stateList.Select(s => s.PathConditions)), flowCaptureSymbols: mergedCaptureSymbols, ownedArrayFlowCaptures: mergedOwnedArrayFlowCaptures);
             }
 
 
@@ -368,6 +375,7 @@ namespace PurelySharp.Analyzer.Engine
                     this.OwnedLocalArraySymbols.Count != other.OwnedLocalArraySymbols.Count ||
                     this.DefinitelyNullLocalSymbols.Count != other.DefinitelyNullLocalSymbols.Count ||
                     this.LocalConcreteTypes.Count != other.LocalConcreteTypes.Count ||
+                    this.SmtSymbolVersions.Count != other.SmtSymbolVersions.Count ||
                     this.PathConditions.Length != other.PathConditions.Length)
                 {
                     return false;
@@ -458,6 +466,15 @@ namespace PurelySharp.Analyzer.Engine
                     }
                 }
 
+                foreach (var kvp in this.SmtSymbolVersions)
+                {
+                    if (!other.SmtSymbolVersions.TryGetValue(kvp.Key, out var otherVersion) ||
+                        kvp.Value != otherVersion)
+                    {
+                        return false;
+                    }
+                }
+
                 return true;
             }
 
@@ -532,6 +549,12 @@ namespace PurelySharp.Analyzer.Engine
                     hash = hash * 23 + SymbolEqualityComparer.Default.GetHashCode(kvp.Value);
                 }
 
+                foreach (var kvp in SmtSymbolVersions.OrderBy(kv => kv.Key.Name))
+                {
+                    hash = hash * 23 + SymbolEqualityComparer.Default.GetHashCode(kvp.Key);
+                    hash = hash * 23 + kvp.Value.GetHashCode();
+                }
+
                 return hash;
             }
 
@@ -549,6 +572,7 @@ namespace PurelySharp.Analyzer.Engine
                 ImmutableHashSet<ISymbol>? definitelyNullLocalSymbols = null,
                 PurityEvidence? firstImpurityEvidence = null,
                 ImmutableDictionary<ISymbol, INamedTypeSymbol>? localConcreteTypes = null,
+                ImmutableDictionary<ISymbol, int>? smtSymbolVersions = null,
                 ImmutableDictionary<CaptureId, INamedTypeSymbol>? flowCaptureConcreteTypes = null,
                 ImmutableArray<SmtFormula>? pathConditions = null,
                 ImmutableDictionary<CaptureId, ISymbol>? flowCaptureSymbols = null,
@@ -564,6 +588,7 @@ namespace PurelySharp.Analyzer.Engine
                     definitelyNullLocalSymbols ?? DefinitelyNullLocalSymbols,
                     firstImpurityEvidence ?? FirstImpurityEvidence,
                     localConcreteTypes: localConcreteTypes ?? LocalConcreteTypes,
+                    smtSymbolVersions: smtSymbolVersions ?? SmtSymbolVersions,
                     flowCaptureConcreteTypes: flowCaptureConcreteTypes ?? FlowCaptureConcreteTypes,
                     pathConditions: pathConditions ?? PathConditions,
                     flowCaptureSymbols: flowCaptureSymbols ?? FlowCaptureSymbols,
@@ -752,6 +777,72 @@ namespace PurelySharp.Analyzer.Engine
                 return Copy(pathConditions: pathConditions);
             }
 
+            public int GetSmtSymbolVersion(ISymbol symbol)
+            {
+                return SmtSymbolVersions.TryGetValue(symbol.OriginalDefinition, out var version)
+                    ? version
+                    : 0;
+            }
+
+            public PurityAnalysisState WithIncrementedSmtSymbolVersion(ISymbol symbol)
+            {
+                var originalDefinition = symbol.OriginalDefinition;
+                var nextVersion = GetSmtSymbolVersion(originalDefinition) + 1;
+                return Copy(
+                    smtSymbolVersions: SmtSymbolVersions.SetItem(originalDefinition, nextVersion),
+                    pathConditions: RemovePathConditionsReferencingSymbol(originalDefinition));
+            }
+
+            private ImmutableArray<SmtFormula> RemovePathConditionsReferencingSymbol(ISymbol symbol)
+            {
+                if (PathConditions.IsDefaultOrEmpty)
+                {
+                    return PathConditions;
+                }
+
+                var variablePrefix = GetSmtSymbolVariablePrefix(symbol);
+                var builder = ImmutableArray.CreateBuilder<SmtFormula>(PathConditions.Length);
+                foreach (var condition in PathConditions)
+                {
+                    if (!ReferencesSmtVariable(condition, variablePrefix))
+                    {
+                        builder.Add(condition);
+                    }
+                }
+
+                return builder.Count == PathConditions.Length
+                    ? PathConditions
+                    : builder.ToImmutable();
+            }
+
+            private static string GetSmtSymbolVariablePrefix(ISymbol symbol)
+            {
+                var start = symbol.Locations.FirstOrDefault()?.SourceSpan.Start ?? 0;
+                return symbol.Name + "#" + start.ToString(CultureInfo.InvariantCulture);
+            }
+
+            private static bool ReferencesSmtVariable(SmtFormula formula, string variablePrefix)
+            {
+                switch (formula)
+                {
+                    case SmtVariable variable:
+                        return variable.Name == variablePrefix ||
+                            variable.Name.StartsWith(variablePrefix + "@v", StringComparison.Ordinal);
+                    case SmtUnaryFormula unary:
+                        return ReferencesSmtVariable(unary.Operand, variablePrefix);
+                    case SmtBinaryFormula binary:
+                        return ReferencesSmtVariable(binary.Left, variablePrefix) ||
+                            ReferencesSmtVariable(binary.Right, variablePrefix);
+                    case SmtIntegerUnaryTerm unary:
+                        return ReferencesSmtVariable(unary.Operand, variablePrefix);
+                    case SmtIntegerBinaryTerm binary:
+                        return ReferencesSmtVariable(binary.Left, variablePrefix) ||
+                            ReferencesSmtVariable(binary.Right, variablePrefix);
+                    default:
+                        return false;
+                }
+            }
+
             private static bool PurityResultsEqual(PurityAnalysisResult a, PurityAnalysisResult b)
             {
                 if (a.IsPure != b.IsPure) return false;
@@ -912,7 +1003,8 @@ namespace PurelySharp.Analyzer.Engine
                 enforcePureAttributeSymbol,
                 allowSynchronizationAttributeSymbol,
                 visited,
-                purityCache
+                purityCache,
+                _smtAnalysis
             );
 
             LogDebug($"<< Exit DeterminePurity ({GetPuritySource(result)}): {methodSymbol.ToDisplayString(_signatureFormat)}, Final IsPure={result.IsPure}");
@@ -941,9 +1033,11 @@ namespace PurelySharp.Analyzer.Engine
             INamedTypeSymbol enforcePureAttributeSymbol,
             INamedTypeSymbol? allowSynchronizationAttributeSymbol,
             HashSet<IMethodSymbol> visited,
-            Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache)
+            Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
+            SmtAnalysisService? smtAnalysis = null)
         {
 
+            var activeSmtAnalysis = smtAnalysis ?? new SmtAnalysisService(SmtAnalysisOptions.Default);
             var indent = new string(' ', visited.Count * 2);
             LogDebug($"{indent}>> Enter DeterminePurity: {methodSymbol.ToDisplayString()}");
 
@@ -1219,6 +1313,7 @@ namespace PurelySharp.Analyzer.Engine
                             visited,
                             methodSymbol,
                             purityCache,
+                            activeSmtAnalysis,
                             out mergedDelegateTargetsFromCfg,
                             out mergedOwnedArrayFlowCapturesFromCfg,
                             out mergedOwnedLocalArraysFromCfg,
@@ -1311,7 +1406,7 @@ namespace PurelySharp.Analyzer.Engine
                         LogDebug($"{indent}  Post-CFG: Checking ThrowOperations...");
                         foreach (var firstThrowOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<IThrowOperation>())
                         {
-                            if (IsInStaticallyUnreachableBranch(firstThrowOp.Syntax, semanticModel))
+                            if (IsInStaticallyUnreachableBranch(firstThrowOp.Syntax, semanticModel, activeSmtAnalysis))
                             {
                                 LogDebug($"{indent}    Post-CFG: Skipping statically unreachable throw: {firstThrowOp.Syntax}");
                                 continue;
@@ -1370,7 +1465,7 @@ namespace PurelySharp.Analyzer.Engine
                         LogDebug($"{indent}  Post-CFG: Checking Known Impure Invocations...");
                         foreach (var invocationOp in ExecutionVisibility.VisibleDescendants(methodBodyIOperation).OfType<IInvocationOperation>())
                         {
-                            if (IsInStaticallyUnreachableBranch(invocationOp.Syntax, semanticModel))
+                            if (IsInStaticallyUnreachableBranch(invocationOp.Syntax, semanticModel, activeSmtAnalysis))
                             {
                                 continue;
                             }
@@ -1549,6 +1644,7 @@ namespace PurelySharp.Analyzer.Engine
             HashSet<IMethodSymbol> visited,
             IMethodSymbol containingMethodSymbol,
             Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
+            SmtAnalysisService smtAnalysis,
             out ImmutableDictionary<ISymbol, PotentialTargets> mergedDelegateTargetsFromBlocks,
             out ImmutableHashSet<CaptureId> mergedOwnedArrayFlowCapturesFromBlocks,
             out ImmutableHashSet<ISymbol> mergedOwnedLocalArraysFromBlocks,
@@ -1635,7 +1731,8 @@ namespace PurelySharp.Analyzer.Engine
                     allowSynchronizationAttributeSymbol,
                     visited,
                     containingMethodSymbol,
-                    purityCache);
+                    purityCache,
+                    smtAnalysis);
 
                 exitBlockStates[currentBlock] = stateAfter;
                 LogDebug($"  [CFG] State after Block #{currentBlock.Ordinal}: Impure={stateAfter.HasPotentialImpurity}");
@@ -1643,7 +1740,7 @@ namespace PurelySharp.Analyzer.Engine
 
 
                 LogDebug($"  [CFG] Propagating stateAfter (Impure={stateAfter.HasPotentialImpurity}) to successors of Block #{currentBlock.Ordinal}.");
-                if (TryGetConstantBranchDecision(currentBlock.BranchValue, semanticModel, out var takeConditionalSuccessor))
+                if (TryGetConstantBranchDecision(currentBlock.BranchValue, semanticModel, smtAnalysis, out var takeConditionalSuccessor))
                 {
                     var trueUsesConditionalSuccessor = BranchTrueUsesConditionalSuccessor(currentBlock.BranchValue);
                     var takenSuccessor = takeConditionalSuccessor
@@ -1653,7 +1750,7 @@ namespace PurelySharp.Analyzer.Engine
                         : (trueUsesConditionalSuccessor
                             ? currentBlock.FallThroughSuccessor?.Destination
                             : currentBlock.ConditionalSuccessor?.Destination);
-                    if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel, takeConditionalSuccessor, out var takenState))
+                    if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel, takeConditionalSuccessor, smtAnalysis, out var takenState))
                     {
                         PropagateToSuccessor(takenSuccessor, takenState, blockStates, worklist, inQueue);
                     }
@@ -1662,12 +1759,12 @@ namespace PurelySharp.Analyzer.Engine
                 {
                     var trueUsesConditionalSuccessor = BranchTrueUsesConditionalSuccessor(currentBlock.BranchValue);
 
-                    if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel, trueUsesConditionalSuccessor, out var conditionalState))
+                    if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel, trueUsesConditionalSuccessor, smtAnalysis, out var conditionalState))
                     {
                         PropagateToSuccessor(currentBlock.ConditionalSuccessor?.Destination, conditionalState, blockStates, worklist, inQueue);
                     }
 
-                    if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel, !trueUsesConditionalSuccessor, out var fallThroughState))
+                    if (TryCreateSuccessorState(stateAfter, currentBlock.BranchValue, semanticModel, !trueUsesConditionalSuccessor, smtAnalysis, out var fallThroughState))
                     {
                         PropagateToSuccessor(currentBlock.FallThroughSuccessor?.Destination, fallThroughState, blockStates, worklist, inQueue);
                     }
@@ -1716,7 +1813,8 @@ namespace PurelySharp.Analyzer.Engine
             INamedTypeSymbol? allowSynchronizationAttributeSymbol,
             HashSet<IMethodSymbol> visited,
             IMethodSymbol containingMethodSymbol,
-            Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache)
+            Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
+            SmtAnalysisService smtAnalysis)
         {
             LogDebug($"ApplyTransferFunction START for Block #{block.Ordinal} - Initial State: Impure={stateBefore.HasPotentialImpurity}");
 
@@ -1738,7 +1836,8 @@ namespace PurelySharp.Analyzer.Engine
                 containingMethodSymbol,
                 _purityRules,
                 CancellationToken.None,
-                null);
+                null,
+                smtAnalysis);
 
 
             var currentStateInBlock = stateBefore;
@@ -2091,6 +2190,7 @@ namespace PurelySharp.Analyzer.Engine
         private static bool TryGetConstantBranchDecision(
             IOperation? branchValue,
             SemanticModel semanticModel,
+            SmtAnalysisService smtAnalysis,
             out bool takeConditionalSuccessor)
         {
             takeConditionalSuccessor = false;
@@ -2104,13 +2204,13 @@ namespace PurelySharp.Analyzer.Engine
 
             if (branchValue?.Syntax is ExpressionSyntax expressionSyntax)
             {
-                if (ExecutionVisibility.IsConditionAlwaysTrue(expressionSyntax, semanticModel))
+                if (ExecutionVisibility.IsConditionAlwaysTrueUsingSmt(expressionSyntax, semanticModel, CancellationToken.None, smtAnalysis))
                 {
                     takeConditionalSuccessor = true;
                     return true;
                 }
 
-                if (ExecutionVisibility.IsConditionAlwaysFalse(expressionSyntax, semanticModel))
+                if (ExecutionVisibility.IsConditionAlwaysFalseUsingSmt(expressionSyntax, semanticModel, CancellationToken.None, smtAnalysis))
                 {
                     takeConditionalSuccessor = false;
                     return true;
@@ -2131,6 +2231,7 @@ namespace PurelySharp.Analyzer.Engine
             IOperation? branchValue,
             SemanticModel semanticModel,
             bool takeConditionalSuccessor,
+            SmtAnalysisService smtAnalysis,
             out PurityAnalysisState successorState)
         {
             successorState = currentState;
@@ -2146,7 +2247,8 @@ namespace PurelySharp.Analyzer.Engine
                 takeConditionalSuccessor,
                 semanticModel,
                 CancellationToken.None,
-                nextPathConditionsBuilder);
+                nextPathConditionsBuilder,
+                currentState.GetSmtSymbolVersion);
 
             SmtFormula branchFormula;
             if (TryTranslateBranchValueToFormula(branchValue, currentState, out var operationFormula) &&
@@ -2154,7 +2256,7 @@ namespace PurelySharp.Analyzer.Engine
             {
                 branchFormula = operationFormula;
             }
-            else if (CSharpConditionToFormula.TryTranslate(expressionSyntax, semanticModel, CancellationToken.None, out var syntaxFormula) &&
+            else if (CSharpConditionToFormula.TryTranslate(expressionSyntax, semanticModel, CancellationToken.None, out var syntaxFormula, currentState.GetSmtSymbolVersion) &&
                      syntaxFormula != null)
             {
                 branchFormula = syntaxFormula;
@@ -2164,7 +2266,7 @@ namespace PurelySharp.Analyzer.Engine
                 if (addedBranchAssumptions)
                 {
                     var partialPathConditions = nextPathConditionsBuilder.ToImmutable();
-                    if (ArePathConditionsUnsatisfiable(currentState, partialPathConditions))
+                    if (ArePathConditionsUnsatisfiable(currentState, partialPathConditions, smtAnalysis))
                     {
                         return false;
                     }
@@ -2184,7 +2286,7 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             var nextPathConditions = nextPathConditionsBuilder.ToImmutable();
-            if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions))
+            if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions, smtAnalysis))
             {
                 return false;
             }
@@ -2195,15 +2297,15 @@ namespace PurelySharp.Analyzer.Engine
 
         private static bool ArePathConditionsUnsatisfiable(
             PurityAnalysisState currentState,
-            ImmutableArray<SmtFormula> pathConditions)
+            ImmutableArray<SmtFormula> pathConditions,
+            SmtAnalysisService smtAnalysis)
         {
             var proofPathConditions = AppendDefinitelyNullFacts(currentState, pathConditions);
             var query = new PurityProofQuery(
                 proofPathConditions,
                 new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
 
-            using var search = new PurityProofSearch();
-            var proofResult = search.Classify(query, SmtTimeout);
+            var proofResult = smtAnalysis.Classify(query);
             return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
         }
 
@@ -2243,14 +2345,14 @@ namespace PurelySharp.Analyzer.Engine
             if (TryResolveTrackedSymbol(operation, currentState) is ILocalSymbol localSymbol &&
                 localSymbol.Type?.IsReferenceType == true)
             {
-                formula = new SmtVariable(GetSmtVariableName(localSymbol), SmtValueKind.Reference);
+                formula = new SmtVariable(GetSmtVariableName(localSymbol, currentState.GetSmtSymbolVersion), SmtValueKind.Reference);
                 return true;
             }
 
             if (TryResolveTrackedSymbol(operation, currentState) is IParameterSymbol parameterSymbol &&
                 parameterSymbol.Type?.IsReferenceType == true)
             {
-                formula = new SmtVariable(GetSmtVariableName(parameterSymbol), SmtValueKind.Reference);
+                formula = new SmtVariable(GetSmtVariableName(parameterSymbol, currentState.GetSmtSymbolVersion), SmtValueKind.Reference);
                 return true;
             }
 
@@ -2279,22 +2381,26 @@ namespace PurelySharp.Analyzer.Engine
 
                 builder.Add(new SmtBinaryFormula(
                     SmtBinaryOperator.Equal,
-                    new SmtVariable(GetSmtVariableName(localSymbol), SmtValueKind.Reference),
+                    new SmtVariable(GetSmtVariableName(localSymbol, currentState.GetSmtSymbolVersion), SmtValueKind.Reference),
                     new SmtNullConstant()));
             }
 
             return builder.ToImmutable();
         }
 
-        private static string GetSmtVariableName(ISymbol symbol)
+        private static string GetSmtVariableName(ISymbol symbol, Func<ISymbol, int>? getSymbolVersion = null)
         {
             var start = symbol.Locations.FirstOrDefault()?.SourceSpan.Start ?? 0;
-            return symbol.Name + "#" + start.ToString(CultureInfo.InvariantCulture);
+            var name = symbol.Name + "#" + start.ToString(CultureInfo.InvariantCulture);
+            var version = getSymbolVersion?.Invoke(symbol.OriginalDefinition) ?? 0;
+            return version > 0
+                ? name + "@v" + version.ToString(CultureInfo.InvariantCulture)
+                : name;
         }
 
-        private static bool IsInStaticallyUnreachableBranch(SyntaxNode syntaxNode, SemanticModel semanticModel)
+        private static bool IsInStaticallyUnreachableBranch(SyntaxNode syntaxNode, SemanticModel semanticModel, SmtAnalysisService smtAnalysis)
         {
-            if (ExecutionVisibility.IsInStaticallyUnreachableBranch(syntaxNode, semanticModel))
+            if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(syntaxNode, semanticModel, CancellationToken.None, smtAnalysis))
             {
                 return true;
             }
@@ -2324,8 +2430,7 @@ namespace PurelySharp.Analyzer.Engine
                 pathConditions,
                 new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
 
-            using var search = new PurityProofSearch();
-            var proofResult = search.Classify(query, SmtTimeout);
+            var proofResult = smtAnalysis.Classify(query);
             return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
         }
 
@@ -2341,7 +2446,7 @@ namespace PurelySharp.Analyzer.Engine
                 {
                     if (ifStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
                     {
-                        AddReachabilityCondition(builder, ifStatementSyntax.Condition, mustBeTrue: true, semanticModel);
+            AddReachabilityCondition(builder, ifStatementSyntax.Condition, mustBeTrue: true, semanticModel);
                     }
                     else if (ifStatementSyntax.Else?.Statement.Span.Contains(syntaxNode.Span) == true)
                     {
@@ -2657,7 +2762,9 @@ namespace PurelySharp.Analyzer.Engine
             LogDebug($"    [CSO] Enter CheckSingleOperation for Kind: {operation.Kind}, Syntax: '{operation.Syntax.ToString().Trim()}'");
             LogDebug($"    [CSO] Current DFA State: Impure={currentState.HasPotentialImpurity}, MapCount={currentState.DelegateTargetMap.Count}");
 
-            if (IsInStaticallyUnreachableBranch(operation.Syntax, context.SemanticModel))
+            var canUseSyntaxOnlyReachability = currentState.SmtSymbolVersions.Count == 0;
+            if (canUseSyntaxOnlyReachability &&
+                IsInStaticallyUnreachableBranch(operation.Syntax, context.SemanticModel, context.SmtAnalysis))
             {
                 LogDebug($"    [CSO] Operation is in a statically unreachable branch. Treating as Pure: {operation.Syntax}");
                 return PurityAnalysisResult.Pure;
@@ -3750,6 +3857,18 @@ namespace PurelySharp.Analyzer.Engine
                     var valueOperation = compoundAssignmentOperation.Value;
                     var targetSymbol = TryResolveTrackedSymbol(targetOperation, currentState);
 
+                    if (targetSymbol is ILocalSymbol compoundLocalSymbol)
+                    {
+                        foreach (var writtenLocalSymbol in EnumerateWrittenLocalSymbols(compoundLocalSymbol, context))
+                        {
+                            nextState = nextState.WithIncrementedSmtSymbolVersion(writtenLocalSymbol);
+                        }
+                    }
+                    else if (targetSymbol is IParameterSymbol compoundParameterSymbol)
+                    {
+                        nextState = nextState.WithIncrementedSmtSymbolVersion(compoundParameterSymbol);
+                    }
+
                     if (targetSymbol != null && targetOperation.Type?.TypeKind == TypeKind.Delegate)
                     {
                         if (compoundAssignmentOperation.OperatorKind == BinaryOperatorKind.Add)
@@ -3784,6 +3903,10 @@ namespace PurelySharp.Analyzer.Engine
                     var writtenLocalSymbols = targetSymbol is ILocalSymbol targetLocalSymbol
                         ? EnumerateWrittenLocalSymbols(targetLocalSymbol, context).ToArray()
                         : Array.Empty<ILocalSymbol>();
+                    if (targetSymbol is IParameterSymbol coalesceParameterSymbol)
+                    {
+                        nextState = nextState.WithIncrementedSmtSymbolVersion(coalesceParameterSymbol);
+                    }
 
                     if (targetSymbol is ILocalSymbol coalesceLocalSymbol &&
                         currentState.IsDefinitelyNullLocalSymbol(coalesceLocalSymbol))
@@ -3814,6 +3937,10 @@ namespace PurelySharp.Analyzer.Engine
                     var writtenLocalSymbols = targetSymbol is ILocalSymbol targetLocalSymbol
                         ? EnumerateWrittenLocalSymbols(targetLocalSymbol, context).ToArray()
                         : Array.Empty<ILocalSymbol>();
+                    if (targetSymbol is IParameterSymbol assignmentParameterSymbol)
+                    {
+                        nextState = nextState.WithIncrementedSmtSymbolVersion(assignmentParameterSymbol);
+                    }
 
                     nextState = ApplyWrittenLocalStateUpdates(
                         nextState,
@@ -3841,20 +3968,26 @@ namespace PurelySharp.Analyzer.Engine
                             continue;
                         }
 
-                        if (TryResolveTrackedSymbol(SkipImplicitConversions(argument.Value), currentState) is ILocalSymbol localSymbol)
+                        var writtenSymbol = TryResolveTrackedSymbol(SkipImplicitConversions(argument.Value), currentState);
+                        if (writtenSymbol is ILocalSymbol localSymbol)
                         {
                             foreach (var writtenLocalSymbol in EnumerateWrittenLocalSymbols(localSymbol, context))
                             {
                                 nextState = nextState
                                     .WithoutLocalConcreteType(writtenLocalSymbol)
                                     .WithoutOwnedLocalArray(writtenLocalSymbol)
-                                    .WithoutDefinitelyNullLocal(writtenLocalSymbol);
+                                    .WithoutDefinitelyNullLocal(writtenLocalSymbol)
+                                    .WithIncrementedSmtSymbolVersion(writtenLocalSymbol);
 
                                 if (writtenLocalSymbol.Type?.TypeKind == TypeKind.Delegate)
                                 {
                                     nextState = nextState.WithDelegateTarget(writtenLocalSymbol, PotentialTargets.Unresolved);
                                 }
                             }
+                        }
+                        else if (writtenSymbol is IParameterSymbol parameterSymbol)
+                        {
+                            nextState = nextState.WithIncrementedSmtSymbolVersion(parameterSymbol);
                         }
                     }
                 }
@@ -3954,6 +4087,8 @@ namespace PurelySharp.Analyzer.Engine
 
             foreach (var writtenLocalSymbol in writtenLocalSymbols)
             {
+                nextState = nextState.WithIncrementedSmtSymbolVersion(writtenLocalSymbol);
+
                 if (TryResolveKnownConcreteType(valueOperation, valueState, compilation, out var concreteType))
                 {
                     nextState = nextState.WithLocalConcreteType(writtenLocalSymbol, concreteType);

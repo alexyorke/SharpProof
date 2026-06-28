@@ -74,6 +74,15 @@ namespace PurelySharp.Analyzer.Engine
             return builder.ToImmutable();
         }
 
+        private static ImmutableDictionary<ISymbol, int> MergeSmtSymbolVersionsAcrossAll(
+            IEnumerable<ImmutableDictionary<ISymbol, int>> maps)
+        {
+            return AggregateAcrossAll(
+                maps,
+                ImmutableDictionary.Create<ISymbol, int>(SymbolEqualityComparer.Default),
+                IntersectSmtSymbolVersions);
+        }
+
         private static PurityAnalysisState MergeStates(PurityAnalysisState state1, PurityAnalysisState state2)
         {
             LogDebug($"  [Merge] Merging States: S1(Impure={state1.HasPotentialImpurity}, MapCount={state1.DelegateTargetMap.Count}) + S2(Impure={state2.HasPotentialImpurity}, MapCount={state2.DelegateTargetMap.Count})");
@@ -89,6 +98,7 @@ namespace PurelySharp.Analyzer.Engine
             var mergedOwnedLocalArrays = IntersectOwnedLocalArraySymbols(state1.OwnedLocalArraySymbols, state2.OwnedLocalArraySymbols);
             var mergedDefinitelyNullLocals = IntersectOwnedLocalArraySymbols(state1.DefinitelyNullLocalSymbols, state2.DefinitelyNullLocalSymbols);
             var mergedLocalConcreteTypes = IntersectLocalConcreteTypes(state1.LocalConcreteTypes, state2.LocalConcreteTypes);
+            var mergedSmtSymbolVersions = IntersectSmtSymbolVersions(state1.SmtSymbolVersions, state2.SmtSymbolVersions);
 
             return new PurityAnalysisState(
                 mergedImpurity,
@@ -100,6 +110,7 @@ namespace PurelySharp.Analyzer.Engine
                 mergedDefinitelyNullLocals,
                 firstImpurityEvidence,
                 localConcreteTypes: mergedLocalConcreteTypes,
+                smtSymbolVersions: mergedSmtSymbolVersions,
                 flowCaptureConcreteTypes: mergedCaptureConcreteTypes,
                 pathConditions: MergePathConditions(state1.PathConditions, state2.PathConditions),
                 flowCaptureSymbols: mergedCaptureSymbols,
@@ -234,6 +245,17 @@ namespace PurelySharp.Analyzer.Engine
                 second,
                 SymbolEqualityComparer.Default,
                 static (left, right) => SymbolEqualityComparer.Default.Equals(left, right));
+        }
+
+        private static ImmutableDictionary<ISymbol, int> IntersectSmtSymbolVersions(
+            ImmutableDictionary<ISymbol, int> first,
+            ImmutableDictionary<ISymbol, int> second)
+        {
+            return IntersectMatchingMaps(
+                first,
+                second,
+                SymbolEqualityComparer.Default,
+                static (left, right) => left == right);
         }
 
         private static ImmutableDictionary<ISymbol, INamedTypeSymbol> IntersectLocalConcreteTypesAcrossAll(

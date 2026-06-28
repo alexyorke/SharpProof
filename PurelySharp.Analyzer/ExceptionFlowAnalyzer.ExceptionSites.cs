@@ -4,6 +4,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using PurelySharp.Analyzer.Engine.Smt;
 
 namespace PurelySharp.Analyzer
 {
@@ -18,7 +19,8 @@ namespace PurelySharp.Analyzer
         internal static IEnumerable<BinaryExpressionSyntax> GetDefiniteDivideByZeroNodes(
             SyntaxNode methodNode,
             SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
         {
             foreach (var binaryExpression in GetRelevantDescendants<BinaryExpressionSyntax>(methodNode))
             {
@@ -34,7 +36,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                if (IsDefinitelyZeroExpression(binaryExpression.Right, binaryExpression, semanticModel, cancellationToken))
+                if (IsDefinitelyZeroExpression(binaryExpression.Right, binaryExpression, semanticModel, cancellationToken, smtAnalysis))
                 {
                     yield return binaryExpression;
                 }
@@ -44,22 +46,23 @@ namespace PurelySharp.Analyzer
         internal static IEnumerable<SyntaxNode> GetDefiniteNullDereferenceNodes(
             SyntaxNode methodNode,
             SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
         {
             foreach (var node in GetRelevantDescendants<SyntaxNode>(methodNode))
             {
                 if (node is MemberAccessExpressionSyntax memberAccess &&
-                    IsDefinitelyNullExpression(memberAccess.Expression, memberAccess, semanticModel, cancellationToken))
+                    IsDefinitelyNullExpression(memberAccess.Expression, memberAccess, semanticModel, cancellationToken, smtAnalysis))
                 {
                     yield return memberAccess;
                 }
                 else if (node is ElementAccessExpressionSyntax elementAccess &&
-                    IsDefinitelyNullExpression(elementAccess.Expression, elementAccess, semanticModel, cancellationToken))
+                    IsDefinitelyNullExpression(elementAccess.Expression, elementAccess, semanticModel, cancellationToken, smtAnalysis))
                 {
                     yield return elementAccess;
                 }
                 else if (node is InvocationExpressionSyntax invocation &&
-                    IsDefinitelyNullExpression(invocation.Expression, invocation, semanticModel, cancellationToken))
+                    IsDefinitelyNullExpression(invocation.Expression, invocation, semanticModel, cancellationToken, smtAnalysis))
                 {
                     yield return invocation;
                 }
@@ -174,19 +177,21 @@ namespace PurelySharp.Analyzer
             ExpressionSyntax expression,
             SyntaxNode useNode,
             SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
         {
             var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
             return (constantValue.HasValue && IsIntegralOrDecimalZero(constantValue.Value)) ||
                 IsKnownByPriorAssignment(expression, useNode, semanticModel, cancellationToken, PathFactKind.Zero) ||
-                IsKnownByDominatingIf(expression, useNode, semanticModel, cancellationToken, PathFactKind.Zero);
+                IsKnownByDominatingIf(expression, useNode, semanticModel, cancellationToken, PathFactKind.Zero, smtAnalysis);
         }
 
         private static bool IsDefinitelyNullExpression(
             ExpressionSyntax expression,
             SyntaxNode useNode,
             SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
         {
             while (true)
             {
@@ -198,7 +203,7 @@ namespace PurelySharp.Analyzer
 
                 if (expression is CastExpressionSyntax castExpression)
                 {
-                    if (IsDefinitelyNullExpression(castExpression.Expression, useNode, semanticModel, cancellationToken))
+                    if (IsDefinitelyNullExpression(castExpression.Expression, useNode, semanticModel, cancellationToken, smtAnalysis))
                     {
                         var castType = semanticModel.GetTypeInfo(castExpression, cancellationToken).Type;
                         return IsReferenceType(castType);
@@ -229,7 +234,7 @@ namespace PurelySharp.Analyzer
             }
 
             return IsKnownByPriorAssignment(expression, useNode, semanticModel, cancellationToken, PathFactKind.Null) ||
-                IsKnownByDominatingIf(expression, useNode, semanticModel, cancellationToken, PathFactKind.Null);
+                IsKnownByDominatingIf(expression, useNode, semanticModel, cancellationToken, PathFactKind.Null, smtAnalysis);
         }
 
         private static bool IsReferenceType(ITypeSymbol? typeSymbol)

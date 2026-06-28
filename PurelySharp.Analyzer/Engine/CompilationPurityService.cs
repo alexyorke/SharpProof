@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis;
 using PurelySharp.Analyzer.Engine.Analysis;
+using PurelySharp.Analyzer.Engine.Smt;
 
 namespace PurelySharp.Analyzer.Engine
 {
@@ -10,9 +11,17 @@ namespace PurelySharp.Analyzer.Engine
         private readonly object _fixedPointLock = new();
 
         public CompilationPurityService(Compilation compilation)
+            : this(compilation, SmtAnalysisOptions.Default)
+        {
+        }
+
+        public CompilationPurityService(Compilation compilation, SmtAnalysisOptions smtOptions)
         {
             _compilation = compilation;
+            SmtAnalysis = new SmtAnalysisService(smtOptions);
         }
+
+        public SmtAnalysisService SmtAnalysis { get; }
 
         public PurityAnalysisEngine.PurityAnalysisResult GetPurity(
             IMethodSymbol methodSymbol,

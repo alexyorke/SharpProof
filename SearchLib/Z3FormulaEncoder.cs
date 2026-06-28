@@ -100,6 +100,7 @@ namespace SearchLib.Smt
             {
                 SmtIntegerBinaryOperator.Add => _context.MkAdd(EncodeInteger(term.Left), EncodeInteger(term.Right)),
                 SmtIntegerBinaryOperator.Subtract => _context.MkSub(EncodeInteger(term.Left), EncodeInteger(term.Right)),
+                SmtIntegerBinaryOperator.Multiply => _context.MkMul(EncodeInteger(term.Left), EncodeInteger(term.Right)),
                 _ => throw new InvalidOperationException("Unsupported SMT integer binary operator."),
             };
         }

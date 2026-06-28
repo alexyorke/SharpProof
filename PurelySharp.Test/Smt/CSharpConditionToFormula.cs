@@ -130,13 +130,13 @@ namespace PurelySharp.Test.Smt
                 leftPattern != null &&
                 rightPattern != null)
             {
-                if (binaryPattern.IsKind(SyntaxKind.AndPattern))
+                if (binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword))
                 {
                     formula = new SmtBinaryFormula(SmtBinaryOperator.And, leftPattern, rightPattern);
                     return true;
                 }
 
-                if (binaryPattern.IsKind(SyntaxKind.OrPattern))
+                if (binaryPattern.OperatorToken.IsKind(SyntaxKind.OrKeyword))
                 {
                     formula = new SmtBinaryFormula(SmtBinaryOperator.Or, leftPattern, rightPattern);
                     return true;
@@ -350,6 +350,17 @@ namespace PurelySharp.Test.Smt
                     subtractRight.Kind == SmtValueKind.Int)
                 {
                     formula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, subtractLeft, subtractRight);
+                    return true;
+                }
+
+                if (binaryExpression.IsKind(SyntaxKind.MultiplyExpression) &&
+                    TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var multiplyLeft) &&
+                    TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var multiplyRight) &&
+                    multiplyLeft.Kind == SmtValueKind.Int &&
+                    multiplyRight.Kind == SmtValueKind.Int &&
+                    (multiplyLeft is SmtIntegerConstant || multiplyRight is SmtIntegerConstant))
+                {
+                    formula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, multiplyLeft, multiplyRight);
                     return true;
                 }
             }

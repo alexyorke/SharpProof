@@ -17,7 +17,8 @@ namespace PurelySharp.Analyzer
             SyntaxNode useNode,
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken,
-            PathFactKind factKind)
+            PathFactKind factKind,
+            SmtAnalysisService smtAnalysis)
         {
             var symbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
             if (symbol == null)
@@ -48,7 +49,7 @@ namespace PurelySharp.Analyzer
             }
 
             AddPrecedingGuardConditions(symbol, useNode, semanticModel, cancellationToken, pathConditions);
-            return pathConditions.Count > 0 && PathConditionsImplyFact(pathConditions, factFormula);
+            return pathConditions.Count > 0 && PathConditionsImplyFact(pathConditions, factFormula, smtAnalysis);
         }
 
         private static bool IsKnownByPriorAssignment(
@@ -293,7 +294,8 @@ namespace PurelySharp.Analyzer
 
         private static bool PathConditionsImplyFact(
             IEnumerable<SmtFormula> pathConditions,
-            SmtFormula factFormula)
+            SmtFormula factFormula,
+            SmtAnalysisService smtAnalysis)
         {
             var query = new PurityProofQuery(
                 pathConditions.ToArray(),
@@ -301,8 +303,7 @@ namespace PurelySharp.Analyzer
                     PurityHazardKind.BranchReachability,
                     new SmtUnaryFormula(SmtUnaryOperator.Not, factFormula)));
 
-            using var search = new PurityProofSearch();
-            var proofResult = search.Classify(query, SmtTimeout);
+            var proofResult = smtAnalysis.Classify(query);
             return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
         }
 

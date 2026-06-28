@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using PurelySharp.Analyzer.Engine.Smt;
 
 namespace PurelySharp.Analyzer.Configuration
 {
@@ -20,6 +21,7 @@ namespace PurelySharp.Analyzer.Configuration
         public bool CheckedExceptions { get; }
         public bool EnableEffectSummaryJson { get; }
         public string PurityProfile { get; }
+        public SmtAnalysisOptions SmtOptions { get; }
 
         private AnalyzerConfiguration(
             ImmutableHashSet<string> extraImpureMethods,
@@ -33,7 +35,8 @@ namespace PurelySharp.Analyzer.Configuration
             bool reportExceptions,
             bool checkedExceptions,
             bool enableEffectSummaryJson,
-            string purityProfile)
+            string purityProfile,
+            SmtAnalysisOptions smtOptions)
         {
             ExtraKnownImpureMethods = extraImpureMethods;
             ExtraKnownPureMethods = extraPureMethods;
@@ -47,6 +50,7 @@ namespace PurelySharp.Analyzer.Configuration
             CheckedExceptions = checkedExceptions;
             EnableEffectSummaryJson = enableEffectSummaryJson;
             PurityProfile = purityProfile;
+            SmtOptions = smtOptions;
         }
 
         public static AnalyzerConfiguration FromOptions(AnalyzerOptions options)
@@ -68,7 +72,20 @@ namespace PurelySharp.Analyzer.Configuration
             bool reportExceptions = GetBool(options, ConfigKeys.ReportExceptions);
             bool checkedExceptions = GetBool(options, ConfigKeys.CheckedExceptions);
             bool enableEffectSummaryJson = GetBool(options, ConfigKeys.EnableEffectSummaryJson);
-            return new AnalyzerConfiguration(impureMethods, pureMethods, impureNamespaces, impureTypes, debug, suggestMissing, missingPuritySuggestions, emitExplanations, reportExceptions, checkedExceptions, enableEffectSummaryJson, GetPurityProfile(options));
+            return new AnalyzerConfiguration(
+                impureMethods,
+                pureMethods,
+                impureNamespaces,
+                impureTypes,
+                debug,
+                suggestMissing,
+                missingPuritySuggestions,
+                emitExplanations,
+                reportExceptions,
+                checkedExceptions,
+                enableEffectSummaryJson,
+                GetPurityProfile(options),
+                GetSmtOptions(options));
         }
 
         public static MissingPuritySuggestionOptions GetMissingPuritySuggestionOptions(
@@ -316,6 +333,71 @@ namespace PurelySharp.Analyzer.Configuration
             catch { }
 
             return "balanced";
+        }
+
+        private static SmtAnalysisOptions GetSmtOptions(AnalyzerOptions options)
+        {
+            var defaults = SmtAnalysisOptions.Default;
+            var mode = GetSmtMode(options, defaults.Mode);
+            var timeoutMs = GetPositiveInt(options, ConfigKeys.SmtTimeoutMs, (int)defaults.QueryTimeout.TotalMilliseconds);
+            var methodBudgetMs = GetPositiveInt(options, ConfigKeys.SmtMethodBudgetMs, (int)defaults.MethodBudget.TotalMilliseconds);
+            var maxPathConditions = GetPositiveInt(options, ConfigKeys.SmtMaxPathConditions, defaults.MaxPathConditions);
+            var maxExpressionNodes = GetPositiveInt(options, ConfigKeys.SmtMaxExpressionNodes, defaults.MaxExpressionNodes);
+            return new SmtAnalysisOptions(
+                mode,
+                TimeSpan.FromMilliseconds(timeoutMs),
+                TimeSpan.FromMilliseconds(methodBudgetMs),
+                maxPathConditions,
+                maxExpressionNodes);
+        }
+
+        private static SmtAnalysisMode GetSmtMode(AnalyzerOptions options, SmtAnalysisMode fallback)
+        {
+            try
+            {
+                var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
+                if (global.TryGetValue(ConfigKeys.SmtMode, out var value) && !string.IsNullOrWhiteSpace(value))
+                {
+                    switch (value.Trim().ToLowerInvariant())
+                    {
+                        case "off":
+                        case "false":
+                        case "disabled":
+                            return SmtAnalysisMode.Off;
+                        case "bounded":
+                        case "default":
+                        case "true":
+                            return SmtAnalysisMode.Bounded;
+                        case "deep":
+                        case "aggressive":
+                            return SmtAnalysisMode.Deep;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return fallback;
+        }
+
+        private static int GetPositiveInt(AnalyzerOptions options, string key, int fallback)
+        {
+            try
+            {
+                var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
+                if (global.TryGetValue(key, out var value) &&
+                    int.TryParse(value.Trim(), out var parsed) &&
+                    parsed > 0)
+                {
+                    return parsed;
+                }
+            }
+            catch
+            {
+            }
+
+            return fallback;
         }
 
         private static MissingPuritySuggestionScope GetMissingPuritySuggestionScope(

@@ -36,8 +36,8 @@ namespace PurelySharp.Analyzer
 
             context.RegisterCompilationStartAction(startContext =>
             {
-                var purityService = new Engine.CompilationPurityService(startContext.Compilation);
                 var config = Configuration.AnalyzerConfiguration.FromOptions(startContext.Options);
+                var purityService = new Engine.CompilationPurityService(startContext.Compilation, config.SmtOptions);
                 var missingPuritySuggestions = config.MissingPuritySuggestions;
                 var emitExplanations = config.EmitExplanations;
                 var baseline = Configuration.DiagnosticBaseline.FromOptions(startContext.Options, startContext.CancellationToken);
@@ -56,7 +56,7 @@ namespace PurelySharp.Analyzer
                     using (Engine.ImpurityCatalog.UseConfiguredOverrides(config))
                     {
                         MethodPurityAnalyzer.AnalyzeSymbolForPurity(c, purityService, missingPuritySuggestions, emitExplanations, baseline);
-                        ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(c, config.ReportExceptions, config.CheckedExceptions, exceptionSummaryCatalog);
+                        ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(c, config.ReportExceptions, config.CheckedExceptions, exceptionSummaryCatalog, purityService);
                     }
                 },
                     SyntaxKind.AddAccessorDeclaration,

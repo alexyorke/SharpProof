@@ -33,6 +33,7 @@ namespace SearchLib.Smt
     {
         Add,
         Subtract,
+        Multiply,
     }
 
     public abstract record SmtFormula(SmtValueKind Kind);

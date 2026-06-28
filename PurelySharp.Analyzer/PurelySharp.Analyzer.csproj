@@ -13,6 +13,7 @@
     <GeneratedPurityArtifactSpecPath Condition="'$(GeneratedPurityArtifactSpecPath)' == ''">$(GeneratedPurityBuiltInSummaryDirectory)\BuiltInEffectSummaryArtifactSpec.json</GeneratedPurityArtifactSpecPath>
     <GeneratedPurityToolProjectPath Condition="'$(GeneratedPurityToolProjectPath)' == ''">$(MSBuildThisFileDirectory)..\Tools\PurelySharp.EffectSummary\PurelySharp.EffectSummary.csproj</GeneratedPurityToolProjectPath>
     <GeneratedPurityToolDllPath Condition="'$(GeneratedPurityToolDllPath)' == ''">$(MSBuildThisFileDirectory)..\Tools\PurelySharp.EffectSummary\bin\$(Configuration)\net8.0\PurelySharp.EffectSummary.dll</GeneratedPurityToolDllPath>
+    <MicrosoftZ3ManagedDllPath Condition="'$(MicrosoftZ3ManagedDllPath)' == ''">$(NuGetPackageRoot)microsoft.z3\4.12.2\lib\netstandard2.0\Microsoft.Z3.dll</MicrosoftZ3ManagedDllPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -38,6 +39,7 @@
     <ProjectReference Include="..\PurelySharp.Attributes\PurelySharp.Attributes.csproj" />
     <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
     <Compile Include="..\Shared\Constants.cs" Link="Engine\Constants.cs" />
+    <None Include="$(MicrosoftZ3ManagedDllPath)" CopyToOutputDirectory="PreserveNewest" Link="Microsoft.Z3.dll" />
   </ItemGroup>
   
   <ItemGroup>

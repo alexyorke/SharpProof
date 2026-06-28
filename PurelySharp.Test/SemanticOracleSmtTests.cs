@@ -34,6 +34,17 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void Oracle_ConstantMultiplicationContradiction_IsUnsatisfiable()
+        {
+            var context = AnalyzerTestHost.CreateConditionContext("int x", "x * 2 == 6 && x == 4");
+            using var oracle = new SmtPathOracle();
+
+            Assert.That(
+                oracle.IsSatisfiable(context.Expression, context.SemanticModel, TimeSpan.FromMilliseconds(50)),
+                Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void Oracle_NullGuardImpliesNotNullComparison()
         {
             var context = AnalyzerTestHost.CreateConditionImplicationContext("string s", "s != null", "s != null");
@@ -135,6 +146,32 @@ public class TestClass
 }");
 
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_ReassignedLocalDoesNotReuseStalePathFact_Reports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int x)
+    {
+        if (x > 0)
+        {
+            x = -1;
+            if (x < 0)
+            {
+                Console.WriteLine(x);
+            }
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
         }
 
         [Test]

@@ -9,20 +9,17 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Analyzer.Engine;
 using PurelySharp.Analyzer.Engine.Smt;
-using SearchLib.Purity;
-using SearchLib.Smt;
 
 namespace PurelySharp.Analyzer
 {
     internal static partial class ExceptionFlowAnalyzer
     {
-        private static readonly TimeSpan SmtTimeout = TimeSpan.FromMilliseconds(25);
-
         public static void AnalyzeSymbolForExceptions(
             SyntaxNodeAnalysisContext context,
             bool reportExceptions,
             bool checkedExceptions,
-            ExceptionSummaryCatalog exceptionSummaryCatalog)
+            ExceptionSummaryCatalog exceptionSummaryCatalog,
+            CompilationPurityService purityService)
         {
             var reportMethodSummaries = Analyzer.Configuration.AnalyzerConfiguration.GetReportExceptions(
                 context.Options,
@@ -52,7 +49,8 @@ namespace PurelySharp.Analyzer
                 context.SemanticModel,
                 context.CancellationToken,
                 methodSymbol,
-                exceptionSummaryCatalog);
+                exceptionSummaryCatalog,
+                purityService.SmtAnalysis);
 
             if (reportCheckedExceptionSites)
             {

@@ -1,4 +1,5 @@
 using System;
+using System.IO.Compression;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -357,6 +358,44 @@ namespace TestNamespace {
 
             Assert.That(legacyAutomationReferences, Is.Empty,
                 "Build and packaging entrypoints should not wire in legacy effect-summary artifact files or refresh scripts.");
+        }
+
+        [Test]
+        public void AnalyzerPackage_ShouldInclude_SearchLibAndZ3Dependencies()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var packageProjectPath = Path.Combine(repositoryRoot, "PurelySharp.Package", "PurelySharp.Package.csproj");
+            var project = XDocument.Load(packageProjectPath);
+            var analyzerPackageFiles = project
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "TfmSpecificPackageFile", StringComparison.Ordinal))
+                .Where(element => string.Equals(element.Attribute("PackagePath")?.Value, "analyzers/dotnet/cs", StringComparison.Ordinal))
+                .Select(element => element.Attribute("Include")?.Value)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(Path.GetFileName)
+                .ToArray();
+
+            Assert.That(analyzerPackageFiles, Does.Contain("SearchLib.dll"));
+            Assert.That(analyzerPackageFiles, Does.Contain("Microsoft.Z3.dll"));
+            Assert.That(analyzerPackageFiles, Does.Contain("libz3.dll"));
+        }
+
+        [Test]
+        public void BuiltAnalyzerPackage_ShouldShip_SearchLibAndZ3Dependencies_WhenPackageExists()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var packagePath = Path.Combine(repositoryRoot, "PurelySharp.Package", "bin", "Release", "PurelySharp.0.0.4.nupkg");
+            if (!File.Exists(packagePath))
+            {
+                Assert.Inconclusive("Build the package before verifying package contents.");
+            }
+
+            using var archive = ZipFile.OpenRead(packagePath);
+            var entryNames = archive.Entries.Select(entry => entry.FullName.Replace('\\', '/')).ToArray();
+
+            Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/SearchLib.dll"));
+            Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/Microsoft.Z3.dll"));
+            Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/libz3.dll"));
         }
 
         [Test]

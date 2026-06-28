@@ -20,5 +20,10 @@ namespace PurelySharp.Analyzer.Configuration
         public const string ReportExceptions = "purelysharp_report_exceptions";
         public const string CheckedExceptions = "purelysharp_checked_exceptions";
         public const string EnableEffectSummaryJson = "purelysharp_enable_effect_summary_json";
+        public const string SmtMode = "purelysharp_smt_mode";
+        public const string SmtTimeoutMs = "purelysharp_smt_timeout_ms";
+        public const string SmtMethodBudgetMs = "purelysharp_smt_method_budget_ms";
+        public const string SmtMaxPathConditions = "purelysharp_smt_max_path_conditions";
+        public const string SmtMaxExpressionNodes = "purelysharp_smt_max_expression_nodes";
     }
 }

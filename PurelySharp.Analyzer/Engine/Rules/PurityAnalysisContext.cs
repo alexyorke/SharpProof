@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading;
+using PurelySharp.Analyzer.Engine.Smt;
 
 namespace PurelySharp.Analyzer.Engine.Rules
 {
@@ -20,6 +21,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
         public IMethodSymbol ContainingMethodSymbol { get; }
         public ImmutableList<IPurityRule> PurityRules { get; }
         public CompilationPurityService? PurityService { get; }
+        public SmtAnalysisService SmtAnalysis { get; }
 
         public PurityAnalysisContext(
             SemanticModel semanticModel,
@@ -31,7 +33,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IMethodSymbol containingMethodSymbol,
             ImmutableList<IPurityRule> purityRules,
             CancellationToken cancellationToken,
-            CompilationPurityService? purityService)
+            CompilationPurityService? purityService,
+            SmtAnalysisService? smtAnalysis = null)
         {
             SemanticModel = semanticModel;
             EnforcePureAttributeSymbol = enforcePureAttributeSymbol;
@@ -43,6 +46,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             PurityRules = purityRules;
             CancellationToken = cancellationToken;
             PurityService = purityService;
+            SmtAnalysis = smtAnalysis ?? purityService?.SmtAnalysis ?? new SmtAnalysisService(SmtAnalysisOptions.Default);
         }
     }
 }
