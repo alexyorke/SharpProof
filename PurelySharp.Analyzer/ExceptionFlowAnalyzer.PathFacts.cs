@@ -291,7 +291,6 @@ namespace PurelySharp.Analyzer
                 var matchingSection = switchStatement.Sections
                     .FirstOrDefault(section => section.Span.Contains(useNode.SpanStart));
                 if (matchingSection == null ||
-                    matchingSection.Labels.Any(static label => label is DefaultSwitchLabelSyntax) ||
                     AnySymbolMutatedInSyntax(switchStatement.Expression, invalidatedSymbols, semanticModel, cancellationToken) ||
                     AnySymbolAssignedBeforeUse(matchingSection, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
                 {

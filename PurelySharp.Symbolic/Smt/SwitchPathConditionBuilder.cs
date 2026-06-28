@@ -16,11 +16,13 @@ namespace PurelySharp.Symbolic.Smt
         {
             formula = null!;
             var labelConditions = new List<SmtFormula>();
+            var hasDefaultLabel = false;
             foreach (var label in section.Labels)
             {
                 if (label is DefaultSwitchLabelSyntax)
                 {
-                    return false;
+                    hasDefaultLabel = true;
+                    continue;
                 }
 
                 if (TryCreateSwitchLabelCondition(
@@ -32,6 +34,25 @@ namespace PurelySharp.Symbolic.Smt
                 {
                     labelConditions.Add(labelCondition);
                 }
+                else
+                {
+                    return false;
+                }
+            }
+
+            if (hasDefaultLabel)
+            {
+                if (!TryCreateSwitchDefaultCondition(
+                        governingExpression,
+                        section,
+                        semanticModel,
+                        cancellationToken,
+                        out var defaultCondition))
+                {
+                    return false;
+                }
+
+                labelConditions.Add(defaultCondition);
             }
 
             return TryCreateDisjunction(labelConditions, out formula);
@@ -114,6 +135,53 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
+        }
+
+        private static bool TryCreateSwitchDefaultCondition(
+            ExpressionSyntax governingExpression,
+            SwitchSectionSyntax defaultSection,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            formula = null!;
+            if (defaultSection.Parent is not SwitchStatementSyntax switchStatement)
+            {
+                return false;
+            }
+
+            var nonDefaultLabelConditions = new List<SmtFormula>();
+            foreach (var section in switchStatement.Sections)
+            {
+                foreach (var label in section.Labels)
+                {
+                    if (label is DefaultSwitchLabelSyntax)
+                    {
+                        continue;
+                    }
+
+                    if (!TryCreateSwitchLabelCondition(
+                            governingExpression,
+                            label,
+                            semanticModel,
+                            cancellationToken,
+                            out var labelCondition))
+                    {
+                        return false;
+                    }
+
+                    nonDefaultLabelConditions.Add(labelCondition);
+                }
+            }
+
+            if (nonDefaultLabelConditions.Count == 0)
+            {
+                formula = new SmtBooleanConstant(true);
+                return true;
+            }
+
+            return TryCreateDisjunction(nonDefaultLabelConditions, out var explicitCaseCondition) &&
+                CreateNegation(explicitCaseCondition, out formula);
         }
 
         private static bool TryTranslateSwitchGoverningValue(
@@ -206,6 +274,12 @@ namespace PurelySharp.Symbolic.Smt
         private static bool TryCreateDisjunction(IReadOnlyList<SmtFormula> formulas, out SmtFormula formula)
         {
             return TryCreateAssociativeFormula(SmtBinaryOperator.Or, formulas, out formula);
+        }
+
+        private static bool CreateNegation(SmtFormula operand, out SmtFormula formula)
+        {
+            formula = new SmtUnaryFormula(SmtUnaryOperator.Not, operand);
+            return true;
         }
 
         private static bool TryCreateAssociativeFormula(
