@@ -36,8 +36,6 @@ public static class Constants
         "System.Enum.GetName(System.Type, object)",
         "System.Enum.IsDefined(System.Type, object)",
         "System.Enum.GetValues(System.Type)",
-        "System.GC.Collect()",
-        "System.GC.GetTotalMemory(bool)",
         "System.IO.DriveInfo.TotalSize.get",
         "System.Lazy<T>.Lazy(System.Func<T>)",
         "System.Lazy<T>.Value.get",
@@ -127,7 +125,6 @@ public static class Constants
         "System.Diagnostics.Debugger.IsAttached.get",
         "System.Diagnostics.Switch.Level.get",
         "System.DirectoryServices.DirectoryEntry.DirectoryEntry(string)",
-        "System.GC.GetGeneration(object)",
         "System.Linq.ParallelEnumerable.ForAll<TSource>(System.Linq.ParallelQuery<TSource>, System.Action<TSource>)",
         "System.Linq.ParallelQuery<TSource>.ToList()",
         "System.Management.ManagementObjectSearcher.ManagementObjectSearcher(string)",
@@ -151,7 +148,6 @@ public static class Constants
         "System.Exception.Source.set",
 
 
-        "System.Activator.CreateInstanceFrom(string, string)",
         "System.Collections.Generic.Dictionary<TKey, TValue>.Values.CopyTo(TValue[], int)",
         "System.ComponentModel.EventHandlerList.AddHandler(object, System.Delegate)",
         "System.HashCode.Add<T>(T)",

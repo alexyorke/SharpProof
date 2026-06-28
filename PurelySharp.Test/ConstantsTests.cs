@@ -347,6 +347,15 @@ namespace PurelySharp.Test
             AssertNotInManualCatalogs("System.Activator.CreateInstance<T>()");
             AssertNotInManualCatalogs("System.Activator.CreateInstance(System.Type)");
             AssertNotInManualCatalogs("System.Activator.CreateInstance(System.Type, params object[])");
+            AssertNotInManualCatalogs("System.Activator.CreateInstanceFrom(string, string)");
+        }
+
+        [Test]
+        public void GarbageCollectionImpureHelpers_AreSourcedFromGeneratedEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.GC.Collect()");
+            AssertNotInManualCatalogs("System.GC.GetTotalMemory(bool)");
+            AssertNotInManualCatalogs("System.GC.GetGeneration(object)");
         }
 
         [Test]
