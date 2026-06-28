@@ -12,20 +12,32 @@ if (options.ShowHelp || options.FilePath == null)
 
 try
 {
-    var smtAnalysis = options.CheckReachability
+    var smtAnalysis = options.CheckReachability || options.ImpliedCondition != null
         ? new SmtAnalysisService(SmtAnalysisOptions.Default)
         : null;
 
-    var result = new SymbolicSourceQueryService().QueryFile(
+    var queryService = new SymbolicSourceQueryService();
+    var result = queryService.QueryFile(
         options.FilePath,
         options.Line,
         options.Column,
         options.CreateReferences(),
         smtAnalysis: smtAnalysis);
+    var implication = options.ImpliedCondition != null
+        ? queryService.ProveConditionAtFile(
+            options.FilePath,
+            options.Line,
+            options.Column,
+            options.ImpliedCondition,
+            smtAnalysis!,
+            options.CreateReferences())
+        : null;
 
     if (options.Json)
     {
-        Console.WriteLine(JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+        Console.WriteLine(implication == null
+            ? JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true })
+            : JsonSerializer.Serialize(new { Result = result, Implication = implication }, new JsonSerializerOptions { WriteIndented = true }));
     }
     else
     {
@@ -35,6 +47,12 @@ try
         {
             Console.WriteLine($"Reachability: {result.Reachability}");
             Console.WriteLine($"Reachability reason: {result.ReachabilityReason}");
+        }
+
+        if (implication != null)
+        {
+            Console.WriteLine($"Implies '{implication.Condition}': {implication.TruthValue}");
+            Console.WriteLine($"Implication reason: {implication.Reason}");
         }
 
         Console.WriteLine("Facts:");
@@ -72,6 +90,7 @@ Options:
   --reference <path>  Metadata reference path. Can be repeated.
   --check-reachability
                       Use bounded SMT to classify whether the queried program point is reachable.
+  --implies <expr>    Use bounded SMT to prove whether invariants at the queried point imply expr.
   --json              Emit JSON instead of text.
 """;
 
@@ -86,6 +105,8 @@ Options:
     public bool Json { get; private set; }
 
     public bool CheckReachability { get; private set; }
+
+    public string? ImpliedCondition { get; private set; }
 
     public bool ShowHelp { get; private set; }
 
@@ -119,6 +140,9 @@ Options:
                     break;
                 case "--check-reachability":
                     options.CheckReachability = true;
+                    break;
+                case "--implies":
+                    options.ImpliedCondition = ReadString(args, ref index, arg);
                     break;
                 default:
                     throw new ArgumentException($"Unknown option '{arg}'.");

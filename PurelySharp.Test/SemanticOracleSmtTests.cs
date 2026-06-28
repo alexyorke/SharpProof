@@ -968,6 +968,104 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesRangeGuardImplications()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        if (index < 0 || index >= values.Length)
+        {
+            return 0;
+        }
+
+        return values[index];
+    }
+}";
+            var service = new SymbolicSourceQueryService();
+            var nonNegative = service.ProveConditionAtSource(
+                source,
+                "ProveConditionRangeGuard.cs",
+                FindLine(source, "return values[index];"),
+                13,
+                "index >= 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+            var belowLength = service.ProveConditionAtSource(
+                source,
+                "ProveConditionRangeGuard.cs",
+                FindLine(source, "return values[index];"),
+                13,
+                "index < values.Length",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(nonNegative.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+            Assert.That(belowLength.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionFalse()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value == 0)
+        {
+            return value;
+        }
+
+        return 1;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ProveConditionFalse.cs",
+                FindLine(source, "return value;"),
+                13,
+                "value != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ReportsUnreachablePoint()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            if (value <= 0)
+            {
+                return value;
+            }
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ProveConditionUnreachable.cs",
+                FindLine(source, "return value;"),
+                17,
+                "value > 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unreachable));
+            Assert.That(proof.Reason, Is.EqualTo("path_unsatisfiable"));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_QuerySource_CollectsExpressionContextFacts()
         {
             const string source = @"

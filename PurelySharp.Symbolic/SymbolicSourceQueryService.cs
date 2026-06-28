@@ -8,6 +8,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using PurelySharp.Symbolic.Smt;
+using SearchLib.Purity;
+using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic
 {
@@ -124,6 +126,175 @@ namespace PurelySharp.Symbolic
                 analysis.ReachabilityReason);
         }
 
+        public SymbolicConditionProofResult ProveConditionAtFile(
+            string filePath,
+            int line,
+            int column,
+            string conditionText,
+            SmtAnalysisService smtAnalysis,
+            IEnumerable<MetadataReference>? references = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                throw new ArgumentException("File path is required.", nameof(filePath));
+            }
+
+            if (!File.Exists(filePath))
+            {
+                throw new FileNotFoundException("Source file does not exist.", filePath);
+            }
+
+            return ProveConditionAtSource(
+                File.ReadAllText(filePath),
+                Path.GetFullPath(filePath),
+                line,
+                column,
+                conditionText,
+                smtAnalysis,
+                references,
+                cancellationToken);
+        }
+
+        public SymbolicConditionProofResult ProveConditionAtSource(
+            string sourceText,
+            string filePath,
+            int line,
+            int column,
+            string conditionText,
+            SmtAnalysisService smtAnalysis,
+            IEnumerable<MetadataReference>? references = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (sourceText == null)
+            {
+                throw new ArgumentNullException(nameof(sourceText));
+            }
+
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                filePath = "PurelySharp.Symbolic.Query.cs";
+            }
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                sourceText,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                filePath,
+                cancellationToken: cancellationToken);
+            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
+            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query",
+                new[] { syntaxTree },
+                referenceArray,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            return ProveConditionAtSyntaxTree(
+                syntaxTree,
+                compilation,
+                line,
+                column,
+                conditionText,
+                smtAnalysis,
+                cancellationToken);
+        }
+
+        public SymbolicConditionProofResult ProveConditionAtSyntaxTree(
+            SyntaxTree syntaxTree,
+            Compilation compilation,
+            int line,
+            int column,
+            string conditionText,
+            SmtAnalysisService smtAnalysis,
+            CancellationToken cancellationToken = default)
+        {
+            if (syntaxTree == null)
+            {
+                throw new ArgumentNullException(nameof(syntaxTree));
+            }
+
+            if (compilation == null)
+            {
+                throw new ArgumentNullException(nameof(compilation));
+            }
+
+            if (string.IsNullOrWhiteSpace(conditionText))
+            {
+                throw new ArgumentException("Condition text is required.", nameof(conditionText));
+            }
+
+            if (smtAnalysis == null)
+            {
+                throw new ArgumentNullException(nameof(smtAnalysis));
+            }
+
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var root = syntaxTree.GetRoot(cancellationToken);
+            var position = GetPosition(syntaxTree, line, column, cancellationToken);
+            var node = FindQueryNode(root, position);
+            var analysis = node is ForStatementSyntax forStatement
+                ? _invariantService.AnalyzeForInitialEntry(forStatement, semanticModel, smtAnalysis, cancellationToken)
+                : _invariantService.AnalyzeAt(node, semanticModel, smtAnalysis, cancellationToken);
+
+            if (analysis.Reachability == SymbolicReachability.Unreachable)
+            {
+                return new SymbolicConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.Unreachable,
+                    analysis.ReachabilityReason);
+            }
+
+            if (!TryCreateSpeculativeCondition(
+                    semanticModel,
+                    position,
+                    conditionText,
+                    out var condition,
+                    out var conditionSemanticModel,
+                    out var failureReason))
+            {
+                return new SymbolicConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.Unknown,
+                    failureReason);
+            }
+
+            if (!CSharpConditionToFormula.TryTranslate(
+                    condition,
+                    conditionSemanticModel,
+                    cancellationToken,
+                    out var conditionFormula) ||
+                conditionFormula == null)
+            {
+                return new SymbolicConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.Unknown,
+                    "condition_not_supported");
+            }
+
+            var trueProof = smtAnalysis.ClassifyImplication(analysis.PathConditions, conditionFormula);
+            if (trueProof.Outcome == PurityProofOutcome.ProvablyPure)
+            {
+                return new SymbolicConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.ProvenTrue,
+                    trueProof.Reason);
+            }
+
+            var falseProof = smtAnalysis.ClassifyImplication(
+                analysis.PathConditions,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, conditionFormula));
+            if (falseProof.Outcome == PurityProofOutcome.ProvablyPure)
+            {
+                return new SymbolicConditionProofResult(
+                    conditionText,
+                    SymbolicTruthValue.ProvenFalse,
+                    falseProof.Reason);
+            }
+
+            return new SymbolicConditionProofResult(
+                conditionText,
+                SymbolicTruthValue.Unknown,
+                falseProof.Reason);
+        }
+
         private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
         {
             var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
@@ -137,6 +308,39 @@ namespace PurelySharp.Symbolic
                 .Where(static path => !string.IsNullOrWhiteSpace(path))
                 .Select(static path => MetadataReference.CreateFromFile(path))
                 .ToImmutableArray<MetadataReference>();
+        }
+
+        private static bool TryCreateSpeculativeCondition(
+            SemanticModel semanticModel,
+            int position,
+            string conditionText,
+            out ExpressionSyntax condition,
+            out SemanticModel conditionSemanticModel,
+            out string failureReason)
+        {
+            var statement = SyntaxFactory.ParseStatement("if (" + conditionText + ") { }");
+            if (statement.ContainsDiagnostics ||
+                statement is not IfStatementSyntax ifStatement)
+            {
+                condition = SyntaxFactory.LiteralExpression(SyntaxKind.FalseLiteralExpression);
+                conditionSemanticModel = semanticModel;
+                failureReason = "condition_parse_failure";
+                return false;
+            }
+
+            if (!semanticModel.TryGetSpeculativeSemanticModel(position, ifStatement, out var speculativeModel) ||
+                speculativeModel == null)
+            {
+                condition = ifStatement.Condition;
+                conditionSemanticModel = semanticModel;
+                failureReason = "condition_binding_failure";
+                return false;
+            }
+
+            conditionSemanticModel = speculativeModel;
+            condition = ifStatement.Condition;
+            failureReason = string.Empty;
+            return true;
         }
 
         private static SyntaxNode FindQueryNode(SyntaxNode root, int position)
@@ -268,5 +472,32 @@ namespace PurelySharp.Symbolic
         public SymbolicReachability Reachability { get; }
 
         public string ReachabilityReason { get; }
+    }
+
+    public sealed class SymbolicConditionProofResult
+    {
+        public SymbolicConditionProofResult(
+            string condition,
+            SymbolicTruthValue truthValue,
+            string reason)
+        {
+            Condition = condition;
+            TruthValue = truthValue;
+            Reason = reason;
+        }
+
+        public string Condition { get; }
+
+        public SymbolicTruthValue TruthValue { get; }
+
+        public string Reason { get; }
+    }
+
+    public enum SymbolicTruthValue
+    {
+        Unknown,
+        ProvenTrue,
+        ProvenFalse,
+        Unreachable,
     }
 }
