@@ -78,7 +78,7 @@ namespace PurelySharp.Analyzer
         {
             foreach (var elementAccess in GetRelevantDescendants<ElementAccessExpressionSyntax>(methodNode))
             {
-                if (IsDefinitelyOutOfRangeArrayAccess(elementAccess, semanticModel, cancellationToken, smtAnalysis))
+                if (IsDefinitelyOutOfRangeBuiltInIndexAccess(elementAccess, semanticModel, cancellationToken, smtAnalysis))
                 {
                     yield return elementAccess;
                 }
@@ -253,7 +253,7 @@ namespace PurelySharp.Analyzer
                 IsKnownByDominatingIf(expression, useNode, semanticModel, cancellationToken, PathFactKind.Null, smtAnalysis);
         }
 
-        private static bool IsDefinitelyOutOfRangeArrayAccess(
+        private static bool IsDefinitelyOutOfRangeBuiltInIndexAccess(
             ElementAccessExpressionSyntax elementAccess,
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken,
@@ -264,14 +264,10 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            var receiverType = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).Type;
-            if (receiverType is not IArrayTypeSymbol arrayType || arrayType.Rank != 1)
-            {
-                return false;
-            }
-
-            var receiverSymbol = GetLocalOrParameterSymbol(elementAccess.Expression, semanticModel, cancellationToken);
-            if (receiverSymbol == null)
+            var receiverTypeInfo = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken);
+            var receiverType = receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type;
+            if (receiverType is not IArrayTypeSymbol { Rank: 1 } &&
+                receiverType?.SpecialType != SpecialType.System_String)
             {
                 return false;
             }
@@ -288,8 +284,15 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            var receiverFormula = new SmtVariable(GetSmtVariableName(receiverSymbol), SmtValueKind.Reference);
-            var lengthFormula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
+            if (!TryCreateBuiltInLengthValueFormula(
+                    elementAccess.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var lengthFormula))
+            {
+                return false;
+            }
+
             var lowerBoundViolation = new SmtBinaryFormula(
                 SmtBinaryOperator.LessThan,
                 indexFormula,

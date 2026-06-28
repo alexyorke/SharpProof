@@ -407,9 +407,9 @@ namespace PurelySharp.Analyzer
                 facts.Add(CreateAssignedValueFact(targetFormula, valueFormula));
             }
 
-            if (TryCreateArrayLengthFormula(targetSymbol, out var targetLengthFormula) &&
+            if (TryCreateBuiltInLengthFormula(targetSymbol, out var targetLengthFormula) &&
                 !ExpressionReferencesSymbol(valueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                TryCreateArrayLengthValueFormula(valueExpression, semanticModel, cancellationToken, out var valueLengthFormula))
+                TryCreateBuiltInLengthValueFormula(valueExpression, semanticModel, cancellationToken, out var valueLengthFormula))
             {
                 facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula));
             }
@@ -469,14 +469,44 @@ namespace PurelySharp.Analyzer
             return false;
         }
 
-        private static bool TryCreateArrayLengthFormula(ISymbol symbol, out SmtFormula formula)
+        private static bool TryCreateBuiltInLengthFormula(ISymbol symbol, out SmtFormula formula)
         {
-            if (symbol is ILocalSymbol { Type: IArrayTypeSymbol { Rank: 1 } } or
-                IParameterSymbol { Type: IArrayTypeSymbol { Rank: 1 } })
+            var type = symbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                _ => null
+            };
+
+            if (type is IArrayTypeSymbol { Rank: 1 } ||
+                type?.SpecialType == SpecialType.System_String)
             {
                 var receiverFormula = new SmtVariable(GetSmtVariableName(symbol), SmtValueKind.Reference);
                 formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
                 return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryCreateBuiltInLengthValueFormula(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            valueExpression = UnwrapFactExpression(valueExpression);
+            var valueType = semanticModel.GetTypeInfo(valueExpression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(valueExpression, cancellationToken).Type;
+            if (valueType is IArrayTypeSymbol { Rank: 1 })
+            {
+                return TryCreateArrayLengthValueFormula(valueExpression, semanticModel, cancellationToken, out formula);
+            }
+
+            if (valueType?.SpecialType == SpecialType.System_String)
+            {
+                return TryCreateStringLengthValueFormula(valueExpression, semanticModel, cancellationToken, out formula);
             }
 
             formula = null!;
@@ -489,15 +519,6 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             out SmtFormula formula)
         {
-            valueExpression = UnwrapFactExpression(valueExpression);
-            var valueType = semanticModel.GetTypeInfo(valueExpression, cancellationToken).ConvertedType ??
-                semanticModel.GetTypeInfo(valueExpression, cancellationToken).Type;
-            if (valueType is not IArrayTypeSymbol { Rank: 1 })
-            {
-                formula = null!;
-                return false;
-            }
-
             if (valueExpression is ArrayCreationExpressionSyntax arrayCreation)
             {
                 if (arrayCreation.Type.RankSpecifiers.Count == 1 &&
@@ -539,6 +560,31 @@ namespace PurelySharp.Analyzer
                 return true;
             }
 
+            return TryCreateReferenceLengthValueFormula(valueExpression, semanticModel, cancellationToken, out formula);
+        }
+
+        private static bool TryCreateStringLengthValueFormula(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            var constantValue = semanticModel.GetConstantValue(valueExpression, cancellationToken);
+            if (constantValue is { HasValue: true, Value: string stringValue })
+            {
+                formula = new SmtIntegerConstant(stringValue.Length);
+                return true;
+            }
+
+            return TryCreateReferenceLengthValueFormula(valueExpression, semanticModel, cancellationToken, out formula);
+        }
+
+        private static bool TryCreateReferenceLengthValueFormula(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
             if (CSharpConditionToFormula.TryTranslateValue(
                     valueExpression,
                     semanticModel,

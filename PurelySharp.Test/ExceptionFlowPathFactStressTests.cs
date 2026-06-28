@@ -563,6 +563,96 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_NegativeStringIndexGuard_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public char TestMethod(string text, int index)
+    {
+        if (index < 0)
+        {
+            return text[index];
+        }
+
+        return '\0';
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+        }
+
+        [Test]
+        public async Task Ps0010_StringUpperBoundIndexGuard_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public char TestMethod(string text, int index)
+    {
+        if (index >= text.Length)
+        {
+            return text[index];
+        }
+
+        return '\0';
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+        }
+
+        [Test]
+        public async Task Ps0010_StringLiteralUpperBound_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public char TestMethod()
+    {
+        var text = ""abc"";
+        return text[3];
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
+        public async Task Ps0010_StringAliasUpperBound_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public char TestMethod(string input)
+    {
+        var text = input;
+        var alias = text;
+        return alias[input.Length];
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+        }
+
+        [Test]
+        public async Task Ps0010_StringLiteralInRangeIndex_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public char TestMethod()
+    {
+        var text = ""abc"";
+        return text[2];
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_ArrayCollectionExpressionSpreadIndex_DoesNotReport()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
