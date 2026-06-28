@@ -1000,7 +1000,7 @@ namespace PurelySharp.Symbolic
                     }
                     else if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression))
                     {
-                        AddCoalesceAssignmentFacts(originalAssignedSymbol, assignment.Right, semanticModel, cancellationToken, facts);
+                        AddCoalesceAssignmentFacts(originalAssignedSymbol, assignment.Right, previousAssignedValue, semanticModel, cancellationToken, facts);
                     }
                     else if (previousAssignedValue != null &&
                              TryCreateCompoundAssignmentFact(
@@ -2494,6 +2494,7 @@ namespace PurelySharp.Symbolic
         private static void AddCoalesceAssignmentFacts(
             ISymbol assignedSymbol,
             ExpressionSyntax rightExpression,
+            SmtFormula? previousAssignedValue,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             List<SmtFormula> facts)
@@ -2501,6 +2502,12 @@ namespace PurelySharp.Symbolic
             if (!TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula) ||
                 targetFormula is not { Kind: SmtValueKind.Reference })
             {
+                return;
+            }
+
+            if (previousAssignedValue is SmtNullConstant)
+            {
+                AddAssignedValueFacts(assignedSymbol, rightExpression, semanticModel, cancellationToken, facts);
                 return;
             }
 
@@ -2939,6 +2946,30 @@ namespace PurelySharp.Symbolic
 
             for (var index = facts.Count - 1; index >= 0; index--)
             {
+                if (facts[index] is SmtUnaryFormula
+                    {
+                        Operator: SmtUnaryOperator.Not,
+                        Operand: SmtBinaryFormula
+                        {
+                            Operator: SmtBinaryOperator.NotEqual,
+                            Left: var notEqualLeft,
+                            Right: var notEqualRight
+                        }
+                    })
+                {
+                    if (Equals(notEqualLeft, targetFormula) && notEqualRight.Kind == targetFormula.Kind)
+                    {
+                        value = notEqualRight;
+                        return true;
+                    }
+
+                    if (Equals(notEqualRight, targetFormula) && notEqualLeft.Kind == targetFormula.Kind)
+                    {
+                        value = notEqualLeft;
+                        return true;
+                    }
+                }
+
                 if (facts[index] is not SmtBinaryFormula
                     {
                         Operator: SmtBinaryOperator.Equal,
