@@ -57,6 +57,34 @@ namespace PurelySharp.Symbolic
                 impliedConditions);
         }
 
+        public SymbolicProgramPointQueryResult AnalyzeFile(
+            string filePath,
+            int line,
+            int column = 1,
+            IEnumerable<MetadataReference>? references = null,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                throw new ArgumentException("File path is required.", nameof(filePath));
+            }
+
+            if (!File.Exists(filePath))
+            {
+                throw new FileNotFoundException("Source file does not exist.", filePath);
+            }
+
+            return AnalyzeSource(
+                File.ReadAllText(filePath),
+                Path.GetFullPath(filePath),
+                line,
+                column,
+                references,
+                cancellationToken,
+                smtAnalysis);
+        }
+
         public SymbolicSourceQueryResult QuerySource(
             string sourceText,
             string filePath,
@@ -96,6 +124,45 @@ namespace PurelySharp.Symbolic
                 cancellationToken,
                 smtAnalysis,
                 impliedConditions);
+        }
+
+        public SymbolicProgramPointQueryResult AnalyzeSource(
+            string sourceText,
+            string filePath,
+            int line,
+            int column = 1,
+            IEnumerable<MetadataReference>? references = null,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null)
+        {
+            if (sourceText == null)
+            {
+                throw new ArgumentNullException(nameof(sourceText));
+            }
+
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                filePath = "PurelySharp.Symbolic.Query.cs";
+            }
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                sourceText,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                filePath,
+                cancellationToken: cancellationToken);
+            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
+            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query",
+                new[] { syntaxTree },
+                referenceArray,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            return AnalyzeSyntaxTree(
+                syntaxTree,
+                compilation,
+                line,
+                column,
+                cancellationToken,
+                smtAnalysis);
         }
 
         public SymbolicSourceQueryResult QuerySyntaxTree(
@@ -143,6 +210,41 @@ namespace PurelySharp.Symbolic
                 query.Analysis.Reachability,
                 query.Analysis.ReachabilityReason,
                 conditionProofs);
+        }
+
+        public SymbolicProgramPointQueryResult AnalyzeSyntaxTree(
+            SyntaxTree syntaxTree,
+            Compilation compilation,
+            int line,
+            int column = 1,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null)
+        {
+            if (syntaxTree == null)
+            {
+                throw new ArgumentNullException(nameof(syntaxTree));
+            }
+
+            if (compilation == null)
+            {
+                throw new ArgumentNullException(nameof(compilation));
+            }
+
+            var query = AnalyzeProgramPoint(
+                syntaxTree,
+                compilation,
+                line,
+                column,
+                smtAnalysis,
+                cancellationToken);
+            return new SymbolicProgramPointQueryResult(
+                syntaxTree.FilePath,
+                line,
+                column,
+                query.Position,
+                query.Node.SpanStart,
+                query.Node.Kind().ToString(),
+                query.Analysis);
         }
 
         public SymbolicConditionProofResult ProveConditionAtFile(
@@ -587,6 +689,49 @@ namespace PurelySharp.Symbolic
         public string ReachabilityReason { get; }
 
         public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; }
+    }
+
+    public sealed class SymbolicProgramPointQueryResult
+    {
+        public SymbolicProgramPointQueryResult(
+            string filePath,
+            int line,
+            int column,
+            int position,
+            int nodeSpanStart,
+            string nodeKind,
+            SymbolicProgramPointAnalysis analysis)
+        {
+            FilePath = filePath;
+            Line = line;
+            Column = column;
+            Position = position;
+            NodeSpanStart = nodeSpanStart;
+            NodeKind = nodeKind;
+            Analysis = analysis ?? throw new ArgumentNullException(nameof(analysis));
+        }
+
+        public string FilePath { get; }
+
+        public int Line { get; }
+
+        public int Column { get; }
+
+        public int Position { get; }
+
+        public int NodeSpanStart { get; }
+
+        public string NodeKind { get; }
+
+        public SymbolicProgramPointAnalysis Analysis { get; }
+
+        public IReadOnlyList<SmtFormula> PathConditions => Analysis.PathConditions;
+
+        public IReadOnlyList<string> Facts => Analysis.Facts;
+
+        public SymbolicReachability Reachability => Analysis.Reachability;
+
+        public string ReachabilityReason => Analysis.ReachabilityReason;
     }
 
     public sealed class SymbolicConditionProofResult
