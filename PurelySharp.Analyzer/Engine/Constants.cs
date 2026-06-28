@@ -27,9 +27,6 @@ public static class Constants
     public static readonly HashSet<string> KnownImpureMethods = new HashSet<string>(StringComparer.Ordinal)
     {
 
-        "System.Activator.CreateInstance<T>()",
-        "System.Activator.CreateInstance(System.Type)",
-        "System.Activator.CreateInstance(System.Type, params object[])",
         "System.Array.AsReadOnly<T>(T[])",
         "System.Collections.ArrayList.Adapter(System.Collections.IList)",
         "System.Collections.Queue.Synchronized(System.Collections.Queue)",

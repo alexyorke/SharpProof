@@ -342,6 +342,14 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ActivatorCreateInstanceHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
+        {
+            AssertNotInManualCatalogs("System.Activator.CreateInstance<T>()");
+            AssertNotInManualCatalogs("System.Activator.CreateInstance(System.Type)");
+            AssertNotInManualCatalogs("System.Activator.CreateInstance(System.Type, params object[])");
+        }
+
+        [Test]
         public void EnvironmentPathStateHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
             var source = @"
