@@ -92,6 +92,39 @@ public static class SourcePredicates
         var isZero = value == 0;
         return isZero;
     }
+
+    public static bool IsZeroWithSwitch(int value)
+    {
+        switch (value)
+        {
+            case 0:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    public static bool IsZeroWithSwitchFallback(int value)
+    {
+        switch (value)
+        {
+            case 0:
+                return true;
+        }
+
+        return false;
+    }
+
+    public static bool IsSmallPositiveWithSwitch(int value)
+    {
+        switch (value)
+        {
+            case > 0 and < 10:
+                return true;
+            default:
+                return false;
+        }
+    }
 }
 
 public sealed class SourcePredicateBox
@@ -1608,6 +1641,90 @@ public class TestClass
                 FindLine(source, "return 10 / divisor;"),
                 13,
                 "divisor == 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementSourcePredicateExactValue()
+        {
+            var source = SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (SourcePredicates.IsZeroWithSwitch(divisor))
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "SwitchStatementSourcePredicateExactValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                13,
+                "divisor == 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementFallbackSourcePredicateExactValue()
+        {
+            var source = SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (SourcePredicates.IsZeroWithSwitchFallback(divisor))
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "SwitchStatementFallbackSourcePredicateExactValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                13,
+                "divisor == 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchStatementPatternSourcePredicateRange()
+        {
+            var source = SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (SourcePredicates.IsSmallPositiveWithSwitch(value))
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "SwitchStatementPatternSourcePredicateRange.cs",
+                FindLine(source, "return value;"),
+                13,
+                "value > 0 && value < 10",
                 new SmtAnalysisService(SmtAnalysisOptions.Default),
                 AnalyzerTestHost.GetTrustedPlatformReferences());
 
@@ -4929,6 +5046,25 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_SourceSwitchStatementPredicateContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value", "SourcePredicates.IsZeroWithSwitch(value) && value != 0", SourcePredicateSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_SourceSwitchStatementPatternPredicateContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "int value",
+                    "SourcePredicates.IsSmallPositiveWithSwitch(value) && (value <= 0 || value >= 10)",
+                    SourcePredicateSource),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_SourceMultiGuardIndexPredicateContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -6697,6 +6833,55 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_SourceSwitchStatementPredicateContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int value)
+    {
+        if (SourcePredicates.IsZeroWithSwitch(value) && value != 0)
+        {
+            Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_SourceSwitchStatementPatternPredicateContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int value)
+    {
+        if (SourcePredicates.IsSmallPositiveWithSwitch(value) &&
+            (value <= 0 || value >= 10))
+        {
+            Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_SourceBooleanPropertyContradictoryImpureCall_DoesNotReport()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
@@ -8010,6 +8195,33 @@ public class TestClass
     public int TestMethod(int divisor)
     {
         if (SourcePredicates.IsZeroViaLocal(divisor))
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_SourceSwitchStatementPredicateImpliesZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (SourcePredicates.IsZeroWithSwitch(divisor))
         {
             return 10 / divisor;
         }

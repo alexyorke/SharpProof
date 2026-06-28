@@ -665,6 +665,19 @@ namespace PurelySharp.Symbolic.Smt
                         substitutions,
                         out formula);
                 }
+
+                if (statements[statementIndex] is SwitchStatementSyntax switchStatement)
+                {
+                    return TryTranslateReturnedBooleanSwitchStatement(
+                        switchStatement,
+                        fallbackReturnExpression: null,
+                        requireFinalDefaultSection: true,
+                        substitutions,
+                        semanticModel,
+                        cancellationToken,
+                        inlineDepth,
+                        out formula);
+                }
             }
 
             if (remainingStatementCount >= 2 &&
@@ -680,7 +693,127 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (remainingStatementCount == 2 &&
+                statements[statementIndex] is SwitchStatementSyntax switchWithFallback &&
+                statements[statementIndex + 1] is ReturnStatementSyntax fallbackReturn &&
+                fallbackReturn.Expression != null)
+            {
+                return TryTranslateReturnedBooleanSwitchStatement(
+                    switchWithFallback,
+                    fallbackReturn.Expression,
+                    requireFinalDefaultSection: false,
+                    substitutions,
+                    semanticModel,
+                    cancellationToken,
+                    inlineDepth,
+                    out formula);
+            }
+
             return false;
+        }
+
+        private static bool TryTranslateReturnedBooleanSwitchStatement(
+            SwitchStatementSyntax switchStatement,
+            ExpressionSyntax? fallbackReturnExpression,
+            bool requireFinalDefaultSection,
+            IReadOnlyList<SmtVariableSubstitution> substitutions,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            int inlineDepth,
+            out SmtFormula? formula)
+        {
+            formula = null;
+            if (switchStatement.Sections.Count == 0)
+            {
+                return false;
+            }
+
+            if (requireFinalDefaultSection)
+            {
+                if (switchStatement.Sections.Count < 2 ||
+                    !HasDefaultLabel(switchStatement.Sections[switchStatement.Sections.Count - 1]))
+                {
+                    return false;
+                }
+            }
+            else if (switchStatement.Sections.Any(HasDefaultLabel))
+            {
+                return false;
+            }
+
+            var sectionConditions = new List<SmtFormula>();
+            var sectionValues = new List<SmtFormula>();
+            foreach (var section in switchStatement.Sections)
+            {
+                if (!TryGetSwitchSectionReturnExpression(section, out var returnExpression) ||
+                    !SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
+                        switchStatement.Expression,
+                        section,
+                        semanticModel,
+                        cancellationToken,
+                        out var sectionCondition) ||
+                    !TryTranslate(returnExpression, semanticModel, cancellationToken, out var sectionValue, getSymbolVersion: null, inlineDepth) ||
+                    sectionValue is not { Kind: SmtValueKind.Bool })
+                {
+                    formula = null;
+                    return false;
+                }
+
+                sectionConditions.Add(sectionCondition);
+                sectionValues.Add(sectionValue);
+            }
+
+            SmtFormula result;
+            var startIndex = sectionValues.Count - 1;
+            if (fallbackReturnExpression != null)
+            {
+                if (!TryTranslate(
+                        fallbackReturnExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var fallbackValue,
+                        getSymbolVersion: null,
+                        inlineDepth) ||
+                    fallbackValue is not { Kind: SmtValueKind.Bool })
+                {
+                    formula = null;
+                    return false;
+                }
+
+                result = fallbackValue;
+            }
+            else
+            {
+                result = sectionValues[sectionValues.Count - 1];
+                startIndex--;
+            }
+
+            for (var index = startIndex; index >= 0; index--)
+            {
+                result = new SmtConditionalFormula(sectionConditions[index], sectionValues[index], result, SmtValueKind.Bool);
+            }
+
+            formula = SubstituteVariables(result, substitutions);
+            return true;
+        }
+
+        private static bool TryGetSwitchSectionReturnExpression(
+            SwitchSectionSyntax section,
+            out ExpressionSyntax returnExpression)
+        {
+            returnExpression = null!;
+            if (section.Statements.Count != 1 ||
+                !TryGetSingleReturnExpression(section.Statements[0], out returnExpression))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool HasDefaultLabel(SwitchSectionSyntax section)
+        {
+            return section.Labels.Any(static label => label is DefaultSwitchLabelSyntax);
         }
 
         private static bool TryTranslateGuardReturnChain(
