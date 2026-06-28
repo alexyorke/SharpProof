@@ -1639,6 +1639,96 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesUsingDeclarationResourceAlias()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(IDisposable value)
+    {
+        using (IDisposable resource = value)
+        {
+            return resource == value ? 1 : 0;
+        }
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "UsingDeclarationResourceAlias.cs",
+                FindLine(source, "return resource == value ? 1 : 0;"),
+                13,
+                "resource == value",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesUsingDeclarationThrowGuardedResourceNonNull()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(IDisposable value)
+    {
+        using (IDisposable resource = value ?? throw new InvalidOperationException())
+        {
+            return resource.GetHashCode();
+        }
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "UsingDeclarationThrowGuardedResourceNonNull.cs",
+                FindLine(source, "return resource.GetHashCode();"),
+                13,
+                "resource != null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesUsingDeclarationNullBranchUnreachable()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(IDisposable value)
+    {
+        using (IDisposable resource = value ?? throw new InvalidOperationException())
+        {
+            if (resource == null)
+            {
+                return 1;
+            }
+
+            return 0;
+        }
+    }
+}";
+            var result = new SymbolicSourceQueryService().AnalyzeSource(
+                source,
+                "UsingDeclarationNullBranchUnreachable.cs",
+                FindLine(source, "return 1;"),
+                17,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(result.PathConditions, Is.Not.Empty);
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+            Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_QuerySource_ProvesForLoopMonotonicIndexBounds()
         {
             const string source = @"

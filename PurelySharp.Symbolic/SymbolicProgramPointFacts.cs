@@ -173,6 +173,16 @@ namespace PurelySharp.Symbolic
                         semanticModel,
                         cancellationToken);
                 }
+                else if (ancestor is UsingStatementSyntax usingStatementSyntax &&
+                         usingStatementSyntax.Declaration != null &&
+                         usingStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
+                {
+                    AddUsingStatementDeclarationFacts(
+                        builder,
+                        usingStatementSyntax,
+                        semanticModel,
+                        cancellationToken);
+                }
                 else if (ancestor is WhileStatementSyntax whileStatementSyntax &&
                          whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
                          !AnyReferencedSymbolAssignedBeforeUse(
@@ -1721,6 +1731,35 @@ namespace PurelySharp.Symbolic
                 SmtBinaryOperator.NotEqual,
                 formula,
                 new SmtNullConstant()));
+        }
+
+        private static void AddUsingStatementDeclarationFacts(
+            ICollection<SmtFormula> facts,
+            UsingStatementSyntax usingStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (usingStatement.Declaration == null)
+            {
+                return;
+            }
+
+            var declarationFacts = new List<SmtFormula>();
+            foreach (var declarator in usingStatement.Declaration.Variables)
+            {
+                if (declarator.Initializer == null ||
+                    semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol localSymbol)
+                {
+                    continue;
+                }
+
+                AddAssignedValueFacts(localSymbol, declarator.Initializer.Value, semanticModel, cancellationToken, declarationFacts);
+            }
+
+            foreach (var fact in declarationFacts)
+            {
+                facts.Add(fact);
+            }
         }
 
         private static void AddForeachBodyEntryFacts(
