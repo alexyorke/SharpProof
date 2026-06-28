@@ -1052,6 +1052,66 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_QuerySource_ProvesMultipleConditionsInSingleProgramPointQuery()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        if (index < 0 || index >= values.Length)
+        {
+            return 0;
+        }
+
+        return values[index];
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "QuerySourceMultipleProofs.cs",
+                FindLine(source, "return values[index];"),
+                13,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
+                impliedConditions: new[] { "index >= 0", "index < values.Length" });
+
+            Assert.That(result.Facts, Is.Not.Empty);
+            Assert.That(result.ConditionProofs, Has.Count.EqualTo(2));
+            Assert.That(result.ConditionProofs.Select(static proof => proof.TruthValue), Is.All.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_QuerySource_ConditionProofsWithoutSmtRemainConservative()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "QuerySourceProofsWithoutSmt.cs",
+                FindLine(source, "return value;"),
+                13,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                impliedConditions: new[] { "value > 0" });
+
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.NotChecked));
+            Assert.That(result.ConditionProofs, Has.Count.EqualTo(1));
+            Assert.That(result.ConditionProofs[0].TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+            Assert.That(result.ConditionProofs[0].Reason, Is.EqualTo("smt_required"));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesRangeGuardImplications()
         {
             const string source = @"
