@@ -3508,6 +3508,54 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalArrayLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var values = flag ? new int[1] : new int[1];
+        return values.Length;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ConditionalArrayLength.cs",
+                FindLine(source, "return values.Length;"),
+                16,
+                "values.Length == 1",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalArrayLengthDisjunction()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var values = flag ? new int[1] : new int[2];
+        return values.Length;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ConditionalArrayLengthDisjunction.cs",
+                FindLine(source, "return values.Length;"),
+                16,
+                "values.Length == 1 || values.Length == 2",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicInvariantService_TupleAssignmentSwapInvalidatesTargetFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -4517,6 +4565,34 @@ public class TestClass
 }");
 
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_ConditionalArrayLengthContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(bool flag)
+    {
+        var values = flag ? new int[1] : new int[1];
+        if (values.Length != 1)
+        {
+            Console.WriteLine(values.Length);
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
         }
 
         [Test]
@@ -6387,6 +6463,27 @@ public class TestClass
         }
 
         return 0;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
+        public async Task Ps0010_ConditionalArrayLengthIndex_ReportsIndexOutOfRange()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var values = flag ? new int[1] : new int[1];
+        return values[1];
     }
 }");
 

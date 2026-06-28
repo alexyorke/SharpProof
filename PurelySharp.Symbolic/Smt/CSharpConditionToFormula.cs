@@ -1452,6 +1452,34 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth)
         {
             receiverExpression = UnwrapExpression(receiverExpression);
+            if (receiverExpression is ConditionalExpressionSyntax conditionalExpression &&
+                TryTranslate(
+                    conditionalExpression.Condition,
+                    semanticModel,
+                    cancellationToken,
+                    out var conditionFormula,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                conditionFormula != null &&
+                TryCreateBuiltInElementAccessLengthFormula(
+                    conditionalExpression.WhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    out var whenTrueLength,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                TryCreateBuiltInElementAccessLengthFormula(
+                    conditionalExpression.WhenFalse,
+                    semanticModel,
+                    cancellationToken,
+                    out var whenFalseLength,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                lengthFormula = new SmtConditionalFormula(conditionFormula, whenTrueLength, whenFalseLength, SmtValueKind.Int);
+                return true;
+            }
+
             var receiverTypeInfo = semanticModel.GetTypeInfo(receiverExpression, cancellationToken);
             if ((receiverTypeInfo.Type is IArrayTypeSymbol { Rank: 1 } ||
                  receiverTypeInfo.ConvertedType is IArrayTypeSymbol { Rank: 1 }) &&
