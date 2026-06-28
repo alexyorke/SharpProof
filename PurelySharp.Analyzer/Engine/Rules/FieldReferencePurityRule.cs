@@ -49,6 +49,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            if (PurityAnalysisEngine.IsConfiguredKnownPureMember(fieldSymbol))
+            {
+                PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Field '{fieldSymbol.Name}' is configured known pure. Assuming Pure.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
 
             if (!fieldSymbol.IsStatic && fieldReferenceOperation.Instance != null)
             {

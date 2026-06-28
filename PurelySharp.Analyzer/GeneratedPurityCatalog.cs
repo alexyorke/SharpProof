@@ -133,7 +133,59 @@ namespace PurelySharp.Analyzer
 
                 foreach (var entry in entries)
                 {
+                    if (IsBuiltInAbstractInterfaceEntry(methodSymbol, entry))
+                    {
+                        continue;
+                    }
+
                     if (!entry.IsTrustedFor(methodSymbol, actualAssemblyIdentity, actualMethodIdentity))
+                    {
+                        continue;
+                    }
+
+                    if (bestEntry == null || CompareTrustedPurityEntries(entry, bestEntry) > 0)
+                    {
+                        bestEntry = entry;
+                    }
+                }
+            }
+
+            if (bestEntry == null)
+            {
+                return TryGetBuiltInFrameworkEntryByKeyOnly(methodSymbol, out classification);
+            }
+
+            classification = bestEntry.Classification;
+            return true;
+        }
+
+        private bool TryGetBuiltInFrameworkEntryByKeyOnly(IMethodSymbol methodSymbol, out PurityEntry classification)
+        {
+            classification = default;
+            if (methodSymbol.Locations.FirstOrDefault()?.IsInMetadata != true ||
+                !IsFrameworkAssemblyName(methodSymbol.ContainingAssembly?.Identity.Name))
+            {
+                return false;
+            }
+
+            SummaryEntry? bestEntry = null;
+            foreach (var key in GetSymbolKeys(methodSymbol))
+            {
+                if (!_entriesBySymbol.TryGetValue(key, out var entries))
+                {
+                    continue;
+                }
+
+                foreach (var entry in entries)
+                {
+                    if (IsBuiltInAbstractInterfaceEntry(methodSymbol, entry))
+                    {
+                        continue;
+                    }
+
+                    if (entry.SourcePriority != BuiltInSummarySourcePriority ||
+                        entry.AssemblyIdentity?.IsComplete != true ||
+                        entry.MethodIdentity == null)
                     {
                         continue;
                     }
@@ -152,6 +204,30 @@ namespace PurelySharp.Analyzer
 
             classification = bestEntry.Classification;
             return true;
+        }
+
+        private static bool IsBuiltInAbstractInterfaceEntry(IMethodSymbol methodSymbol, SummaryEntry entry)
+        {
+            return entry.SourcePriority == BuiltInSummarySourcePriority &&
+                methodSymbol.ContainingType?.TypeKind == TypeKind.Interface &&
+                (string.Equals(entry.Classification.PrimaryCategory, "abstract", StringComparison.Ordinal) ||
+                 entry.Classification.Categories.Contains("abstract", StringComparer.Ordinal));
+        }
+
+        private static bool IsFrameworkAssemblyName(string? assemblyName)
+        {
+            if (string.IsNullOrWhiteSpace(assemblyName))
+            {
+                return false;
+            }
+
+            var name = assemblyName!;
+            return name == "mscorlib" ||
+                name == "netstandard" ||
+                name == "System" ||
+                name == "System.Private.CoreLib" ||
+                name.StartsWith("System.", StringComparison.Ordinal) ||
+                name.StartsWith("Microsoft.", StringComparison.Ordinal);
         }
 
         private static bool TryGetImplicitMetadataValueTypeConstructorPurity(IMethodSymbol methodSymbol, out PurityEntry classification)

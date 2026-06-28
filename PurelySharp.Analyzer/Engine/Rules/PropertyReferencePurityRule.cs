@@ -88,6 +88,22 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            if (PurityAnalysisEngine.IsConfiguredKnownPureMember(propertySymbol) ||
+                (getterSymbol != null && PurityAnalysisEngine.IsConfiguredKnownPureMember(getterSymbol)))
+            {
+                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is configured known pure. Assuming Pure.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            if (getterSymbol != null &&
+                hasTrustedGeneratedPurity &&
+                generatedPurity.IsPure &&
+                IsTrustedGeneratedMetadataGetter(getterSymbol))
+            {
+                PurityAnalysisEngine.LogDebug($"    [PropRefRule] Metadata getter '{getterSymbol.ToDisplayString()}' is trusted pure from generated purity summary.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
 
 
             string impureSig = propertySymbol.OriginalDefinition.ToDisplayString();
@@ -133,7 +149,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             if (PurityAnalysisEngine.IsInConfiguredImpureNamespaceOrType(propertySymbol) &&
-                !PurityAnalysisEngine.IsConfiguredKnownPureMember(propertySymbol))
+                !PurityAnalysisEngine.IsConfiguredKnownPureMember(propertySymbol) &&
+                (getterSymbol == null || !PurityAnalysisEngine.IsConfiguredKnownPureMember(getterSymbol)))
             {
                 PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is in a known impure namespace or type. Impure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -147,7 +164,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         catalogSource: "known_impure_namespace_or_type"));
             }
 
-            if (knownImpureMemberSource != null)
+            if (knownImpureMemberSource != null && !hasTrustedGeneratedPurity)
             {
                 PurityAnalysisEngine.LogDebug($"    [PropRefRule] Property {propertySymbol.Name} is built-in known impure. Impure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Impure(
@@ -1281,6 +1298,56 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static string GetCatalogHitCategory(ISymbol symbol) =>
             PurityAnalysisEngine.GetKnownImpureCatalogHitCategory(symbol);
+
+        private static bool IsTrustedGeneratedMetadataGetter(IMethodSymbol getterSymbol)
+        {
+            var containingType = getterSymbol.ContainingType?.OriginalDefinition.ToDisplayString();
+            if (containingType == "System.Type")
+            {
+                return getterSymbol.Name is
+                    "get_Attributes" or
+                    "get_DeclaringMethod" or
+                    "get_DeclaringType" or
+                    "get_IsAbstract" or
+                    "get_IsAnsiClass" or
+                    "get_IsArray" or
+                    "get_IsAutoClass" or
+                    "get_IsAutoLayout" or
+                    "get_IsByRef" or
+                    "get_IsClass" or
+                    "get_IsCOMObject" or
+                    "get_IsContextful" or
+                    "get_IsExplicitLayout" or
+                    "get_IsGenericParameter" or
+                    "get_IsGenericType" or
+                    "get_IsGenericTypeDefinition" or
+                    "get_IsImport" or
+                    "get_IsInterface" or
+                    "get_IsLayoutSequential" or
+                    "get_IsMarshalByRef" or
+                    "get_IsNested" or
+                    "get_IsNestedAssembly" or
+                    "get_IsNestedFamANDAssem" or
+                    "get_IsNestedFamORAssem" or
+                    "get_IsNestedFamily" or
+                    "get_IsNestedPrivate" or
+                    "get_IsNestedPublic" or
+                    "get_IsNotPublic" or
+                    "get_IsPointer" or
+                    "get_IsPrimitive" or
+                    "get_IsPublic" or
+                    "get_IsSealed" or
+                    "get_IsSpecialName" or
+                    "get_IsUnicodeClass" or
+                    "get_IsValueType" or
+                    "get_MemberType" or
+                    "get_ReflectedType";
+            }
+
+            return containingType == "System.RuntimeType" ||
+                containingType == "System.Reflection.MemberInfo" ||
+                (containingType?.StartsWith("System.Reflection.", StringComparison.Ordinal) == true);
+        }
 
         private static ImmutableArray<IMethodSymbol> ResolvePotentialGetterTargets(
             IPropertySymbol propertySymbol,

@@ -74,6 +74,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            if (TryCheckArrayInterfaceGetEnumeratorPurity(invocationOperation, context, out var earlyArrayEnumeratorResult))
+            {
+                return earlyArrayEnumeratorResult;
+            }
+
             if (invocationOperation.Instance != null && IsDynamicInvocationReceiver(invocationOperation.Instance))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] Invocation on dynamic instance is treated as conservative impure.");
@@ -508,7 +513,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return stringEnumerableJoinResult;
             }
 
-            if (TryCheckSemanticallyPureParsePurity(invocationOperation, out var semanticParseResult))
+            if (TryCheckSemanticallyPureParsePurity(invocationOperation, context, currentState, out var semanticParseResult))
             {
                 return semanticParseResult;
             }
@@ -549,6 +554,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            if (IsContractGuardInvocation(originalDefinitionSymbol))
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (contract guard intrinsic)");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             if (PurityAnalysisEngine.TryGetSemanticKnownImpureCatalogSource(invocationOperation, out var semanticCatalogSource))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (semantic current-culture-sensitive invocation)");
@@ -570,6 +581,17 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (hasConfiguredKnownImpureMember)
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (Configured Known Impure)");
+                return PurityAnalysisEngine.ImpureResult(
+                    invocationOperation,
+                    "global_state_write",
+                    nameof(MethodInvocationPurityRule),
+                    originalDefinitionSymbol,
+                    knownImpureMemberSource);
+            }
+
+            if (ShouldPreferSemanticImpurityEvidence(knownImpureMemberSource))
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (semantic impurity evidence)");
                 return PurityAnalysisEngine.ImpureResult(
                     invocationOperation,
                     GetCatalogHitCategory(originalDefinitionSymbol),
@@ -1228,10 +1250,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
             result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
             var methodSymbol = invocationOperation.TargetMethod;
-            if (methodSymbol.Name != "GetEnumerator" ||
+            var hasOperationArrayReceiver = TryGetKnownArrayReceiverType(invocationOperation.Instance, out _);
+            var hasSyntaxArrayReceiver = TryGetKnownArrayReceiverTypeFromSyntax(invocationOperation, context.SemanticModel, out _);
+            if (!IsGetEnumeratorMethodName(methodSymbol) ||
                 methodSymbol.Parameters.Length != 0 ||
-                !IsEnumerableGetEnumeratorDispatchTarget(methodSymbol) ||
-                !TryGetKnownArrayReceiverType(invocationOperation.Instance, out _))
+                (!IsEnumerableGetEnumeratorDispatchTarget(methodSymbol) && !hasSyntaxArrayReceiver) ||
+                (!hasOperationArrayReceiver && !hasSyntaxArrayReceiver))
             {
                 return false;
             }
@@ -1267,7 +1291,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return containingType is INamedTypeSymbol namedContainingType &&
-                namedContainingType.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T;
+                (namedContainingType.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T ||
+                 string.Equals(namedContainingType.OriginalDefinition.ToDisplayString(), "System.Collections.Generic.IEnumerable<T>", StringComparison.Ordinal));
+        }
+
+        private static bool IsGetEnumeratorMethodName(IMethodSymbol methodSymbol)
+        {
+            return methodSymbol.Name == "GetEnumerator" ||
+                methodSymbol.ToDisplayString().Contains(".GetEnumerator(", StringComparison.Ordinal);
         }
 
         private static bool TryGetKnownArrayReceiverType(
@@ -1326,6 +1357,48 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 arrayType = null!;
                 return false;
             }
+        }
+
+        private static bool TryGetKnownArrayReceiverTypeFromSyntax(
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            out IArrayTypeSymbol arrayType)
+        {
+            arrayType = null!;
+            var invocationSyntax = invocationOperation.Syntax as InvocationExpressionSyntax ??
+                invocationOperation.Syntax.FirstAncestorOrSelf<InvocationExpressionSyntax>();
+            if (invocationSyntax == null ||
+                invocationSyntax.Expression is not MemberAccessExpressionSyntax memberAccess)
+            {
+                return false;
+            }
+
+            var receiverExpression = UnwrapParentheses(memberAccess.Expression);
+            if (receiverExpression is not CastExpressionSyntax castExpression)
+            {
+                return false;
+            }
+
+            var operandType = semanticModel.GetTypeInfo(castExpression.Expression).ConvertedType ??
+                semanticModel.GetTypeInfo(castExpression.Expression).Type;
+            if (operandType is not IArrayTypeSymbol resolvedArrayType)
+            {
+                return false;
+            }
+
+            arrayType = resolvedArrayType;
+            return true;
+        }
+
+        private static ExpressionSyntax UnwrapParentheses(ExpressionSyntax expression)
+        {
+            var current = expression;
+            while (current is ParenthesizedExpressionSyntax parenthesized)
+            {
+                current = parenthesized.Expression;
+            }
+
+            return current;
         }
 
         private static bool TryCheckEqualityComparerDispatchPurity(
@@ -2236,6 +2309,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static bool TryCheckSemanticallyPureParsePurity(
             IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
             out PurityAnalysisEngine.PurityAnalysisResult result)
         {
             result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
@@ -2249,6 +2324,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return IsBooleanParseMethod(methodSymbol) ||
                 IsBooleanTryParseMethod(methodSymbol) ||
                 IsEnumTryParseMethod(methodSymbol) ||
+                TryCheckEnumParsePurity(invocationOperation, methodSymbol, context, currentState, out result) ||
                 IsIPAddressParseMethod(methodSymbol);
         }
 
@@ -2291,6 +2367,60 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var outParameter = methodSymbol.Parameters[methodSymbol.Parameters.Length - 1];
             return outParameter.RefKind == RefKind.Out &&
                 SymbolEqualityComparer.Default.Equals(outParameter.Type, methodSymbol.TypeParameters[0]);
+        }
+
+        private static bool TryCheckEnumParsePurity(
+            IInvocationOperation invocationOperation,
+            IMethodSymbol methodSymbol,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            if (!IsEnumParseMethod(methodSymbol) ||
+                invocationOperation.Arguments.Length < 2 ||
+                !IsCompileTimeEnumTypeArgument(invocationOperation.Arguments[0].Value))
+            {
+                return false;
+            }
+
+            for (var index = 1; index < invocationOperation.Arguments.Length; index++)
+            {
+                var argumentResult = PurityAnalysisEngine.CheckSingleOperation(
+                    invocationOperation.Arguments[index].Value,
+                    context,
+                    currentState);
+                if (!argumentResult.IsPure)
+                {
+                    result = argumentResult;
+                    return true;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool IsEnumParseMethod(IMethodSymbol methodSymbol)
+        {
+            if (methodSymbol.ContainingType?.ToDisplayString() != "System.Enum" ||
+                methodSymbol.Name != "Parse" ||
+                methodSymbol.Parameters.Length is not (2 or 3) ||
+                methodSymbol.Parameters[0].Type.ToDisplayString() != "System.Type" ||
+                !IsStringOrReadOnlySpanOfChar(methodSymbol.Parameters[1].Type))
+            {
+                return false;
+            }
+
+            return methodSymbol.Parameters.Length == 2 ||
+                methodSymbol.Parameters[2].Type.SpecialType == SpecialType.System_Boolean;
+        }
+
+        private static bool IsCompileTimeEnumTypeArgument(IOperation operation)
+        {
+            var unwrappedOperation = PurityAnalysisEngine.SkipImplicitConversions(operation);
+            return unwrappedOperation is ITypeOfOperation typeOfOperation &&
+                typeOfOperation.TypeOperand.TypeKind == TypeKind.Enum;
         }
 
         private static bool IsIPAddressParseMethod(IMethodSymbol methodSymbol)
@@ -3728,6 +3858,21 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static string GetCatalogHitCategory(ISymbol symbol) =>
             PurityAnalysisEngine.GetKnownImpureCatalogHitCategory(symbol, includeSynchronizationCategory: true);
+
+        private static bool IsContractGuardInvocation(IMethodSymbol methodSymbol)
+        {
+            return methodSymbol.ContainingType?.OriginalDefinition.ToDisplayString() == "System.Diagnostics.Contracts.Contract" &&
+                methodSymbol.Name is "Requires" or "Ensures";
+        }
+
+        private static bool ShouldPreferSemanticImpurityEvidence(string? knownImpureMemberSource)
+        {
+            return knownImpureMemberSource is
+                "array_mutation_semantic_rule" or
+                "random_semantic_rule" or
+                "string_builder_semantic_rule" or
+                "threading_semantic_rule";
+        }
 
         private static PurityAnalysisEngine.PurityAnalysisResult CheckLinqSourceEnumeratorPurity(
             IOperation sourceOperation,

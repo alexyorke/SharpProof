@@ -467,7 +467,7 @@ namespace TestNamespace {
                 "AnalyzerPackagingTests." + Guid.NewGuid().ToString("N") + ".PurelySharp.EffectSummary.json");
             var summaryJson = GeneratedPurityTestSupport.CreatePuritySummaryJson(
                 typeof(System.Environment).Assembly.Location,
-                "System.Environment.GetEnvironmentVariable(string)",
+                "System.Environment.GetLogicalDrives()",
                 "pure",
                 "[]");
 
@@ -485,13 +485,13 @@ namespace TestNamespace {
                 const string source = """
 using System;
 
-public static class TestClass
-{
-    public static string? ReadEnvironmentValue()
+    public static class TestClass
     {
-        return Environment.GetEnvironmentVariable("PATH");
+        public static string[] ReadLogicalDrives()
+        {
+        return Environment.GetLogicalDrives();
+        }
     }
-}
 """;
 
                 var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));

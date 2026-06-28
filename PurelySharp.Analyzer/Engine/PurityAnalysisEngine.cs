@@ -1119,7 +1119,7 @@ namespace PurelySharp.Analyzer.Engine
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is configured known impure.");
                     var configuredKnownImpureResult = ImpureResult(
                         declaringSyntax,
-                        "catalog_hit",
+                        "impure_callee",
                         "KnownImpureMethod",
                         methodSymbol,
                         knownImpureMemberSource);
@@ -1479,6 +1479,7 @@ namespace PurelySharp.Analyzer.Engine
                                 out var semanticKnownImpureCatalogSource);
                             if (invocationOp.TargetMethod != null &&
                                 !IsArrayAsReadOnlyInvocation(invocationOp) &&
+                                !IsArrayInterfaceGetEnumeratorInvocation(invocationOp, semanticModel) &&
                                 !IsTransientCharArrayConsumedByStringConstructor(invocationOp, semanticModel))
                             {
                                 var targetMethod = invocationOp.TargetMethod.OriginalDefinition;
@@ -4665,6 +4666,42 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             return true;
+        }
+
+        private static bool IsArrayInterfaceGetEnumeratorInvocation(
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel)
+        {
+            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
+            if (targetMethod == null ||
+                targetMethod.Name != "GetEnumerator" ||
+                targetMethod.Parameters.Length != 0)
+            {
+                return false;
+            }
+
+            var invocationSyntax = invocationOperation.Syntax as InvocationExpressionSyntax ??
+                invocationOperation.Syntax.FirstAncestorOrSelf<InvocationExpressionSyntax>();
+            if (invocationSyntax == null ||
+                invocationSyntax.Expression is not MemberAccessExpressionSyntax memberAccess)
+            {
+                return false;
+            }
+
+            var receiverExpression = memberAccess.Expression;
+            while (receiverExpression is ParenthesizedExpressionSyntax parenthesized)
+            {
+                receiverExpression = parenthesized.Expression;
+            }
+
+            if (receiverExpression is not CastExpressionSyntax castExpression)
+            {
+                return false;
+            }
+
+            var operandType = semanticModel.GetTypeInfo(castExpression.Expression).ConvertedType ??
+                semanticModel.GetTypeInfo(castExpression.Expression).Type;
+            return operandType is IArrayTypeSymbol;
         }
 
         internal static bool IsArrayAsReadOnlyOwnedLocalArrayInvocation(

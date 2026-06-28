@@ -136,6 +136,48 @@ namespace PurelySharp.Analyzer.Engine
 		internal static bool IsConfiguredKnownPureMember(ISymbol symbol)
 		{
 			string signature = symbol.OriginalDefinition.ToDisplayString();
+			if (MatchesConfiguredKnownPureSignature(signature))
+			{
+				return true;
+			}
+
+			foreach (var accessorSignature in GetPropertyAccessorSignatureCandidates(symbol))
+			{
+				if (MatchesConfiguredKnownPureSignature(accessorSignature))
+				{
+					return true;
+				}
+			}
+
+			if (symbol is IMethodSymbol accessorSymbol &&
+				accessorSymbol.AssociatedSymbol is IPropertySymbol associatedProperty)
+			{
+				var accessorSuffix = accessorSymbol.MethodKind == MethodKind.PropertySet ? ".set" : ".get";
+				var associatedSignature = associatedProperty.OriginalDefinition.ToDisplayString();
+				if (MatchesConfiguredKnownPureSignature(associatedSignature + accessorSuffix))
+				{
+					return true;
+				}
+			}
+
+			if (symbol is IMethodSymbol propertyAccessorSymbol &&
+				propertyAccessorSymbol.ContainingType != null &&
+				(propertyAccessorSymbol.MethodKind == MethodKind.PropertyGet ||
+				 propertyAccessorSymbol.MethodKind == MethodKind.PropertySet))
+			{
+				var accessorName = propertyAccessorSymbol.Name;
+				var propertyName = accessorName.StartsWith("get_", StringComparison.Ordinal) ||
+					accessorName.StartsWith("set_", StringComparison.Ordinal)
+					? accessorName.Substring(4)
+					: accessorName;
+				var accessorSuffix = propertyAccessorSymbol.MethodKind == MethodKind.PropertySet ? ".set" : ".get";
+				var propertyStyleSignature = $"{propertyAccessorSymbol.ContainingType.OriginalDefinition.ToDisplayString()}.{propertyName}{accessorSuffix}";
+				if (MatchesConfiguredKnownPureSignature(propertyStyleSignature))
+				{
+					return true;
+				}
+			}
+
 			if (symbol.Kind == SymbolKind.Property &&
 				!signature.EndsWith(".get", StringComparison.Ordinal) &&
 				!signature.EndsWith(".set", StringComparison.Ordinal))
@@ -163,6 +205,88 @@ namespace PurelySharp.Analyzer.Engine
 			}
 
 			return false;
+		}
+
+		private static IEnumerable<string> GetPropertyAccessorSignatureCandidates(ISymbol symbol)
+		{
+			if (symbol is IPropertySymbol propertySymbol)
+			{
+				foreach (var containingTypeName in GetContainingTypeNames(propertySymbol.ContainingType))
+				{
+					yield return $"{containingTypeName}.{propertySymbol.Name}.get";
+					yield return $"{containingTypeName}.get_{propertySymbol.Name}";
+					yield return $"{containingTypeName}.get_{propertySymbol.Name}()";
+				}
+
+				yield break;
+			}
+
+			if (symbol is IFieldSymbol fieldSymbol)
+			{
+				foreach (var containingTypeName in GetContainingTypeNames(fieldSymbol.ContainingType))
+				{
+					yield return $"{containingTypeName}.{fieldSymbol.Name}";
+					yield return $"{containingTypeName}.{fieldSymbol.Name}.get";
+				}
+
+				yield break;
+			}
+
+			if (symbol is not IMethodSymbol methodSymbol ||
+				methodSymbol.ContainingType == null)
+			{
+				yield break;
+			}
+
+			var accessorSuffix = methodSymbol.MethodKind == MethodKind.PropertySet ? ".set" : ".get";
+			if (methodSymbol.AssociatedSymbol is IPropertySymbol associatedProperty)
+			{
+				foreach (var containingTypeName in GetContainingTypeNames(associatedProperty.ContainingType))
+				{
+					yield return $"{containingTypeName}.{associatedProperty.Name}{accessorSuffix}";
+					yield return $"{containingTypeName}.{methodSymbol.Name}";
+					yield return $"{containingTypeName}.{methodSymbol.Name}()";
+				}
+			}
+
+			if (!methodSymbol.Name.StartsWith("get_", StringComparison.Ordinal) &&
+				!methodSymbol.Name.StartsWith("set_", StringComparison.Ordinal))
+			{
+				yield break;
+			}
+
+			var propertyName = methodSymbol.Name.Substring(4);
+			foreach (var containingTypeName in GetContainingTypeNames(methodSymbol.ContainingType))
+			{
+				yield return $"{containingTypeName}.{propertyName}{accessorSuffix}";
+				yield return $"{containingTypeName}.{methodSymbol.Name}";
+				yield return $"{containingTypeName}.{methodSymbol.Name}()";
+			}
+		}
+
+		private static IEnumerable<string> GetContainingTypeNames(INamedTypeSymbol? containingType)
+		{
+			if (containingType == null)
+			{
+				yield break;
+			}
+
+			yield return containingType.ToDisplayString();
+			var originalDefinition = containingType.OriginalDefinition.ToDisplayString();
+			if (!string.Equals(originalDefinition, containingType.ToDisplayString(), StringComparison.Ordinal))
+			{
+				yield return originalDefinition;
+			}
+
+			if (containingType.IsGenericType)
+			{
+				var constructedFrom = containingType.ConstructedFrom.ToDisplayString();
+				if (!string.Equals(constructedFrom, containingType.ToDisplayString(), StringComparison.Ordinal) &&
+					!string.Equals(constructedFrom, originalDefinition, StringComparison.Ordinal))
+				{
+					yield return constructedFrom;
+				}
+			}
 		}
 
 		private static bool MatchesConfiguredKnownPureSignature(string signature)

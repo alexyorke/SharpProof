@@ -167,6 +167,465 @@
       ]
     },
     {
+      "OutputPath": "datetime-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "SymbolPrefixes": [
+        "System.DateTime..ctor(int, int, int)",
+        "System.DateTime..ctor(long)",
+        "System.DateTime.Add(System.TimeSpan)",
+        "System.DateTime.AddDays(double)",
+        "System.DateTime.AddHours(double)",
+        "System.DateTime.AddMilliseconds(double)",
+        "System.DateTime.AddMinutes(double)",
+        "System.DateTime.AddSeconds(double)",
+        "System.DateTime.AddTicks(long)",
+        "System.DateTime.Compare(System.DateTime, System.DateTime)",
+        "System.DateTime.CompareTo(System.DateTime)",
+        "System.DateTime.DaysInMonth(int, int)",
+        "System.DateTime.Equals(System.DateTime)",
+        "System.DateTime.Equals(System.DateTime, System.DateTime)",
+        "System.DateTime.Equals(object)",
+        "System.DateTime.FromBinary(long)",
+        "System.DateTime.FromOADate(double)",
+        "System.DateTime.get_Date()",
+        "System.DateTime.get_Day()",
+        "System.DateTime.get_DayOfWeek()",
+        "System.DateTime.get_DayOfYear()",
+        "System.DateTime.get_Hour()",
+        "System.DateTime.get_Kind()",
+        "System.DateTime.get_Millisecond()",
+        "System.DateTime.get_Minute()",
+        "System.DateTime.get_Month()",
+        "System.DateTime.get_Now()",
+        "System.DateTime.get_Second()",
+        "System.DateTime.get_Ticks()",
+        "System.DateTime.get_TimeOfDay()",
+        "System.DateTime.get_Today()",
+        "System.DateTime.get_UtcNow()",
+        "System.DateTime.get_Year()",
+        "System.DateTime.IsLeapYear(int)",
+        "System.DateTime.Subtract(System.DateTime)",
+        "System.DateTime.Subtract(System.TimeSpan)",
+        "System.DateTime.ToBinary()",
+        "System.DateTime.ToFileTime()",
+        "System.DateTime.ToLocalTime()",
+        "System.DateTime.ToOADate()",
+        "System.DateTime.ToString()"
+      ]
+    },
+    {
+      "OutputPath": "datetimeoffset-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "SymbolPrefixes": [
+        "System.DateTimeOffset..ctor(long, System.TimeSpan)",
+        "System.DateTimeOffset.Add(System.TimeSpan)",
+        "System.DateTimeOffset.AddDays(double)",
+        "System.DateTimeOffset.AddHours(double)",
+        "System.DateTimeOffset.AddMilliseconds(double)",
+        "System.DateTimeOffset.AddMinutes(double)",
+        "System.DateTimeOffset.AddMonths(int)",
+        "System.DateTimeOffset.AddSeconds(double)",
+        "System.DateTimeOffset.AddTicks(long)",
+        "System.DateTimeOffset.AddYears(int)",
+        "System.DateTimeOffset.Compare(System.DateTimeOffset, System.DateTimeOffset)",
+        "System.DateTimeOffset.CompareTo(System.DateTimeOffset)",
+        "System.DateTimeOffset.Equals(System.DateTimeOffset)",
+        "System.DateTimeOffset.Equals(System.DateTimeOffset, System.DateTimeOffset)",
+        "System.DateTimeOffset.Equals(object)",
+        "System.DateTimeOffset.FromUnixTimeMilliseconds(long)",
+        "System.DateTimeOffset.FromUnixTimeSeconds(long)",
+        "System.DateTimeOffset.get_DateTime()",
+        "System.DateTimeOffset.get_Day()",
+        "System.DateTimeOffset.get_DayOfWeek()",
+        "System.DateTimeOffset.get_DayOfYear()",
+        "System.DateTimeOffset.get_Hour()",
+        "System.DateTimeOffset.get_Millisecond()",
+        "System.DateTimeOffset.get_Minute()",
+        "System.DateTimeOffset.get_Month()",
+        "System.DateTimeOffset.get_Now()",
+        "System.DateTimeOffset.get_Offset()",
+        "System.DateTimeOffset.get_Second()",
+        "System.DateTimeOffset.get_Ticks()",
+        "System.DateTimeOffset.get_UtcDateTime()",
+        "System.DateTimeOffset.get_UtcNow()",
+        "System.DateTimeOffset.get_UtcTicks()",
+        "System.DateTimeOffset.get_Year()",
+        "System.DateTimeOffset.Subtract(System.DateTimeOffset)",
+        "System.DateTimeOffset.ToString()",
+        "System.DateTimeOffset.ToUnixTimeMilliseconds()",
+        "System.DateTimeOffset.ToUnixTimeSeconds()"
+      ]
+    },
+    {
+      "OutputPath": "runtime-core-bcl.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "SymbolPrefixes": [
+        "System.AggregateException",
+        "System.AppContext",
+        "System.AppDomain",
+        "System.ArgumentException.ThrowIfNullOrEmpty",
+        "System.ArgumentException.ThrowIfNullOrWhiteSpace",
+        "System.ArgumentNullException.ThrowIfNull",
+        "System.ArgumentOutOfRangeException.ThrowIfGreaterThan",
+        "System.ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual",
+        "System.ArgumentOutOfRangeException.ThrowIfLessThan",
+        "System.ArgumentOutOfRangeException.ThrowIfLessThanOrEqual",
+        "System.ArgumentOutOfRangeException.ThrowIfNegative",
+        "System.ArgumentOutOfRangeException.ThrowIfNegativeOrZero",
+        "System.ArgumentOutOfRangeException.ThrowIfZero",
+        "System.Array.AsReadOnly",
+        "System.Array.BinarySearch",
+        "System.Array.Clear",
+        "System.Array.ConstrainedCopy",
+        "System.Array.ConvertAll",
+        "System.Array.Copy",
+        "System.Array.CopyTo",
+        "System.Array.Empty()",
+        "System.Array.Exists(",
+        "System.Array.Fill",
+        "System.Array.Find(",
+        "System.Array.FindAll(",
+        "System.Array.FindIndex(",
+        "System.Array.GetEnumerator",
+        "System.Array.GetLength",
+        "System.Array.get_Length",
+        "System.Array.IndexOf",
+        "System.Array.Sort(!!0[], System.Collections.Generic.IComparer`1",
+        "System.Array.Sort(!!0[], int, int, System.Collections.Generic.IComparer`1",
+        "System.Array.TrueForAll",
+        "System.ArraySegment`1",
+        "System.Attribute.GetCustomAttribute",
+        "System.Attribute.GetCustomAttributes",
+        "System.Attribute.IsDefined",
+        "System.Boolean",
+        "System.Buffer",
+        "System.Buffers.Binary.BinaryPrimitives",
+        "System.Char",
+        "System.Collections.Generic.Comparer`1",
+        "System.Collections.Generic.Dictionary`2",
+        "System.Collections.Generic.EqualityComparer`1",
+        "System.Collections.Generic.HashSet`1",
+        "System.Collections.Generic.ICollection`1",
+        "System.Collections.Generic.IEnumerable`1",
+        "System.Collections.Generic.IEnumerator`1",
+        "System.Collections.Generic.IList`1",
+        "System.Collections.Generic.KeyValuePair`2",
+        "System.Collections.Generic.LinkedList`1",
+        "System.Collections.Generic.LinkedListNode`1",
+        "System.Collections.Generic.List`1",
+        "System.Collections.Generic.PriorityQueue`2",
+        "System.Collections.Generic.Queue`1",
+        "System.Collections.Generic.SortedDictionary`2",
+        "System.Collections.Generic.SortedList`2",
+        "System.Collections.Generic.SortedSet`1",
+        "System.Collections.Generic.Stack`1",
+        "System.Collections.Concurrent.ConcurrentQueue`1",
+        "System.Collections.Hashtable",
+        "System.Collections.Queue",
+        "System.Collections.SortedList",
+        "System.Collections.Stack",
+        "System.Convert.ChangeType",
+        "System.DateOnly",
+        "System.Decimal",
+        "System.Diagnostics.Contracts.Contract.Ensures",
+        "System.Diagnostics.Contracts.Contract.Requires",
+        "System.Diagnostics.ConditionalAttribute..ctor",
+        "System.Diagnostics.Debug.Assert",
+        "System.Diagnostics.StackFrame",
+        "System.Diagnostics.Stopwatch",
+        "System.Environment.get_CommandLine",
+        "System.Environment.get_CurrentManagedThreadId",
+        "System.Environment.get_CurrentDirectory",
+        "System.Environment.set_CurrentDirectory",
+        "System.Environment.Exit",
+        "System.Environment.get_ExitCode",
+        "System.Environment.set_ExitCode",
+        "System.Environment.ExpandEnvironmentVariables",
+        "System.Environment.GetEnvironmentVariable",
+        "System.Environment.GetEnvironmentVariables",
+        "System.Environment.GetFolderPath",
+        "System.Environment.get_Is64BitOperatingSystem",
+        "System.Environment.get_Is64BitProcess",
+        "System.Environment.get_NewLine",
+        "System.Environment.get_OSVersion",
+        "System.Environment.get_ProcessId",
+        "System.Environment.SetEnvironmentVariable",
+        "System.Environment.get_StackTrace",
+        "System.Environment.get_SystemDirectory",
+        "System.Environment.get_TickCount",
+        "System.Environment.get_TickCount64",
+        "System.Environment.get_UserInteractive",
+        "System.Environment.get_UserName",
+        "System.Environment.get_Version",
+        "System.ArgumentException",
+        "System.ArgumentNullException",
+        "System.CallerArgumentExpressionAttribute",
+        "System.DivideByZeroException",
+        "System.FlagsAttribute",
+        "System.FormatException",
+        "System.InvalidOperationException",
+        "System.NotImplementedException",
+        "System.NotSupportedException",
+        "System.ObjectDisposedException",
+        "System.ObsoleteAttribute",
+        "System.OverflowException",
+        "System.PlatformNotSupportedException",
+        "System.SerializableAttribute",
+        "System.Exception",
+        "System.EventArgs",
+        "System.Guid",
+        "System.HashCode",
+        "System.Index",
+        "System.IO.Directory.CreateDirectory",
+        "System.IO.Directory.CreateTempSubdirectory",
+        "System.IO.Directory.Exists",
+        "System.IO.Directory.GetCurrentDirectory",
+        "System.IO.Directory.SetCurrentDirectory",
+        "System.IO.DirectoryInfo.get_Name",
+        "System.IO.DirectoryInfo.get_Parent",
+        "System.IO.File.Exists",
+        "System.IO.FileInfo.get_DirectoryName",
+        "System.IO.FileInfo.get_Extension",
+        "System.IO.FileInfo.get_Name",
+        "System.IO.FileSystemInfo.get_Extension",
+        "System.IO.Path.Combine",
+        "System.IO.Path.GetFileName",
+        "System.IO.Path.GetFullPath",
+        "System.IO.Path.GetTempPath",
+        "System.IO.EndOfStreamException",
+        "System.MemoryExtensions",
+        "System.Nullable",
+        "System.Object.Equals(object, object)",
+        "System.Object.GetType()",
+        "System.Object.MemberwiseClone()",
+        "System.Object.ReferenceEquals(object, object)",
+        "System.OperatingSystem",
+        "System.Range",
+        "System.Reflection.CustomAttributeData.GetCustomAttributes",
+        "System.Reflection.MemberInfo.get_DeclaringType",
+        "System.Reflection.MemberInfo.get_MemberType",
+        "System.Reflection.MemberInfo.get_ReflectedType",
+        "System.Runtime.CompilerServices.Unsafe",
+        "System.Runtime.CompilerServices.CallerArgumentExpressionAttribute",
+        "System.Runtime.CompilerServices.MethodImplAttribute",
+        "System.Runtime.CompilerServices.TypeHandle",
+        "System.Runtime.InteropServices.CollectionsMarshal.AsSpan",
+        "System.Runtime.InteropServices.Marshal.PtrToStructure",
+        "System.Runtime.Versioning.FrameworkName",
+        "System.RuntimeType",
+        "System.RuntimeTypeHandle",
+        "System.String",
+        "System.StringComparer",
+        "System.Text.StringBuilder.get_Length",
+        "System.Threading.CancellationToken.get_None",
+        "System.Threading.Tasks.Task.get_CompletedTask",
+        "System.Threading.Tasks.Task.Delay",
+        "System.Threading.Tasks.Task.Run",
+        "System.Threading.Tasks.ValueTask",
+        "System.Threading.Thread.get_CurrentThread",
+        "System.TimeOnly",
+        "System.TimeProvider",
+        "System.TimeSpan",
+        "System.TimeZoneInfo.ConvertTime",
+        "System.TimeZoneInfo.FindSystemTimeZoneById",
+        "System.Tuple",
+        "System.UIntPtr",
+        "System.ValueTuple",
+        "System.Version"
+      ]
+    },
+    {
+      "OutputPath": "globalization-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "SymbolPrefixes": [
+        "System.Globalization.CompareInfo.Compare",
+        "System.Globalization.CultureInfo.get_CurrentCulture",
+        "System.Globalization.CultureInfo.get_CurrentUICulture",
+        "System.Globalization.CultureInfo.get_DefaultThreadCurrentCulture",
+        "System.Globalization.CultureInfo.get_DefaultThreadCurrentUICulture",
+        "System.Globalization.CultureInfo.get_InstalledUICulture",
+        "System.Globalization.CultureInfo.get_InvariantCulture",
+        "System.Globalization.CultureInfo.get_Name",
+        "System.Globalization.CultureInfo.GetCultureInfo",
+        "System.Globalization.DateTimeFormatInfo.get_CurrentInfo",
+        "System.Globalization.NumberFormatInfo.get_CurrentInfo",
+        "System.Globalization.RegionInfo.get_CurrentRegion"
+      ]
+    },
+    {
+      "OutputPath": "console-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Console.dll",
+      "SymbolPrefixes": [
+        "System.Console"
+      ]
+    },
+    {
+      "OutputPath": "uri-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.Uri.dll",
+      "SymbolPrefixes": [
+        "System.Uri.EscapeDataString",
+        "System.Uri.IsWellFormedUriString",
+        "System.Uri.ToString",
+        "System.Uri.UnescapeDataString"
+      ]
+    },
+    {
+      "OutputPath": "security-claims-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Security.Claims.dll",
+      "SymbolPrefixes": [
+        "System.Security.Claims.ClaimsPrincipal.IsInRole"
+      ]
+    },
+    {
+      "OutputPath": "networking-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Net.Primitives.dll",
+      "SymbolPrefixes": [
+        "System.Net.IPAddress",
+        "System.Net.IPEndPoint"
+      ]
+    },
+    {
+      "OutputPath": "http-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Net.Http.dll",
+      "SymbolPrefixes": [
+        "System.Net.Http.HttpResponseMessage.get_IsSuccessStatusCode"
+      ]
+    },
+    {
+      "OutputPath": "diagnostics-process-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Diagnostics.Process.dll",
+      "SymbolPrefixes": [
+        "System.Diagnostics.Process"
+      ]
+    },
+    {
+      "OutputPath": "diagnostics-fileversion-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Diagnostics.FileVersionInfo.dll",
+      "SymbolPrefixes": [
+        "System.Diagnostics.FileVersionInfo.get_FileVersion"
+      ]
+    },
+    {
+      "OutputPath": "diagnostics-source-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Diagnostics.DiagnosticSource.dll",
+      "SymbolPrefixes": [
+        "System.Diagnostics.DiagnosticListener"
+      ]
+    },
+    {
+      "OutputPath": "system-collections-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Collections.dll",
+      "SymbolPrefixes": [
+        "System.Collections.BitArray",
+        "System.Collections.Generic.LinkedList`1",
+        "System.Collections.Generic.LinkedListNode`1",
+        "System.Collections.Generic.PriorityQueue`2",
+        "System.Collections.Generic.Stack`1",
+        "System.Collections.Generic.SortedDictionary`2",
+        "System.Collections.Generic.SortedList`2",
+        "System.Collections.Generic.SortedSet`1"
+      ]
+    },
+    {
+      "OutputPath": "non-generic-collections-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Collections.NonGeneric.dll",
+      "SymbolPrefixes": [
+        "System.Collections.Hashtable",
+        "System.Collections.Queue",
+        "System.Collections.SortedList",
+        "System.Collections.Stack"
+      ]
+    },
+    {
+      "OutputPath": "concurrent-collections-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Collections.Concurrent.dll",
+      "SymbolPrefixes": [
+        "System.Collections.Concurrent.BlockingCollection`1",
+        "System.Collections.Concurrent.ConcurrentBag`1",
+        "System.Collections.Concurrent.ConcurrentDictionary`2",
+        "System.Collections.Concurrent.ConcurrentQueue`1"
+      ]
+    },
+    {
+      "OutputPath": "objectmodel-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.ObjectModel.dll",
+      "SymbolPrefixes": [
+        "System.Collections.ObjectModel.KeyedCollection`2",
+        "System.Collections.ObjectModel.ReadOnlyCollection`1"
+      ]
+    },
+    {
+      "OutputPath": "memory-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Memory.dll",
+      "SymbolPrefixes": [
+        "System.Buffers.ReadOnlySequence`1"
+      ]
+    },
+    {
+      "OutputPath": "linq-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Linq.dll",
+      "SymbolPrefixes": [
+        "System.Linq.Enumerable"
+      ]
+    },
+    {
+      "OutputPath": "expressions-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Linq.Expressions.dll",
+      "SymbolPrefixes": [
+        "System.Linq.Expressions.Expression"
+      ]
+    },
+    {
+      "OutputPath": "numerics-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Runtime.Numerics.dll",
+      "SymbolPrefixes": [
+        "System.Numerics.BigInteger",
+        "System.Numerics.Complex"
+      ]
+    },
+    {
+      "OutputPath": "componentmodel-primitives-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.ComponentModel.Primitives.dll",
+      "SymbolPrefixes": [
+        "System.ComponentModel.BrowsableAttribute",
+        "System.ComponentModel.DescriptionAttribute"
+      ]
+    },
+    {
+      "OutputPath": "dataannotations-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.ComponentModel.Annotations.dll",
+      "SymbolPrefixes": [
+        "System.ComponentModel.DataAnnotations.EmailAddressAttribute",
+        "System.ComponentModel.DataAnnotations.RangeAttribute",
+        "System.ComponentModel.DataAnnotations.RegularExpressionAttribute",
+        "System.ComponentModel.DataAnnotations.RequiredAttribute",
+        "System.ComponentModel.DataAnnotations.StringLengthAttribute"
+      ]
+    },
+    {
+      "OutputPath": "immutable-collections-runtime.PurelySharp.EffectSummary.json",
+      "PackageId": "System.Collections.Immutable",
+      "PackageVersion": "9.0.0",
+      "PackageAssemblyRelativePath": "lib/net8.0/System.Collections.Immutable.dll",
+      "SymbolPrefixes": [
+        "System.Collections.Immutable.ImmutableArray",
+        "System.Collections.Immutable.ImmutableDictionary",
+        "System.Collections.Immutable.ImmutableHashSet",
+        "System.Collections.Immutable.ImmutableList",
+        "System.Collections.Immutable.ImmutableQueue",
+        "System.Collections.Immutable.ImmutableStack"
+      ]
+    },
+    {
+      "OutputPath": "configuration-runtime.PurelySharp.EffectSummary.json",
+      "PackageId": "System.Configuration.ConfigurationManager",
+      "PackageVersion": "10.0.8",
+      "PackageAssemblyRelativePath": "lib/net8.0/System.Configuration.ConfigurationManager.dll",
+      "SymbolPrefixes": [
+        "System.Configuration.ConfigurationManager"
+      ]
+    },
+    {
       "OutputPath": "runtime-static-cache-getters.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Private.CoreLib.dll",
       "SymbolPrefixes": [
@@ -196,7 +655,11 @@
         "System.RuntimeType.get_ContainsGenericParameters()",
         "System.RuntimeType.get_IsEnum()",
         "System.RuntimeTypeHandle.IsInterface(System.RuntimeType)",
+        "System.Type.Equals",
+        "System.Type.GetHashCode()",
         "System.Type.get_Attributes()",
+        "System.Type.get_DeclaringMethod()",
+        "System.Type.get_DeclaringType()",
         "System.Type.get_IsAbstract()",
         "System.Type.get_IsAnsiClass()",
         "System.Type.get_IsArray()",
@@ -206,10 +669,15 @@
         "System.Type.get_IsByRefLike()",
         "System.Type.get_IsClass()",
         "System.Type.get_IsCOMObject()",
+        "System.Type.get_IsContextful()",
         "System.Type.get_IsExplicitLayout()",
+        "System.Type.get_IsGenericParameter()",
+        "System.Type.get_IsGenericType()",
+        "System.Type.get_IsGenericTypeDefinition()",
         "System.Type.get_IsImport()",
         "System.Type.get_IsInterface()",
         "System.Type.get_IsLayoutSequential()",
+        "System.Type.get_IsMarshalByRef()",
         "System.Type.get_IsNested()",
         "System.Type.get_IsNestedAssembly()",
         "System.Type.get_IsNestedFamANDAssem()",
@@ -225,6 +693,8 @@
         "System.Type.get_IsSpecialName()",
         "System.Type.get_IsUnicodeClass()",
         "System.Type.get_IsValueType()",
+        "System.Type.get_MemberType()",
+        "System.Type.get_ReflectedType()",
         "System.Type.get_TypeHandle()",
         "System.Type.GetAttributeFlagsImpl()",
         "System.Type.GetRootElementType()",
