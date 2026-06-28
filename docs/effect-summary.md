@@ -2,7 +2,7 @@
 
 `Tools/PurelySharp.EffectSummary` is the first step toward evidence-based BCL and framework purity summaries.
 
-Checked-in effect-summary JSON artifacts and the reviewed artifact spec have been removed from the repository. Treat this tool as an ad hoc calibration utility, not part of the active day-to-day analyzer development loop.
+The analyzer now regenerates its built-in effect-summary JSON into `obj` during build/test from `PurelySharp.Analyzer/BuiltInEffectSummaryArtifactSpec.json` and consumes those summaries only as embedded resources from the current build. Checked-in effect-summary JSON artifacts and the reviewed artifact spec are gone. Treat ad hoc outputs from this tool as disposable local calibration data.
 
 The goal is to reduce hand-maintained heuristics by summarizing implementation assemblies and then feeding stable effect facts back into the analyzer/catalog pipeline.
 The current first landing is report-first: the tool can now emit fixed-point,
@@ -79,7 +79,7 @@ For ad hoc local refreshes, prefer the repo wrapper:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Update-EffectSummaries.ps1 -SymbolPrefix System.String.Format -IncludeCallees -MaxDepth 2 -TransitiveRoots
 ```
 
-The wrapper builds `Tools\PurelySharp.EffectSummary` under the repo's job-object .NET launcher and writes a timestamped `*.PurelySharp.EffectSummary.json` file under ignored `artifacts\effect-summary\...` paths by default. It does not require a checked-in `ReviewedRuntimeArtifactSpec.json`, and broad runtime scans now require an explicit `-AllowUnfilteredRuntimeScan`.
+The wrapper builds `Tools\PurelySharp.EffectSummary` under the repo's job-object .NET launcher and writes a timestamped `*.PurelySharp.EffectSummary.json` file under ignored `artifacts\effect-summary\...` paths by default. Those outputs are for local inspection only, and broad runtime scans require an explicit `-AllowUnfilteredRuntimeScan`.
 
 Smoke run against the latest installed .NET 8 `System.Private.CoreLib.dll`:
 
@@ -123,7 +123,9 @@ dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --sym
 
 ## Analyzer consumption
 
-The analyzer can consume generated exception summaries when the JSON is supplied as an additional file named `PurelySharp.EffectSummary.json` or `*.PurelySharp.EffectSummary.json`, but the repository no longer ships or tracks checked-in copies of those files.
+Built-in analyzer summaries are regenerated into `obj` during build/test and then embedded into the analyzer assembly for that build. The loader does not probe loose files beside the analyzer, `AppContext.BaseDirectory`, or repo artifact directories for built-ins.
+
+The analyzer can also consume generated exception summaries when the JSON is supplied explicitly as an additional file named `PurelySharp.EffectSummary.json` or `*.PurelySharp.EffectSummary.json`, but the repository no longer ships or tracks checked-in copies of those files.
 
 With `purelysharp_report_exceptions = true` and/or `purelysharp_checked_exceptions = true`, `PS0010` and `PS0011` use `ThrownExceptionTypes` and `TransitiveThrownExceptionTypes` for matching metadata/library method calls. `PS0010` remains controlled by `purelysharp_report_exceptions`, while `PS0011` is controlled by `purelysharp_checked_exceptions`. This extends exception-flow reporting beyond current-compilation source without doing slow live decompilation inside Roslyn analyzer callbacks. The analyzer also accepts `TransitiveThrownExceptionEdges` as additive metadata and folds their `SourcePath` provenance back into the existing diagnostics model.
 

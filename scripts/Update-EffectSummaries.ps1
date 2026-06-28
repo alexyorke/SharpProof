@@ -39,9 +39,6 @@ param(
     [switch]$CompareManualCatalogs,
 
     [Parameter(ParameterSetName = 'Direct')]
-    [switch]$IgnoreReviewedPurityEntries,
-
-    [Parameter(ParameterSetName = 'Direct')]
     [int]$Limit,
 
     [Parameter(ParameterSetName = 'Direct')]
@@ -316,10 +313,6 @@ try {
         }
         elseif ($ClassifyPurity.IsPresent) {
             $toolArgs += '--classify-purity'
-        }
-
-        if ($IgnoreReviewedPurityEntries.IsPresent) {
-            $toolArgs += '--ignore-reviewed-purity-entries'
         }
 
         if ($PSBoundParameters.ContainsKey('Limit')) {

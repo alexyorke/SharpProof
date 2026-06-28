@@ -80,13 +80,9 @@ internal static class EffectSummaryCli
         GeneratedPurityCatalogDocument? generatedPurityCatalog = null;
         if (options.IncludePurityClassification || options.CompareManualCatalogs)
         {
-            var externalGeneratedPurityEntries = options.IgnoreReviewedPurityEntries
-                ? EmptyReviewedSummaryEntries
-                : ReviewedSummaryCatalogLoader.Load();
             var classificationOutput = PurityClassificationEngine.Classify(
                 reports,
-                includeCatalogComparison: options.CompareManualCatalogs,
-                externalGeneratedPurityEntries: externalGeneratedPurityEntries);
+                includeCatalogComparison: options.CompareManualCatalogs);
             reports = classificationOutput.Assemblies;
             purityClassificationReport = classificationOutput.Report;
             generatedPurityCatalog = classificationOutput.GeneratedPurityCatalog;
@@ -101,10 +97,6 @@ internal static class EffectSummaryCli
 
         return document;
     }
-
-    private static readonly IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> EmptyReviewedSummaryEntries =
-        new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
-
     private static void WriteDocument(EffectSummaryDocument document, string? outputPath)
     {
         var jsonOptions = new JsonSerializerOptions
@@ -144,7 +136,6 @@ internal static class EffectSummaryCli
         Console.Error.WriteLine("  --transitive-roots         Propagate root candidate labels through same-assembly calls.");
         Console.Error.WriteLine("  --classify-purity         Add report-only fixed-point purity classifications to the JSON output.");
         Console.Error.WriteLine("  --compare-manual-catalogs Compare emitted methods against the current reviewed manual catalogs.");
-        Console.Error.WriteLine("  --ignore-reviewed-purity-entries  Classify without loading checked-in reviewed purity summaries.");
         Console.Error.WriteLine("  --output <path>            Write JSON to a file instead of stdout.");
         Console.Error.WriteLine("  --limit <count>            Limit emitted method summaries for smoke testing.");
         Console.Error.WriteLine("  --help                     Show this help.");
@@ -182,8 +173,6 @@ internal sealed class CliOptions
     public bool IncludePurityClassification { get; private set; }
 
     public bool CompareManualCatalogs { get; private set; }
-
-    public bool IgnoreReviewedPurityEntries { get; private set; }
 
     public bool ShowHelp { get; private set; }
 
@@ -226,9 +215,6 @@ internal sealed class CliOptions
                     options.IncludePurityClassification = true;
                     options.CompareManualCatalogs = true;
                     break;
-                case "--ignore-reviewed-purity-entries":
-                    options.IgnoreReviewedPurityEntries = true;
-                    break;
                 case "--output":
                     options.OutputPath = ReadRequiredValue(args, ref i, arg);
                     break;
@@ -264,7 +250,6 @@ internal sealed class CliOptions
             IncludeTransitiveRoots = artifact.IncludeTransitiveRoots ?? defaults?.IncludeTransitiveRoots ?? false,
             IncludePurityClassification = artifact.IncludePurityClassification ?? defaults?.IncludePurityClassification ?? false,
             CompareManualCatalogs = artifact.CompareManualCatalogs ?? defaults?.CompareManualCatalogs ?? false,
-            IgnoreReviewedPurityEntries = artifact.IgnoreReviewedPurityEntries ?? defaults?.IgnoreReviewedPurityEntries ?? false,
         };
 
         var explicitAssemblyPaths = artifact.AssemblyPaths ?? Array.Empty<string>();
@@ -602,8 +587,6 @@ internal sealed class ArtifactSpecDefaults
 
     public bool? CompareManualCatalogs { get; set; }
 
-    public bool? IgnoreReviewedPurityEntries { get; set; }
-
     public string[]? ExcludedSymbolPrefixes { get; set; }
 }
 
@@ -639,8 +622,6 @@ internal sealed class ArtifactSpecEntry
 
     public bool? CompareManualCatalogs { get; set; }
 
-    public bool? IgnoreReviewedPurityEntries { get; set; }
-
     public string[]? ExcludedSymbolPrefixes { get; set; }
 }
 
@@ -657,7 +638,7 @@ internal static class ArtifactSpecSymbolSource
         var exclusionPrefixes = excludedSymbolPrefixes ?? Array.Empty<string>();
         var inclusionPrefixes = includedSymbolPrefixes ?? Array.Empty<string>();
 
-        if (TryCollectReachableReviewedMethods(document.RootElement, inclusionPrefixes, exclusionPrefixes, symbols, exactSymbolKeys))
+        if (TryCollectReachableSourceSummaryMethods(document.RootElement, inclusionPrefixes, exclusionPrefixes, symbols, exactSymbolKeys))
         {
             return new ArtifactSpecSymbolSet(
                 Symbols: symbols.OrderBy(symbol => symbol, StringComparer.Ordinal).ToArray(),
@@ -755,7 +736,7 @@ internal static class ArtifactSpecSymbolSource
         return includedSymbolPrefixes.Any(prefix => symbol.StartsWith(prefix, StringComparison.Ordinal));
     }
 
-    private static bool TryCollectReachableReviewedMethods(
+    private static bool TryCollectReachableSourceSummaryMethods(
         JsonElement rootElement,
         IReadOnlyList<string> includedSymbolPrefixes,
         IReadOnlyList<string> excludedSymbolPrefixes,
@@ -935,261 +916,6 @@ internal static class ArtifactSpecSymbolFilter
 
         return excludedSymbolPrefixes.Any(prefix => symbol.StartsWith(prefix, StringComparison.Ordinal));
     }
-}
-
-internal static class ReviewedSummaryCatalogLoader
-{
-    public static IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> Load()
-    {
-        var summaryDirectory = TryFindAnalyzerSummaryDirectory();
-        if (summaryDirectory == null)
-        {
-            return new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
-        }
-
-        var candidatesByKey = new Dictionary<string, List<ReviewedCatalogCandidate>>(StringComparer.Ordinal);
-        var order = 0;
-        foreach (var path in Directory.EnumerateFiles(summaryDirectory, "*.PurelySharp.EffectSummary.json", SearchOption.TopDirectoryOnly)
-                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
-        {
-            using var document = JsonDocument.Parse(File.ReadAllText(path));
-            if (!document.RootElement.TryGetProperty("GeneratedPurityCatalog", out var generatedPurityCatalog) ||
-                generatedPurityCatalog.ValueKind != JsonValueKind.Object ||
-                !generatedPurityCatalog.TryGetProperty("Entries", out var entriesElement) ||
-                entriesElement.ValueKind != JsonValueKind.Array)
-            {
-                continue;
-            }
-
-            foreach (var entryElement in entriesElement.EnumerateArray())
-            {
-                var entry = TryParseEntry(entryElement);
-                if (entry == null || string.IsNullOrWhiteSpace(entry.ExactSymbolKey))
-                {
-                    continue;
-                }
-
-                if (!candidatesByKey.TryGetValue(entry.ExactSymbolKey, out var candidates))
-                {
-                    candidates = new List<ReviewedCatalogCandidate>();
-                    candidatesByKey.Add(entry.ExactSymbolKey, candidates);
-                }
-
-                candidates.Add(new ReviewedCatalogCandidate(entry, order++));
-            }
-        }
-
-        var entriesByKey = new Dictionary<string, GeneratedPurityCatalogEntry>(StringComparer.Ordinal);
-        foreach (var pair in candidatesByKey)
-        {
-            var resolvedEntry = ResolveReviewedEntryCandidates(pair.Value);
-            if (resolvedEntry != null)
-            {
-                entriesByKey[pair.Key] = resolvedEntry;
-            }
-        }
-
-        return entriesByKey;
-    }
-
-    private static GeneratedPurityCatalogEntry? ResolveReviewedEntryCandidates(
-        IReadOnlyList<ReviewedCatalogCandidate> candidates)
-    {
-        ReviewedCatalogCandidate? bestCandidate = null;
-        foreach (var implementationGroup in candidates
-                     .GroupBy(candidate => CreateReviewedImplementationKey(candidate.Entry), StringComparer.Ordinal))
-        {
-            var resolvedCandidate = ResolveSameImplementationCandidates(
-                implementationGroup
-                    .OrderBy(candidate => candidate.Order)
-                    .ToArray());
-            if (resolvedCandidate == null)
-            {
-                continue;
-            }
-
-            if (bestCandidate == null ||
-                CompareReviewedCatalogCandidates(resolvedCandidate.Value, bestCandidate.Value) > 0)
-            {
-                bestCandidate = resolvedCandidate;
-            }
-        }
-
-        return bestCandidate?.Entry;
-    }
-
-    private static ReviewedCatalogCandidate? ResolveSameImplementationCandidates(
-        IReadOnlyList<ReviewedCatalogCandidate> candidates)
-    {
-        if (candidates.Count == 0)
-        {
-            return null;
-        }
-
-        var bestCandidate = candidates[0];
-        for (var i = 1; i < candidates.Count; i++)
-        {
-            var candidate = candidates[i];
-            if (GeneratedPurityCatalogEntryRelations.AreEquivalent(bestCandidate.Entry, candidate.Entry))
-            {
-                continue;
-            }
-
-            var bestDominatesCandidate = GeneratedPurityCatalogEntryRelations.DoesDominate(bestCandidate.Entry, candidate.Entry);
-            var candidateDominatesBest = GeneratedPurityCatalogEntryRelations.DoesDominate(candidate.Entry, bestCandidate.Entry);
-            if (bestDominatesCandidate == candidateDominatesBest)
-            {
-                return null;
-            }
-
-            if (candidateDominatesBest)
-            {
-                bestCandidate = candidate;
-            }
-        }
-
-        return bestCandidate;
-    }
-
-    private static int CompareReviewedCatalogCandidates(
-        ReviewedCatalogCandidate left,
-        ReviewedCatalogCandidate right)
-    {
-        var classificationComparison =
-            GetClassificationStrength(left.Entry.Classification).CompareTo(GetClassificationStrength(right.Entry.Classification));
-        if (classificationComparison != 0)
-        {
-            return classificationComparison;
-        }
-
-        return right.Order.CompareTo(left.Order);
-    }
-
-    private static string CreateReviewedImplementationKey(GeneratedPurityCatalogEntry entry)
-    {
-        return string.Join(
-            "|",
-            entry.AssemblyName,
-            entry.AssemblySha256,
-            entry.ModuleVersionId,
-            entry.MetadataToken,
-            entry.MethodBodySha256 ?? string.Empty);
-    }
-
-    private static string? TryFindAnalyzerSummaryDirectory()
-    {
-        var current = new DirectoryInfo(Directory.GetCurrentDirectory());
-        while (current != null)
-        {
-            var candidate = Path.Combine(current.FullName, "PurelySharp.Analyzer");
-            if (Directory.Exists(candidate))
-            {
-                return candidate;
-            }
-
-            current = current.Parent;
-        }
-
-        return null;
-    }
-
-    private static GeneratedPurityCatalogEntry? TryParseEntry(JsonElement entryElement)
-    {
-        var symbol = GetTrimmedStringProperty(entryElement, "Symbol");
-        var exactSymbolKey = GetTrimmedStringProperty(entryElement, "ExactSymbolKey");
-        var cacheKey = GetTrimmedStringProperty(entryElement, "CacheKey");
-        var assemblyName = GetTrimmedStringProperty(entryElement, "AssemblyName");
-        var assemblyPath = GetTrimmedStringProperty(entryElement, "AssemblyPath");
-        var assemblySha256 = GetTrimmedStringProperty(entryElement, "AssemblySha256");
-        var moduleVersionId = GetTrimmedStringProperty(entryElement, "ModuleVersionId");
-        var metadataToken = GetTrimmedStringProperty(entryElement, "MetadataToken");
-        var classification = GetTrimmedStringProperty(entryElement, "Classification");
-        var primaryCategory = GetTrimmedStringProperty(entryElement, "PrimaryCategory");
-        var freshnessClassification = GetTrimmedStringProperty(entryElement, "FreshnessClassification");
-        var effectVisibilityClassification = GetTrimmedStringProperty(entryElement, "EffectVisibilityClassification");
-        if (string.IsNullOrWhiteSpace(symbol) ||
-            string.IsNullOrWhiteSpace(exactSymbolKey) ||
-            string.IsNullOrWhiteSpace(cacheKey) ||
-            string.IsNullOrWhiteSpace(assemblyName) ||
-            string.IsNullOrWhiteSpace(assemblyPath) ||
-            string.IsNullOrWhiteSpace(assemblySha256) ||
-            string.IsNullOrWhiteSpace(moduleVersionId) ||
-            string.IsNullOrWhiteSpace(metadataToken) ||
-            string.IsNullOrWhiteSpace(classification) ||
-            string.IsNullOrWhiteSpace(primaryCategory) ||
-            string.IsNullOrWhiteSpace(freshnessClassification) ||
-            string.IsNullOrWhiteSpace(effectVisibilityClassification))
-        {
-            return null;
-        }
-
-        return new GeneratedPurityCatalogEntry(
-            Symbol: symbol,
-            ExactSymbolKey: exactSymbolKey,
-            CacheKey: cacheKey,
-            AssemblyName: assemblyName,
-            AssemblyPath: assemblyPath,
-            AssemblySha256: assemblySha256,
-            ModuleVersionId: moduleVersionId,
-            MetadataToken: metadataToken,
-            MethodBodySha256: GetTrimmedStringProperty(entryElement, "MethodBodySha256"),
-            Classification: classification,
-            PrimaryCategory: primaryCategory,
-            Categories: ReadStringArray(entryElement, "Categories"),
-            FirstBlockingCallChain: ReadStringArray(entryElement, "FirstBlockingCallChain"),
-            HasFreshArrayAllocationEvidence: ReadBoolean(entryElement, "HasFreshArrayAllocationEvidence"),
-            HasFreshObjectAllocationEvidence: ReadBoolean(entryElement, "HasFreshObjectAllocationEvidence"),
-            HasUnsupportedEffects: ReadBoolean(entryElement, "HasUnsupportedEffects"),
-            FreshnessClassification: freshnessClassification,
-            EffectVisibilityClassification: effectVisibilityClassification);
-    }
-
-    private static string[] ReadStringArray(JsonElement element, string propertyName)
-    {
-        if (!element.TryGetProperty(propertyName, out var valuesElement) ||
-            valuesElement.ValueKind != JsonValueKind.Array)
-        {
-            return Array.Empty<string>();
-        }
-
-        return valuesElement.EnumerateArray()
-            .Where(value => value.ValueKind == JsonValueKind.String)
-            .Select(value => value.GetString())
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value!.Trim())
-            .ToArray();
-    }
-
-    private static bool ReadBoolean(JsonElement element, string propertyName)
-    {
-        return element.TryGetProperty(propertyName, out var propertyElement) &&
-            propertyElement.ValueKind == JsonValueKind.True;
-    }
-
-    private static string? GetTrimmedStringProperty(JsonElement element, string propertyName)
-    {
-        if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind != JsonValueKind.String)
-        {
-            return null;
-        }
-
-        return property.GetString()?.Trim();
-    }
-
-    private static int GetClassificationStrength(string classification)
-    {
-        return classification switch
-        {
-            "impure" => 3,
-            "conservative_unknown" => 2,
-            "pure" => 1,
-            _ => 0,
-        };
-    }
-
-    private readonly record struct ReviewedCatalogCandidate(
-        GeneratedPurityCatalogEntry Entry,
-        int Order);
 }
 
 internal static class RuntimeAssemblyResolver

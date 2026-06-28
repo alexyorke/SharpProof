@@ -2422,144 +2422,6 @@ public static class StringComparisonFixture
         }
 
         [Test]
-        public void ReviewedSummaryCatalogLoader_DropsAmbiguousSameImplementationDuplicates()
-        {
-            var assembly = Assembly.LoadFrom(GetEffectSummaryToolDllPath());
-            var loaderType = assembly.GetType("ReviewedSummaryCatalogLoader", throwOnError: true)!;
-            var loadMethod = loaderType.GetMethod("Load", BindingFlags.Public | BindingFlags.Static)!;
-            const string conflictingExactSymbolKey = "TestType.Conflicting()->void";
-            const string stableExactSymbolKey = "TestType.Stable()->void";
-            var rootDirectory = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "reviewed-loader-ambiguous-" + Guid.NewGuid().ToString("N"));
-            var analyzerDirectory = Path.Combine(rootDirectory, "PurelySharp.Analyzer");
-            Directory.CreateDirectory(analyzerDirectory);
-
-            try
-            {
-                File.WriteAllText(
-                    Path.Combine(analyzerDirectory, "A.PurelySharp.EffectSummary.json"),
-                    CreateReviewedSummaryDocument(
-                        CreateReviewedEntry(
-                            symbol: "TestType.Conflicting()",
-                            exactSymbolKey: conflictingExactSymbolKey,
-                            metadataToken: "0x06000001",
-                            methodBodySha256: "conflict-body",
-                            primaryCategory: "global_state_read",
-                            categories: new[] { "global_state_read" }),
-                        CreateReviewedEntry(
-                            symbol: "TestType.Stable()",
-                            exactSymbolKey: stableExactSymbolKey,
-                            metadataToken: "0x06000002",
-                            methodBodySha256: "stable-body",
-                            classification: "pure",
-                            primaryCategory: "generated_purity_summary",
-                            categories: Array.Empty<string>(),
-                            effectVisibilityClassification: "none")));
-                File.WriteAllText(
-                    Path.Combine(analyzerDirectory, "B.PurelySharp.EffectSummary.json"),
-                    CreateReviewedSummaryDocument(
-                        CreateReviewedEntry(
-                            symbol: "TestType.Conflicting()",
-                            exactSymbolKey: conflictingExactSymbolKey,
-                            metadataToken: "0x06000001",
-                            methodBodySha256: "conflict-body",
-                            primaryCategory: "global_state_write",
-                            categories: new[] { "global_state_write" })));
-
-                lock (EffectSummaryToolBuildLock)
-                {
-                    var originalDirectory = Directory.GetCurrentDirectory();
-                    try
-                    {
-                        Directory.SetCurrentDirectory(rootDirectory);
-                        var entries = (System.Collections.IDictionary)loadMethod.Invoke(null, Array.Empty<object>())!;
-                        Assert.That(entries.Contains(conflictingExactSymbolKey), Is.False);
-                        Assert.That(entries.Contains(stableExactSymbolKey), Is.True);
-                    }
-                    finally
-                    {
-                        Directory.SetCurrentDirectory(originalDirectory);
-                    }
-                }
-            }
-            finally
-            {
-                if (Directory.Exists(rootDirectory))
-                {
-                    Directory.Delete(rootDirectory, recursive: true);
-                }
-            }
-        }
-
-        [Test]
-        public void ReviewedSummaryCatalogLoader_PrefersDominatingSameImplementationDuplicate()
-        {
-            var assembly = Assembly.LoadFrom(GetEffectSummaryToolDllPath());
-            var loaderType = assembly.GetType("ReviewedSummaryCatalogLoader", throwOnError: true)!;
-            var loadMethod = loaderType.GetMethod("Load", BindingFlags.Public | BindingFlags.Static)!;
-            const string exactSymbolKey = "TestType.Dominating()->void";
-            var rootDirectory = Path.Combine(
-                TestContext.CurrentContext.WorkDirectory,
-                "reviewed-loader-dominating-" + Guid.NewGuid().ToString("N"));
-            var analyzerDirectory = Path.Combine(rootDirectory, "PurelySharp.Analyzer");
-            Directory.CreateDirectory(analyzerDirectory);
-
-            try
-            {
-                File.WriteAllText(
-                    Path.Combine(analyzerDirectory, "A.PurelySharp.EffectSummary.json"),
-                    CreateReviewedSummaryDocument(
-                        CreateReviewedEntry(
-                            symbol: "TestType.Dominating()",
-                            exactSymbolKey: exactSymbolKey,
-                            metadataToken: "0x06000003",
-                            methodBodySha256: "dominating-body",
-                            primaryCategory: "global_state_read",
-                            categories: new[] { "global_state_read" })));
-                File.WriteAllText(
-                    Path.Combine(analyzerDirectory, "B.PurelySharp.EffectSummary.json"),
-                    CreateReviewedSummaryDocument(
-                        CreateReviewedEntry(
-                            symbol: "TestType.Dominating()",
-                            exactSymbolKey: exactSymbolKey,
-                            metadataToken: "0x06000003",
-                            methodBodySha256: "dominating-body",
-                            primaryCategory: "global_state_read",
-                            categories: new[] { "global_state_read", "impure_callee" },
-                            firstBlockingCallChain: new[] { "TestType.Helper()" })));
-
-                lock (EffectSummaryToolBuildLock)
-                {
-                    var originalDirectory = Directory.GetCurrentDirectory();
-                    try
-                    {
-                        Directory.SetCurrentDirectory(rootDirectory);
-                        var entries = (System.Collections.IDictionary)loadMethod.Invoke(null, Array.Empty<object>())!;
-                        Assert.That(entries.Contains(exactSymbolKey), Is.True);
-
-                        var entry = entries[exactSymbolKey]!;
-                        var categories = ((string[])entry.GetType().GetProperty("Categories")!.GetValue(entry)!)
-                            .OrderBy(value => value, StringComparer.Ordinal)
-                            .ToArray();
-                        Assert.That(categories, Is.EqualTo(new[] { "global_state_read", "impure_callee" }));
-                    }
-                    finally
-                    {
-                        Directory.SetCurrentDirectory(originalDirectory);
-                    }
-                }
-            }
-            finally
-            {
-                if (Directory.Exists(rootDirectory))
-                {
-                    Directory.Delete(rootDirectory, recursive: true);
-                }
-            }
-        }
-
-        [Test]
         public async Task EffectSummaryTool_RuntimeSortedDictionaryLookupSlice_UsesGeneratedPurityCatalogEntries()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
@@ -3902,14 +3764,13 @@ public static class StringComparisonFixture
         }
 
         [Test]
-        public async Task EffectSummaryTool_RuntimeVersionSlice_IgnoreReviewedPurityEntries_RemainsVerifiableFromGeneratedOutput()
+        public async Task EffectSummaryTool_RuntimeVersionSlice_RemainsVerifiableFromGeneratedOutput()
         {
             using var summary = await RunRuntimeEffectSummaryAsyncForAssembly(
                 "System.Private.CoreLib.dll",
                 20,
                 1,
                 false,
-                true,
                 "System.Version..ctor(int, int)",
                 "System.Version.CompareTo(System.Version)",
                 "System.Version.get_Major");
@@ -4990,14 +4851,12 @@ public static class StringComparisonFixture
         {
             using var summary = await RunRuntimeEffectSummaryAsync(
                 140,
-                "System.MemoryExtensions.BinarySearch",
                 "System.ReadOnlySpan`1.get_Length",
                 "System.ReadOnlySpan`1.get_IsEmpty",
                 "System.ReadOnlySpan`1.Slice(int, int)",
                 "System.Span`1.get_Length",
                 "System.Span`1.get_IsEmpty",
-                "System.Runtime.InteropServices.MemoryMarshal.AsBytes",
-                "System.Runtime.InteropServices.MemoryMarshal.Read");
+                "System.Runtime.InteropServices.MemoryMarshal.AsBytes");
 
             var report = summary.RootElement.GetProperty("PurityReport");
             var catalogComparison = report.GetProperty("CatalogComparison");
@@ -5012,10 +4871,8 @@ public static class StringComparisonFixture
                 "System.ReadOnlySpan`1.Slice(int, int)",
                 "System.Span`1.get_Length()",
                 "System.Span`1.get_IsEmpty()",
-                "System.MemoryExtensions.BinarySearch(System.ReadOnlySpan`1<!!0>, !!1)",
                 "System.Runtime.InteropServices.MemoryMarshal.AsBytes(System.ReadOnlySpan`1<!!0>)",
                 "System.Runtime.InteropServices.MemoryMarshal.AsBytes(System.Span`1<!!0>)",
-                "System.Runtime.InteropServices.MemoryMarshal.Read(System.ReadOnlySpan`1<byte>)",
             };
 
             foreach (var symbol in representativeSymbols)
@@ -8331,7 +8188,6 @@ public static class DuplicateReviewedSeedFixture
                 20,
                 1,
                 false,
-                true,
                 "System.Type.GetTypeFromHandle",
                 "System.Type.Equals",
                 "System.Type.GetHashCode");
@@ -10214,7 +10070,6 @@ public static class DuplicateReviewedSeedFixture
                 40,
                 2,
                 false,
-                true,
                 "System.Threading.CancellationToken.get_IsCancellationRequested",
                 "System.Threading.Tasks.Task.get_IsCompleted");
 
@@ -10232,7 +10087,6 @@ public static class DuplicateReviewedSeedFixture
                 40,
                 2,
                 false,
-                true,
                 "System.Threading.Tasks.Task`1.get_Result");
 
             var knownImpureRows = summary.RootElement

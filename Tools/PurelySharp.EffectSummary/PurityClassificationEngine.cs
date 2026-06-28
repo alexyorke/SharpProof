@@ -1033,6 +1033,7 @@ internal static class PurityClassificationEngine
         classification = default!;
 
         string effectVisibilityClassification;
+        var treatsByRefLikeViewWrapperAsPure = false;
         if (HasPureReadOnlyCharSpanSearchWrapperPattern(summary))
         {
             effectVisibilityClassification = "none";
@@ -1040,6 +1041,12 @@ internal static class PurityClassificationEngine
         else if (HasPureArrayBackedByRefLikeViewWrapperPattern(summary))
         {
             effectVisibilityClassification = "none";
+            treatsByRefLikeViewWrapperAsPure = true;
+        }
+        else if (HasPureSpanBackedByRefLikeViewWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "none";
+            treatsByRefLikeViewWrapperAsPure = true;
         }
         else if (HasPureStringFromReadOnlyCharSpanWrapperPattern(summary))
         {
@@ -1110,7 +1117,9 @@ internal static class PurityClassificationEngine
             Categories: Array.Empty<string>(),
             FirstBlockingCallChain: Array.Empty<string>(),
             HasFreshArrayAllocationEvidence: false,
-            HasFreshObjectAllocationEvidence: summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
+            HasFreshObjectAllocationEvidence: treatsByRefLikeViewWrapperAsPure
+                ? false
+                : summary.Effects.Contains("allocates_object", StringComparer.Ordinal),
             HasUnsupportedEffects: false,
             FreshnessClassification: "none",
             EffectVisibilityClassification: effectVisibilityClassification);
@@ -1149,6 +1158,16 @@ internal static class PurityClassificationEngine
             IsByRefLikeViewReturn(summary.ExactSymbolKey) &&
             summary.Calls.Any(IsArrayBackedByRefLikeViewConstructionCall) &&
             summary.Calls.All(IsArrayBackedByRefLikeViewWrapperCall);
+    }
+
+    private static bool HasPureSpanBackedByRefLikeViewWrapperPattern(MethodEffectSummary summary)
+    {
+        return CallsOnly(summary, "allocates_object", "calls_method", "reads_instance_field") &&
+            RootsAreSemanticallyPureWrapperCompatible(summary) &&
+            IsByRefLikeViewReturn(summary.ExactSymbolKey) &&
+            HasOnlyByRefLikeViewProjectionFieldReads(summary) &&
+            summary.Calls.Any(IsByRefLikeViewConstructionCall) &&
+            summary.Calls.All(IsSpanBackedByRefLikeViewWrapperCall);
     }
 
     private static bool HasPureStringFromReadOnlyCharSpanWrapperPattern(MethodEffectSummary summary)
@@ -1420,8 +1439,12 @@ internal static class PurityClassificationEngine
 
     private static bool IsByRefLikeViewReturn(string exactSymbolKey)
     {
-        return exactSymbolKey.EndsWith(")->System.Span`1<!!0>", StringComparison.Ordinal) ||
+        return exactSymbolKey.EndsWith(")->System.Span`1<!0>", StringComparison.Ordinal) ||
+            exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<!0>", StringComparison.Ordinal) ||
+            exactSymbolKey.EndsWith(")->System.Span`1<!!0>", StringComparison.Ordinal) ||
             exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<!!0>", StringComparison.Ordinal) ||
+            exactSymbolKey.EndsWith(")->System.Span`1<byte>", StringComparison.Ordinal) ||
+            exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<byte>", StringComparison.Ordinal) ||
             exactSymbolKey.EndsWith(")->System.Span`1<char>", StringComparison.Ordinal) ||
             exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<char>", StringComparison.Ordinal);
     }
@@ -1448,6 +1471,33 @@ internal static class PurityClassificationEngine
             callSymbol.StartsWith("System.Type.op_Inequality(System.Type, System.Type)", StringComparison.Ordinal) ||
             callSymbol.StartsWith("object.GetType()", StringComparison.Ordinal) ||
             callSymbol.StartsWith("string.get_Length()", StringComparison.Ordinal);
+    }
+
+    private static bool IsSpanBackedByRefLikeViewWrapperCall(string callSymbol)
+    {
+        return IsByRefLikeViewConstructionCall(callSymbol) ||
+            IsPurityNeutralIntrinsicHelperCall(callSymbol) ||
+            callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetReference(System.Span`1<", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Runtime.InteropServices.MemoryMarshal.GetReference(System.ReadOnlySpan`1<", StringComparison.Ordinal) ||
+            callSymbol.StartsWith("System.Type.GetTypeFromHandle(System.RuntimeTypeHandle)", StringComparison.Ordinal) ||
+            IsSemanticallyNeutralValidationThrowHelper(callSymbol);
+    }
+
+    private static bool HasOnlyByRefLikeViewProjectionFieldReads(MethodEffectSummary summary)
+    {
+        if (!summary.Effects.Contains("reads_instance_field", StringComparer.Ordinal))
+        {
+            return true;
+        }
+
+        return summary.Fields.All(static field =>
+            field.StartsWith("System.ValueTuple", StringComparison.Ordinal) &&
+            (field.EndsWith(".Item1", StringComparison.Ordinal) ||
+             field.EndsWith(".Item2", StringComparison.Ordinal)) ||
+            string.Equals(field, "System.ReadOnlySpan`1._length", StringComparison.Ordinal) ||
+            string.Equals(field, "System.ReadOnlySpan`1._reference", StringComparison.Ordinal) ||
+            string.Equals(field, "System.Span`1._length", StringComparison.Ordinal) ||
+            string.Equals(field, "System.Span`1._reference", StringComparison.Ordinal));
     }
 
     private static bool IsReadOnlyCharSpanSearchHelperCall(string callSymbol)

@@ -242,6 +242,21 @@ namespace TestNamespace {
             Assert.That(stageCopies[0].Attribute("SourceFiles")?.Value, Is.EqualTo("$(GeneratedPurityArtifactSpecSourcePath)"));
             Assert.That(stageCopies[0].Attribute("DestinationFiles")?.Value, Is.EqualTo("$(GeneratedPurityArtifactSpecPath)"));
 
+            var stageRemovals = stageTarget
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "RemoveDir", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(stageRemovals, Has.Length.EqualTo(1));
+            Assert.That(stageRemovals[0].Attribute("Directories")?.Value, Is.EqualTo("$(GeneratedPurityBuiltInSummaryDirectory)"));
+            Assert.That(stageRemovals[0].Attribute("Condition")?.Value, Is.EqualTo("Exists('$(GeneratedPurityBuiltInSummaryDirectory)')"));
+
+            var stageDirectories = stageTarget
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "MakeDir", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(stageDirectories, Has.Length.EqualTo(1));
+            Assert.That(stageDirectories[0].Attribute("Directories")?.Value, Is.EqualTo("$(GeneratedPurityBuiltInSummaryDirectory)"));
+
             var stageBuilds = stageTarget
                 .Descendants()
                 .Where(element => string.Equals(element.Name.LocalName, "MSBuild", StringComparison.Ordinal))
@@ -314,12 +329,16 @@ namespace TestNamespace {
             var repositoryRoot = FindRepositoryRoot();
             var entrypointFiles = Directory
                 .EnumerateFiles(repositoryRoot, "*.sln", SearchOption.TopDirectoryOnly)
+                .Concat(Directory.EnumerateFiles(repositoryRoot, "*.ps1", SearchOption.TopDirectoryOnly))
                 .Concat(Directory.EnumerateFiles(repositoryRoot, "*.props", SearchOption.AllDirectories))
                 .Concat(Directory.EnumerateFiles(repositoryRoot, "*.targets", SearchOption.AllDirectories))
                 .Concat(Directory.EnumerateFiles(repositoryRoot, "*.csproj", SearchOption.AllDirectories))
                 .Where(path => !string.Equals(
                     path,
                     Path.Combine(repositoryRoot, "PurelySharp.Analyzer", "PurelySharp.Analyzer.csproj"),
+                    StringComparison.OrdinalIgnoreCase))
+                .Where(path => !path.StartsWith(
+                    Path.Combine(repositoryRoot, ".baseline-check") + Path.DirectorySeparatorChar,
                     StringComparison.OrdinalIgnoreCase))
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray();

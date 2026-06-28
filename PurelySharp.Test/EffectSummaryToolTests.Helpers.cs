@@ -470,7 +470,7 @@ public sealed class StableCacheDerived : StaticFieldBase
 
         private static async Task<JsonDocument> RunRuntimeEffectSummaryAsync(int limit, params string[] symbolPrefixes)
         {
-            return await RunRuntimeEffectSummaryAsyncCore(limit, null, 1, false, false, symbolPrefixes);
+            return await RunRuntimeEffectSummaryAsyncCore(limit, null, 1, false, symbolPrefixes);
         }
 
         private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(
@@ -478,26 +478,16 @@ public sealed class StableCacheDerived : StaticFieldBase
             int limit,
             params string[] symbolPrefixes)
         {
-            return RunRuntimeEffectSummaryAsyncForAssembly(runtimeAssemblyName, limit, 1, false, false, symbolPrefixes);
-        }
-
-        private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(
-            string runtimeAssemblyName,
-            int limit,
-            int maxDepth,
-            params string[] symbolPrefixes)
-        {
-            return RunRuntimeEffectSummaryAsyncForAssembly(runtimeAssemblyName, limit, maxDepth, false, false, symbolPrefixes);
+            return RunRuntimeEffectSummaryAsyncForAssembly(runtimeAssemblyName, limit, 1, false, symbolPrefixes);
         }
 
         private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(
             string runtimeAssemblyName,
             int limit,
             int maxDepth,
-            bool includeTransitiveRoots,
             params string[] symbolPrefixes)
         {
-            return RunRuntimeEffectSummaryAsyncForAssembly(runtimeAssemblyName, limit, maxDepth, includeTransitiveRoots, false, symbolPrefixes);
+            return RunRuntimeEffectSummaryAsyncForAssembly(runtimeAssemblyName, limit, maxDepth, false, symbolPrefixes);
         }
 
         private static Task<JsonDocument> RunRuntimeEffectSummaryAsyncForAssembly(
@@ -505,10 +495,9 @@ public sealed class StableCacheDerived : StaticFieldBase
             int limit,
             int maxDepth,
             bool includeTransitiveRoots,
-            bool ignoreReviewedPurityEntries,
             params string[] symbolPrefixes)
         {
-            return RunRuntimeEffectSummaryAsyncCore(limit, runtimeAssemblyName, maxDepth, includeTransitiveRoots, ignoreReviewedPurityEntries, symbolPrefixes);
+            return RunRuntimeEffectSummaryAsyncCore(limit, runtimeAssemblyName, maxDepth, includeTransitiveRoots, symbolPrefixes);
         }
 
         private static async Task<JsonDocument> RunRuntimeEffectSummaryAsyncCore(
@@ -516,7 +505,6 @@ public sealed class StableCacheDerived : StaticFieldBase
             string? runtimeAssemblyName,
             int maxDepth,
             bool includeTransitiveRoots,
-            bool ignoreReviewedPurityEntries,
             params string[] symbolPrefixes)
         {
             if (symbolPrefixes.Length == 0)
@@ -555,10 +543,6 @@ public sealed class StableCacheDerived : StaticFieldBase
             }
             startInfo.ArgumentList.Add("--classify-purity");
             startInfo.ArgumentList.Add("--compare-manual-catalogs");
-            if (ignoreReviewedPurityEntries)
-            {
-                startInfo.ArgumentList.Add("--ignore-reviewed-purity-entries");
-            }
             startInfo.ArgumentList.Add("--limit");
             startInfo.ArgumentList.Add(limit.ToString());
             startInfo.ArgumentList.Add("--output");
@@ -710,14 +694,6 @@ public sealed class StableCacheDerived : StaticFieldBase
             await RunEffectSummaryToolAsync(arguments.ToArray());
         }
 
-        private static string CreateReviewedSummaryDocument(params object[] entries)
-        {
-            return CreateGeneratedPurityCatalogSummaryDocument(new
-            {
-                Entries = entries
-            });
-        }
-
         private static string CreateGeneratedOnlySummaryDocument(JsonDocument summary)
         {
             return CreateGeneratedPurityCatalogSummaryDocument(summary.RootElement.GetProperty("GeneratedPurityCatalog"));
@@ -741,44 +717,6 @@ public sealed class StableCacheDerived : StaticFieldBase
                 .Select(symbol => symbol!)
                 .OrderBy(symbol => symbol, StringComparer.Ordinal)
                 .ToArray();
-        }
-
-        private static object CreateReviewedEntry(
-            string symbol,
-            string exactSymbolKey,
-            string metadataToken,
-            string methodBodySha256,
-            string classification = "impure",
-            string primaryCategory = "generated_purity_summary",
-            string[]? categories = null,
-            string[]? firstBlockingCallChain = null,
-            bool hasFreshArrayAllocationEvidence = false,
-            bool hasFreshObjectAllocationEvidence = false,
-            bool hasUnsupportedEffects = false,
-            string freshnessClassification = "none",
-            string effectVisibilityClassification = "caller_visible")
-        {
-            return new
-            {
-                Symbol = symbol,
-                ExactSymbolKey = exactSymbolKey,
-                CacheKey = "mvid:test-mvid|token:" + metadataToken + "|il:" + methodBodySha256,
-                AssemblyName = "TestAssembly",
-                AssemblyPath = "TestAssembly.dll",
-                AssemblySha256 = "test-assembly-sha256",
-                ModuleVersionId = "test-module-version-id",
-                MetadataToken = metadataToken,
-                MethodBodySha256 = methodBodySha256,
-                Classification = classification,
-                PrimaryCategory = primaryCategory,
-                Categories = categories ?? Array.Empty<string>(),
-                FirstBlockingCallChain = firstBlockingCallChain ?? Array.Empty<string>(),
-                HasFreshArrayAllocationEvidence = hasFreshArrayAllocationEvidence,
-                HasFreshObjectAllocationEvidence = hasFreshObjectAllocationEvidence,
-                HasUnsupportedEffects = hasUnsupportedEffects,
-                FreshnessClassification = freshnessClassification,
-                EffectVisibilityClassification = effectVisibilityClassification
-            };
         }
 
         private static void TryKillProcess(Process process)

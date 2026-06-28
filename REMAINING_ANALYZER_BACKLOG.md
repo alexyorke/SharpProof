@@ -98,8 +98,9 @@ Remaining:
       stay aligned.
 - [ ] Reduce conservative `unknown_external_call` fallbacks only when a
       trusted per-member summary exists.
-- [ ] Add or check in reviewed framework summary artifacts only after identity
-      validation is strong enough to reject mismatched runtimes.
+- [ ] Add more validated built-in manifest entries or ad hoc local summary
+      slices only after identity validation is strong enough to reject
+      mismatched runtimes.
 - [ ] Promote trusted generated purity rows into optional analyzer consumption
       only for exact external members after review.
 - [ ] Keep runtime-native, OS, reflection, environment, time, culture,
