@@ -1412,6 +1412,29 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_FiniteForeachNonZeroContradictoryDivide_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        foreach (var divisor in new[] { 5, 10 })
+        {
+            if (divisor == 0)
+            {
+                return 10 / 0;
+            }
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_CatchFilterNonZeroDivisor_DoesNotReport()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

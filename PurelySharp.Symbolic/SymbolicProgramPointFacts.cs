@@ -15,6 +15,7 @@ namespace PurelySharp.Symbolic
     {
         private const int MaxMergedIfElseFacts = 16;
         private const int MaxMergedSwitchFacts = 32;
+        private const int MaxFiniteForeachElementFacts = 8;
 
         public static List<SmtFormula> CollectPriorAssignmentFacts(
             SyntaxNode site,
@@ -1772,7 +1773,7 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken)
         {
             AddReferenceNullCondition(facts, expressionSyntax, isNull: false, semanticModel, cancellationToken);
-            AddSingleElementForeachIterationFact(facts, expressionSyntax, iterationSymbol, semanticModel, cancellationToken);
+            AddFiniteForeachIterationFact(facts, expressionSyntax, iterationSymbol, semanticModel, cancellationToken);
 
             var typeInfo = semanticModel.GetTypeInfo(expressionSyntax, cancellationToken);
             if (!IsSupportedForeachLengthReceiver(expressionSyntax) &&
@@ -1799,7 +1800,7 @@ namespace PurelySharp.Symbolic
                 new SmtIntegerConstant(0)));
         }
 
-        private static void AddSingleElementForeachIterationFact(
+        private static void AddFiniteForeachIterationFact(
             ICollection<SmtFormula> facts,
             ExpressionSyntax expressionSyntax,
             ILocalSymbol? iterationSymbol,
@@ -1807,42 +1808,93 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken)
         {
             if (iterationSymbol == null ||
-                !TryGetSingleElementExpression(expressionSyntax, out var elementExpression) ||
-                ExpressionReferencesSymbol(elementExpression, iterationSymbol.OriginalDefinition, semanticModel, cancellationToken) ||
-                !TryCreateAssignedValueFact(
-                    iterationSymbol.OriginalDefinition,
-                    elementExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var iterationValueFact))
+                !TryGetFiniteElementExpressions(expressionSyntax, out var elementExpressions))
             {
                 return;
             }
 
-            facts.Add(iterationValueFact);
+            SmtFormula? finiteDomainFact = null;
+            foreach (var elementExpression in elementExpressions)
+            {
+                if (ExpressionReferencesSymbol(elementExpression, iterationSymbol.OriginalDefinition, semanticModel, cancellationToken) ||
+                    !TryCreateAssignedValueFact(
+                        iterationSymbol.OriginalDefinition,
+                        elementExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var elementValueFact))
+                {
+                    return;
+                }
+
+                finiteDomainFact = finiteDomainFact == null
+                    ? elementValueFact
+                    : new SmtBinaryFormula(SmtBinaryOperator.Or, finiteDomainFact, elementValueFact);
+            }
+
+            if (finiteDomainFact != null)
+            {
+                facts.Add(finiteDomainFact);
+            }
         }
 
-        private static bool TryGetSingleElementExpression(
+        private static bool TryGetFiniteElementExpressions(
             ExpressionSyntax expressionSyntax,
-            out ExpressionSyntax elementExpression)
+            out ImmutableArray<ExpressionSyntax> elementExpressions)
         {
             expressionSyntax = UnwrapExpression(expressionSyntax);
+            SeparatedSyntaxList<ExpressionSyntax>? initializerExpressions = null;
             switch (expressionSyntax)
             {
-                case ArrayCreationExpressionSyntax { Initializer.Expressions.Count: 1 } arrayCreation:
-                    elementExpression = arrayCreation.Initializer.Expressions[0];
-                    return true;
-                case ImplicitArrayCreationExpressionSyntax { Initializer.Expressions.Count: 1 } implicitArrayCreation:
-                    elementExpression = implicitArrayCreation.Initializer.Expressions[0];
-                    return true;
-                case CollectionExpressionSyntax { Elements.Count: 1 } collectionExpression
-                    when collectionExpression.Elements[0] is ExpressionElementSyntax expressionElement:
-                    elementExpression = expressionElement.Expression;
-                    return true;
-                default:
-                    elementExpression = null!;
-                    return false;
+                case ArrayCreationExpressionSyntax { Initializer: { } initializer }:
+                    initializerExpressions = initializer.Expressions;
+                    break;
+                case ImplicitArrayCreationExpressionSyntax { Initializer: { } initializer }:
+                    initializerExpressions = initializer.Expressions;
+                    break;
+                case CollectionExpressionSyntax collectionExpression:
+                    return TryGetFiniteCollectionExpressionElements(collectionExpression, out elementExpressions);
             }
+
+            if (initializerExpressions is not { } expressions ||
+                expressions.Count == 0 ||
+                expressions.Count > MaxFiniteForeachElementFacts)
+            {
+                elementExpressions = ImmutableArray<ExpressionSyntax>.Empty;
+                return false;
+            }
+
+            elementExpressions = expressions.ToImmutableArray();
+            return true;
+        }
+
+        private static bool TryGetFiniteCollectionExpressionElements(
+            CollectionExpressionSyntax collectionExpression,
+            out ImmutableArray<ExpressionSyntax> elementExpressions)
+        {
+            if (collectionExpression.Elements.Count == 0 ||
+                collectionExpression.Elements.Count > MaxFiniteForeachElementFacts)
+            {
+                elementExpressions = ImmutableArray<ExpressionSyntax>.Empty;
+                return false;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<ExpressionSyntax>(collectionExpression.Elements.Count);
+            foreach (var element in collectionExpression.Elements)
+            {
+                switch (element)
+                {
+                    case ExpressionElementSyntax expressionElement:
+                        builder.Add(expressionElement.Expression);
+                        break;
+                    default:
+                        elementExpressions = ImmutableArray<ExpressionSyntax>.Empty;
+                        return false;
+                }
+            }
+
+            elementExpressions = builder.ToImmutable();
+            return true;
         }
 
         private static bool IsSupportedForeachLengthReceiver(ExpressionSyntax expressionSyntax)
