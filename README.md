@@ -274,6 +274,15 @@ dotnet run --project Tools/PurelySharp.CorpusReport -- --output artifacts/purely
 
 The JSON report includes a stable `SchemaVersion`, `PS0002`, `PS0004`, `PS0009`, `PS0010`, and `PS0011` counts, per-diagnostic evidence rows, impurity categories, exception categories/sources, rule-name counts, operation kinds, unsupported/unknown operation kinds, top impure APIs, catalog/config-source details, catalog-miss candidates, and false-positive candidates based on the structured diagnostic properties emitted by `PS0002`, `PS0010`, and `PS0011`. Exception-flow rows also preserve additive `purelysharp.exceptions.edges` payloads when present. Explanation diagnostics (`PS0009`) remain visible as diagnostic rows but do not double-count impurity aggregates.
 
+## Symbolic Invariant Queries
+
+`Tools/PurelySharp.SymbolicCli` queries the shared symbolic invariant library directly. It reports the SMT facts known at a source line/column, which is useful for debugging reachability, range, null, length, and pattern-binding facts independently from analyzer diagnostics.
+
+```powershell
+dotnet run --project Tools/PurelySharp.SymbolicCli -- --file src\Example.cs --line 42 --column 9 --json
+dotnet run --project Tools/PurelySharp.SymbolicCli -- --file src\Example.cs --line 42 --reference bin\Debug\net8.0\SomeLibrary.dll
+```
+
 For framework and library calibration, `Tools/PurelySharp.EffectSummary` can now emit implementation-derived purity classifications in its own JSON output. This is the preferred starting point for reviewing which manual pure entries are still justified by the current runtime implementation before changing analyzer behavior.
 
 ## CI Usage

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.CodeAnalysis;
 using PurelySharp.Symbolic;
 
 var options = SymbolicCliOptions.Parse(args);
@@ -13,7 +14,8 @@ try
     var result = new SymbolicSourceQueryService().QueryFile(
         options.FilePath,
         options.Line,
-        options.Column);
+        options.Column,
+        options.CreateReferences());
 
     if (options.Json)
     {
@@ -52,10 +54,11 @@ internal sealed class SymbolicCliOptions
 Usage: PurelySharp.SymbolicCli --file <path> --line <n> [--column <n>] [--json]
 
 Options:
-  --file <path>    C# source file to query.
-  --line <n>       1-based source line to query.
-  --column <n>     1-based source column to query. Default: 1.
-  --json           Emit JSON instead of text.
+  --file <path>       C# source file to query.
+  --line <n>          1-based source line to query.
+  --column <n>        1-based source column to query. Default: 1.
+  --reference <path>  Metadata reference path. Can be repeated.
+  --json              Emit JSON instead of text.
 """;
 
     public string? FilePath { get; private set; }
@@ -63,6 +66,8 @@ Options:
     public int Line { get; private set; }
 
     public int Column { get; private set; } = 1;
+
+    public List<string> ReferencePaths { get; } = new();
 
     public bool Json { get; private set; }
 
@@ -89,6 +94,10 @@ Options:
                 case "--column":
                     options.Column = ReadInt(args, ref index, arg);
                     break;
+                case "--reference":
+                case "-r":
+                    options.ReferencePaths.Add(ReadString(args, ref index, arg));
+                    break;
                 case "--json":
                     options.Json = true;
                     break;
@@ -113,9 +122,27 @@ Options:
             {
                 throw new ArgumentException("--line is required.");
             }
+
+            foreach (var referencePath in options.ReferencePaths)
+            {
+                if (!File.Exists(referencePath))
+                {
+                    throw new ArgumentException("--reference does not exist: " + referencePath);
+                }
+            }
         }
 
         return options;
+    }
+
+    public IEnumerable<MetadataReference>? CreateReferences()
+    {
+        if (ReferencePaths.Count == 0)
+        {
+            return null;
+        }
+
+        return ReferencePaths.Select(static path => MetadataReference.CreateFromFile(Path.GetFullPath(path)));
     }
 
     private static string ReadString(string[] args, ref int index, string optionName)
