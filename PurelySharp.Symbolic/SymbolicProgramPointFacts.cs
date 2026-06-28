@@ -219,6 +219,7 @@ namespace PurelySharp.Symbolic
                     AddForeachBodyEntryFacts(
                         builder,
                         forEachStatementSyntax.Expression,
+                        semanticModel.GetDeclaredSymbol(forEachStatementSyntax, cancellationToken) as ILocalSymbol,
                         semanticModel,
                         cancellationToken);
                 }
@@ -234,6 +235,7 @@ namespace PurelySharp.Symbolic
                     AddForeachBodyEntryFacts(
                         builder,
                         forEachVariableStatementSyntax.Expression,
+                        iterationSymbol: null,
                         semanticModel,
                         cancellationToken);
                 }
@@ -1765,10 +1767,12 @@ namespace PurelySharp.Symbolic
         private static void AddForeachBodyEntryFacts(
             ICollection<SmtFormula> facts,
             ExpressionSyntax expressionSyntax,
+            ILocalSymbol? iterationSymbol,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
             AddReferenceNullCondition(facts, expressionSyntax, isNull: false, semanticModel, cancellationToken);
+            AddSingleElementForeachIterationFact(facts, expressionSyntax, iterationSymbol, semanticModel, cancellationToken);
 
             var typeInfo = semanticModel.GetTypeInfo(expressionSyntax, cancellationToken);
             if (!IsSupportedForeachLengthReceiver(expressionSyntax) &&
@@ -1795,11 +1799,58 @@ namespace PurelySharp.Symbolic
                 new SmtIntegerConstant(0)));
         }
 
+        private static void AddSingleElementForeachIterationFact(
+            ICollection<SmtFormula> facts,
+            ExpressionSyntax expressionSyntax,
+            ILocalSymbol? iterationSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (iterationSymbol == null ||
+                !TryGetSingleElementExpression(expressionSyntax, out var elementExpression) ||
+                ExpressionReferencesSymbol(elementExpression, iterationSymbol.OriginalDefinition, semanticModel, cancellationToken) ||
+                !TryCreateAssignedValueFact(
+                    iterationSymbol.OriginalDefinition,
+                    elementExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var iterationValueFact))
+            {
+                return;
+            }
+
+            facts.Add(iterationValueFact);
+        }
+
+        private static bool TryGetSingleElementExpression(
+            ExpressionSyntax expressionSyntax,
+            out ExpressionSyntax elementExpression)
+        {
+            expressionSyntax = UnwrapExpression(expressionSyntax);
+            switch (expressionSyntax)
+            {
+                case ArrayCreationExpressionSyntax { Initializer.Expressions.Count: 1 } arrayCreation:
+                    elementExpression = arrayCreation.Initializer.Expressions[0];
+                    return true;
+                case ImplicitArrayCreationExpressionSyntax { Initializer.Expressions.Count: 1 } implicitArrayCreation:
+                    elementExpression = implicitArrayCreation.Initializer.Expressions[0];
+                    return true;
+                case CollectionExpressionSyntax { Elements.Count: 1 } collectionExpression
+                    when collectionExpression.Elements[0] is ExpressionElementSyntax expressionElement:
+                    elementExpression = expressionElement.Expression;
+                    return true;
+                default:
+                    elementExpression = null!;
+                    return false;
+            }
+        }
+
         private static bool IsSupportedForeachLengthReceiver(ExpressionSyntax expressionSyntax)
         {
             expressionSyntax = UnwrapExpression(expressionSyntax);
             return expressionSyntax is ArrayCreationExpressionSyntax or
-                ImplicitArrayCreationExpressionSyntax;
+                ImplicitArrayCreationExpressionSyntax or
+                CollectionExpressionSyntax;
         }
 
         private static bool IsSupportedForeachLengthReceiver(ITypeSymbol? type)

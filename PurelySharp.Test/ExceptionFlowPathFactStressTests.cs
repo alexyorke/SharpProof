@@ -1371,6 +1371,47 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_SingleElementForeachZeroDivisor_ReportsDivideByZeroException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        foreach (var divisor in new[] { 0 })
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_SingleElementForeachNonZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        foreach (var divisor in new[] { 5 })
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_CatchFilterNonZeroDivisor_DoesNotReport()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

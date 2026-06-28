@@ -1452,6 +1452,62 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesSingleElementForeachValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        foreach (var value in new[] { 5 })
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "SingleElementForeachValue.cs",
+                FindLine(source, "return value;"),
+                20,
+                "value == 5",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotAssumeMultiElementForeachValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        foreach (var value in new[] { 0, 1 })
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "MultiElementForeachValue.cs",
+                FindLine(source, "return value;"),
+                20,
+                "value == 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesLockReceiverNonNull()
         {
             const string source = @"
