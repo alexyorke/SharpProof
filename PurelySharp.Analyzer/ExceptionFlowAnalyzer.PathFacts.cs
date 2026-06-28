@@ -490,11 +490,14 @@ namespace PurelySharp.Analyzer
             List<SmtFormula> facts)
         {
             RemoveFactsReferencingSymbol(facts, targetSymbol);
+            var effectiveValueExpression = TryGetCoalesceThrowValue(valueExpression, out var coalesceThrowValue)
+                ? coalesceThrowValue
+                : valueExpression;
 
             if (TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) &&
-                !ExpressionReferencesSymbol(valueExpression, targetSymbol, semanticModel, cancellationToken) &&
+                !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
                 CSharpConditionToFormula.TryTranslateValue(
-                    valueExpression,
+                    effectiveValueExpression,
                     semanticModel,
                     cancellationToken,
                     out var valueFormula,
@@ -506,11 +509,54 @@ namespace PurelySharp.Analyzer
             }
 
             if (TryCreateBuiltInLengthFormula(targetSymbol, out var targetLengthFormula) &&
-                !ExpressionReferencesSymbol(valueExpression, targetSymbol, semanticModel, cancellationToken) &&
-                TryCreateBuiltInLengthValueFormula(valueExpression, semanticModel, cancellationToken, out var valueLengthFormula))
+                !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
+                TryCreateBuiltInLengthValueFormula(effectiveValueExpression, semanticModel, cancellationToken, out var valueLengthFormula))
             {
                 facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula));
             }
+
+            if (!ReferenceEquals(effectiveValueExpression, valueExpression))
+            {
+                AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+        }
+
+        private static bool TryGetCoalesceThrowValue(ExpressionSyntax valueExpression, out ExpressionSyntax effectiveValueExpression)
+        {
+            valueExpression = UnwrapFactExpression(valueExpression);
+            if (valueExpression is BinaryExpressionSyntax coalesceExpression &&
+                coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                UnwrapFactExpression(coalesceExpression.Right) is ThrowExpressionSyntax)
+            {
+                effectiveValueExpression = coalesceExpression.Left;
+                return true;
+            }
+
+            effectiveValueExpression = null!;
+            return false;
+        }
+
+        private static void AddReferenceNonNullFact(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var formula,
+                    getSymbolVersion: null) ||
+                formula is not { Kind: SmtValueKind.Reference })
+            {
+                return;
+            }
+
+            facts.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.NotEqual,
+                formula,
+                new SmtNullConstant()));
         }
 
         private static void RemoveFactsInvalidatedByNestedMutations(

@@ -385,17 +385,65 @@ namespace PurelySharp.Symbolic
             List<SmtFormula> facts)
         {
             RemoveFactsReferencingSymbol(facts, assignedSymbol);
-            if (!ExpressionReferencesSymbol(valueExpression, assignedSymbol, semanticModel, cancellationToken) &&
-                TryCreateAssignedValueFact(assignedSymbol, valueExpression, semanticModel, cancellationToken, out var fact))
+            var effectiveValueExpression = TryGetCoalesceThrowValue(valueExpression, out var coalesceThrowValue)
+                ? coalesceThrowValue
+                : valueExpression;
+
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
+                TryCreateAssignedValueFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var fact))
             {
                 facts.Add(fact);
             }
 
-            if (!ExpressionReferencesSymbol(valueExpression, assignedSymbol, semanticModel, cancellationToken) &&
-                TryCreateBuiltInLengthFact(assignedSymbol, valueExpression, semanticModel, cancellationToken, out var lengthFact))
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
+                TryCreateBuiltInLengthFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var lengthFact))
             {
                 facts.Add(lengthFact);
             }
+
+            if (!ReferenceEquals(effectiveValueExpression, valueExpression))
+            {
+                AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+        }
+
+        private static bool TryGetCoalesceThrowValue(ExpressionSyntax valueExpression, out ExpressionSyntax effectiveValueExpression)
+        {
+            valueExpression = UnwrapExpression(valueExpression);
+            if (valueExpression is BinaryExpressionSyntax coalesceExpression &&
+                coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                UnwrapExpression(coalesceExpression.Right) is ThrowExpressionSyntax)
+            {
+                effectiveValueExpression = coalesceExpression.Left;
+                return true;
+            }
+
+            effectiveValueExpression = null!;
+            return false;
+        }
+
+        private static void AddReferenceNonNullFact(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var formula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) ||
+                formula is not { Kind: SmtValueKind.Reference })
+            {
+                return;
+            }
+
+            facts.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.NotEqual,
+                formula,
+                new SmtNullConstant()));
         }
 
         private static bool TryCreateAssignedValueFact(
