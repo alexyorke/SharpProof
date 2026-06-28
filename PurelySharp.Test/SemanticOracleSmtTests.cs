@@ -834,6 +834,70 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_QuerySource_CollectsPatternVariableBindingFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value is > 0 and var divisor)
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "QuerySourcePatternBindingFacts.cs",
+                FindLine(source, "return 10 / divisor;"),
+                13,
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(result.Facts, Is.Not.Empty);
+            Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal) &&
+                                                 fact.Contains("value", StringComparison.Ordinal) &&
+                                                 fact.Contains("0", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                                 fact.Contains("divisor", StringComparison.Ordinal) &&
+                                                 fact.Contains("value", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_QuerySource_CollectsPropertyPatternVariableBindingFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        if (text is { Length: > 0 and var length })
+        {
+            return 10 / length;
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "QuerySourcePropertyPatternBindingFacts.cs",
+                FindLine(source, "return 10 / length;"),
+                13,
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(result.Facts, Is.Not.Empty);
+            Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal) &&
+                                                 fact.Contains("Length", StringComparison.Ordinal) &&
+                                                 fact.Contains("0", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                                 fact.Contains("length", StringComparison.Ordinal) &&
+                                                 fact.Contains("Length", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_UlongZeroContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -2641,6 +2705,46 @@ public class TestClass
         if (divisor != 0)
         {
             return value / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_RelationalPatternVariableBindingExcludesZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value is > 0 and var divisor)
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_PropertyPatternVariableBindingExcludesZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        if (text is { Length: > 0 and var length })
+        {
+            return 10 / length;
         }
 
         return 0;

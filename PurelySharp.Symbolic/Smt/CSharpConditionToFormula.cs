@@ -609,6 +609,11 @@ namespace PurelySharp.Symbolic.Smt
                 }
             }
 
+            if (branchWhenTrue)
+            {
+                AddPatternBindingFacts(expression, semanticModel, cancellationToken, formulas, getSymbolVersion);
+            }
+
             if (!TryTranslate(expression, semanticModel, cancellationToken, out var formula, getSymbolVersion) ||
                 formula == null)
             {
@@ -618,6 +623,153 @@ namespace PurelySharp.Symbolic.Smt
             formulas.Add(branchWhenTrue
                 ? formula
                 : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
+        }
+
+        private static void AddPatternBindingFacts(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is not IsPatternExpressionSyntax isPatternExpression ||
+                !TryTranslateValue(isPatternExpression.Expression, semanticModel, cancellationToken, out var matchedValue, getSymbolVersion) ||
+                matchedValue == null)
+            {
+                return;
+            }
+
+            var valueType = semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).Type;
+            AddPatternBindingFacts(
+                matchedValue,
+                valueType,
+                isPatternExpression.Pattern,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion);
+        }
+
+        private static void AddPatternBindingFacts(
+            SmtFormula matchedValue,
+            ITypeSymbol? matchedValueType,
+            PatternSyntax pattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
+            {
+                AddPatternBindingFacts(
+                    matchedValue,
+                    matchedValueType,
+                    parenthesizedPattern.Pattern,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion);
+                return;
+            }
+
+            switch (pattern)
+            {
+                case VarPatternSyntax varPattern:
+                    AddDesignationBindingFact(matchedValue, varPattern.Designation, semanticModel, formulas, getSymbolVersion);
+                    return;
+                case DeclarationPatternSyntax declarationPattern:
+                    AddDesignationBindingFact(matchedValue, declarationPattern.Designation, semanticModel, formulas, getSymbolVersion);
+                    return;
+                case RecursivePatternSyntax recursivePattern:
+                    AddDesignationBindingFact(matchedValue, recursivePattern.Designation, semanticModel, formulas, getSymbolVersion);
+                    AddRecursivePropertyPatternBindingFacts(
+                        matchedValue,
+                        recursivePattern,
+                        semanticModel,
+                        cancellationToken,
+                        formulas,
+                        getSymbolVersion);
+                    return;
+                case BinaryPatternSyntax binaryPattern when binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword):
+                    AddPatternBindingFacts(
+                        matchedValue,
+                        matchedValueType,
+                        binaryPattern.Left,
+                        semanticModel,
+                        cancellationToken,
+                        formulas,
+                        getSymbolVersion);
+                    AddPatternBindingFacts(
+                        matchedValue,
+                        matchedValueType,
+                        binaryPattern.Right,
+                        semanticModel,
+                        cancellationToken,
+                        formulas,
+                        getSymbolVersion);
+                    return;
+            }
+        }
+
+        private static void AddRecursivePropertyPatternBindingFacts(
+            SmtFormula matchedValue,
+            RecursivePatternSyntax recursivePattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            var subpatterns = recursivePattern.PropertyPatternClause?.Subpatterns;
+            if (subpatterns == null)
+            {
+                return;
+            }
+
+            foreach (var subpattern in subpatterns.Value)
+            {
+                if (subpattern.NameColon?.Name == null)
+                {
+                    continue;
+                }
+
+                var memberSymbol = semanticModel.GetSymbolInfo(subpattern.NameColon.Name, cancellationToken).Symbol;
+                if (!TryGetMemberType(memberSymbol, out var memberType) ||
+                    !TryCreateMemberFormula(matchedValue, memberSymbol!.Name, memberType, out var memberValue) ||
+                    memberValue == null)
+                {
+                    continue;
+                }
+
+                AddPatternBindingFacts(
+                    memberValue,
+                    memberType,
+                    subpattern.Pattern,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion);
+            }
+        }
+
+        private static void AddDesignationBindingFact(
+            SmtFormula matchedValue,
+            VariableDesignationSyntax? designation,
+            SemanticModel semanticModel,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (designation is not SingleVariableDesignationSyntax singleVariableDesignation ||
+                singleVariableDesignation.Identifier.ValueText == "_" ||
+                semanticModel.GetDeclaredSymbol(singleVariableDesignation) is not ILocalSymbol localSymbol ||
+                !TryCreateSymbolFormula(localSymbol, getSymbolVersion, out var localValue) ||
+                !AreComparable(localValue, matchedValue))
+            {
+                return;
+            }
+
+            formulas.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, localValue, matchedValue));
         }
 
         private static bool TryTranslatePatternExpression(
@@ -1234,6 +1386,29 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
+        }
+
+        private static bool TryCreateSymbolFormula(
+            ISymbol symbol,
+            Func<ISymbol, int>? getSymbolVersion,
+            out SmtFormula formula)
+        {
+            var type = symbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                _ => null
+            };
+
+            if (type == null ||
+                !TryGetValueKind(type, out var kind))
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(GetVariableName(symbol, getSymbolVersion), kind);
+            return true;
         }
 
         private static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)
