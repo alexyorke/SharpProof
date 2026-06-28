@@ -3663,6 +3663,59 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableLiteralAssignmentFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int? value = 5;
+        return value.Value;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "NullableLiteralAssignmentFacts.cs",
+                FindLine(source, "return value.Value;"),
+                16,
+                "value.HasValue && value.Value == 5",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardedConditionalNullableHasValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        if (flag)
+        {
+            int? value = flag ? 5 : null;
+            return value.Value;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "GuardedConditionalNullableFacts.cs",
+                FindLine(source, "return value.Value;"),
+                16,
+                "value.HasValue",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicInvariantService_TupleAssignmentSwapInvalidatesTargetFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -5652,6 +5705,58 @@ public class TestClass
 }");
 
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_NullableHasValueContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        int? value = 5;
+        if (!value.HasValue)
+        {
+            Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_NullableDefaultReassignmentReachableGuard_Reports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        int? value = 5;
+        value = default;
+        if (!value.HasValue)
+        {
+            Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
         }
 
         [Test]

@@ -2173,6 +2173,11 @@ namespace PurelySharp.Symbolic
                     new SmtNullConstant()));
             }
 
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
+            {
+                AddNullableAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+
             AddTupleElementAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
 
             if (hasThrowGuard &&
@@ -2705,6 +2710,199 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
+        private static void AddNullableAssignedValueFacts(
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (!TryCreateNullableHasValueFormula(assignedSymbol, out var targetHasValue) ||
+                !TryCreateNullableValueFormula(assignedSymbol, out var targetValue))
+            {
+                return;
+            }
+
+            if (TryCreateNullableStateFormulas(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var hasValueFormula,
+                    out var valueFormula))
+            {
+                facts.Add(CreateAssignedValueFact(targetHasValue, hasValueFormula));
+
+                if (valueFormula != null &&
+                    CanCompareSmtValues(targetValue, valueFormula))
+                {
+                    facts.Add(CreateAssignedValueFact(targetValue, valueFormula));
+                }
+            }
+        }
+
+        private static bool TryCreateNullableStateFormulas(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula hasValueFormula,
+            out SmtFormula? valueFormula)
+        {
+            valueExpression = UnwrapExpression(valueExpression);
+            if (IsNullOrDefaultNullableValue(valueExpression, semanticModel, cancellationToken))
+            {
+                hasValueFormula = new SmtBooleanConstant(false);
+                valueFormula = null;
+                return true;
+            }
+
+            if (TryGetNullableWrappedValueExpression(valueExpression, semanticModel, cancellationToken, out var wrappedValueExpression) &&
+                CSharpConditionToFormula.TryTranslateValue(
+                    wrappedValueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out valueFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                valueFormula != null)
+            {
+                hasValueFormula = new SmtBooleanConstant(true);
+                return true;
+            }
+
+            if (semanticModel.GetSymbolInfo(valueExpression, cancellationToken).Symbol is { } sourceSymbol &&
+                sourceSymbol is ILocalSymbol or IParameterSymbol &&
+                TryCreateNullableHasValueFormula(sourceSymbol.OriginalDefinition, out hasValueFormula))
+            {
+                valueFormula = null;
+                return true;
+            }
+
+            if (valueExpression is ConditionalExpressionSyntax conditionalExpression &&
+                CSharpConditionToFormula.TryTranslate(
+                    conditionalExpression.Condition,
+                    semanticModel,
+                    cancellationToken,
+                    out var conditionFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                conditionFormula != null &&
+                TryCreateNullableStateFormulas(
+                    conditionalExpression.WhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    out var trueHasValue,
+                    out var trueValue) &&
+                TryCreateNullableStateFormulas(
+                    conditionalExpression.WhenFalse,
+                    semanticModel,
+                    cancellationToken,
+                    out var falseHasValue,
+                    out var falseValue))
+            {
+                hasValueFormula = new SmtConditionalFormula(conditionFormula, trueHasValue, falseHasValue, SmtValueKind.Bool);
+                valueFormula = trueValue != null &&
+                    falseValue != null &&
+                    trueValue.Kind == falseValue.Kind
+                        ? new SmtConditionalFormula(conditionFormula, trueValue, falseValue, trueValue.Kind)
+                        : null;
+                return true;
+            }
+
+            hasValueFormula = null!;
+            valueFormula = null;
+            return false;
+        }
+
+        private static bool IsNullOrDefaultNullableValue(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (semanticModel.GetConstantValue(valueExpression, cancellationToken) is { HasValue: true, Value: null } &&
+                TryGetNullableUnderlyingType(
+                    semanticModel.GetTypeInfo(valueExpression, cancellationToken).ConvertedType ??
+                    semanticModel.GetTypeInfo(valueExpression, cancellationToken).Type,
+                    out _))
+            {
+                return true;
+            }
+
+            if (!valueExpression.IsKind(SyntaxKind.DefaultLiteralExpression) &&
+                valueExpression is not DefaultExpressionSyntax)
+            {
+                return false;
+            }
+
+            return TryGetNullableUnderlyingType(
+                semanticModel.GetTypeInfo(valueExpression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(valueExpression, cancellationToken).Type,
+                out _);
+        }
+
+        private static bool TryGetNullableWrappedValueExpression(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax wrappedValueExpression)
+        {
+            valueExpression = UnwrapExpression(valueExpression);
+            if (valueExpression is CastExpressionSyntax castExpression &&
+                TryGetNullableUnderlyingType(
+                    semanticModel.GetTypeInfo(castExpression, cancellationToken).Type,
+                    out _))
+            {
+                wrappedValueExpression = castExpression.Expression;
+                return true;
+            }
+
+            if (valueExpression is ObjectCreationExpressionSyntax objectCreation &&
+                TryGetNullableUnderlyingType(
+                    semanticModel.GetTypeInfo(objectCreation, cancellationToken).Type,
+                    out _) &&
+                objectCreation.ArgumentList?.Arguments.Count == 1)
+            {
+                wrappedValueExpression = objectCreation.ArgumentList.Arguments[0].Expression;
+                return true;
+            }
+
+            var typeInfo = semanticModel.GetTypeInfo(valueExpression, cancellationToken);
+            if (TryGetNullableUnderlyingType(typeInfo.ConvertedType, out var convertedUnderlyingType) &&
+                typeInfo.Type != null &&
+                SymbolEqualityComparer.Default.Equals(typeInfo.Type, convertedUnderlyingType))
+            {
+                wrappedValueExpression = valueExpression;
+                return true;
+            }
+
+            wrappedValueExpression = null!;
+            return false;
+        }
+
+        private static bool TryCreateNullableHasValueFormula(ISymbol symbol, out SmtFormula formula)
+        {
+            if (!TryGetNullableUnderlyingType(GetSymbolType(symbol), out _))
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(GetSmtVariableName(symbol) + ".HasValue", SmtValueKind.Bool);
+            return true;
+        }
+
+        private static bool TryCreateNullableValueFormula(ISymbol symbol, out SmtFormula formula)
+        {
+            if (!TryGetNullableUnderlyingType(GetSymbolType(symbol), out var underlyingType) ||
+                !TryGetValueKind(underlyingType, out var kind))
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(GetSmtVariableName(symbol) + ".Value", kind);
+            return true;
+        }
+
         private static bool TryHandleTupleDeconstructionDeclaration(
             AssignmentExpressionSyntax assignment,
             SemanticModel semanticModel,
@@ -3180,6 +3378,54 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
+        private static ITypeSymbol? GetSymbolType(ISymbol symbol)
+        {
+            return symbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                _ => null
+            };
+        }
+
+        private static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)
+        {
+            if (type.SpecialType == SpecialType.System_Boolean)
+            {
+                kind = SmtValueKind.Bool;
+                return true;
+            }
+
+            if (IsIntegralOrEnumType(type))
+            {
+                kind = SmtValueKind.Int;
+                return true;
+            }
+
+            if (type.IsReferenceType)
+            {
+                kind = SmtValueKind.Reference;
+                return true;
+            }
+
+            kind = default;
+            return false;
+        }
+
+        private static bool TryGetNullableUnderlyingType(ITypeSymbol? type, out ITypeSymbol underlyingType)
+        {
+            if (type is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T &&
+                namedType.TypeArguments.Length == 1)
+            {
+                underlyingType = namedType.TypeArguments[0];
+                return true;
+            }
+
+            underlyingType = null!;
+            return false;
+        }
+
         private static SmtFormula CreateAssignedValueFact(SmtFormula targetFormula, SmtFormula valueFormula)
         {
             if (targetFormula.Kind == SmtValueKind.Bool &&
@@ -3366,6 +3612,12 @@ namespace PurelySharp.Symbolic
                 SpecialType.System_UInt32 or
                 SpecialType.System_Int64 or
                 SpecialType.System_UInt64;
+        }
+
+        private static bool IsIntegralOrEnumType(ITypeSymbol typeSymbol)
+        {
+            return IsIntegralType(typeSymbol) ||
+                typeSymbol.TypeKind == TypeKind.Enum;
         }
     }
 }

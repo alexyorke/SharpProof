@@ -2301,6 +2301,11 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (TryTranslateNullableMemberValue(memberAccess, memberSymbol, semanticModel, cancellationToken, out formula, getSymbolVersion))
+            {
+                return true;
+            }
+
             if (!TryTranslateValue(memberAccess.Expression, semanticModel, cancellationToken, out var receiver, getSymbolVersion, inlineDepth) ||
                 receiver == null)
             {
@@ -2314,6 +2319,41 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return TryCreateMemberFormula(receiver, memberSymbol.Name, type, out formula);
+        }
+
+        private static bool TryTranslateNullableMemberValue(
+            MemberAccessExpressionSyntax memberAccess,
+            ISymbol memberSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null;
+            if (memberSymbol.Name is not "HasValue" and not "Value" ||
+                semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not { } receiverSymbol ||
+                receiverSymbol is not ILocalSymbol and not IParameterSymbol ||
+                !TryGetNullableUnderlyingType(
+                    semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).Type,
+                    out var underlyingType))
+            {
+                return false;
+            }
+
+            var variableName = GetVariableName(receiverSymbol.OriginalDefinition, getSymbolVersion);
+            if (memberSymbol.Name == "HasValue")
+            {
+                formula = new SmtVariable(variableName + ".HasValue", SmtValueKind.Bool);
+                return true;
+            }
+
+            if (!TryGetValueKind(underlyingType, out var kind))
+            {
+                return false;
+            }
+
+            formula = new SmtVariable(variableName + ".Value", kind);
+            return true;
         }
 
         private static bool TryTranslateTupleElementValue(
@@ -2426,6 +2466,20 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             kind = default;
+            return false;
+        }
+
+        private static bool TryGetNullableUnderlyingType(ITypeSymbol? type, out ITypeSymbol underlyingType)
+        {
+            if (type is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T &&
+                namedType.TypeArguments.Length == 1)
+            {
+                underlyingType = namedType.TypeArguments[0];
+                return true;
+            }
+
+            underlyingType = null!;
             return false;
         }
 
