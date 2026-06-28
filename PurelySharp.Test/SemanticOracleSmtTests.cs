@@ -772,6 +772,42 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_QuerySource_CollectsConditionalThrowAssignmentFacts()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        var safe = value != null ? value : throw new InvalidOperationException();
+        if (safe == null)
+        {
+            return 0;
+        }
+
+        return safe.Length;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "QuerySourceConditionalThrowFacts.cs",
+                FindLine(source, "if (safe == null)"),
+                9,
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(result.NodeKind, Is.EqualTo("IfStatement"));
+            Assert.That(result.Facts, Is.Not.Empty);
+            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                                 fact.Contains("safe", StringComparison.Ordinal) &&
+                                                 fact.Contains("value", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts.Any(fact => fact.Contains("NotEqual", StringComparison.Ordinal) &&
+                                                 fact.Contains("value", StringComparison.Ordinal) &&
+                                                 fact.Contains("Null", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_UlongZeroContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -1147,6 +1183,34 @@ public class TestClass
     public void TestMethod(string value)
     {
         var safe = value ?? throw new InvalidOperationException();
+        if (safe == null)
+        {
+            Console.WriteLine(safe);
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_ConditionalThrowAssignedNonNullContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string value)
+    {
+        var safe = value != null ? value : throw new InvalidOperationException();
         if (safe == null)
         {
             Console.WriteLine(safe);

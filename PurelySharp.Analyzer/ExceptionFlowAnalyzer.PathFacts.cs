@@ -490,8 +490,14 @@ namespace PurelySharp.Analyzer
             List<SmtFormula> facts)
         {
             RemoveFactsReferencingSymbol(facts, targetSymbol);
-            var effectiveValueExpression = TryGetCoalesceThrowValue(valueExpression, out var coalesceThrowValue)
-                ? coalesceThrowValue
+            var hasThrowGuard = TryGetThrowGuardedValue(
+                valueExpression,
+                out var throwGuardedValue,
+                out var guardExpression,
+                out var guardBranchWhenTrue,
+                out var requiresNonNullValue);
+            var effectiveValueExpression = hasThrowGuard
+                ? throwGuardedValue
                 : valueExpression;
 
             if (TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) &&
@@ -515,13 +521,31 @@ namespace PurelySharp.Analyzer
                 facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula));
             }
 
-            if (!ReferenceEquals(effectiveValueExpression, valueExpression))
+            if (hasThrowGuard &&
+                guardExpression != null &&
+                !ExpressionReferencesSymbol(guardExpression, targetSymbol, semanticModel, cancellationToken))
+            {
+                CSharpConditionToFormula.TryCollectBranchAssumptions(
+                    guardExpression,
+                    guardBranchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
+            else if (hasThrowGuard &&
+                     requiresNonNullValue &&
+                     !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken))
             {
                 AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
         }
 
-        private static bool TryGetCoalesceThrowValue(ExpressionSyntax valueExpression, out ExpressionSyntax effectiveValueExpression)
+        private static bool TryGetThrowGuardedValue(
+            ExpressionSyntax valueExpression,
+            out ExpressionSyntax effectiveValueExpression,
+            out ExpressionSyntax? guardExpression,
+            out bool guardBranchWhenTrue,
+            out bool requiresNonNullValue)
         {
             valueExpression = UnwrapFactExpression(valueExpression);
             if (valueExpression is BinaryExpressionSyntax coalesceExpression &&
@@ -529,10 +553,37 @@ namespace PurelySharp.Analyzer
                 UnwrapFactExpression(coalesceExpression.Right) is ThrowExpressionSyntax)
             {
                 effectiveValueExpression = coalesceExpression.Left;
+                guardExpression = null;
+                guardBranchWhenTrue = true;
+                requiresNonNullValue = true;
                 return true;
             }
 
+            if (valueExpression is ConditionalExpressionSyntax conditionalExpression)
+            {
+                if (UnwrapFactExpression(conditionalExpression.WhenFalse) is ThrowExpressionSyntax)
+                {
+                    effectiveValueExpression = conditionalExpression.WhenTrue;
+                    guardExpression = conditionalExpression.Condition;
+                    guardBranchWhenTrue = true;
+                    requiresNonNullValue = false;
+                    return true;
+                }
+
+                if (UnwrapFactExpression(conditionalExpression.WhenTrue) is ThrowExpressionSyntax)
+                {
+                    effectiveValueExpression = conditionalExpression.WhenFalse;
+                    guardExpression = conditionalExpression.Condition;
+                    guardBranchWhenTrue = false;
+                    requiresNonNullValue = false;
+                    return true;
+                }
+            }
+
             effectiveValueExpression = null!;
+            guardExpression = null;
+            guardBranchWhenTrue = true;
+            requiresNonNullValue = false;
             return false;
         }
 
