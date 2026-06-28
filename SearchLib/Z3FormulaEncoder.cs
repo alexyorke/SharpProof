@@ -50,12 +50,24 @@ namespace SearchLib.Smt
             {
                 SmtBooleanConstant booleanConstant => booleanConstant.Value ? _context.MkTrue() : _context.MkFalse(),
                 SmtIntegerConstant integerConstant => _context.MkInt(integerConstant.Value),
+                SmtStringConstant stringConstant => _context.MkString(stringConstant.Value),
                 SmtNullConstant => _nullReference,
                 SmtVariable variable => GetOrCreateVariable(variable),
                 SmtUnaryFormula unaryFormula => EncodeUnary(unaryFormula),
                 SmtBinaryFormula binaryFormula => EncodeBinary(binaryFormula),
                 SmtIntegerUnaryTerm integerUnaryTerm => EncodeIntegerUnary(integerUnaryTerm),
                 SmtIntegerBinaryTerm integerBinaryTerm => EncodeIntegerBinary(integerBinaryTerm),
+                SmtStringLengthTerm stringLengthTerm => _context.MkLength(EncodeString(stringLengthTerm.Value)),
+                SmtStringContainsFormula stringContainsFormula => _context.MkContains(
+                    EncodeString(stringContainsFormula.Value),
+                    EncodeString(stringContainsFormula.Search)),
+                SmtStringStartsWithFormula stringStartsWithFormula => _context.MkPrefixOf(
+                    EncodeString(stringStartsWithFormula.Prefix),
+                    EncodeString(stringStartsWithFormula.Value)),
+                SmtStringEndsWithFormula stringEndsWithFormula => _context.MkSuffixOf(
+                    EncodeString(stringEndsWithFormula.Suffix),
+                    EncodeString(stringEndsWithFormula.Value)),
+                SmtRegexMatchFormula regexMatchFormula => EncodeRegexMatch(regexMatchFormula),
                 SmtConditionalFormula conditionalFormula => EncodeConditional(conditionalFormula),
                 _ => throw new InvalidOperationException("Unsupported SMT formula node."),
             };
@@ -124,6 +136,26 @@ namespace SearchLib.Smt
             return (ArithExpr)Encode(formula);
         }
 
+        private SeqExpr EncodeString(SmtFormula formula)
+        {
+            if (formula.Kind != SmtValueKind.String)
+            {
+                throw new InvalidOperationException("Only string SMT formulas can be encoded as string expressions.");
+            }
+
+            return (SeqExpr)Encode(formula);
+        }
+
+        private BoolExpr EncodeRegexMatch(SmtRegexMatchFormula formula)
+        {
+            if (!Z3RegexTranslator.TryTranslate(_context, formula.Pattern, out var regex))
+            {
+                throw new InvalidOperationException("Unsupported SMT regex pattern.");
+            }
+
+            return _context.MkInRe(EncodeString(formula.Value), regex);
+        }
+
         private Expr GetOrCreateVariable(SmtVariable variable)
         {
             if (_variables.TryGetValue(variable.Name, out var existing))
@@ -136,11 +168,448 @@ namespace SearchLib.Smt
                 SmtValueKind.Bool => _context.MkBoolConst(variable.Name),
                 SmtValueKind.Int => _context.MkIntConst(variable.Name),
                 SmtValueKind.Reference => _context.MkConst(variable.Name, _referenceSort),
+                SmtValueKind.String => _context.MkConst(variable.Name, _context.StringSort),
                 _ => throw new InvalidOperationException("Unsupported SMT variable kind."),
             };
 
             _variables.Add(variable.Name, created);
             return created;
+        }
+
+        private sealed class Z3RegexTranslator
+        {
+            private const int MaxBoundedRepeat = 64;
+            private readonly Context _context;
+            private readonly string _pattern;
+            private int _position;
+
+            private Z3RegexTranslator(Context context, string pattern)
+            {
+                _context = context;
+                _pattern = pattern;
+            }
+
+            public static bool TryTranslate(Context context, string pattern, out ReExpr regex)
+            {
+                regex = null!;
+                if (pattern.Length > 256)
+                {
+                    return false;
+                }
+
+                var startAnchored = pattern.StartsWith("^", StringComparison.Ordinal);
+                var strictStartAnchored = pattern.StartsWith(@"\A", StringComparison.Ordinal);
+                var strictEndAnchored = pattern.EndsWith(@"\z", StringComparison.Ordinal);
+                var dollarEndAnchored = !strictEndAnchored &&
+                    pattern.EndsWith("$", StringComparison.Ordinal) &&
+                    !IsEscaped(pattern, pattern.Length - 1);
+                var bodyStart = strictStartAnchored ? 2 : startAnchored ? 1 : 0;
+                var bodyEndTrim = strictEndAnchored ? 2 : dollarEndAnchored ? 1 : 0;
+                var bodyLength = pattern.Length - bodyStart - bodyEndTrim;
+                if (bodyLength < 0)
+                {
+                    return false;
+                }
+
+                var translator = new Z3RegexTranslator(context, pattern.Substring(bodyStart, bodyLength));
+                if (!translator.TryParseExpression(out var body) ||
+                    translator._position != translator._pattern.Length)
+                {
+                    return false;
+                }
+
+                regex = body;
+                if (!startAnchored && !strictStartAnchored)
+                {
+                    regex = context.MkConcat(new[] { translator.CreateAnyStringRegex(), regex });
+                }
+
+                if (dollarEndAnchored)
+                {
+                    regex = context.MkConcat(new[] { regex, translator.CreateOptionalFinalNewlineRegex() });
+                }
+                else if (!strictEndAnchored)
+                {
+                    regex = context.MkConcat(new[] { regex, translator.CreateAnyStringRegex() });
+                }
+
+                return true;
+            }
+
+            private bool TryParseExpression(out ReExpr regex)
+            {
+                var alternatives = new List<ReExpr>();
+                if (!TryParseConcat(out var first))
+                {
+                    regex = null!;
+                    return false;
+                }
+
+                alternatives.Add(first);
+                while (Peek('|'))
+                {
+                    _position++;
+                    if (!TryParseConcat(out var alternative))
+                    {
+                        regex = null!;
+                        return false;
+                    }
+
+                    alternatives.Add(alternative);
+                }
+
+                regex = alternatives.Count == 1
+                    ? alternatives[0]
+                    : _context.MkUnion(alternatives.ToArray());
+                return true;
+            }
+
+            private bool TryParseConcat(out ReExpr regex)
+            {
+                var parts = new List<ReExpr>();
+                while (_position < _pattern.Length &&
+                       !Peek('|') &&
+                       !Peek(')'))
+                {
+                    if (!TryParseRepeat(out var part))
+                    {
+                        regex = null!;
+                        return false;
+                    }
+
+                    parts.Add(part);
+                }
+
+                regex = parts.Count switch
+                {
+                    0 => CreateLiteralRegex(string.Empty),
+                    1 => parts[0],
+                    _ => _context.MkConcat(parts.ToArray())
+                };
+                return true;
+            }
+
+            private bool TryParseRepeat(out ReExpr regex)
+            {
+                if (!TryParseAtom(out regex))
+                {
+                    return false;
+                }
+
+                if (_position >= _pattern.Length)
+                {
+                    return true;
+                }
+
+                switch (_pattern[_position])
+                {
+                    case '*':
+                        _position++;
+                        regex = _context.MkStar(regex);
+                        ConsumeNonGreedyMarker();
+                        return true;
+                    case '+':
+                        _position++;
+                        regex = _context.MkPlus(regex);
+                        ConsumeNonGreedyMarker();
+                        return true;
+                    case '?':
+                        _position++;
+                        regex = _context.MkOption(regex);
+                        ConsumeNonGreedyMarker();
+                        return true;
+                    case '{':
+                        return TryParseBoundedRepeat(ref regex);
+                    default:
+                        return true;
+                }
+            }
+
+            private bool TryParseBoundedRepeat(ref ReExpr regex)
+            {
+                var savedPosition = _position;
+                _position++;
+                if (!TryReadNumber(out var lower))
+                {
+                    _position = savedPosition;
+                    return true;
+                }
+
+                uint upper = lower;
+                var unbounded = false;
+                if (Peek(','))
+                {
+                    _position++;
+                    if (Peek('}'))
+                    {
+                        unbounded = true;
+                    }
+                    else if (!TryReadNumber(out upper))
+                    {
+                        return false;
+                    }
+                }
+
+                if (!Peek('}') ||
+                    upper < lower ||
+                    lower > MaxBoundedRepeat ||
+                    (!unbounded && upper > MaxBoundedRepeat))
+                {
+                    return false;
+                }
+
+                _position++;
+                regex = unbounded
+                    ? CreateConcat(CreateExactRepeat(regex, lower), _context.MkStar(regex))
+                    : _context.MkLoop(regex, lower, upper);
+                ConsumeNonGreedyMarker();
+                return true;
+            }
+
+            private bool TryParseAtom(out ReExpr regex)
+            {
+                regex = null!;
+                if (_position >= _pattern.Length)
+                {
+                    return false;
+                }
+
+                var current = _pattern[_position++];
+                switch (current)
+                {
+                    case '(':
+                        if (!TryParseExpression(out regex) || !Peek(')'))
+                        {
+                            return false;
+                        }
+
+                        _position++;
+                        return true;
+                    case '[':
+                        return TryParseCharClass(out regex);
+                    case '.':
+                        regex = _context.MkDiff(CreateAnyCharRegex(), CreateLiteralRegex("\n"));
+                        return true;
+                    case '\\':
+                        return TryParseEscapedAtom(out regex);
+                    case '^':
+                    case '$':
+                        return false;
+                    default:
+                        if (IsRegexMetaCharacter(current))
+                        {
+                            return false;
+                        }
+
+                        regex = CreateLiteralRegex(current.ToString());
+                        return true;
+                }
+            }
+
+            private bool TryParseEscapedAtom(out ReExpr regex)
+            {
+                regex = null!;
+                if (_position >= _pattern.Length)
+                {
+                    return false;
+                }
+
+                var escaped = _pattern[_position++];
+                var literal = escaped switch
+                {
+                    'n' => "\n",
+                    'r' => "\r",
+                    't' => "\t",
+                    '\\' => "\\",
+                    '.' => ".",
+                    '^' => "^",
+                    '$' => "$",
+                    '|' => "|",
+                    '?' => "?",
+                    '*' => "*",
+                    '+' => "+",
+                    '(' => "(",
+                    ')' => ")",
+                    '[' => "[",
+                    ']' => "]",
+                    '{' => "{",
+                    '}' => "}",
+                    '-' => "-",
+                    _ => null
+                };
+
+                if (literal == null)
+                {
+                    return false;
+                }
+
+                regex = CreateLiteralRegex(literal);
+                return true;
+            }
+
+            private bool TryParseCharClass(out ReExpr regex)
+            {
+                regex = null!;
+                if (Peek('^'))
+                {
+                    return false;
+                }
+
+                var parts = new List<ReExpr>();
+                while (_position < _pattern.Length && !Peek(']'))
+                {
+                    if (!TryReadClassChar(out var start))
+                    {
+                        return false;
+                    }
+
+                    if (Peek('-') &&
+                        _position + 1 < _pattern.Length &&
+                        _pattern[_position + 1] != ']')
+                    {
+                        _position++;
+                        if (!TryReadClassChar(out var end) || end < start)
+                        {
+                            return false;
+                        }
+
+                        parts.Add(_context.MkRange(
+                            _context.MkString(start.ToString()),
+                            _context.MkString(end.ToString())));
+                    }
+                    else
+                    {
+                        parts.Add(CreateLiteralRegex(start.ToString()));
+                    }
+                }
+
+                if (!Peek(']') || parts.Count == 0)
+                {
+                    return false;
+                }
+
+                _position++;
+                regex = parts.Count == 1 ? parts[0] : _context.MkUnion(parts.ToArray());
+                return true;
+            }
+
+            private bool TryReadClassChar(out char value)
+            {
+                value = default;
+                if (_position >= _pattern.Length)
+                {
+                    return false;
+                }
+
+                var current = _pattern[_position++];
+                if (current != '\\')
+                {
+                    value = current;
+                    return true;
+                }
+
+                if (_position >= _pattern.Length)
+                {
+                    return false;
+                }
+
+                var escaped = _pattern[_position++];
+                value = escaped switch
+                {
+                    'n' => '\n',
+                    'r' => '\r',
+                    't' => '\t',
+                    '\\' => '\\',
+                    '-' => '-',
+                    ']' => ']',
+                    '^' => '^',
+                    _ => '\0'
+                };
+
+                return value != '\0';
+            }
+
+            private bool TryReadNumber(out uint value)
+            {
+                value = 0;
+                var start = _position;
+                while (_position < _pattern.Length && char.IsDigit(_pattern[_position]))
+                {
+                    var digit = (uint)(_pattern[_position] - '0');
+                    value = checked((value * 10) + digit);
+                    _position++;
+                    if (value > MaxBoundedRepeat)
+                    {
+                        return false;
+                    }
+                }
+
+                return _position > start;
+            }
+
+            private void ConsumeNonGreedyMarker()
+            {
+                if (Peek('?'))
+                {
+                    _position++;
+                }
+            }
+
+            private ReExpr CreateAnyStringRegex()
+            {
+                return _context.MkStar(CreateAnyCharRegex());
+            }
+
+            private ReExpr CreateOptionalFinalNewlineRegex()
+            {
+                return _context.MkOption(CreateLiteralRegex("\n"));
+            }
+
+            private ReExpr CreateAnyCharRegex()
+            {
+                return _context.MkRange(_context.MkString("\u0000"), _context.MkString("\uffff"));
+            }
+
+            private ReExpr CreateExactRepeat(ReExpr regex, uint count)
+            {
+                if (count == 0)
+                {
+                    return CreateLiteralRegex(string.Empty);
+                }
+
+                return _context.MkLoop(regex, count, count);
+            }
+
+            private ReExpr CreateConcat(ReExpr left, ReExpr right)
+            {
+                return _context.MkConcat(new[] { left, right });
+            }
+
+            private ReExpr CreateLiteralRegex(string value)
+            {
+                return _context.MkToRe(_context.MkString(value));
+            }
+
+            private bool Peek(char value)
+            {
+                return _position < _pattern.Length && _pattern[_position] == value;
+            }
+
+            private static bool IsEscaped(string value, int index)
+            {
+                var slashCount = 0;
+                for (var current = index - 1; current >= 0 && value[current] == '\\'; current--)
+                {
+                    slashCount++;
+                }
+
+                return slashCount % 2 == 1;
+            }
+
+            private static bool IsRegexMetaCharacter(char value)
+            {
+                return value is '|' or '?' or '*' or '+' or ')' or '[' or ']' or '{' or '}';
+            }
         }
     }
 }

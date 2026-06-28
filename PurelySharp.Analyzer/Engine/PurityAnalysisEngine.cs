@@ -4144,6 +4144,19 @@ namespace PurelySharp.Analyzer.Engine
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula)));
             }
 
+            if (TryCreateStringContentFormula(targetSymbol, currentState, out var targetStringFormula) &&
+                CSharpConditionToFormula.TryTranslateStringValue(
+                    valueExpression,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var valueStringFormula,
+                    valueState.GetSmtSymbolVersion) &&
+                valueStringFormula != null)
+            {
+                nextState = nextState.WithPathConditions(nextState.PathConditions.Add(
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, targetStringFormula, valueStringFormula)));
+            }
+
             return nextState;
         }
 
@@ -4201,6 +4214,28 @@ namespace PurelySharp.Analyzer.Engine
             return false;
         }
 
+        private static bool TryCreateStringContentFormula(
+            ISymbol symbol,
+            PurityAnalysisState currentState,
+            out SmtFormula formula)
+        {
+            var type = symbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                _ => null
+            };
+
+            if (type?.SpecialType == SpecialType.System_String)
+            {
+                formula = new SmtVariable(GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion) + ".String", SmtValueKind.String);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
         private static bool TryCreateBuiltInLengthFormula(
             ISymbol symbol,
             PurityAnalysisState currentState,
@@ -4213,8 +4248,13 @@ namespace PurelySharp.Analyzer.Engine
                 _ => null
             };
 
-            if (type is IArrayTypeSymbol { Rank: 1 } ||
-                type?.SpecialType == SpecialType.System_String)
+            if (type?.SpecialType == SpecialType.System_String)
+            {
+                formula = new SmtStringLengthTerm(new SmtVariable(GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion) + ".String", SmtValueKind.String));
+                return true;
+            }
+
+            if (type is IArrayTypeSymbol { Rank: 1 })
             {
                 var receiverFormula = new SmtVariable(GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion), SmtValueKind.Reference);
                 formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
@@ -4313,7 +4353,20 @@ namespace PurelySharp.Analyzer.Engine
                 return true;
             }
 
-            return TryCreateReferenceLengthValueFormula(valueExpression, semanticModel, cancellationToken, getSymbolVersion, out formula);
+            if (CSharpConditionToFormula.TryTranslateStringValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var stringFormula,
+                    getSymbolVersion) &&
+                stringFormula != null)
+            {
+                formula = new SmtStringLengthTerm(stringFormula);
+                return true;
+            }
+
+            formula = null!;
+            return false;
         }
 
         private static bool TryCreateReferenceLengthValueFormula(

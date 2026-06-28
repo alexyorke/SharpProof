@@ -701,6 +701,19 @@ namespace PurelySharp.Analyzer
                 facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula));
             }
 
+            if (TryCreateStringContentFormula(targetSymbol, out var targetStringFormula) &&
+                !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
+                CSharpConditionToFormula.TryTranslateStringValue(
+                    effectiveValueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueStringFormula,
+                    getSymbolVersion: null) &&
+                valueStringFormula != null)
+            {
+                facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetStringFormula, valueStringFormula));
+            }
+
             if (hasThrowGuard &&
                 guardExpression != null &&
                 !ExpressionReferencesSymbol(guardExpression, targetSymbol, semanticModel, cancellationToken))
@@ -844,6 +857,25 @@ namespace PurelySharp.Analyzer
             return false;
         }
 
+        private static bool TryCreateStringContentFormula(ISymbol symbol, out SmtFormula formula)
+        {
+            var type = symbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                _ => null
+            };
+
+            if (type?.SpecialType == SpecialType.System_String)
+            {
+                formula = new SmtVariable(GetSmtVariableName(symbol) + ".String", SmtValueKind.String);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
         private static bool TryCreateBuiltInLengthFormula(ISymbol symbol, out SmtFormula formula)
         {
             var type = symbol switch
@@ -853,8 +885,13 @@ namespace PurelySharp.Analyzer
                 _ => null
             };
 
-            if (type is IArrayTypeSymbol { Rank: 1 } ||
-                type?.SpecialType == SpecialType.System_String)
+            if (type?.SpecialType == SpecialType.System_String)
+            {
+                formula = new SmtStringLengthTerm(new SmtVariable(GetSmtVariableName(symbol) + ".String", SmtValueKind.String));
+                return true;
+            }
+
+            if (type is IArrayTypeSymbol { Rank: 1 })
             {
                 var receiverFormula = new SmtVariable(GetSmtVariableName(symbol), SmtValueKind.Reference);
                 formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
@@ -1168,6 +1205,19 @@ namespace PurelySharp.Analyzer
                 case SmtIntegerBinaryTerm integerBinary:
                     return ReferencesSmtVariable(integerBinary.Left, variablePrefix) ||
                         ReferencesSmtVariable(integerBinary.Right, variablePrefix);
+                case SmtStringLengthTerm stringLength:
+                    return ReferencesSmtVariable(stringLength.Value, variablePrefix);
+                case SmtStringContainsFormula stringContains:
+                    return ReferencesSmtVariable(stringContains.Value, variablePrefix) ||
+                        ReferencesSmtVariable(stringContains.Search, variablePrefix);
+                case SmtStringStartsWithFormula stringStartsWith:
+                    return ReferencesSmtVariable(stringStartsWith.Value, variablePrefix) ||
+                        ReferencesSmtVariable(stringStartsWith.Prefix, variablePrefix);
+                case SmtStringEndsWithFormula stringEndsWith:
+                    return ReferencesSmtVariable(stringEndsWith.Value, variablePrefix) ||
+                        ReferencesSmtVariable(stringEndsWith.Suffix, variablePrefix);
+                case SmtRegexMatchFormula regexMatch:
+                    return ReferencesSmtVariable(regexMatch.Value, variablePrefix);
                 case SmtConditionalFormula conditional:
                     return ReferencesSmtVariable(conditional.Condition, variablePrefix) ||
                         ReferencesSmtVariable(conditional.WhenTrue, variablePrefix) ||

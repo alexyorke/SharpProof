@@ -5,6 +5,7 @@ namespace SearchLib.Smt
         Bool,
         Int,
         Reference,
+        String,
     }
 
     public enum SmtUnaryOperator
@@ -42,6 +43,8 @@ namespace SearchLib.Smt
 
     public sealed record SmtIntegerConstant(long Value) : SmtFormula(SmtValueKind.Int);
 
+    public sealed record SmtStringConstant(string Value) : SmtFormula(SmtValueKind.String);
+
     public sealed record SmtNullConstant() : SmtFormula(SmtValueKind.Reference);
 
     public sealed record SmtVariable(string Name, SmtValueKind Kind) : SmtFormula(Kind);
@@ -53,6 +56,16 @@ namespace SearchLib.Smt
     public sealed record SmtIntegerUnaryTerm(SmtIntegerUnaryOperator Operator, SmtFormula Operand) : SmtFormula(SmtValueKind.Int);
 
     public sealed record SmtIntegerBinaryTerm(SmtIntegerBinaryOperator Operator, SmtFormula Left, SmtFormula Right) : SmtFormula(SmtValueKind.Int);
+
+    public sealed record SmtStringLengthTerm(SmtFormula Value) : SmtFormula(SmtValueKind.Int);
+
+    public sealed record SmtStringContainsFormula(SmtFormula Value, SmtFormula Search) : SmtFormula(SmtValueKind.Bool);
+
+    public sealed record SmtStringStartsWithFormula(SmtFormula Value, SmtFormula Prefix) : SmtFormula(SmtValueKind.Bool);
+
+    public sealed record SmtStringEndsWithFormula(SmtFormula Value, SmtFormula Suffix) : SmtFormula(SmtValueKind.Bool);
+
+    public sealed record SmtRegexMatchFormula(SmtFormula Value, string Pattern) : SmtFormula(SmtValueKind.Bool);
 
     public sealed record SmtConditionalFormula(SmtFormula Condition, SmtFormula WhenTrue, SmtFormula WhenFalse, SmtValueKind ResultKind) : SmtFormula(ResultKind);
 }

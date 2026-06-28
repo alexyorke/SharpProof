@@ -960,6 +960,56 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsRegexReachabilityFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+using System.Text.RegularExpressions;
+
+public class TestClass
+{
+    public int TestMethod(string input)
+    {
+        if (Regex.IsMatch(input, ""^[A-Z][0-9]$""))
+        {
+            return input.Length;
+        }
+
+        return 0;
+    }
+}",
+                "return input.Length;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("SmtRegexMatchFormula", StringComparison.Ordinal) &&
+                                           fact.Contains("^[A-Z][0-9]$", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicInvariantService_CollectsStringPredicateReachabilityFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(string input)
+    {
+        if (input.Contains(""SKU""))
+        {
+            return input.Length;
+        }
+
+        return 0;
+    }
+}",
+                "return input.Length;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("SmtStringContainsFormula", StringComparison.Ordinal) &&
+                                           fact.Contains("SKU", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsPriorEarlyExitGuardFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -5210,6 +5260,69 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_StrictRegexLiteralImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\A[A-Z][0-9]\z"") && text.Length != 2",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_DollarRegexAnchorAllowsTrailingNewline()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "Regex.IsMatch(text, \"^AB$\") && text == \"AB\\n\"",
+                    "using System.Text.RegularExpressions;"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StrictRegexLiteralContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\AAB\z"") && text != ""AB""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceRegexLiteralContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"new Regex(@""\AAB\z"").IsMatch(text) && text != ""AB""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_UnsupportedRegexOptionsRemainConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "Regex.IsMatch(text, \"^ab$\", RegexOptions.IgnoreCase) && text == \"AB\"",
+                    "using System.Text.RegularExpressions;"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringContainsContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "text.Contains(\"Z\") && text == \"ABC\""),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_CustomLengthNegative_RemainsUnknown()
         {
             Assert.That(
@@ -7190,7 +7303,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task Ps0002_MetadataStringPredicateContradictoryBranch_RemainsConservativeReports()
+        public async Task Ps0002_MetadataStringPredicateContradictoryBranch_DoesNotReport()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
@@ -7208,7 +7321,7 @@ public class TestClass
     }
 }");
 
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
         }
 
         [Test]
