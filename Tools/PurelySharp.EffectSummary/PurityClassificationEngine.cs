@@ -369,12 +369,11 @@ internal static class PurityClassificationEngine
                     }
                     else if (string.Equals(externalClassification.Classification, "conservative_unknown", StringComparison.Ordinal))
                     {
-                        if (IsPureArgumentGuardWrapper(externalEntry.Symbol) ||
-                            ((treatsArgumentGuardThrowHelpersAsPure &&
-                              IsArgumentGuardThrowHelper(externalEntry.Symbol)) ||
-                             (treatsDelegateDispatchAsSemantic &&
-                              IsSemanticallyNeutralValidationThrowHelper(externalEntry.Symbol))) ||
-                            IsValidationThrowHelperCompatible(
+                        if (ShouldIgnoreUnknownCall(
+                                summary,
+                                callSite,
+                                externalEntry.Symbol,
+                                externalClassification,
                                 assembly,
                                 externalCallKey,
                                 bySymbol,
@@ -383,8 +382,9 @@ internal static class PurityClassificationEngine
                                 memo,
                                 freshOwnedInitializationMemo,
                                 validationThrowHelperMemo,
-                                visiting) ||
-                            ShouldTreatCallAsSemanticallyPure(summary, callSite, externalEntry.Symbol, externalClassification))
+                                visiting,
+                                treatsArgumentGuardThrowHelpersAsPure,
+                                treatsDelegateDispatchAsSemantic))
                         {
                             continue;
                         }
@@ -496,12 +496,11 @@ internal static class PurityClassificationEngine
             }
             else if (string.Equals(effectiveCalleeClassification.Classification, "conservative_unknown", StringComparison.Ordinal))
             {
-                if (IsPureArgumentGuardWrapper(resolvedCallSummary.Symbol) ||
-                    ((treatsArgumentGuardThrowHelpersAsPure &&
-                      IsArgumentGuardThrowHelper(resolvedCallSummary.Symbol)) ||
-                     (treatsDelegateDispatchAsSemantic &&
-                      IsSemanticallyNeutralValidationThrowHelper(resolvedCallSummary.Symbol))) ||
-                    IsValidationThrowHelperCompatible(
+                if (ShouldIgnoreUnknownCall(
+                        summary,
+                        callSite,
+                        resolvedCallSummary.Symbol,
+                        effectiveCalleeClassification,
                         assembly,
                         resolvedCallKey,
                         bySymbol,
@@ -510,8 +509,9 @@ internal static class PurityClassificationEngine
                         memo,
                         freshOwnedInitializationMemo,
                         validationThrowHelperMemo,
-                        visiting) ||
-                    ShouldTreatCallAsSemanticallyPure(summary, callSite, resolvedCallSummary, effectiveCalleeClassification))
+                        visiting,
+                        treatsArgumentGuardThrowHelpersAsPure,
+                        treatsDelegateDispatchAsSemantic))
                 {
                     continue;
                 }
@@ -927,6 +927,41 @@ internal static class PurityClassificationEngine
              blockingCallChain[0].StartsWith("System.SpanHelpers.LastIndexOf(", StringComparison.Ordinal) ||
              blockingCallChain[0].StartsWith("System.SpanHelpers.LastIndexOfAny(", StringComparison.Ordinal)) &&
             string.Equals(blockingCallChain[1], "System.IEquatable`1.Equals(!0)", StringComparison.Ordinal);
+    }
+
+    private static bool ShouldIgnoreUnknownCall(
+        MethodEffectSummary callerSummary,
+        CallSiteSummary callSite,
+        string calleeSymbol,
+        MethodPurityClassification calleeClassification,
+        AssemblyEffectReport assembly,
+        string calleeKey,
+        IReadOnlyDictionary<string, MethodEffectSummary> bySymbol,
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> externalGeneratedPurityEntries,
+        IReadOnlyDictionary<string, GeneratedPurityCatalogEntry> reviewedGeneratedPurityEntries,
+        Dictionary<string, MethodPurityClassification> memo,
+        Dictionary<string, bool> freshOwnedInitializationMemo,
+        Dictionary<string, bool> validationThrowHelperMemo,
+        HashSet<string> visiting,
+        bool treatsArgumentGuardThrowHelpersAsPure,
+        bool treatsDelegateDispatchAsSemantic)
+    {
+        return IsPureArgumentGuardWrapper(calleeSymbol) ||
+            ((treatsArgumentGuardThrowHelpersAsPure &&
+              IsArgumentGuardThrowHelper(calleeSymbol)) ||
+             (treatsDelegateDispatchAsSemantic &&
+              IsSemanticallyNeutralValidationThrowHelper(calleeSymbol))) ||
+            IsValidationThrowHelperCompatible(
+                assembly,
+                calleeKey,
+                bySymbol,
+                externalGeneratedPurityEntries,
+                reviewedGeneratedPurityEntries,
+                memo,
+                freshOwnedInitializationMemo,
+                validationThrowHelperMemo,
+                visiting) ||
+            ShouldTreatCallAsSemanticallyPure(callerSummary, callSite, calleeSymbol, calleeClassification);
     }
 
     private static void AddImpureCalleeCategories(
