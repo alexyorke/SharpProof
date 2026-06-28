@@ -743,8 +743,17 @@ namespace PurelySharp.Symbolic.Smt
             Func<ISymbol, int>? getSymbolVersion)
         {
             expression = UnwrapExpression(expression);
-            if (expression is not IsPatternExpressionSyntax isPatternExpression ||
-                !TryTranslateValue(isPatternExpression.Expression, semanticModel, cancellationToken, out var matchedValue, getSymbolVersion) ||
+            if (expression is not IsPatternExpressionSyntax isPatternExpression)
+            {
+                return;
+            }
+
+            if (TryAddNullablePatternBindingFacts(isPatternExpression, semanticModel, cancellationToken, formulas, getSymbolVersion))
+            {
+                return;
+            }
+
+            if (!TryTranslateValue(isPatternExpression.Expression, semanticModel, cancellationToken, out var matchedValue, getSymbolVersion) ||
                 matchedValue == null)
             {
                 return;
@@ -760,6 +769,82 @@ namespace PurelySharp.Symbolic.Smt
                 cancellationToken,
                 formulas,
                 getSymbolVersion);
+        }
+
+        private static bool TryAddNullablePatternBindingFacts(
+            IsPatternExpressionSyntax isPatternExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (!TryTranslateNullableValueParts(
+                    isPatternExpression.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out _,
+                    out var nullableValue,
+                    getSymbolVersion,
+                    inlineDepth: 0) ||
+                nullableValue == null)
+            {
+                return false;
+            }
+
+            AddNullablePatternBindingFacts(
+                nullableValue,
+                isPatternExpression.Pattern,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion);
+            return true;
+        }
+
+        private static void AddNullablePatternBindingFacts(
+            SmtFormula nullableValue,
+            PatternSyntax pattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
+            {
+                AddNullablePatternBindingFacts(
+                    nullableValue,
+                    parenthesizedPattern.Pattern,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion);
+                return;
+            }
+
+            if (pattern is DeclarationPatternSyntax declarationPattern)
+            {
+                AddDesignationBindingFact(nullableValue, declarationPattern.Designation, semanticModel, formulas, getSymbolVersion);
+                return;
+            }
+
+            if (pattern is BinaryPatternSyntax binaryPattern &&
+                binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword))
+            {
+                AddNullablePatternBindingFacts(
+                    nullableValue,
+                    binaryPattern.Left,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion);
+                AddNullablePatternBindingFacts(
+                    nullableValue,
+                    binaryPattern.Right,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion);
+            }
         }
 
         private static void AddPatternBindingFacts(
@@ -941,6 +1026,17 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth)
         {
             formula = null;
+            if (TryTranslateNullablePatternExpression(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             if (!TryTranslateValue(expression.Expression, semanticModel, cancellationToken, out var value, getSymbolVersion, inlineDepth) ||
                 value == null)
             {
@@ -950,6 +1046,206 @@ namespace PurelySharp.Symbolic.Smt
             var valueType = semanticModel.GetTypeInfo(expression.Expression, cancellationToken).ConvertedType ??
                 semanticModel.GetTypeInfo(expression.Expression, cancellationToken).Type;
             return TryTranslatePattern(value, expression.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion, valueType, inlineDepth);
+        }
+
+        private static bool TryTranslateNullablePatternExpression(
+            IsPatternExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!TryTranslateNullableValueParts(
+                    expression.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var hasValueFormula,
+                    out var valueFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                valueFormula == null ||
+                !TryGetNullableUnderlyingType(
+                    semanticModel.GetTypeInfo(expression.Expression, cancellationToken).Type,
+                    out var underlyingType))
+            {
+                return false;
+            }
+
+            return TryTranslateNullablePattern(
+                hasValueFormula,
+                valueFormula,
+                underlyingType,
+                expression.Pattern,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
+        private static bool TryTranslateNullablePattern(
+            SmtFormula hasValueFormula,
+            SmtFormula valueFormula,
+            ITypeSymbol underlyingType,
+            PatternSyntax pattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
+            {
+                return TryTranslateNullablePattern(
+                    hasValueFormula,
+                    valueFormula,
+                    underlyingType,
+                    parenthesizedPattern.Pattern,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth);
+            }
+
+            if (pattern is DiscardPatternSyntax or VarPatternSyntax)
+            {
+                formula = new SmtBooleanConstant(true);
+                return true;
+            }
+
+            if (pattern is DeclarationPatternSyntax declarationPattern &&
+                PatternTypeMatchesUnderlyingType(declarationPattern.Type, underlyingType, semanticModel, cancellationToken))
+            {
+                formula = hasValueFormula;
+                return true;
+            }
+
+            if (pattern is TypePatternSyntax typePattern &&
+                PatternTypeMatchesUnderlyingType(typePattern.Type, underlyingType, semanticModel, cancellationToken))
+            {
+                formula = hasValueFormula;
+                return true;
+            }
+
+            if (pattern is ConstantPatternSyntax constantPattern &&
+                TryTranslateValue(constantPattern.Expression, semanticModel, cancellationToken, out var constantValue, getSymbolVersion, inlineDepth) &&
+                constantValue != null &&
+                AreComparable(valueFormula, constantValue))
+            {
+                formula = new SmtBinaryFormula(
+                    SmtBinaryOperator.And,
+                    hasValueFormula,
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, valueFormula, constantValue));
+                return true;
+            }
+
+            if (pattern is RelationalPatternSyntax relationalPattern &&
+                valueFormula.Kind == SmtValueKind.Int &&
+                TryTranslateValue(relationalPattern.Expression, semanticModel, cancellationToken, out var relationalValue, getSymbolVersion, inlineDepth) &&
+                relationalValue is { Kind: SmtValueKind.Int } &&
+                TryTranslateRelationalPatternComparison(relationalPattern.OperatorToken.Kind(), valueFormula, relationalValue, out var comparison))
+            {
+                formula = new SmtBinaryFormula(SmtBinaryOperator.And, hasValueFormula, comparison);
+                return true;
+            }
+
+            if (pattern is UnaryPatternSyntax unaryPattern &&
+                unaryPattern.OperatorToken.IsKind(SyntaxKind.NotKeyword) &&
+                TryTranslateNullablePattern(
+                    hasValueFormula,
+                    valueFormula,
+                    underlyingType,
+                    unaryPattern.Pattern,
+                    semanticModel,
+                    cancellationToken,
+                    out var negatedPattern,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                negatedPattern != null)
+            {
+                formula = new SmtUnaryFormula(SmtUnaryOperator.Not, negatedPattern);
+                return true;
+            }
+
+            if (pattern is BinaryPatternSyntax binaryPattern &&
+                TryTranslateNullablePattern(
+                    hasValueFormula,
+                    valueFormula,
+                    underlyingType,
+                    binaryPattern.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out var leftPattern,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                leftPattern != null &&
+                TryTranslateNullablePattern(
+                    hasValueFormula,
+                    valueFormula,
+                    underlyingType,
+                    binaryPattern.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var rightPattern,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                rightPattern != null)
+            {
+                if (binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword))
+                {
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.And, leftPattern, rightPattern);
+                    return true;
+                }
+
+                if (binaryPattern.OperatorToken.IsKind(SyntaxKind.OrKeyword))
+                {
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.Or, leftPattern, rightPattern);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryTranslateRelationalPatternComparison(
+            SyntaxKind operatorKind,
+            SmtFormula left,
+            SmtFormula right,
+            out SmtFormula formula)
+        {
+            formula = null!;
+            switch (operatorKind)
+            {
+                case SyntaxKind.GreaterThanToken:
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, left, right);
+                    return true;
+                case SyntaxKind.GreaterThanEqualsToken:
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, left, right);
+                    return true;
+                case SyntaxKind.LessThanToken:
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.LessThan, left, right);
+                    return true;
+                case SyntaxKind.LessThanEqualsToken:
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.LessThanOrEqual, left, right);
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool PatternTypeMatchesUnderlyingType(
+            TypeSyntax patternTypeSyntax,
+            ITypeSymbol underlyingType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var patternType = semanticModel.GetTypeInfo(patternTypeSyntax, cancellationToken).Type;
+            return patternType != null &&
+                SymbolEqualityComparer.Default.Equals(patternType, underlyingType);
         }
 
         public static bool TryTranslatePattern(

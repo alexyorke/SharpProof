@@ -3904,6 +3904,59 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableDeclarationPatternBinding()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int? maybe = 5;
+        if (maybe is int value)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "NullableDeclarationPatternBinding.cs",
+                FindLine(source, "return value;"),
+                20,
+                "value == 5",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableRelationalPattern()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int? maybe = 5;
+        return maybe.GetValueOrDefault();
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "NullableRelationalPattern.cs",
+                FindLine(source, "return maybe.GetValueOrDefault();"),
+                16,
+                "maybe is > 3 and < 10",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessReferenceNullSourceResultNull()
         {
             const string source = @"
@@ -6161,6 +6214,90 @@ public class TestClass
         string text = null;
         int length = text?.Length ?? 0;
         if (length != 0)
+        {
+            Console.ReadLine();
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_NullableDeclarationPatternNullInputGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        int? maybe = null;
+        if (maybe is int value)
+        {
+            Console.ReadLine();
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_NullableDeclarationPatternBindingContradictoryGuard_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        int? maybe = 5;
+        if (maybe is int value && value != 5)
+        {
+            Console.ReadLine();
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_NullableRelationalPatternContradictoryGuard_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        int? maybe = 5;
+        if (maybe is < 0)
         {
             Console.ReadLine();
         }
