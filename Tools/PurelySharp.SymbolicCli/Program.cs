@@ -69,13 +69,29 @@ catch (ArgumentException ex)
 
 static SyntaxNode FindQueryNode(SyntaxNode root, int position)
 {
+    var token = root.FindToken(position);
+    var switchArm = token.Parent?
+        .AncestorsAndSelf()
+        .OfType<SwitchExpressionArmSyntax>()
+        .FirstOrDefault(arm => arm.Expression.Span.Contains(position));
+    if (switchArm != null)
+    {
+        return switchArm.Expression
+            .DescendantNodesAndSelf()
+            .Where(node => node.Span.Contains(position))
+            .OfType<ExpressionSyntax>()
+            .OrderBy(node => node.Span.Length)
+            .FirstOrDefault()
+            ?? switchArm.Expression;
+    }
+
     return root
         .DescendantNodesAndSelf()
         .Where(node => node.Span.Contains(position))
         .OfType<StatementSyntax>()
         .OrderBy(node => node.Span.Length)
         .FirstOrDefault()
-        ?? root.FindToken(position).Parent
+        ?? token.Parent
         ?? root;
 }
 

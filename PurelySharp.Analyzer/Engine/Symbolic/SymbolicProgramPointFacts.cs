@@ -94,6 +94,36 @@ namespace PurelySharp.Analyzer.Engine.Symbolic
                 {
                     AddReachabilityCondition(builder, forStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
                 }
+                else if (ancestor is SwitchStatementSyntax switchStatementSyntax)
+                {
+                    var matchingSection = switchStatementSyntax.Sections
+                        .FirstOrDefault(section => section.Span.Contains(syntaxNode.SpanStart));
+                    if (matchingSection != null &&
+                        SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
+                            switchStatementSyntax.Expression,
+                            matchingSection,
+                            semanticModel,
+                            cancellationToken,
+                            out var sectionCondition))
+                    {
+                        builder.Add(sectionCondition);
+                    }
+                }
+                else if (ancestor is SwitchExpressionSyntax switchExpressionSyntax)
+                {
+                    var matchingArm = switchExpressionSyntax.Arms
+                        .FirstOrDefault(arm => arm.Expression.Span.Contains(syntaxNode.SpanStart));
+                    if (matchingArm != null &&
+                        SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
+                            switchExpressionSyntax.GoverningExpression,
+                            matchingArm,
+                            semanticModel,
+                            cancellationToken,
+                            out var armCondition))
+                    {
+                        builder.Add(armCondition);
+                    }
+                }
             }
 
             return builder.ToImmutable();

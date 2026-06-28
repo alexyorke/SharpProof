@@ -588,6 +588,56 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsSwitchStatementSectionFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        switch (value)
+        {
+            case 2:
+                return value;
+            default:
+                return 0;
+        }
+    }
+}",
+                "return value;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("2", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicInvariantService_CollectsSwitchExpressionArmFacts()
+        {
+            var facts = CollectExpressionProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return value switch
+        {
+            > 10 when value < 20 => value + 1,
+            _ => 0
+        };
+    }
+}",
+                "value + 1");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal) &&
+                                           fact.Contains("10", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains("LessThan", StringComparison.Ordinal) &&
+                                           fact.Contains("20", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_UlongZeroContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -2743,6 +2793,24 @@ public class TestClass
                 .OfType<StatementSyntax>()
                 .Single(node => node.ToString().StartsWith(statementPrefix, StringComparison.Ordinal));
             var snapshot = new SymbolicInvariantService().GetInvariantsAt(statement, semanticModel, CancellationToken.None);
+
+            return snapshot.Facts.ToArray();
+        }
+
+        private static string[] CollectExpressionProgramPointFacts(string source, string expressionPrefix)
+        {
+            var syntaxTree = CSharpSyntaxTree.ParseText(source);
+            var compilation = CSharpCompilation.Create(
+                "SymbolicFactsTest",
+                new[] { syntaxTree },
+                new[] { MetadataReference.CreateFromFile(typeof(object).Assembly.Location) },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var expression = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<ExpressionSyntax>()
+                .Single(node => node.ToString().StartsWith(expressionPrefix, StringComparison.Ordinal));
+            var snapshot = new SymbolicInvariantService().GetInvariantsAt(expression, semanticModel, CancellationToken.None);
 
             return snapshot.Facts.ToArray();
         }
