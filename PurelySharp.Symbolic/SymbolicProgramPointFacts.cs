@@ -380,6 +380,10 @@ namespace PurelySharp.Symbolic
             {
                 AddCompletedIfStatementFacts(ifStatement, semanticModel, cancellationToken, facts);
             }
+            else
+            {
+                AddCompletedLoopStatementFacts(statement, semanticModel, cancellationToken, facts);
+            }
         }
 
         private static void AddCompletedIfStatementFacts(
@@ -411,6 +415,91 @@ namespace PurelySharp.Symbolic
                     cancellationToken,
                     facts);
             }
+        }
+
+        private static void AddCompletedLoopStatementFacts(
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            switch (statement)
+            {
+                case WhileStatementSyntax whileStatement
+                    when CanAssumeLoopConditionFalseAfterNormalExit(whileStatement, whileStatement.Statement):
+                    AddBranchConditionFacts(
+                        whileStatement.Condition,
+                        branchWhenTrue: false,
+                        semanticModel,
+                        cancellationToken,
+                        facts);
+                    break;
+                case ForStatementSyntax { Condition: { } condition } forStatement
+                    when CanAssumeLoopConditionFalseAfterNormalExit(forStatement, forStatement.Statement):
+                    AddBranchConditionFacts(
+                        condition,
+                        branchWhenTrue: false,
+                        semanticModel,
+                        cancellationToken,
+                        facts);
+                    break;
+                case DoStatementSyntax doStatement
+                    when CanAssumeLoopConditionFalseAfterNormalExit(doStatement, doStatement.Statement):
+                    AddBranchConditionFacts(
+                        doStatement.Condition,
+                        branchWhenTrue: false,
+                        semanticModel,
+                        cancellationToken,
+                        facts);
+                    break;
+            }
+        }
+
+        private static bool CanAssumeLoopConditionFalseAfterNormalExit(
+            StatementSyntax loopStatement,
+            StatementSyntax loopBody)
+        {
+            if (loopBody.DescendantNodesAndSelf(
+                    descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+                .OfType<GotoStatementSyntax>()
+                .Any())
+            {
+                return false;
+            }
+
+            return !loopBody.DescendantNodesAndSelf(
+                    descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+                .OfType<BreakStatementSyntax>()
+                .Any(breakStatement => BreakTargetsLoop(breakStatement, loopStatement));
+        }
+
+        private static bool BreakTargetsLoop(
+            BreakStatementSyntax breakStatement,
+            StatementSyntax loopStatement)
+        {
+            for (var ancestor = breakStatement.Parent; ancestor != null; ancestor = ancestor.Parent)
+            {
+                if (ReferenceEquals(ancestor, loopStatement))
+                {
+                    return true;
+                }
+
+                if (ancestor is SwitchStatementSyntax ||
+                    IsLoopStatement(ancestor))
+                {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsLoopStatement(SyntaxNode node)
+        {
+            return node is WhileStatementSyntax or
+                ForStatementSyntax or
+                ForEachStatementSyntax or
+                DoStatementSyntax;
         }
 
         private static void AddReachabilityCondition(

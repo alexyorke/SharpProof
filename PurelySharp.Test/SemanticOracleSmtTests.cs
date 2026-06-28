@@ -517,6 +517,65 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_WhileNormalExitCondition_PrunesUnreachableBranch()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        while (index < values.Length)
+        {
+            index++;
+        }
+
+        if (index < values.Length)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_WhileBreakExit_RemainsConservative()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index, bool stop)
+    {
+        while (index < values.Length)
+        {
+            if (stop)
+            {
+                break;
+            }
+
+            index++;
+        }
+
+        if (index < values.Length)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.False);
+        }
+
+        [Test]
         public void SymbolicProgramPointFacts_CollectPriorAssignmentFacts_ReturnsReusableFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -538,6 +597,31 @@ public class TestClass
 
             Assert.That(facts, Is.Not.Empty);
             Assert.That(facts.Any(fact => fact.Contains("Length", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicInvariantService_CollectsWhileNormalExitConditionFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        while (index < values.Length)
+        {
+            index++;
+        }
+
+        return index;
+    }
+}",
+                "return index;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
+                                           fact.Contains("LessThan", StringComparison.Ordinal) &&
+                                           fact.Contains("Length", StringComparison.Ordinal)), Is.True);
         }
 
         [Test]
@@ -1003,6 +1087,34 @@ public class TestClass
 
             Assert.That(nonNegative.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
             Assert.That(belowLength.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesWhileNormalExitImplication()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        while (index < values.Length)
+        {
+            index++;
+        }
+
+        return index;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ProveConditionWhileExit.cs",
+                FindLine(source, "return index;"),
+                13,
+                "index >= values.Length",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
         }
 
         [Test]
@@ -2109,6 +2221,33 @@ public class TestClass
         if (isZero && value != 0)
         {
             Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_WhileNormalExitConditionContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int[] values, int index)
+    {
+        while (index < values.Length)
+        {
+            index++;
+        }
+
+        if (index < values.Length)
+        {
+            Console.WriteLine(index);
         }
     }
 }");
