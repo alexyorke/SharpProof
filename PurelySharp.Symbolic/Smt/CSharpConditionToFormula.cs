@@ -1204,6 +1204,11 @@ namespace PurelySharp.Symbolic.Smt
                 }
             }
 
+            if (TryTranslateDefaultValue(expression, semanticModel, cancellationToken, out formula))
+            {
+                return true;
+            }
+
             if (expression is ConditionalExpressionSyntax conditionalExpression &&
                 TryTranslate(conditionalExpression.Condition, semanticModel, cancellationToken, out var conditionFormula, getSymbolVersion, inlineDepth) &&
                 conditionFormula != null &&
@@ -1264,6 +1269,47 @@ namespace PurelySharp.Symbolic.Smt
             if (type.IsReferenceType)
             {
                 formula = new SmtVariable(GetVariableName(symbol, getSymbolVersion), SmtValueKind.Reference);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryTranslateDefaultValue(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula)
+        {
+            formula = null;
+            if (!expression.IsKind(SyntaxKind.DefaultLiteralExpression) &&
+                expression is not DefaultExpressionSyntax)
+            {
+                return false;
+            }
+
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            var type = typeInfo.ConvertedType ?? typeInfo.Type;
+            if (type == null)
+            {
+                return false;
+            }
+
+            if (type.SpecialType == SpecialType.System_Boolean)
+            {
+                formula = new SmtBooleanConstant(false);
+                return true;
+            }
+
+            if (IsIntegralType(type))
+            {
+                formula = new SmtIntegerConstant(0);
+                return true;
+            }
+
+            if (type.IsReferenceType)
+            {
+                formula = new SmtNullConstant();
                 return true;
             }
 

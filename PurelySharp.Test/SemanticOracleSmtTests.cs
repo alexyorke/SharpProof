@@ -1185,6 +1185,48 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsDefaultLiteralAssignmentFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int divisor = default;
+        return 10 / divisor;
+    }
+}",
+                "return 10 / divisor;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("divisor", StringComparison.Ordinal) &&
+                                           fact.Contains("0", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicInvariantService_CollectsDefaultReferenceAssignmentFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        string value = default;
+        return value.Length;
+    }
+}",
+                "return value.Length;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("value", StringComparison.Ordinal) &&
+                                           fact.Contains("Null", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void SymbolicInvariantService_TupleAssignmentSwapInvalidatesTargetFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -1442,6 +1484,22 @@ public class TestClass
         {
             Assert.That(
                 IsConditionAlwaysFalse("bool ready", "ready && !ready"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_DefaultLiteralNullContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string value", "value != null && value == default"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_DefaultExpressionZeroContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value", "value == default(int) && value != 0"),
                 Is.True);
         }
 
@@ -3010,6 +3068,27 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_DefaultLiteralDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int divisor = default;
+        return 10 / divisor;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
         public async Task Ps0010_AssignedZeroDivisor_ReportsDivideByZero()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"
@@ -3553,6 +3632,27 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_null_dereference"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.NullReferenceException=definite_null_dereference:null_receiver"));
+        }
+
+        [Test]
+        public async Task Ps0010_DefaultLiteralReference_ReportsNullReference()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        string value = default;
+        return value.Length;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_null_dereference"));
         }
 
         [Test]

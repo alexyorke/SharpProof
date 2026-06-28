@@ -1366,11 +1366,48 @@ namespace PurelySharp.Analyzer
             expression = UnwrapFactExpression(expression);
             if (factKind == PathFactKind.Null)
             {
-                return expression.IsKind(SyntaxKind.NullLiteralExpression);
+                return expression.IsKind(SyntaxKind.NullLiteralExpression) ||
+                    IsDefaultReferenceExpression(expression, semanticModel, cancellationToken);
             }
 
             var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
-            return constantValue.HasValue && IsIntegralOrDecimalZero(constantValue.Value);
+            return constantValue.HasValue && IsIntegralOrDecimalZero(constantValue.Value) ||
+                IsDefaultIntegralExpression(expression, semanticModel, cancellationToken);
+        }
+
+        private static bool IsDefaultReferenceExpression(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            return IsDefaultExpressionSyntax(expression) &&
+                IsReferenceType(GetExpressionType(expression, semanticModel, cancellationToken));
+        }
+
+        private static bool IsDefaultIntegralExpression(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var type = GetExpressionType(expression, semanticModel, cancellationToken);
+            return IsDefaultExpressionSyntax(expression) &&
+                type != null &&
+                IsSearchLibIntegralType(type);
+        }
+
+        private static bool IsDefaultExpressionSyntax(ExpressionSyntax expression)
+        {
+            return expression.IsKind(SyntaxKind.DefaultLiteralExpression) ||
+                expression is DefaultExpressionSyntax;
+        }
+
+        private static ITypeSymbol? GetExpressionType(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            return typeInfo.ConvertedType ?? typeInfo.Type;
         }
 
         private static bool TryCreateFactFormula(
