@@ -650,6 +650,31 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_CollectPriorAssignmentFacts_UsesSharedArrayEmptyLengthFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = System.Array.Empty<int>();
+        if (values.Length != 0)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                "if (values.Length != 0)");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Length", StringComparison.Ordinal) &&
+                                           fact.Contains("0", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsWhileNormalExitConditionFacts()
         {
             var facts = CollectProgramPointFacts(

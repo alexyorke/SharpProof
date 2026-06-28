@@ -621,6 +621,23 @@ namespace PurelySharp.Symbolic.Smt
             return true;
         }
 
+        public static bool TryTranslateBuiltInLengthValue(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            return TryCreateBuiltInElementAccessLengthFormula(
+                expression,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
         public static bool TryCollectDomainFacts(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
