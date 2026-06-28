@@ -718,6 +718,14 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_ArrayConstrainedNonEmptyListPatternContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int[] values", "values is [0, ..] && values.Length == 0"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_StringListPatternExactLengthContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -2559,6 +2567,26 @@ public class TestClass
     public int TestMethod(int[] values)
     {
         if (values is [_, ..])
+        {
+            return values[0];
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_ConstrainedNonEmptyListPatternIndex_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values is [0, ..])
         {
             return values[0];
         }

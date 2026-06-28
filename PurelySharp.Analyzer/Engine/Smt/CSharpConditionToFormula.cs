@@ -835,21 +835,10 @@ namespace PurelySharp.Analyzer.Engine.Smt
             var minimumLength = 0;
             foreach (var subpattern in listPattern.Patterns)
             {
-                if (subpattern is SlicePatternSyntax slicePattern)
+                if (subpattern is SlicePatternSyntax)
                 {
-                    if (slicePattern.Pattern != null &&
-                        !IsUnconstrainedListSubpattern(slicePattern.Pattern))
-                    {
-                        return false;
-                    }
-
                     hasSlice = true;
                     continue;
-                }
-
-                if (!IsUnconstrainedListSubpattern(subpattern))
-                {
-                    return false;
                 }
 
                 minimumLength++;
@@ -899,16 +888,6 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).Type;
             return receiverType is IArrayTypeSymbol ||
                 receiverType?.SpecialType == SpecialType.System_String;
-        }
-
-        private static bool IsUnconstrainedListSubpattern(PatternSyntax pattern)
-        {
-            while (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
-            {
-                pattern = parenthesizedPattern.Pattern;
-            }
-
-            return pattern is DiscardPatternSyntax or VarPatternSyntax;
         }
 
         private static bool TryTranslateComparison(
