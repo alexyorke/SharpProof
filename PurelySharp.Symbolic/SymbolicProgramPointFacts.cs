@@ -221,6 +221,7 @@ namespace PurelySharp.Symbolic
                         builder,
                         forEachStatementSyntax.Expression,
                         semanticModel.GetDeclaredSymbol(forEachStatementSyntax, cancellationToken) as ILocalSymbol,
+                        forEachStatementSyntax,
                         semanticModel,
                         cancellationToken);
                 }
@@ -237,6 +238,7 @@ namespace PurelySharp.Symbolic
                         builder,
                         forEachVariableStatementSyntax.Expression,
                         iterationSymbol: null,
+                        forEachVariableStatementSyntax,
                         semanticModel,
                         cancellationToken);
                 }
@@ -1773,11 +1775,12 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> facts,
             ExpressionSyntax expressionSyntax,
             ILocalSymbol? iterationSymbol,
+            StatementSyntax foreachStatement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
             AddReferenceNullCondition(facts, expressionSyntax, isNull: false, semanticModel, cancellationToken);
-            AddFiniteForeachIterationFact(facts, expressionSyntax, iterationSymbol, semanticModel, cancellationToken);
+            AddFiniteForeachIterationFact(facts, expressionSyntax, iterationSymbol, foreachStatement, semanticModel, cancellationToken);
 
             var typeInfo = semanticModel.GetTypeInfo(expressionSyntax, cancellationToken);
             if (!IsSupportedForeachLengthReceiver(expressionSyntax) &&
@@ -1808,11 +1811,12 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> facts,
             ExpressionSyntax expressionSyntax,
             ILocalSymbol? iterationSymbol,
+            StatementSyntax foreachStatement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
             if (iterationSymbol == null ||
-                !TryGetFiniteElementExpressions(expressionSyntax, out var elementExpressions))
+                !TryGetFiniteElementExpressions(expressionSyntax, foreachStatement, semanticModel, cancellationToken, out var elementExpressions))
             {
                 return;
             }
@@ -1844,6 +1848,22 @@ namespace PurelySharp.Symbolic
 
         private static bool TryGetFiniteElementExpressions(
             ExpressionSyntax expressionSyntax,
+            StatementSyntax foreachStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ImmutableArray<ExpressionSyntax> elementExpressions)
+        {
+            return TryGetFiniteElementExpressions(expressionSyntax, out elementExpressions) ||
+                TryGetPriorAssignedFiniteElementExpressions(
+                    expressionSyntax,
+                    foreachStatement,
+                    semanticModel,
+                    cancellationToken,
+                    out elementExpressions);
+        }
+
+        private static bool TryGetFiniteElementExpressions(
+            ExpressionSyntax expressionSyntax,
             out ImmutableArray<ExpressionSyntax> elementExpressions)
         {
             expressionSyntax = UnwrapExpression(expressionSyntax);
@@ -1870,6 +1890,78 @@ namespace PurelySharp.Symbolic
 
             elementExpressions = expressions.ToImmutableArray();
             return true;
+        }
+
+        private static bool TryGetPriorAssignedFiniteElementExpressions(
+            ExpressionSyntax expressionSyntax,
+            StatementSyntax foreachStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ImmutableArray<ExpressionSyntax> elementExpressions)
+        {
+            elementExpressions = ImmutableArray<ExpressionSyntax>.Empty;
+            if (foreachStatement.Parent is not BlockSyntax containingBlock ||
+                semanticModel.GetSymbolInfo(UnwrapExpression(expressionSyntax), cancellationToken).Symbol?.OriginalDefinition is not { } receiverSymbol ||
+                receiverSymbol is not ILocalSymbol and not IParameterSymbol)
+            {
+                return false;
+            }
+
+            for (var index = containingBlock.Statements.Count - 1; index >= 0; index--)
+            {
+                var statement = containingBlock.Statements[index];
+                if (statement.SpanStart >= foreachStatement.SpanStart)
+                {
+                    continue;
+                }
+
+                if (TryGetFiniteElementsFromAssignmentStatement(statement, receiverSymbol, semanticModel, cancellationToken, out elementExpressions))
+                {
+                    return true;
+                }
+
+                if (StatementMutatesSymbol(statement, receiverSymbol, semanticModel, cancellationToken))
+                {
+                    elementExpressions = ImmutableArray<ExpressionSyntax>.Empty;
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryGetFiniteElementsFromAssignmentStatement(
+            StatementSyntax statement,
+            ISymbol receiverSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ImmutableArray<ExpressionSyntax> elementExpressions)
+        {
+            elementExpressions = ImmutableArray<ExpressionSyntax>.Empty;
+            if (statement is LocalDeclarationStatementSyntax localDeclaration)
+            {
+                foreach (var declarator in localDeclaration.Declaration.Variables)
+                {
+                    if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken)?.OriginalDefinition is { } declaredSymbol &&
+                        SymbolEqualityComparer.Default.Equals(declaredSymbol, receiverSymbol))
+                    {
+                        return declarator.Initializer != null &&
+                            TryGetFiniteElementExpressions(declarator.Initializer.Value, out elementExpressions);
+                    }
+                }
+
+                return false;
+            }
+
+            if (statement is ExpressionStatementSyntax { Expression: AssignmentExpressionSyntax assignment } &&
+                assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) &&
+                semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol?.OriginalDefinition is { } assignedSymbol &&
+                SymbolEqualityComparer.Default.Equals(assignedSymbol, receiverSymbol))
+            {
+                return TryGetFiniteElementExpressions(assignment.Right, out elementExpressions);
+            }
+
+            return false;
         }
 
         private static bool TryGetFiniteCollectionExpressionElements(
