@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using NUnit.Framework;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Purity;
@@ -102,6 +103,47 @@ namespace PurelySharp.Test
             Assert.That(result.Reason, Is.EqualTo("smt_expression_budget_exceeded"));
             Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
             Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void Classify_MethodBudgetDoesNotExpireBeforeFirstSolverQueryByWallClock()
+        {
+            var x = new SmtVariable("x", SmtValueKind.Int);
+            var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
+            var service = new SmtAnalysisService(new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.FromMilliseconds(250),
+                TimeSpan.FromMilliseconds(1),
+                maxPathConditions: 4,
+                maxExpressionNodes: 32));
+
+            Thread.Sleep(20);
+
+            var result = service.Classify(CreateQuery(new[] { xIsZero }, xIsZero));
+
+            Assert.That(result.Reason, Is.Not.EqualTo("smt_method_budget_exceeded"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Classify_MethodBudgetExceededAfterSolverTime_ReturnsConservativeUnknownWithoutSolver()
+        {
+            var x = new SmtVariable("x", SmtValueKind.Int);
+            var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
+            var xIsPositive = new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(0));
+            var service = new SmtAnalysisService(new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.FromMilliseconds(250),
+                TimeSpan.FromTicks(1),
+                maxPathConditions: 4,
+                maxExpressionNodes: 32));
+
+            _ = service.Classify(CreateQuery(new[] { xIsZero }, xIsZero));
+            var result = service.Classify(CreateQuery(new[] { xIsPositive }, xIsPositive));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+            Assert.That(result.Reason, Is.EqualTo("smt_method_budget_exceeded"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(1));
         }
 
         [Test]

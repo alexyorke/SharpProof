@@ -592,21 +592,18 @@ namespace PurelySharp.Symbolic.Smt
         {
             formula = null;
             var substitutions = new List<SmtVariableSubstitution>();
+            var localVariableNames = new HashSet<string>(StringComparer.Ordinal);
             var statementIndex = 0;
-            while (statementIndex < bodySyntax.Statements.Count &&
-                bodySyntax.Statements[statementIndex] is LocalDeclarationStatementSyntax localDeclaration)
+            if (!TryCollectLeadingLocalSubstitutions(
+                    bodySyntax.Statements,
+                    ref statementIndex,
+                    semanticModel,
+                    cancellationToken,
+                    inlineDepth,
+                    substitutions,
+                    localVariableNames))
             {
-                if (!TryCollectLocalDeclarationSubstitutions(
-                        localDeclaration,
-                        semanticModel,
-                        cancellationToken,
-                        inlineDepth,
-                        substitutions))
-                {
-                    return false;
-                }
-
-                statementIndex++;
+                return false;
             }
 
             return TryTranslateReturnedBooleanStatements(
@@ -616,7 +613,9 @@ namespace PurelySharp.Symbolic.Smt
                 semanticModel,
                 cancellationToken,
                 inlineDepth,
-                out formula);
+                out formula) &&
+                formula != null &&
+                !FormulaReferencesAnyVariableName(formula, localVariableNames);
         }
 
         private static bool TryTranslateReturnedBooleanStatements(
@@ -878,19 +877,81 @@ namespace PurelySharp.Symbolic.Smt
             return true;
         }
 
+        private static bool TryCollectLeadingLocalSubstitutions(
+            SyntaxList<StatementSyntax> statements,
+            ref int statementIndex,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            int inlineDepth,
+            IList<SmtVariableSubstitution> substitutions,
+            ISet<string> localVariableNames)
+        {
+            while (statementIndex < statements.Count)
+            {
+                switch (statements[statementIndex])
+                {
+                    case LocalDeclarationStatementSyntax localDeclaration:
+                        if (!TryCollectLocalDeclarationSubstitutions(
+                                localDeclaration,
+                                semanticModel,
+                                cancellationToken,
+                                inlineDepth,
+                                substitutions,
+                                localVariableNames))
+                        {
+                            return false;
+                        }
+
+                        statementIndex++;
+                        continue;
+                    case ExpressionStatementSyntax expressionStatement
+                        when expressionStatement.Expression is AssignmentExpressionSyntax assignment &&
+                            assignment.IsKind(SyntaxKind.SimpleAssignmentExpression):
+                        if (!TryCollectLocalAssignmentSubstitution(
+                                assignment,
+                                semanticModel,
+                                cancellationToken,
+                                inlineDepth,
+                                substitutions,
+                                localVariableNames))
+                        {
+                            return false;
+                        }
+
+                        statementIndex++;
+                        continue;
+                    default:
+                        return true;
+                }
+            }
+
+            return true;
+        }
+
         private static bool TryCollectLocalDeclarationSubstitutions(
             LocalDeclarationStatementSyntax localDeclaration,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             int inlineDepth,
-            ICollection<SmtVariableSubstitution> substitutions)
+            IList<SmtVariableSubstitution> substitutions,
+            ISet<string> localVariableNames)
         {
             foreach (var variable in localDeclaration.Declaration.Variables)
             {
-                if (variable.Initializer == null ||
-                    semanticModel.GetDeclaredSymbol(variable, cancellationToken) is not ILocalSymbol localSymbol ||
-                    !TryGetValueKind(localSymbol.Type, out var localKind) ||
-                    !TryTranslateValue(
+                if (semanticModel.GetDeclaredSymbol(variable, cancellationToken) is not ILocalSymbol localSymbol ||
+                    !TryGetValueKind(localSymbol.Type, out var localKind))
+                {
+                    return false;
+                }
+
+                var localVariableName = GetVariableName(localSymbol, getSymbolVersion: null);
+                localVariableNames.Add(localVariableName);
+                if (variable.Initializer == null)
+                {
+                    continue;
+                }
+
+                if (!TryTranslateValue(
                         variable.Initializer.Value,
                         semanticModel,
                         cancellationToken,
@@ -904,15 +965,67 @@ namespace PurelySharp.Symbolic.Smt
                 }
 
                 var replacement = SubstituteVariables(initializerFormula, substitutions.ToArray());
-                var localVariable = new SmtVariable(GetVariableName(localSymbol, getSymbolVersion: null), localKind);
-                substitutions.Add(new SmtVariableSubstitution(
-                    localVariable.Name,
-                    localVariable.Name + ".",
-                    localVariable + ".",
-                    replacement));
+                SetLocalSubstitution(localVariableName, localKind, replacement, substitutions);
             }
 
             return true;
+        }
+
+        private static bool TryCollectLocalAssignmentSubstitution(
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            int inlineDepth,
+            IList<SmtVariableSubstitution> substitutions,
+            ISet<string> localVariableNames)
+        {
+            var left = UnwrapExpression(assignment.Left);
+            if (semanticModel.GetSymbolInfo(left, cancellationToken).Symbol is not ILocalSymbol localSymbol ||
+                !TryGetValueKind(localSymbol.Type, out var localKind))
+            {
+                return false;
+            }
+
+            var localVariableName = GetVariableName(localSymbol, getSymbolVersion: null);
+            if (!localVariableNames.Contains(localVariableName) ||
+                !TryTranslateValue(
+                    assignment.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var assignedFormula,
+                    getSymbolVersion: null,
+                    inlineDepth) ||
+                assignedFormula == null ||
+                assignedFormula.Kind != localKind)
+            {
+                return false;
+            }
+
+            var replacement = SubstituteVariables(assignedFormula, substitutions.ToArray());
+            SetLocalSubstitution(localVariableName, localKind, replacement, substitutions);
+            return true;
+        }
+
+        private static void SetLocalSubstitution(
+            string localVariableName,
+            SmtValueKind localKind,
+            SmtFormula replacement,
+            IList<SmtVariableSubstitution> substitutions)
+        {
+            for (var index = substitutions.Count - 1; index >= 0; index--)
+            {
+                if (string.Equals(substitutions[index].ExactName, localVariableName, StringComparison.Ordinal))
+                {
+                    substitutions.RemoveAt(index);
+                }
+            }
+
+            var localVariable = new SmtVariable(localVariableName, localKind);
+            substitutions.Add(new SmtVariableSubstitution(
+                localVariable.Name,
+                localVariable.Name + ".",
+                localVariable + ".",
+                replacement));
         }
 
         private static bool TryTranslateReturnedBooleanConditional(
@@ -1112,6 +1225,40 @@ namespace PurelySharp.Symbolic.Smt
             var suffix = variable.Name.Substring(memberPrefix.Length - 1);
             substituted = new SmtVariable(replacement + suffix, variable.Kind);
             return true;
+        }
+
+        private static bool FormulaReferencesAnyVariableName(
+            SmtFormula formula,
+            ISet<string> variableNames)
+        {
+            if (variableNames.Count == 0)
+            {
+                return false;
+            }
+
+            switch (formula)
+            {
+                case SmtVariable variable:
+                    return variableNames.Any(name =>
+                        string.Equals(variable.Name, name, StringComparison.Ordinal) ||
+                        variable.Name.StartsWith(name + ".", StringComparison.Ordinal));
+                case SmtUnaryFormula unary:
+                    return FormulaReferencesAnyVariableName(unary.Operand, variableNames);
+                case SmtBinaryFormula binary:
+                    return FormulaReferencesAnyVariableName(binary.Left, variableNames) ||
+                        FormulaReferencesAnyVariableName(binary.Right, variableNames);
+                case SmtIntegerUnaryTerm unary:
+                    return FormulaReferencesAnyVariableName(unary.Operand, variableNames);
+                case SmtIntegerBinaryTerm binary:
+                    return FormulaReferencesAnyVariableName(binary.Left, variableNames) ||
+                        FormulaReferencesAnyVariableName(binary.Right, variableNames);
+                case SmtConditionalFormula conditional:
+                    return FormulaReferencesAnyVariableName(conditional.Condition, variableNames) ||
+                        FormulaReferencesAnyVariableName(conditional.WhenTrue, variableNames) ||
+                        FormulaReferencesAnyVariableName(conditional.WhenFalse, variableNames);
+                default:
+                    return false;
+            }
         }
 
         private sealed class SmtVariableSubstitution

@@ -55,6 +55,15 @@ public static class SourcePredicates
         return present && positiveLength;
     }
 
+    public static bool HasTextViaAssignment(string value)
+    {
+        bool present;
+        bool positiveLength;
+        present = value != null;
+        positiveLength = value.Length > 0;
+        return present && positiveLength;
+    }
+
     public static bool InRange(int value)
     {
         return value >= 10 && value <= 20;
@@ -91,6 +100,20 @@ public static class SourcePredicates
     {
         var isZero = value == 0;
         return isZero;
+    }
+
+    public static bool IsZeroViaAssignment(int value)
+    {
+        bool isZero;
+        isZero = value == 0;
+        return isZero;
+    }
+
+    public static bool IsPositiveAfterLocalAssignment(int value)
+    {
+        var adjusted = value;
+        adjusted = adjusted + 1;
+        return adjusted > 0;
     }
 
     public static bool IsZeroWithSwitch(int value)
@@ -1624,6 +1647,34 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAssignmentSourcePredicateImplications()
+        {
+            var source = SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        if (SourcePredicates.HasTextViaAssignment(value))
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "LocalAssignmentSourcePredicateImplications.cs",
+                FindLine(source, "return value.Length;"),
+                13,
+                "value != null && value.Length > 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesMultiGuardSourcePredicateIndexFacts()
         {
             var source = SourcePredicateSource + @"
@@ -1701,6 +1752,62 @@ public class TestClass
                 FindLine(source, "return 10 / divisor;"),
                 13,
                 "divisor == 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesLocalAssignmentSourcePredicateExactValue()
+        {
+            var source = SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (SourcePredicates.IsZeroViaAssignment(divisor))
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "LocalAssignmentSourcePredicateExactValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                13,
+                "divisor == 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesReassignedIntegerLocalSourcePredicate()
+        {
+            var source = SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (SourcePredicates.IsPositiveAfterLocalAssignment(value))
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ReassignedIntegerLocalSourcePredicate.cs",
+                FindLine(source, "return value;"),
+                13,
+                "value > -1",
                 new SmtAnalysisService(SmtAnalysisOptions.Default),
                 AnalyzerTestHost.GetTrustedPlatformReferences());
 
@@ -5229,6 +5336,22 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_SourceHasTextLocalAssignmentPredicateContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "SourcePredicates.HasTextViaAssignment(text) && (text == null || text.Length <= 0)", SourcePredicateSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_SourceLocalAssignmentIntegerPredicateContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value", "SourcePredicates.IsPositiveAfterLocalAssignment(value) && value < -1", SourcePredicateSource),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_SourceBooleanPropertyContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -6897,6 +7020,54 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_SourceHasTextLocalAssignmentPredicateContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (SourcePredicates.HasTextViaAssignment(text) && (text == null || text.Length <= 0))
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_SourceLocalAssignmentIntegerPredicateContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int value)
+    {
+        if (SourcePredicates.IsPositiveAfterLocalAssignment(value) && value < -1)
+        {
+            Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_SourceMultiGuardIndexPredicateContradictoryImpureCall_DoesNotReport()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
@@ -8343,6 +8514,33 @@ public class TestClass
     public int TestMethod(int divisor)
     {
         if (SourcePredicates.IsZeroViaLocal(divisor))
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_SourceLocalAssignmentPredicateImpliesZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (SourcePredicates.IsZeroViaAssignment(divisor))
         {
             return 10 / divisor;
         }

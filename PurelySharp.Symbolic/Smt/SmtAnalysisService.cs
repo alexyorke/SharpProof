@@ -14,8 +14,8 @@ namespace PurelySharp.Symbolic.Smt
     public sealed class SmtAnalysisService
     {
         private readonly ConcurrentDictionary<string, PurityProofResult> _queryCache = new(StringComparer.Ordinal);
-        private readonly Stopwatch _budgetClock = Stopwatch.StartNew();
         private readonly object _solverLock = new();
+        private long _consumedQueryTicks;
         private int _executedQueryCount;
         private bool _solverUnavailable;
 
@@ -85,7 +85,7 @@ namespace PurelySharp.Symbolic.Smt
                 return Unknown("smt_expression_budget_exceeded");
             }
 
-            if (_budgetClock.Elapsed > Options.MethodBudget)
+            if (IsMethodBudgetExceeded())
             {
                 return Unknown("smt_method_budget_exceeded");
             }
@@ -104,6 +104,7 @@ namespace PurelySharp.Symbolic.Smt
 
         private PurityProofResult ClassifyCore(PurityProofQuery query)
         {
+            var queryClock = Stopwatch.StartNew();
             try
             {
                 lock (_solverLock)
@@ -122,6 +123,17 @@ namespace PurelySharp.Symbolic.Smt
                 _solverUnavailable = true;
                 return Unknown("smt_unavailable");
             }
+            finally
+            {
+                queryClock.Stop();
+                Interlocked.Add(ref _consumedQueryTicks, queryClock.ElapsedTicks);
+            }
+        }
+
+        private bool IsMethodBudgetExceeded()
+        {
+            var budgetTicks = Options.MethodBudget.TotalSeconds * Stopwatch.Frequency;
+            return Interlocked.Read(ref _consumedQueryTicks) > budgetTicks;
         }
 
         private static PurityProofResult Unknown(string reason)
