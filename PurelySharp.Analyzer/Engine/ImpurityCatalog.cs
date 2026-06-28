@@ -93,6 +93,12 @@ namespace PurelySharp.Analyzer.Engine
 				return true;
 			}
 
+			if (IsSemanticallyPureStringMember(symbol))
+			{
+				PurityAnalysisEngine.LogDebug($"Helper IsKnownPureBCLMember: Semantic string purity match for {symbol.ToDisplayString()}");
+				return true;
+			}
+
 			string signature = symbol.OriginalDefinition.ToDisplayString();
 			if (symbol.Kind == SymbolKind.Property)
 			{

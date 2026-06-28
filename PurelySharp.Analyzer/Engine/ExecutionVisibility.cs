@@ -354,7 +354,7 @@ namespace PurelySharp.Analyzer.Engine
             if (!CSharpConditionToFormula.TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||
                 formula == null)
             {
-                return KnownBooleanValue.Unknown;
+                return EvaluateBranchAssumptionFeasibility(expression, semanticModel, cancellationToken, smtAnalysis);
             }
 
             var domainFacts = new List<SmtFormula>();
@@ -366,6 +366,39 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             if (IsBranchConditionUnreachable(new SmtUnaryFormula(SmtUnaryOperator.Not, formula), domainFacts, smtAnalysis))
+            {
+                return KnownBooleanValue.True;
+            }
+
+            return KnownBooleanValue.Unknown;
+        }
+
+        private static KnownBooleanValue EvaluateBranchAssumptionFeasibility(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            var trueBranchFacts = new List<SmtFormula>();
+            if (CSharpConditionToFormula.TryCollectBranchAssumptions(
+                    expression,
+                    branchWhenTrue: true,
+                    semanticModel,
+                    cancellationToken,
+                    trueBranchFacts) &&
+                IsBranchConditionUnreachable(new SmtBooleanConstant(true), trueBranchFacts, smtAnalysis))
+            {
+                return KnownBooleanValue.False;
+            }
+
+            var falseBranchFacts = new List<SmtFormula>();
+            if (CSharpConditionToFormula.TryCollectBranchAssumptions(
+                    expression,
+                    branchWhenTrue: false,
+                    semanticModel,
+                    cancellationToken,
+                    falseBranchFacts) &&
+                IsBranchConditionUnreachable(new SmtBooleanConstant(true), falseBranchFacts, smtAnalysis))
             {
                 return KnownBooleanValue.True;
             }

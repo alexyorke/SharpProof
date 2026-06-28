@@ -741,6 +741,26 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_StringIsNullOrWhiteSpaceFalseBranchContradictoryIndex_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public char TestMethod(string text)
+    {
+        if (!string.IsNullOrWhiteSpace(text) && text.Length <= 0)
+        {
+            return text[0];
+        }
+
+        return '\0';
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_ArrayCollectionExpressionSpreadIndex_DoesNotReport()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

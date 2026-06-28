@@ -67,6 +67,29 @@ namespace PurelySharp.Analyzer.Engine
 				string.Equals(displayName, "System.UInt128", StringComparison.Ordinal);
 		}
 
+		private static bool IsSemanticallyPureStringMember(ISymbol symbol)
+		{
+			if (symbol is not IMethodSymbol
+				{
+					IsStatic: true,
+					MethodKind: MethodKind.Ordinary,
+					ReturnsVoid: false,
+					ReturnsByRef: false,
+					ReturnsByRefReadonly: false,
+					TypeArguments.Length: 0,
+					Parameters.Length: 1,
+					ReturnType.SpecialType: SpecialType.System_Boolean,
+					ContainingType.SpecialType: SpecialType.System_String
+				} methodSymbol ||
+				methodSymbol.Parameters[0].RefKind != RefKind.None ||
+				methodSymbol.Parameters[0].Type.SpecialType != SpecialType.System_String)
+			{
+				return false;
+			}
+
+			return methodSymbol.Name is "IsNullOrEmpty" or "IsNullOrWhiteSpace";
+		}
+
 		private static bool IsRandomSemanticImpure(ISymbol symbol)
 		{
 			if (!IsExactRandomType(symbol.ContainingType))

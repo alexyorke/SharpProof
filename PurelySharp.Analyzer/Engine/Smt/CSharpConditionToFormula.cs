@@ -117,19 +117,16 @@ namespace PurelySharp.Analyzer.Engine.Smt
             Func<ISymbol, int>? getSymbolVersion)
         {
             formula = null;
-            if (semanticModel.GetSymbolInfo(invocationExpression, cancellationToken).Symbol is not IMethodSymbol
-                {
-                    Name: "IsNullOrEmpty",
-                    IsStatic: true,
-                    ContainingType.SpecialType: SpecialType.System_String,
-                    Parameters.Length: 1
-                } ||
-                invocationExpression.ArgumentList.Arguments.Count != 1)
+            if (!TryGetKnownStringPredicateInvocation(
+                    invocationExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var methodSymbol,
+                    out var argument))
             {
                 return false;
             }
 
-            var argument = invocationExpression.ArgumentList.Arguments[0].Expression;
             var constantValue = semanticModel.GetConstantValue(argument, cancellationToken);
             if (constantValue is { HasValue: true, Value: null })
             {
@@ -139,8 +136,20 @@ namespace PurelySharp.Analyzer.Engine.Smt
 
             if (TryGetKnownStringLength(argument, semanticModel, cancellationToken, out var knownStringLength))
             {
-                formula = new SmtBooleanConstant(knownStringLength == 0);
+                formula = new SmtBooleanConstant(methodSymbol.Name == "IsNullOrEmpty"
+                    ? knownStringLength == 0
+                    : knownStringLength == 0 || IsKnownWhitespaceString(argument, semanticModel, cancellationToken));
                 return true;
+            }
+
+            if (methodSymbol.Name != "IsNullOrEmpty")
+            {
+                return TryCreateStringIsNullOrWhiteSpaceFormula(
+                    argument,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion);
             }
 
             var argumentTypeInfo = semanticModel.GetTypeInfo(argument, cancellationToken);
@@ -164,6 +173,78 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 new SmtBinaryFormula(SmtBinaryOperator.Equal, argumentFormula, new SmtNullConstant()),
                 new SmtBinaryFormula(SmtBinaryOperator.Equal, lengthFormula, new SmtIntegerConstant(0)));
             return true;
+        }
+
+        private static bool TryCreateStringIsNullOrWhiteSpaceFormula(
+            ExpressionSyntax argument,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null;
+            var argumentTypeInfo = semanticModel.GetTypeInfo(argument, cancellationToken);
+            var argumentType = argumentTypeInfo.ConvertedType ?? argumentTypeInfo.Type;
+            if (argumentType?.SpecialType != SpecialType.System_String ||
+                !TryTranslateValue(argument, semanticModel, cancellationToken, out var argumentFormula, getSymbolVersion) ||
+                argumentFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+            if (!TryCreateMemberFormula(argumentFormula, "Length", intType, out var lengthFormula) ||
+                lengthFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            var nullFormula = new SmtBinaryFormula(SmtBinaryOperator.Equal, argumentFormula, new SmtNullConstant());
+            var emptyFormula = new SmtBinaryFormula(SmtBinaryOperator.Equal, lengthFormula, new SmtIntegerConstant(0));
+            var whitespaceOnlyFormula = new SmtVariable(argumentFormula + ".IsWhiteSpaceOnly", SmtValueKind.Bool);
+
+            formula = new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                new SmtBinaryFormula(SmtBinaryOperator.Or, nullFormula, emptyFormula),
+                whitespaceOnlyFormula);
+            return true;
+        }
+
+        private static bool TryGetKnownStringPredicateInvocation(
+            InvocationExpressionSyntax invocationExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out IMethodSymbol methodSymbol,
+            out ExpressionSyntax argument)
+        {
+            methodSymbol = null!;
+            argument = null!;
+            if (semanticModel.GetSymbolInfo(invocationExpression, cancellationToken).Symbol is not IMethodSymbol
+                {
+                    IsStatic: true,
+                    ContainingType.SpecialType: SpecialType.System_String,
+                    Parameters.Length: 1
+                } candidate ||
+                invocationExpression.ArgumentList.Arguments.Count != 1 ||
+                candidate.Name is not ("IsNullOrEmpty" or "IsNullOrWhiteSpace"))
+            {
+                return false;
+            }
+
+            methodSymbol = candidate;
+            argument = invocationExpression.ArgumentList.Arguments[0].Expression;
+            return true;
+        }
+
+        private static bool IsKnownWhitespaceString(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapExpression(expression);
+            var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
+            return constantValue is { HasValue: true, Value: string stringValue } &&
+                string.IsNullOrWhiteSpace(stringValue);
         }
 
         public static bool TryGetKnownStringLength(
@@ -266,6 +347,17 @@ namespace PurelySharp.Analyzer.Engine.Smt
         {
             expression = UnwrapExpression(expression);
 
+            if (TryAddKnownInvocationBranchAssumptions(
+                    expression,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion))
+            {
+                return;
+            }
+
             if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
                 prefixUnary.IsKind(SyntaxKind.LogicalNotExpression))
             {
@@ -299,6 +391,80 @@ namespace PurelySharp.Analyzer.Engine.Smt
             formulas.Add(branchWhenTrue
                 ? formula
                 : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
+        }
+
+        private static bool TryAddKnownInvocationBranchAssumptions(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (expression is not InvocationExpressionSyntax invocationExpression ||
+                !TryGetKnownStringPredicateInvocation(
+                    invocationExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var methodSymbol,
+                    out var argument))
+            {
+                return false;
+            }
+
+            if (TryTranslateKnownBooleanInvocation(
+                    invocationExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var constantOrExactFormula,
+                    getSymbolVersion) &&
+                constantOrExactFormula is SmtBooleanConstant booleanConstant)
+            {
+                formulas.Add(branchWhenTrue == booleanConstant.Value
+                    ? new SmtBooleanConstant(true)
+                    : new SmtBooleanConstant(false));
+                return true;
+            }
+
+            if (branchWhenTrue)
+            {
+                return false;
+            }
+
+            return TryAddKnownNonEmptyStringFacts(
+                argument,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion);
+        }
+
+        private static bool TryAddKnownNonEmptyStringFacts(
+            ExpressionSyntax argument,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            var argumentTypeInfo = semanticModel.GetTypeInfo(argument, cancellationToken);
+            var argumentType = argumentTypeInfo.ConvertedType ?? argumentTypeInfo.Type;
+            if (argumentType?.SpecialType != SpecialType.System_String ||
+                !TryTranslateValue(argument, semanticModel, cancellationToken, out var argumentFormula, getSymbolVersion) ||
+                argumentFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+            if (!TryCreateMemberFormula(argumentFormula, "Length", intType, out var lengthFormula) ||
+                lengthFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            formulas.Add(new SmtBinaryFormula(SmtBinaryOperator.NotEqual, argumentFormula, new SmtNullConstant()));
+            formulas.Add(new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, lengthFormula, new SmtIntegerConstant(0)));
+            return true;
         }
 
         private static bool TryTranslatePatternExpression(

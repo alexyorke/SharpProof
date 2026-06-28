@@ -258,6 +258,54 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ExecutionVisibility_StringIsNullOrWhiteSpaceFalseBranchLengthContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "!string.IsNullOrWhiteSpace(text) && text.Length <= 0"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIsNullOrWhiteSpaceFalseBranchNullContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "!string.IsNullOrWhiteSpace(text) && text == null"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIsNullOrWhiteSpaceTrueBranchPositiveLength_RemainsUnknown()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "string.IsNullOrWhiteSpace(text) && text != null && text.Length > 0"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIsNullOrWhiteSpaceWhitespaceLiteral_IsAlwaysTrue()
+        {
+            Assert.That(
+                IsConditionAlwaysTrue("", "string.IsNullOrWhiteSpace(\"   \")"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIsNullOrWhiteSpaceNonWhitespaceLiteral_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("", "string.IsNullOrWhiteSpace(\"abc\")"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIsNullOrWhiteSpaceStringEmpty_IsAlwaysTrue()
+        {
+            Assert.That(
+                IsConditionAlwaysTrue("", "string.IsNullOrWhiteSpace(string.Empty)"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_DeclarationPatternImpliesNonNull_IsAlwaysFalse()
         {
             Assert.That(
@@ -1224,6 +1272,72 @@ public class TestClass
     public void TestMethod(string text)
     {
         if (string.IsNullOrEmpty(text))
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
+        }
+
+        [Test]
+        public async Task Ps0002_StringIsNullOrWhiteSpaceFalseBranchContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (!string.IsNullOrWhiteSpace(text) && text.Length <= 0)
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_StringIsNullOrWhiteSpaceFalseBranchNullContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (!string.IsNullOrWhiteSpace(text) && text == null)
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_StringIsNullOrWhiteSpaceTrueBranchPositiveLength_RemainsConservativeReports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text) && text != null && text.Length > 0)
         {
             Console.WriteLine(text);
         }

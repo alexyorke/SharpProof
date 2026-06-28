@@ -1827,6 +1827,13 @@ namespace PurelySharp.Analyzer.Engine
                 return stateBefore;
             }
 
+            if (stateBefore.PathConditions.Length > 0 &&
+                ArePathConditionsUnsatisfiable(stateBefore, stateBefore.PathConditions, smtAnalysis))
+            {
+                LogDebug($"ApplyTransferFunction SKIP for Block #{block.Ordinal} - SMT path conditions are unsatisfiable.");
+                return stateBefore;
+            }
+
 
             var pureAttributeSymbol_block = semanticModel.Compilation.GetTypeByMetadataName("PurelySharp.Attributes.PureAttribute");
             var ruleContext = new Rules.PurityAnalysisContext(
@@ -2834,6 +2841,13 @@ namespace PurelySharp.Analyzer.Engine
         {
             LogDebug($"    [CSO] Enter CheckSingleOperation for Kind: {operation.Kind}, Syntax: '{operation.Syntax.ToString().Trim()}'");
             LogDebug($"    [CSO] Current DFA State: Impure={currentState.HasPotentialImpurity}, MapCount={currentState.DelegateTargetMap.Count}");
+
+            if (currentState.PathConditions.Length > 0 &&
+                ArePathConditionsUnsatisfiable(currentState, currentState.PathConditions, context.SmtAnalysis))
+            {
+                LogDebug($"    [CSO] Current SMT path conditions are unsatisfiable. Treating as Pure: {operation.Syntax}");
+                return PurityAnalysisResult.Pure;
+            }
 
             var canUseSyntaxOnlyReachability = currentState.SmtSymbolVersions.Count == 0;
             if (canUseSyntaxOnlyReachability &&
