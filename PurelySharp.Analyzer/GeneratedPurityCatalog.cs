@@ -171,7 +171,9 @@ namespace PurelySharp.Analyzer
                 categories: ImmutableArray<string>.Empty,
                 primaryCategory: "implicit_metadata_value_type_constructor",
                 hasFreshArrayAllocationEvidence: false,
-                freshnessClassification: "none");
+                freshnessClassification: "none",
+                hasUnsupportedEffects: false,
+                effectVisibilityClassification: "internal_only");
             return true;
         }
 
@@ -371,6 +373,7 @@ namespace PurelySharp.Analyzer
             var categories = ReadStringArray(element, "Categories");
             var primaryCategory = CompatibilityHelpers.GetTrimmedStringProperty(element, "PrimaryCategory");
             var freshnessClassification = CompatibilityHelpers.GetTrimmedStringProperty(element, "FreshnessClassification") ?? "none";
+            var effectVisibilityClassification = CompatibilityHelpers.GetTrimmedStringProperty(element, "EffectVisibilityClassification") ?? "unknown";
             purityEntry = new PurityEntry(
                 classification.Trim(),
                 categories,
@@ -378,7 +381,9 @@ namespace PurelySharp.Analyzer
                     ? PrimaryCategoryFallback(categories)
                     : primaryCategory.Trim(),
                 ReadBooleanProperty(element, "HasFreshArrayAllocationEvidence"),
-                freshnessClassification);
+                freshnessClassification,
+                ReadBooleanProperty(element, "HasUnsupportedEffects"),
+                effectVisibilityClassification);
             return true;
         }
 
@@ -1272,13 +1277,17 @@ namespace PurelySharp.Analyzer
                 ImmutableArray<string> categories,
                 string primaryCategory,
                 bool hasFreshArrayAllocationEvidence,
-                string freshnessClassification)
+                string freshnessClassification,
+                bool hasUnsupportedEffects,
+                string effectVisibilityClassification)
             {
                 Classification = classification;
                 Categories = categories;
                 PrimaryCategory = primaryCategory;
                 HasFreshArrayAllocationEvidence = hasFreshArrayAllocationEvidence;
                 FreshnessClassification = freshnessClassification;
+                HasUnsupportedEffects = hasUnsupportedEffects;
+                EffectVisibilityClassification = effectVisibilityClassification;
             }
 
             public string Classification { get; }
@@ -1286,6 +1295,8 @@ namespace PurelySharp.Analyzer
             public string PrimaryCategory { get; }
             public bool HasFreshArrayAllocationEvidence { get; }
             public string FreshnessClassification { get; }
+            public bool HasUnsupportedEffects { get; }
+            public string EffectVisibilityClassification { get; }
             public bool IsPure => string.Equals(Classification, "pure", StringComparison.Ordinal);
             public bool IsImpure => string.Equals(Classification, "impure", StringComparison.Ordinal);
             public bool IsConservativeUnknown => string.Equals(Classification, "conservative_unknown", StringComparison.Ordinal);
@@ -1295,6 +1306,13 @@ namespace PurelySharp.Analyzer
                 HasFreshArrayAllocationEvidence &&
                 (string.Equals(FreshnessClassification, "fresh_array_candidate_via_local_helpers", StringComparison.Ordinal) ||
                  string.Equals(FreshnessClassification, "fresh_owned_array_write", StringComparison.Ordinal));
+            public bool AllowsNonEscapingArrayReturn =>
+                IsFreshArrayCandidate ||
+                (IsPure &&
+                 !HasFreshArrayAllocationEvidence &&
+                 !HasUnsupportedEffects &&
+                 string.Equals(FreshnessClassification, "none", StringComparison.Ordinal) &&
+                 string.Equals(EffectVisibilityClassification, "internal_only", StringComparison.Ordinal));
         }
 
         private sealed class Scope : IDisposable

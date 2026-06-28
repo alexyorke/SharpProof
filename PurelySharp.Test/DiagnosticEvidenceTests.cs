@@ -4375,6 +4375,9 @@ public class TestClass
             var freshnessClassification = matched && purityEntry != null
                 ? (string)purityEntry.GetType().GetProperty("FreshnessClassification")!.GetValue(purityEntry)!
                 : string.Empty;
+            var effectVisibilityClassification = matched && purityEntry != null
+                ? (string)purityEntry.GetType().GetProperty("EffectVisibilityClassification")!.GetValue(purityEntry)!
+                : string.Empty;
 
             Assert.That(
                 diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
@@ -4384,6 +4387,7 @@ public class TestClass
                 "Generated purity catalog should resolve Array.Empty<T>() to runtime-backed purity evidence.");
             Assert.That(classification, Is.EqualTo("pure"));
             Assert.That(freshnessClassification, Is.EqualTo("none"));
+            Assert.That(effectVisibilityClassification, Is.EqualTo("internal_only"));
         }
 
         [Test]

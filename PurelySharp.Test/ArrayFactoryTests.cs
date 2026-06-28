@@ -67,6 +67,26 @@ public class TestClass
         }
 
         [Test]
+        public async Task ArrayEmptyLocalReturned_NoDiagnostic()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int[] TestMethod()
+    {
+        var values = Array.Empty<int>();
+        return values;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task ArrayEmptyConstantConditionalWithDeadArrayFactory_NoDiagnostic()
         {
             var test = @"

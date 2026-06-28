@@ -177,35 +177,23 @@ namespace PurelySharp.Analyzer.Engine
                 purity.IsFreshArrayCandidate;
         }
 
+        internal static bool IsTrustedGeneratedNonEscapingArrayReturningMember(
+            IMethodSymbol methodSymbol,
+            Compilation compilation)
+        {
+            return methodSymbol?.ReturnType is IArrayTypeSymbol &&
+                TryGetTrustedGeneratedPurity(methodSymbol, compilation, out var purity) &&
+                purity.AllowsNonEscapingArrayReturn;
+        }
+
         internal static bool IsKnownFreshOwnedArrayReturningMember(
             IMethodSymbol methodSymbol,
             Compilation compilation)
         {
-            if (methodSymbol == null)
-            {
-                return false;
-            }
-
-            if (TryGetTrustedGeneratedPurity(methodSymbol, compilation, out var purity))
-            {
-                return purity.IsPure && purity.IsFreshArrayCandidate;
-            }
-
-            var signature = methodSymbol.OriginalDefinition.ToDisplayString();
-            if (Constants.KnownFreshOwnedArrayReturningMembers.Contains(signature))
-            {
-                return true;
-            }
-
-            if (methodSymbol.ContainingType?.SpecialType == SpecialType.System_String &&
-                signature.StartsWith("string.", StringComparison.Ordinal) &&
-                Constants.KnownFreshOwnedArrayReturningMembers.Contains("System.String." + signature.Substring("string.".Length)))
-            {
-                return true;
-            }
-
-            return methodSymbol.IsGenericMethod &&
-                Constants.KnownFreshOwnedArrayReturningMembers.Contains(methodSymbol.ConstructedFrom.ToDisplayString());
+            return methodSymbol != null &&
+                TryGetTrustedGeneratedPurity(methodSymbol, compilation, out var purity) &&
+                purity.IsPure &&
+                purity.IsFreshArrayCandidate;
         }
     }
 }

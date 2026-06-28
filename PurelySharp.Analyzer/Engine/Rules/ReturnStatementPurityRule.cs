@@ -263,8 +263,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             out IMethodSymbol factoryMethod)
         {
             var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
-            if (PurityAnalysisEngine.IsArrayEmptyFactoryOperation(unwrappedReturnedValue, out factoryMethod) ||
-                PurityAnalysisEngine.IsTrustedFreshArrayFactoryOperation(unwrappedReturnedValue, compilation, out factoryMethod))
+            if (PurityAnalysisEngine.IsTrustedFreshArrayFactoryOperation(unwrappedReturnedValue, compilation, out factoryMethod))
             {
                 return true;
             }
@@ -312,12 +311,19 @@ namespace PurelySharp.Analyzer.Engine.Rules
             out IMethodSymbol methodSymbol)
         {
             var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
+            if (PurityAnalysisEngine.IsTrustedNonEscapingArrayFactoryOperation(
+                    unwrappedReturnedValue,
+                    semanticModel.Compilation,
+                    out methodSymbol))
+            {
+                return true;
+            }
+
             if (unwrappedReturnedValue is IInvocationOperation invocationOperation &&
                 invocationOperation.Type is IArrayTypeSymbol)
             {
                 var originalDefinition = invocationOperation.TargetMethod.OriginalDefinition;
-                if (IsArrayEmptyFactory(originalDefinition) ||
-                    PurityAnalysisEngine.IsTrustedGeneratedFreshOwnedArrayReturningMember(
+                if (PurityAnalysisEngine.IsTrustedGeneratedNonEscapingArrayReturningMember(
                         originalDefinition,
                         semanticModel.Compilation))
                 {
@@ -435,8 +441,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
         {
             var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
             if (unwrappedReturnedValue is IInvocationOperation invocationOperation &&
-                invocationOperation.Type is IArrayTypeSymbol &&
-                !IsArrayEmptyFactory(invocationOperation.TargetMethod.OriginalDefinition))
+                invocationOperation.Type is IArrayTypeSymbol)
             {
                 methodSymbol = invocationOperation.TargetMethod.OriginalDefinition;
                 return true;
@@ -865,13 +870,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 methodSymbol.Parameters.Length >= 1 &&
                 methodSymbol.Parameters[0].Type is IArrayTypeSymbol &&
                 methodSymbol.ContainingType?.ToDisplayString() == "System.MemoryExtensions";
-        }
-
-        private static bool IsArrayEmptyFactory(IMethodSymbol methodSymbol)
-        {
-            return methodSymbol.Name == "Empty" &&
-                methodSymbol.Parameters.Length == 0 &&
-                methodSymbol.ContainingType?.SpecialType == SpecialType.System_Array;
         }
 
         private static bool IsOwnedLocalArrayReturn(

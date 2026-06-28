@@ -503,9 +503,13 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return semanticParseResult;
             }
 
-            if (IsArrayEmptyFactoryInvocation(invocationOperation))
+            if (invocationOperation.Type is IArrayTypeSymbol &&
+                PurityAnalysisEngine.IsTrustedFreshArrayFactoryOperation(
+                    invocationOperation,
+                    context.SemanticModel.Compilation,
+                    out _))
             {
-                PurityAnalysisEngine.LogDebug("  [MIR] System.Array.Empty<T>() is treated as a pure fresh array factory.");
+                PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (trusted generated fresh array factory)");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
@@ -905,15 +909,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return (allowLocalReference && operation is ILocalReferenceOperation) ||
                 operation is IDeclarationExpressionOperation ||
                 operation is IDiscardOperation;
-        }
-
-        private static bool IsArrayEmptyFactoryInvocation(IInvocationOperation invocationOperation)
-        {
-            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
-            return targetMethod != null &&
-                targetMethod.Name == "Empty" &&
-                targetMethod.Parameters.Length == 0 &&
-                targetMethod.ContainingType?.SpecialType == SpecialType.System_Array;
         }
 
         private static bool IsDeconstructOutArgumentMethod(IMethodSymbol methodSymbol)

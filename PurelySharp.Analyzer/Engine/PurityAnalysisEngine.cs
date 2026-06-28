@@ -2855,21 +2855,6 @@ namespace PurelySharp.Analyzer.Engine
         }
         internal static bool IsStrictPurityProfile => ImpurityCatalog.IsStrictPurityProfile;
 
-        internal static bool IsArrayEmptyFactoryOperation(IOperation? operation, out IMethodSymbol factoryMethod)
-        {
-            var unwrappedOperation = SkipImplicitConversions(operation);
-            if (unwrappedOperation is IInvocationOperation invocation &&
-                invocation.Type is IArrayTypeSymbol &&
-                IsArrayEmptyFactory(invocation.TargetMethod.OriginalDefinition))
-            {
-                factoryMethod = invocation.TargetMethod;
-                return true;
-            }
-
-            factoryMethod = null!;
-            return false;
-        }
-
         internal static bool IsTrustedFreshArrayFactoryOperation(
             IOperation? operation,
             Compilation compilation,
@@ -2879,6 +2864,26 @@ namespace PurelySharp.Analyzer.Engine
             if (unwrappedOperation is IInvocationOperation invocation &&
                 invocation.Type is IArrayTypeSymbol &&
                 IsTrustedGeneratedFreshOwnedArrayReturningMember(
+                    invocation.TargetMethod.OriginalDefinition,
+                    compilation))
+            {
+                factoryMethod = invocation.TargetMethod;
+                return true;
+            }
+
+            factoryMethod = null!;
+            return false;
+        }
+
+        internal static bool IsTrustedNonEscapingArrayFactoryOperation(
+            IOperation? operation,
+            Compilation compilation,
+            out IMethodSymbol factoryMethod)
+        {
+            var unwrappedOperation = SkipImplicitConversions(operation);
+            if (unwrappedOperation is IInvocationOperation invocation &&
+                invocation.Type is IArrayTypeSymbol &&
+                IsTrustedGeneratedNonEscapingArrayReturningMember(
                     invocation.TargetMethod.OriginalDefinition,
                     compilation))
             {
