@@ -186,7 +186,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
             return TryTranslatePattern(value, expression.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion);
         }
 
-        private static bool TryTranslatePattern(
+        public static bool TryTranslatePattern(
             SmtFormula value,
             PatternSyntax pattern,
             SemanticModel semanticModel,
@@ -199,6 +199,12 @@ namespace PurelySharp.Analyzer.Engine.Smt
             if (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
             {
                 return TryTranslatePattern(value, parenthesizedPattern.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion);
+            }
+
+            if (pattern is DiscardPatternSyntax or VarPatternSyntax)
+            {
+                formula = new SmtBooleanConstant(true);
+                return true;
             }
 
             if (pattern is ConstantPatternSyntax constantPattern &&
