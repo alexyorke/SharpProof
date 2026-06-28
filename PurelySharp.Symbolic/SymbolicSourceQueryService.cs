@@ -378,7 +378,8 @@ namespace PurelySharp.Symbolic
                 query.Analysis.Facts,
                 query.Analysis.Reachability,
                 query.Analysis.ReachabilityReason,
-                conditionProofs);
+                conditionProofs,
+                SymbolicSmtDiagnostics.FromService(smtAnalysis));
         }
 
         public SymbolicSourceQueryResult QuerySyntaxTreeAtPosition(
@@ -424,7 +425,8 @@ namespace PurelySharp.Symbolic
                 query.Analysis.Facts,
                 query.Analysis.Reachability,
                 query.Analysis.ReachabilityReason,
-                conditionProofs);
+                conditionProofs,
+                SymbolicSmtDiagnostics.FromService(smtAnalysis));
         }
 
         public SymbolicProgramPointQueryResult AnalyzeSyntaxTree(
@@ -1000,7 +1002,8 @@ namespace PurelySharp.Symbolic
             IReadOnlyList<string> facts,
             SymbolicReachability reachability = SymbolicReachability.NotChecked,
             string reachabilityReason = "reachability_not_checked",
-            IReadOnlyList<SymbolicConditionProofResult>? conditionProofs = null)
+            IReadOnlyList<SymbolicConditionProofResult>? conditionProofs = null,
+            SymbolicSmtDiagnostics? smtDiagnostics = null)
         {
             FilePath = filePath;
             Line = line;
@@ -1012,6 +1015,7 @@ namespace PurelySharp.Symbolic
             Reachability = reachability;
             ReachabilityReason = reachabilityReason;
             ConditionProofs = conditionProofs ?? Array.Empty<SymbolicConditionProofResult>();
+            SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         }
 
         public string FilePath { get; }
@@ -1033,6 +1037,8 @@ namespace PurelySharp.Symbolic
         public string ReachabilityReason { get; }
 
         public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; }
+
+        public SymbolicSmtDiagnostics SmtDiagnostics { get; }
     }
 
     public sealed class SymbolicProgramPointQueryResult
@@ -1076,6 +1082,8 @@ namespace PurelySharp.Symbolic
         public SymbolicReachability Reachability => Analysis.Reachability;
 
         public string ReachabilityReason => Analysis.ReachabilityReason;
+
+        public SymbolicSmtDiagnostics SmtDiagnostics => Analysis.SmtDiagnostics;
     }
 
     public sealed class SymbolicConditionProofResult

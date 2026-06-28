@@ -1275,6 +1275,8 @@ public class TestClass
             Assert.That(result.Facts, Is.Not.Empty);
             Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.NotChecked));
             Assert.That(result.ReachabilityReason, Is.EqualTo("reachability_not_checked"));
+            Assert.That(result.SmtDiagnostics.IsConfigured, Is.False);
+            Assert.That(result.SmtDiagnostics.ExecutedQueryCount, Is.EqualTo(0));
         }
 
         [Test]
@@ -1337,6 +1339,14 @@ public class TestClass
             Assert.That(result.Facts, Is.Not.Empty);
             Assert.That(result.ConditionProofs, Has.Count.EqualTo(2));
             Assert.That(result.ConditionProofs.Select(static proof => proof.TruthValue), Is.All.EqualTo(SymbolicTruthValue.ProvenTrue));
+            Assert.That(result.SmtDiagnostics.IsConfigured, Is.True);
+            Assert.That(result.SmtDiagnostics.Mode, Is.EqualTo(SmtAnalysisMode.Bounded));
+            Assert.That(result.SmtDiagnostics.QueryTimeoutMs, Is.EqualTo(750));
+            Assert.That(result.SmtDiagnostics.MethodBudgetMs, Is.EqualTo(5000));
+            Assert.That(result.SmtDiagnostics.MaxPathConditions, Is.EqualTo(192));
+            Assert.That(result.SmtDiagnostics.MaxExpressionNodes, Is.EqualTo(2048));
+            Assert.That(result.SmtDiagnostics.ExecutedQueryCount, Is.GreaterThanOrEqualTo(2));
+            Assert.That(result.SmtDiagnostics.CacheEntryCount, Is.GreaterThanOrEqualTo(2));
         }
 
         [Test]

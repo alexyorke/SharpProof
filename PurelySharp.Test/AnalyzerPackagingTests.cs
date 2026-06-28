@@ -432,6 +432,8 @@ namespace TestNamespace {
             Assert.That(source, Does.Contain("--position <n>"));
             Assert.That(source, Does.Contain("QueryFileAtPosition"));
             Assert.That(source, Does.Contain("options.CreateSmtOptions()"));
+            Assert.That(source, Does.Contain("Executed queries"));
+            Assert.That(source, Does.Contain("Cache entries"));
             Assert.That(source, Does.Not.Contain("new SmtAnalysisService(SmtAnalysisOptions.Default)"));
         }
 

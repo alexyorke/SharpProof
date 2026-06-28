@@ -53,6 +53,19 @@ try
             Console.WriteLine($"Implication reason: {proof.Reason}");
         }
 
+        if (result.SmtDiagnostics.IsConfigured)
+        {
+            Console.WriteLine("SMT:");
+            Console.WriteLine($"  Mode: {result.SmtDiagnostics.Mode}");
+            Console.WriteLine($"  Enabled: {result.SmtDiagnostics.IsEnabled}");
+            Console.WriteLine($"  Query timeout ms: {result.SmtDiagnostics.QueryTimeoutMs}");
+            Console.WriteLine($"  Method budget ms: {result.SmtDiagnostics.MethodBudgetMs}");
+            Console.WriteLine($"  Max path conditions: {result.SmtDiagnostics.MaxPathConditions}");
+            Console.WriteLine($"  Max expression nodes: {result.SmtDiagnostics.MaxExpressionNodes}");
+            Console.WriteLine($"  Executed queries: {result.SmtDiagnostics.ExecutedQueryCount}");
+            Console.WriteLine($"  Cache entries: {result.SmtDiagnostics.CacheEntryCount}");
+        }
+
         Console.WriteLine("Facts:");
         if (result.Facts.Count == 0)
         {

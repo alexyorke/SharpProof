@@ -92,7 +92,8 @@ namespace PurelySharp.Symbolic
                 spanStart,
                 formulas,
                 reachability,
-                proof?.Reason ?? "reachability_not_checked");
+                proof?.Reason ?? "reachability_not_checked",
+                SymbolicSmtDiagnostics.FromService(smtAnalysis));
         }
     }
 
@@ -118,13 +119,15 @@ namespace PurelySharp.Symbolic
             int spanStart,
             IReadOnlyList<SmtFormula> pathConditions,
             SymbolicReachability reachability,
-            string reachabilityReason)
+            string reachabilityReason,
+            SymbolicSmtDiagnostics? smtDiagnostics = null)
         {
             SpanStart = spanStart;
             PathConditions = pathConditions;
             Facts = pathConditions.Select(static fact => fact.ToString() ?? string.Empty).ToArray();
             Reachability = reachability;
             ReachabilityReason = reachabilityReason;
+            SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         }
 
         public int SpanStart { get; }
@@ -136,6 +139,81 @@ namespace PurelySharp.Symbolic
         public SymbolicReachability Reachability { get; }
 
         public string ReachabilityReason { get; }
+
+        public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+    }
+
+    public sealed class SymbolicSmtDiagnostics
+    {
+        public static readonly SymbolicSmtDiagnostics NotConfigured = new(
+            isConfigured: false,
+            mode: SmtAnalysisMode.Off,
+            isEnabled: false,
+            queryTimeoutMs: 0,
+            methodBudgetMs: 0,
+            maxPathConditions: 0,
+            maxExpressionNodes: 0,
+            executedQueryCount: 0,
+            cacheEntryCount: 0);
+
+        public SymbolicSmtDiagnostics(
+            bool isConfigured,
+            SmtAnalysisMode mode,
+            bool isEnabled,
+            int queryTimeoutMs,
+            int methodBudgetMs,
+            int maxPathConditions,
+            int maxExpressionNodes,
+            int executedQueryCount,
+            int cacheEntryCount)
+        {
+            IsConfigured = isConfigured;
+            Mode = mode;
+            IsEnabled = isEnabled;
+            QueryTimeoutMs = queryTimeoutMs;
+            MethodBudgetMs = methodBudgetMs;
+            MaxPathConditions = maxPathConditions;
+            MaxExpressionNodes = maxExpressionNodes;
+            ExecutedQueryCount = executedQueryCount;
+            CacheEntryCount = cacheEntryCount;
+        }
+
+        public bool IsConfigured { get; }
+
+        public SmtAnalysisMode Mode { get; }
+
+        public bool IsEnabled { get; }
+
+        public int QueryTimeoutMs { get; }
+
+        public int MethodBudgetMs { get; }
+
+        public int MaxPathConditions { get; }
+
+        public int MaxExpressionNodes { get; }
+
+        public int ExecutedQueryCount { get; }
+
+        public int CacheEntryCount { get; }
+
+        public static SymbolicSmtDiagnostics FromService(SmtAnalysisService? smtAnalysis)
+        {
+            if (smtAnalysis == null)
+            {
+                return NotConfigured;
+            }
+
+            return new SymbolicSmtDiagnostics(
+                true,
+                smtAnalysis.Options.Mode,
+                smtAnalysis.Options.IsEnabled,
+                checked((int)smtAnalysis.Options.QueryTimeout.TotalMilliseconds),
+                checked((int)smtAnalysis.Options.MethodBudget.TotalMilliseconds),
+                smtAnalysis.Options.MaxPathConditions,
+                smtAnalysis.Options.MaxExpressionNodes,
+                smtAnalysis.ExecutedQueryCount,
+                smtAnalysis.CacheEntryCount);
+        }
     }
 
     public enum SymbolicReachability
