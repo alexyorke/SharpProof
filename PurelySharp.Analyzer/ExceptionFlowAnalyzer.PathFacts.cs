@@ -36,14 +36,16 @@ namespace PurelySharp.Analyzer
             foreach (var ifStatement in useNode.Ancestors().OfType<IfStatementSyntax>())
             {
                 if (ifStatement.Statement.Span.Contains(useNode.SpanStart) &&
-                    !AnySymbolAssignedBeforeUse(ifStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                    !AnySymbolAssignedBeforeUse(ifStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken) &&
+                    !AnyReferencedSymbolAssignedBeforeUse(ifStatement.Condition, ifStatement.Statement, useNode.SpanStart, semanticModel, cancellationToken))
                 {
                     TryAddPathCondition(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
                 }
 
                 if (ifStatement.Else?.Statement is { } elseStatement &&
                     elseStatement.Span.Contains(useNode.SpanStart) &&
-                    !AnySymbolAssignedBeforeUse(elseStatement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                    !AnySymbolAssignedBeforeUse(elseStatement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken) &&
+                    !AnyReferencedSymbolAssignedBeforeUse(ifStatement.Condition, elseStatement, useNode.SpanStart, semanticModel, cancellationToken))
                 {
                     TryAddPathCondition(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, pathConditions);
                 }
@@ -164,14 +166,16 @@ namespace PurelySharp.Analyzer
             foreach (var ifStatement in useNode.Ancestors().OfType<IfStatementSyntax>())
             {
                 if (ifStatement.Statement.Span.Contains(useNode.SpanStart) &&
-                    !AnySymbolAssignedBeforeUse(ifStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                    !AnySymbolAssignedBeforeUse(ifStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken) &&
+                    !AnyReferencedSymbolAssignedBeforeUse(ifStatement.Condition, ifStatement.Statement, useNode.SpanStart, semanticModel, cancellationToken))
                 {
                     TryAddPathCondition(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
                 }
 
                 if (ifStatement.Else?.Statement is { } elseStatement &&
                     elseStatement.Span.Contains(useNode.SpanStart) &&
-                    !AnySymbolAssignedBeforeUse(elseStatement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                    !AnySymbolAssignedBeforeUse(elseStatement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken) &&
+                    !AnyReferencedSymbolAssignedBeforeUse(ifStatement.Condition, elseStatement, useNode.SpanStart, semanticModel, cancellationToken))
                 {
                     TryAddPathCondition(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, pathConditions);
                 }
@@ -256,7 +260,8 @@ namespace PurelySharp.Analyzer
             foreach (var whileStatement in useNode.Ancestors().OfType<WhileStatementSyntax>())
             {
                 if (!whileStatement.Statement.Span.Contains(useNode.SpanStart) ||
-                    AnySymbolAssignedBeforeUse(whileStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                    AnySymbolAssignedBeforeUse(whileStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken) ||
+                    AnyReferencedSymbolAssignedBeforeUse(whileStatement.Condition, whileStatement.Statement, useNode.SpanStart, semanticModel, cancellationToken))
                 {
                     continue;
                 }
@@ -268,7 +273,8 @@ namespace PurelySharp.Analyzer
             {
                 if (forStatement.Condition == null ||
                     !forStatement.Statement.Span.Contains(useNode.SpanStart) ||
-                    AnySymbolAssignedBeforeUse(forStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                    AnySymbolAssignedBeforeUse(forStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken) ||
+                    AnyReferencedSymbolAssignedBeforeUse(forStatement.Condition, forStatement.Statement, useNode.SpanStart, semanticModel, cancellationToken))
                 {
                     continue;
                 }
@@ -290,7 +296,8 @@ namespace PurelySharp.Analyzer
                     .FirstOrDefault(section => section.Span.Contains(useNode.SpanStart));
                 if (matchingSection == null ||
                     AnySymbolMutatedInSyntax(switchStatement.Expression, invalidatedSymbols, semanticModel, cancellationToken) ||
-                    AnySymbolAssignedBeforeUse(matchingSection, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                    AnySymbolAssignedBeforeUse(matchingSection, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken) ||
+                    AnyReferencedSymbolAssignedBeforeUse(switchStatement.Expression, matchingSection, useNode.SpanStart, semanticModel, cancellationToken))
                 {
                     continue;
                 }
@@ -312,7 +319,8 @@ namespace PurelySharp.Analyzer
                     .FirstOrDefault(arm => arm.Expression.Span.Contains(useNode.SpanStart));
                 if (matchingArm == null ||
                     AnySymbolMutatedInSyntax(switchExpression.GoverningExpression, invalidatedSymbols, semanticModel, cancellationToken) ||
-                    AnySymbolAssignedBeforeUse(matchingArm, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                    AnySymbolAssignedBeforeUse(matchingArm, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken) ||
+                    AnyReferencedSymbolAssignedBeforeUse(switchExpression.GoverningExpression, matchingArm, useNode.SpanStart, semanticModel, cancellationToken))
                 {
                     continue;
                 }
@@ -1691,6 +1699,18 @@ namespace PurelySharp.Analyzer
             return AnySymbolAssignedBetween(branchRoot, branchRoot.SpanStart - 1, useSpanStart, symbols, semanticModel, cancellationToken);
         }
 
+        private static bool AnyReferencedSymbolAssignedBeforeUse(
+            SyntaxNode condition,
+            SyntaxNode branchRoot,
+            int useSpanStart,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var referencedSymbols = GetReferencedLocalAndParameterSymbols(condition, semanticModel, cancellationToken);
+            return referencedSymbols.Count != 0 &&
+                AnySymbolAssignedBeforeUse(branchRoot, useSpanStart, referencedSymbols, semanticModel, cancellationToken);
+        }
+
         private static bool IsSymbolAssignedBetween(
             SyntaxNode root,
             int afterSpanStart,
@@ -1707,7 +1727,9 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                if (MutatesSymbol(node, symbol, semanticModel, cancellationToken))
+                if (TryGetMutatedLocalOrParameterSymbol(node, semanticModel, cancellationToken, out var mutatedSymbol) &&
+                    SymbolEqualityComparer.Default.Equals(mutatedSymbol, symbol) ||
+                    MutatesSymbol(node, symbol, semanticModel, cancellationToken))
                 {
                     return true;
                 }

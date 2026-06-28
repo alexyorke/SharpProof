@@ -115,6 +115,7 @@ namespace PurelySharp.Symbolic
                          forStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
                 {
                     AddReachabilityCondition(builder, forStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                    AddForLoopMonotonicLowerBoundFacts(builder, forStatementSyntax, semanticModel, cancellationToken);
                 }
                 else if (ancestor is SwitchStatementSyntax switchStatementSyntax)
                 {
@@ -187,6 +188,165 @@ namespace PurelySharp.Symbolic
             return facts;
         }
 
+        private static void AddForLoopMonotonicLowerBoundFacts(
+            ICollection<SmtFormula> facts,
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var initializer in EnumerateForLoopConstantInitializers(forStatement, semanticModel, cancellationToken))
+            {
+                if (!TryCreateSymbolSmtValue(initializer.Symbol, out var symbolFormula) ||
+                    symbolFormula.Kind != SmtValueKind.Int ||
+                    StatementMutatesSymbol(forStatement.Statement, initializer.Symbol, semanticModel, cancellationToken) ||
+                    !ForLoopIncrementorsPreserveLowerBound(forStatement, initializer.Symbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                facts.Add(new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThanOrEqual,
+                    symbolFormula,
+                    new SmtIntegerConstant(initializer.InitialValue)));
+            }
+        }
+
+        private static IEnumerable<(ISymbol Symbol, long InitialValue)> EnumerateForLoopConstantInitializers(
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (forStatement.Declaration != null)
+            {
+                foreach (var declarator in forStatement.Declaration.Variables)
+                {
+                    if (declarator.Initializer == null ||
+                        semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol localSymbol ||
+                        !TryGetIntegralConstant(declarator.Initializer.Value, semanticModel, cancellationToken, out var initialValue))
+                    {
+                        continue;
+                    }
+
+                    yield return (localSymbol.OriginalDefinition, initialValue);
+                }
+            }
+
+            foreach (var expression in forStatement.Initializers)
+            {
+                if (expression is not AssignmentExpressionSyntax assignment ||
+                    !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                    semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } symbol ||
+                    symbol is not ILocalSymbol and not IParameterSymbol ||
+                    !TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var initialValue))
+                {
+                    continue;
+                }
+
+                yield return (symbol.OriginalDefinition, initialValue);
+            }
+        }
+
+        private static bool ForLoopIncrementorsPreserveLowerBound(
+            ForStatementSyntax forStatement,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var incrementor in forStatement.Incrementors)
+            {
+                if (!ExpressionReferencesSymbol(incrementor, symbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                if (!IncrementorPreservesLowerBound(incrementor, symbol, semanticModel, cancellationToken))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool IncrementorPreservesLowerBound(
+            ExpressionSyntax expression,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapExpression(expression);
+            if (TryGetIncrementedOrDecrementedSymbol(expression, semanticModel, cancellationToken, out var unarySymbol, out var delta) &&
+                SymbolEqualityComparer.Default.Equals(unarySymbol, symbol))
+            {
+                return delta >= 0;
+            }
+
+            if (expression is not AssignmentExpressionSyntax assignment ||
+                semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } assignedSymbol ||
+                !SymbolEqualityComparer.Default.Equals(assignedSymbol.OriginalDefinition, symbol))
+            {
+                return false;
+            }
+
+            if (assignment.IsKind(SyntaxKind.AddAssignmentExpression) &&
+                TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var addedValue))
+            {
+                return addedValue >= 0;
+            }
+
+            if (assignment.IsKind(SyntaxKind.SubtractAssignmentExpression) &&
+                TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var subtractedValue))
+            {
+                return subtractedValue <= 0;
+            }
+
+            if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+            {
+                return TryIsSelfPlusNonNegativeConstant(assignment.Right, symbol, semanticModel, cancellationToken);
+            }
+
+            return false;
+        }
+
+        private static bool TryIsSelfPlusNonNegativeConstant(
+            ExpressionSyntax expression,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is not BinaryExpressionSyntax binaryExpression)
+            {
+                return false;
+            }
+
+            if (binaryExpression.IsKind(SyntaxKind.AddExpression))
+            {
+                return IsSymbolReference(binaryExpression.Left, symbol, semanticModel, cancellationToken) &&
+                        TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue) &&
+                        rightValue >= 0 ||
+                    IsSymbolReference(binaryExpression.Right, symbol, semanticModel, cancellationToken) &&
+                        TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue) &&
+                        leftValue >= 0;
+            }
+
+            return binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
+                IsSymbolReference(binaryExpression.Left, symbol, semanticModel, cancellationToken) &&
+                TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken, out var subtractValue) &&
+                subtractValue <= 0;
+        }
+
+        private static bool IsSymbolReference(
+            ExpressionSyntax expression,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var expressionSymbol = semanticModel.GetSymbolInfo(UnwrapExpression(expression), cancellationToken).Symbol;
+            return expressionSymbol != null &&
+                SymbolEqualityComparer.Default.Equals(expressionSymbol.OriginalDefinition, symbol);
+        }
+
         private static bool IsLoopBodyBlock(BlockSyntax block)
         {
             return block.Parent switch
@@ -243,6 +403,38 @@ namespace PurelySharp.Symbolic
                 var mutatedSymbol = semanticModel.GetSymbolInfo(mutatedExpression, cancellationToken).Symbol?.OriginalDefinition;
                 if (mutatedSymbol != null &&
                     conditionSymbols.Any(symbol => SymbolEqualityComparer.Default.Equals(symbol, mutatedSymbol)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool StatementMutatesSymbol(
+            StatementSyntax statement,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var node in statement.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+            {
+                var mutatedExpression = node switch
+                {
+                    AssignmentExpressionSyntax assignment => assignment.Left,
+                    PrefixUnaryExpressionSyntax prefixUnary
+                        when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) || prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
+                        prefixUnary.Operand,
+                    PostfixUnaryExpressionSyntax postfixUnary
+                        when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) || postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
+                        postfixUnary.Operand,
+                    ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) => argument.Expression,
+                    _ => null
+                };
+
+                if (mutatedExpression != null &&
+                    ExpressionReferencesSymbol(mutatedExpression, symbol, semanticModel, cancellationToken))
                 {
                     return true;
                 }
@@ -1806,6 +1998,54 @@ namespace PurelySharp.Symbolic
             }
 
             return false;
+        }
+
+        private static bool TryGetIntegralConstant(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out long value)
+        {
+            var constantValue = semanticModel.GetConstantValue(UnwrapExpression(expression), cancellationToken);
+            if (!constantValue.HasValue || constantValue.Value == null)
+            {
+                value = 0;
+                return false;
+            }
+
+            switch (constantValue.Value)
+            {
+                case sbyte sbyteValue:
+                    value = sbyteValue;
+                    return true;
+                case byte byteValue:
+                    value = byteValue;
+                    return true;
+                case short shortValue:
+                    value = shortValue;
+                    return true;
+                case ushort ushortValue:
+                    value = ushortValue;
+                    return true;
+                case int intValue:
+                    value = intValue;
+                    return true;
+                case uint uintValue:
+                    value = uintValue;
+                    return true;
+                case long longValue:
+                    value = longValue;
+                    return true;
+                case ulong ulongValue when ulongValue <= long.MaxValue:
+                    value = (long)ulongValue;
+                    return true;
+                case char charValue:
+                    value = charValue;
+                    return true;
+                default:
+                    value = 0;
+                    return false;
+            }
         }
 
         private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)
