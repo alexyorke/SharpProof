@@ -3877,6 +3877,56 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_WhileNormalExitIndex_ReportsIndexOutOfRange()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        while (index < values.Length)
+        {
+            index++;
+        }
+
+        return values[index];
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
+        public async Task Ps0010_WhileBreakExitIndex_RemainsConservativeDoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index, bool stop)
+    {
+        while (index < values.Length)
+        {
+            if (stop)
+            {
+                break;
+            }
+
+            index++;
+        }
+
+        return values[index];
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_EmptyArrayFromEndIndex_ReportsIndexOutOfRange()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"
