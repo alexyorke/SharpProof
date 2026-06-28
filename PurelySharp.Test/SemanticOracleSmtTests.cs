@@ -368,6 +368,153 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_ArrayCreationLength_PrunesUnreachableBranch()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = new int[0];
+        if (values.Length > 0)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_ImplicitArrayLength_PrunesUnreachableBranch()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = new[] { 1, 2 };
+        if (values.Length != 2)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringLiteralLength_PrunesUnreachableBranch()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var text = ""abc"";
+        if (text.Length < 3)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LengthReassignment_UsesLatestFact()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = new int[1];
+        values = new int[2];
+        if (values.Length == 1)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LoopArrayMutation_InvalidatesPreLoopLengthFact()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod(bool keepGoing)
+    {
+        var values = new int[0];
+        while (keepGoing)
+        {
+            if (values.Length > 0)
+            {
+                return 1;
+            }
+
+            values = new int[1];
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_LoopWithoutArrayMutation_PreservesPreLoopLengthFact()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod(bool keepGoing)
+    {
+        var values = new int[0];
+        while (keepGoing)
+        {
+            if (values.Length > 0)
+            {
+                return 1;
+            }
+        }
+
+        return 0;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_UlongZeroContradiction_IsAlwaysFalse()
         {
             Assert.That(

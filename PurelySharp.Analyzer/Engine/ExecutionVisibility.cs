@@ -339,7 +339,7 @@ namespace PurelySharp.Analyzer.Engine
                     RemoveFactsInvalidatedByNestedMutations(declarator.Initializer.Value, semanticModel, cancellationToken, facts);
                     if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
                     {
-                        AddForInitializerFact(localSymbol, declarator.Initializer.Value, semanticModel, cancellationToken, facts);
+                        AddAssignedValueFacts(localSymbol, declarator.Initializer.Value, semanticModel, cancellationToken, facts);
                     }
                 }
 
@@ -358,7 +358,7 @@ namespace PurelySharp.Analyzer.Engine
                     RemoveFactsReferencingSymbol(facts, assignedSymbol.OriginalDefinition);
                     if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
                     {
-                        AddForInitializerFact(assignedSymbol.OriginalDefinition, assignment.Right, semanticModel, cancellationToken, facts);
+                        AddAssignedValueFacts(assignedSymbol.OriginalDefinition, assignment.Right, semanticModel, cancellationToken, facts);
                     }
                 }
 
@@ -416,7 +416,7 @@ namespace PurelySharp.Analyzer.Engine
                     if (declarator.Initializer != null &&
                         semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol)
                     {
-                        AddForInitializerFact(localSymbol, declarator.Initializer.Value, semanticModel, cancellationToken, facts);
+                        AddAssignedValueFacts(localSymbol, declarator.Initializer.Value, semanticModel, cancellationToken, facts);
                     }
                 }
             }
@@ -432,14 +432,14 @@ namespace PurelySharp.Analyzer.Engine
                 var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
                 if (assignedSymbol is ILocalSymbol or IParameterSymbol)
                 {
-                    AddForInitializerFact(assignedSymbol.OriginalDefinition, assignment.Right, semanticModel, cancellationToken, facts);
+                    AddAssignedValueFacts(assignedSymbol.OriginalDefinition, assignment.Right, semanticModel, cancellationToken, facts);
                 }
             }
 
             return facts;
         }
 
-        private static void AddForInitializerFact(
+        private static void AddAssignedValueFacts(
             ISymbol assignedSymbol,
             ExpressionSyntax valueExpression,
             SemanticModel semanticModel,
@@ -451,6 +451,12 @@ namespace PurelySharp.Analyzer.Engine
                 TryCreateAssignedValueFact(assignedSymbol, valueExpression, semanticModel, cancellationToken, out var fact))
             {
                 facts.Add(fact);
+            }
+
+            if (!ExpressionReferencesSymbol(valueExpression, assignedSymbol, semanticModel, cancellationToken) &&
+                TryCreateBuiltInLengthFact(assignedSymbol, valueExpression, semanticModel, cancellationToken, out var lengthFact))
+            {
+                facts.Add(lengthFact);
             }
         }
 
@@ -471,6 +477,166 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             fact = CreateAssignedValueFact(targetFormula, valueFormula);
+            return true;
+        }
+
+        private static bool TryCreateBuiltInLengthFact(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula fact)
+        {
+            fact = null!;
+            if (!TryCreateBuiltInLengthFormula(targetSymbol, out var targetLengthFormula) ||
+                !TryCreateBuiltInLengthValueFormula(valueExpression, semanticModel, cancellationToken, out var valueLengthFormula))
+            {
+                return false;
+            }
+
+            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula);
+            return true;
+        }
+
+        private static bool TryCreateBuiltInLengthFormula(ISymbol symbol, out SmtFormula formula)
+        {
+            var type = symbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                _ => null
+            };
+
+            if (type is IArrayTypeSymbol { Rank: 1 } ||
+                type?.SpecialType == SpecialType.System_String)
+            {
+                var receiverFormula = new SmtVariable(GetSmtVariableName(symbol), SmtValueKind.Reference);
+                formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryCreateBuiltInLengthValueFormula(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            valueExpression = UnwrapExpression(valueExpression);
+            var valueType = semanticModel.GetTypeInfo(valueExpression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(valueExpression, cancellationToken).Type;
+            if (valueType is IArrayTypeSymbol { Rank: 1 })
+            {
+                return TryCreateArrayLengthValueFormula(valueExpression, semanticModel, cancellationToken, out formula);
+            }
+
+            if (valueType?.SpecialType == SpecialType.System_String)
+            {
+                return TryCreateStringLengthValueFormula(valueExpression, semanticModel, cancellationToken, out formula);
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryCreateArrayLengthValueFormula(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            if (valueExpression is ArrayCreationExpressionSyntax arrayCreation)
+            {
+                if (arrayCreation.Type.RankSpecifiers.Count == 1 &&
+                    arrayCreation.Type.RankSpecifiers[0].Sizes.Count == 1 &&
+                    !arrayCreation.Type.RankSpecifiers[0].Sizes[0].IsKind(SyntaxKind.OmittedArraySizeExpression) &&
+                    CSharpConditionToFormula.TryTranslateValue(
+                        arrayCreation.Type.RankSpecifiers[0].Sizes[0],
+                        semanticModel,
+                        cancellationToken,
+                        out var sizeFormula,
+                        getSymbolVersion: null,
+                        inlineDepth: 0) &&
+                    sizeFormula is { Kind: SmtValueKind.Int })
+                {
+                    formula = sizeFormula;
+                    return true;
+                }
+
+                if (arrayCreation.Initializer != null)
+                {
+                    formula = new SmtIntegerConstant(arrayCreation.Initializer.Expressions.Count);
+                    return true;
+                }
+            }
+
+            if (valueExpression is ImplicitArrayCreationExpressionSyntax implicitArrayCreation)
+            {
+                formula = new SmtIntegerConstant(implicitArrayCreation.Initializer.Expressions.Count);
+                return true;
+            }
+
+            if (TryCreateCollectionExpressionLengthFormula(valueExpression, out formula))
+            {
+                return true;
+            }
+
+            return TryCreateReferenceLengthValueFormula(valueExpression, semanticModel, cancellationToken, out formula);
+        }
+
+        private static bool TryCreateStringLengthValueFormula(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            if (CSharpConditionToFormula.TryGetKnownStringLength(valueExpression, semanticModel, cancellationToken, out var stringLength))
+            {
+                formula = new SmtIntegerConstant(stringLength);
+                return true;
+            }
+
+            return TryCreateReferenceLengthValueFormula(valueExpression, semanticModel, cancellationToken, out formula);
+        }
+
+        private static bool TryCreateReferenceLengthValueFormula(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            if (CSharpConditionToFormula.TryTranslateValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                receiverFormula is SmtVariable { Kind: SmtValueKind.Reference })
+            {
+                formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryCreateCollectionExpressionLengthFormula(
+            ExpressionSyntax valueExpression,
+            out SmtFormula formula)
+        {
+            if (valueExpression is not CollectionExpressionSyntax collectionExpression ||
+                collectionExpression.Elements.Any(static element => element is not ExpressionElementSyntax))
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtIntegerConstant(collectionExpression.Elements.Count);
             return true;
         }
 
