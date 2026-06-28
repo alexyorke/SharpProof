@@ -2153,6 +2153,17 @@ namespace PurelySharp.Symbolic
                 facts.Add(lengthFact);
             }
 
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
+                IsDefinitelyNonNullReferenceValue(effectiveValueExpression, semanticModel, cancellationToken) &&
+                TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula) &&
+                targetFormula is { Kind: SmtValueKind.Reference })
+            {
+                facts.Add(new SmtBinaryFormula(
+                    SmtBinaryOperator.NotEqual,
+                    targetFormula,
+                    new SmtNullConstant()));
+            }
+
             AddTupleElementAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
 
             if (hasThrowGuard &&
@@ -2542,6 +2553,19 @@ namespace PurelySharp.Symbolic
             if (constantValue is { HasValue: true, Value: not null })
             {
                 return true;
+            }
+
+            if (expression is ConditionalExpressionSyntax conditionalExpression)
+            {
+                return IsDefinitelyNonNullReferenceValue(conditionalExpression.WhenTrue, semanticModel, cancellationToken) &&
+                    IsDefinitelyNonNullReferenceValue(conditionalExpression.WhenFalse, semanticModel, cancellationToken);
+            }
+
+            if (expression is BinaryExpressionSyntax coalesceExpression &&
+                coalesceExpression.IsKind(SyntaxKind.CoalesceExpression))
+            {
+                return IsDefinitelyNonNullReferenceValue(coalesceExpression.Left, semanticModel, cancellationToken) ||
+                    IsDefinitelyNonNullReferenceValue(coalesceExpression.Right, semanticModel, cancellationToken);
             }
 
             return expression is ObjectCreationExpressionSyntax or

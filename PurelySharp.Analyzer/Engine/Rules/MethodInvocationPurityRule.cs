@@ -23,6 +23,16 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            if (ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(
+                    invocationOperation.Syntax,
+                    context.SemanticModel,
+                    System.Threading.CancellationToken.None,
+                    context.SmtAnalysis))
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] Invocation is in an SMT-proven unreachable branch. Treating as pure.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             var invokedMethodSymbol = invocationOperation.TargetMethod;
             if (invokedMethodSymbol == null)
             {
