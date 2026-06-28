@@ -150,6 +150,90 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        private static List<SmtFormula> CollectPathConditionsForUse(
+            SyntaxNode useNode,
+            IReadOnlyCollection<ISymbol> invalidatedSymbols,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var pathConditions = new List<SmtFormula>();
+            foreach (var ifStatement in useNode.Ancestors().OfType<IfStatementSyntax>())
+            {
+                if (ifStatement.Statement.Span.Contains(useNode.SpanStart) &&
+                    !AnySymbolAssignedBeforeUse(ifStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                {
+                    TryAddPathCondition(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
+                }
+
+                if (ifStatement.Else?.Statement is { } elseStatement &&
+                    elseStatement.Span.Contains(useNode.SpanStart) &&
+                    !AnySymbolAssignedBeforeUse(elseStatement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                {
+                    TryAddPathCondition(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, pathConditions);
+                }
+            }
+
+            AddPrecedingGuardConditions(invalidatedSymbols, useNode, semanticModel, cancellationToken, pathConditions);
+            return pathConditions;
+        }
+
+        private static void AddPrecedingGuardConditions(
+            IReadOnlyCollection<ISymbol> invalidatedSymbols,
+            SyntaxNode useNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
+        {
+            var containingStatement = useNode
+                .AncestorsAndSelf()
+                .OfType<StatementSyntax>()
+                .FirstOrDefault(statement => statement.Parent is BlockSyntax);
+            if (containingStatement?.Parent is not BlockSyntax block)
+            {
+                return;
+            }
+
+            foreach (var statement in block.Statements)
+            {
+                if (ReferenceEquals(statement, containingStatement))
+                {
+                    break;
+                }
+
+                if (statement is IfStatementSyntax ifStatement &&
+                    ifStatement.Else == null &&
+                    StatementDefinitelyExits(ifStatement.Statement) &&
+                    !AnySymbolAssignedBetween(block, ifStatement.Span.End, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                {
+                    TryAddPathCondition(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, pathConditions);
+                }
+            }
+        }
+
+        private static IReadOnlyCollection<ISymbol> CollectLocalAndParameterSymbols(
+            SyntaxNode root,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var symbols = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+            foreach (var node in root.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+            {
+                if (node is not ExpressionSyntax expression)
+                {
+                    continue;
+                }
+
+                var symbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
+                if (symbol != null)
+                {
+                    symbols.Add(symbol);
+                }
+            }
+
+            return symbols;
+        }
+
         private static ISymbol? GetLocalOrParameterSymbol(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
@@ -317,6 +401,16 @@ namespace PurelySharp.Analyzer
             return IsSymbolAssignedBetween(branchRoot, branchRoot.SpanStart - 1, useSpanStart, symbol, semanticModel, cancellationToken);
         }
 
+        private static bool AnySymbolAssignedBeforeUse(
+            SyntaxNode branchRoot,
+            int useSpanStart,
+            IReadOnlyCollection<ISymbol> symbols,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            return AnySymbolAssignedBetween(branchRoot, branchRoot.SpanStart - 1, useSpanStart, symbols, semanticModel, cancellationToken);
+        }
+
         private static bool IsSymbolAssignedBetween(
             SyntaxNode root,
             int afterSpanStart,
@@ -334,6 +428,30 @@ namespace PurelySharp.Analyzer
                 }
 
                 if (MutatesSymbol(node, symbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool AnySymbolAssignedBetween(
+            SyntaxNode root,
+            int afterSpanStart,
+            int beforeSpanStart,
+            IReadOnlyCollection<ISymbol> symbols,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            if (symbols.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var symbol in symbols)
+            {
+                if (IsSymbolAssignedBetween(root, afterSpanStart, beforeSpanStart, symbol, semanticModel, cancellationToken))
                 {
                     return true;
                 }

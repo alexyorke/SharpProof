@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using PurelySharp.Analyzer.Engine.Smt;
+using SearchLib.Smt;
 
 namespace PurelySharp.Analyzer
 {
@@ -65,6 +66,21 @@ namespace PurelySharp.Analyzer
                     IsDefinitelyNullExpression(invocation.Expression, invocation, semanticModel, cancellationToken, smtAnalysis))
                 {
                     yield return invocation;
+                }
+            }
+        }
+
+        internal static IEnumerable<ElementAccessExpressionSyntax> GetDefiniteIndexOutOfRangeNodes(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            foreach (var elementAccess in GetRelevantDescendants<ElementAccessExpressionSyntax>(methodNode))
+            {
+                if (IsDefinitelyOutOfRangeArrayAccess(elementAccess, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    yield return elementAccess;
                 }
             }
         }
@@ -235,6 +251,65 @@ namespace PurelySharp.Analyzer
 
             return IsKnownByPriorAssignment(expression, useNode, semanticModel, cancellationToken, PathFactKind.Null) ||
                 IsKnownByDominatingIf(expression, useNode, semanticModel, cancellationToken, PathFactKind.Null, smtAnalysis);
+        }
+
+        private static bool IsDefinitelyOutOfRangeArrayAccess(
+            ElementAccessExpressionSyntax elementAccess,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (elementAccess.ArgumentList.Arguments.Count != 1)
+            {
+                return false;
+            }
+
+            var receiverType = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).Type;
+            if (receiverType is not IArrayTypeSymbol arrayType || arrayType.Rank != 1)
+            {
+                return false;
+            }
+
+            var receiverSymbol = GetLocalOrParameterSymbol(elementAccess.Expression, semanticModel, cancellationToken);
+            if (receiverSymbol == null)
+            {
+                return false;
+            }
+
+            var indexExpression = elementAccess.ArgumentList.Arguments[0].Expression;
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    indexExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var indexFormula,
+                    getSymbolVersion: null) ||
+                indexFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            var receiverFormula = new SmtVariable(GetSmtVariableName(receiverSymbol), SmtValueKind.Reference);
+            var lengthFormula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
+            var lowerBoundViolation = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThan,
+                indexFormula,
+                new SmtIntegerConstant(0));
+            var upperBoundViolation = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                indexFormula,
+                lengthFormula);
+            var outOfRangeFormula = new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                lowerBoundViolation,
+                upperBoundViolation);
+
+            var pathConditions = CollectPathConditionsForUse(
+                elementAccess,
+                CollectLocalAndParameterSymbols(elementAccess, semanticModel, cancellationToken),
+                semanticModel,
+                cancellationToken);
+
+            return PathConditionsImplyFact(pathConditions, outOfRangeFormula, smtAnalysis);
         }
 
         private static bool IsReferenceType(ITypeSymbol? typeSymbol)

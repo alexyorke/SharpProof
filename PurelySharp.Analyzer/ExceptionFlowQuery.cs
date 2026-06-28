@@ -193,6 +193,34 @@ namespace PurelySharp.Analyzer
                         "definite_null_dereference",
                         "null_receiver"));
             }
+
+            foreach (var indexOutOfRangeNode in ExceptionFlowAnalyzer.GetDefiniteIndexOutOfRangeNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                if (IsInStaticallyUnreachableBranch(indexOutOfRangeNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (ExceptionFlowAnalyzer.IsShadowedByDefinitelyThrowingFinally(indexOutOfRangeNode))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.IndexOutOfRangeException");
+                if (IsCaughtWithinMethod(indexOutOfRangeNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    indexOutOfRangeNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        "System.IndexOutOfRangeException",
+                        "definite_index_out_of_range",
+                        "array_index"));
+            }
         }
 
         private static IEnumerable<ExceptionCandidate> CollectSourceCalleeExceptions(
