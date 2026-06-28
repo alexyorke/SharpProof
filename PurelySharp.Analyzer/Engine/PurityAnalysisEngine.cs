@@ -4109,7 +4109,7 @@ namespace PurelySharp.Analyzer.Engine
 
             if (unwrappedValue is IInvocationOperation invocationOperation &&
                 invocationOperation.Type is IArrayTypeSymbol &&
-                IsKnownFreshOwnedArrayReturningMember(invocationOperation.TargetMethod.OriginalDefinition, compilation))
+                IsTrustedGeneratedFreshOwnedArrayReturningMember(invocationOperation.TargetMethod.OriginalDefinition, compilation))
             {
                 return true;
             }

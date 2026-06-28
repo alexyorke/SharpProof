@@ -636,7 +636,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             if (invocationOperation.Type is IArrayTypeSymbol &&
-                PurityAnalysisEngine.IsKnownFreshOwnedArrayReturningMember(
+                PurityAnalysisEngine.IsTrustedGeneratedFreshOwnedArrayReturningMember(
                     originalDefinitionSymbol,
                     context.SemanticModel.Compilation))
             {
@@ -4170,7 +4170,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             var originalDefinition = invocationOperation.TargetMethod.OriginalDefinition;
-            return PurityAnalysisEngine.IsKnownFreshOwnedArrayReturningMember(originalDefinition, compilation) ||
+            return PurityAnalysisEngine.IsTrustedGeneratedFreshOwnedArrayReturningMember(originalDefinition, compilation) ||
                 PurityAnalysisEngine.IsTrustedFreshArrayFactoryOperation(unwrappedSource, compilation, out _);
         }
 

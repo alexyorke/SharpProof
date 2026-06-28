@@ -185,15 +185,5 @@ namespace PurelySharp.Analyzer.Engine
                 TryGetTrustedGeneratedPurity(methodSymbol, compilation, out var purity) &&
                 purity.AllowsNonEscapingArrayReturn;
         }
-
-        internal static bool IsKnownFreshOwnedArrayReturningMember(
-            IMethodSymbol methodSymbol,
-            Compilation compilation)
-        {
-            return methodSymbol != null &&
-                TryGetTrustedGeneratedPurity(methodSymbol, compilation, out var purity) &&
-                purity.IsPure &&
-                purity.IsFreshArrayCandidate;
-        }
     }
 }
