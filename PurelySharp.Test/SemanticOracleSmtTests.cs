@@ -1822,6 +1822,30 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_BitwiseBooleanAndContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value", "(value == 0) & (value != 0)"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_BitwiseBooleanOrFalseBranchContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value", "!((value < 0) | (value > 0)) && value != 0"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_BooleanExclusiveOrContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("bool left, bool right", "(left ^ right) && left == right"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_DefaultLiteralNullContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -2219,6 +2243,28 @@ public class TestClass
     {
         var isZero = value == 0;
         if (isZero && value != 0)
+        {
+            Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_BitwiseBooleanAndContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int value)
+    {
+        if ((value == 0) & (value != 0))
         {
             Console.WriteLine(value);
         }
@@ -3307,6 +3353,31 @@ public class TestClass
     public int TestMethod(int value, int divisor)
     {
         if (divisor == 0)
+        {
+            return value / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_BitwiseBooleanAndGuardImpliesZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor, bool ready)
+    {
+        if ((divisor == 0) & ready)
         {
             return value / divisor;
         }

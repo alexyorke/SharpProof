@@ -622,7 +622,25 @@ namespace PurelySharp.Symbolic.Smt
                     return;
                 }
 
+                if (branchWhenTrue &&
+                    binaryExpression.IsKind(SyntaxKind.BitwiseAndExpression) &&
+                    HasSupportedBooleanType(binaryExpression, semanticModel, cancellationToken))
+                {
+                    AddBranchAssumptions(binaryExpression.Left, branchWhenTrue: true, semanticModel, cancellationToken, formulas, getSymbolVersion);
+                    AddBranchAssumptions(binaryExpression.Right, branchWhenTrue: true, semanticModel, cancellationToken, formulas, getSymbolVersion);
+                    return;
+                }
+
                 if (!branchWhenTrue && binaryExpression.IsKind(SyntaxKind.LogicalOrExpression))
+                {
+                    AddBranchAssumptions(binaryExpression.Left, branchWhenTrue: false, semanticModel, cancellationToken, formulas, getSymbolVersion);
+                    AddBranchAssumptions(binaryExpression.Right, branchWhenTrue: false, semanticModel, cancellationToken, formulas, getSymbolVersion);
+                    return;
+                }
+
+                if (!branchWhenTrue &&
+                    binaryExpression.IsKind(SyntaxKind.BitwiseOrExpression) &&
+                    HasSupportedBooleanType(binaryExpression, semanticModel, cancellationToken))
                 {
                     AddBranchAssumptions(binaryExpression.Left, branchWhenTrue: false, semanticModel, cancellationToken, formulas, getSymbolVersion);
                     AddBranchAssumptions(binaryExpression.Right, branchWhenTrue: false, semanticModel, cancellationToken, formulas, getSymbolVersion);
@@ -1356,6 +1374,16 @@ namespace PurelySharp.Symbolic.Smt
                     return true;
                 }
 
+                if (binaryExpression.IsKind(SyntaxKind.BitwiseAndExpression) &&
+                    TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftBitwiseAnd, getSymbolVersion, inlineDepth) &&
+                    TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightBitwiseAnd, getSymbolVersion, inlineDepth) &&
+                    leftBitwiseAnd != null &&
+                    rightBitwiseAnd != null)
+                {
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.And, leftBitwiseAnd, rightBitwiseAnd);
+                    return true;
+                }
+
                 if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression) &&
                     TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftOr, getSymbolVersion, inlineDepth) &&
                     TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightOr, getSymbolVersion, inlineDepth) &&
@@ -1363,6 +1391,26 @@ namespace PurelySharp.Symbolic.Smt
                     rightOr != null)
                 {
                     formula = new SmtBinaryFormula(SmtBinaryOperator.Or, leftOr, rightOr);
+                    return true;
+                }
+
+                if (binaryExpression.IsKind(SyntaxKind.BitwiseOrExpression) &&
+                    TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftBitwiseOr, getSymbolVersion, inlineDepth) &&
+                    TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightBitwiseOr, getSymbolVersion, inlineDepth) &&
+                    leftBitwiseOr != null &&
+                    rightBitwiseOr != null)
+                {
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.Or, leftBitwiseOr, rightBitwiseOr);
+                    return true;
+                }
+
+                if (binaryExpression.IsKind(SyntaxKind.ExclusiveOrExpression) &&
+                    TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftExclusiveOr, getSymbolVersion, inlineDepth) &&
+                    TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightExclusiveOr, getSymbolVersion, inlineDepth) &&
+                    leftExclusiveOr is { Kind: SmtValueKind.Bool } &&
+                    rightExclusiveOr is { Kind: SmtValueKind.Bool })
+                {
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, leftExclusiveOr, rightExclusiveOr);
                     return true;
                 }
 
