@@ -377,10 +377,11 @@ namespace PurelySharp.Symbolic
                 return;
             }
 
+            var factsBeforeStatement = facts.ToArray();
             RemoveFactsInvalidatedByNestedMutations(statement, semanticModel, cancellationToken, facts);
             if (statement is IfStatementSyntax ifStatement)
             {
-                AddCompletedIfStatementFacts(ifStatement, semanticModel, cancellationToken, facts);
+                AddCompletedIfStatementFacts(ifStatement, factsBeforeStatement, semanticModel, cancellationToken, facts);
             }
             else
             {
@@ -390,6 +391,7 @@ namespace PurelySharp.Symbolic
 
         private static void AddCompletedIfStatementFacts(
             IfStatementSyntax ifStatement,
+            IReadOnlyList<SmtFormula> factsBeforeStatement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             ICollection<SmtFormula> facts)
@@ -419,6 +421,48 @@ namespace PurelySharp.Symbolic
             }
 
             AddCompletedIfElseMergedFacts(ifStatement, semanticModel, cancellationToken, facts);
+            AddCompletedIfImplicitElseMergedFacts(ifStatement, factsBeforeStatement, semanticModel, cancellationToken, facts);
+        }
+
+        private static void AddCompletedIfImplicitElseMergedFacts(
+            IfStatementSyntax ifStatement,
+            IReadOnlyList<SmtFormula> factsBeforeStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (ifStatement.Else != null ||
+                StatementDefinitelyExits(ifStatement.Statement))
+            {
+                return;
+            }
+
+            var trueBranchFacts = CollectCompletedBranchFacts(
+                factsBeforeStatement,
+                ifStatement.Condition,
+                branchWhenTrue: true,
+                ifStatement.Statement,
+                semanticModel,
+                cancellationToken);
+            var falseBranchFacts = new List<SmtFormula>(factsBeforeStatement);
+            AddBranchConditionFacts(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, falseBranchFacts);
+
+            AddIdenticalBranchFacts(trueBranchFacts, falseBranchFacts, facts);
+
+            if (AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken) ||
+                !TryCreateBranchConditionFormula(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, out var trueCondition) ||
+                !TryCreateBranchConditionFormula(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, out var falseCondition))
+            {
+                return;
+            }
+
+            AddConditionalMergedBranchFacts(
+                trueBranchFacts,
+                falseBranchFacts,
+                facts.ToArray(),
+                trueCondition,
+                falseCondition,
+                facts);
         }
 
         private static void AddCompletedIfElseMergedFacts(
@@ -449,6 +493,31 @@ namespace PurelySharp.Symbolic
                 elseStatement,
                 semanticModel,
                 cancellationToken);
+
+            AddIdenticalBranchFacts(trueBranchFacts, falseBranchFacts, facts);
+
+            if (AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken) ||
+                AnyConditionSymbolMutatedInStatement(ifStatement.Condition, elseStatement, semanticModel, cancellationToken) ||
+                !TryCreateBranchConditionFormula(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, out var trueCondition) ||
+                !TryCreateBranchConditionFormula(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, out var falseCondition))
+            {
+                return;
+            }
+
+            AddConditionalMergedBranchFacts(
+                trueBranchFacts,
+                falseBranchFacts,
+                currentFacts,
+                trueCondition,
+                falseCondition,
+                facts);
+        }
+
+        private static void AddIdenticalBranchFacts(
+            IReadOnlyCollection<SmtFormula> trueBranchFacts,
+            IReadOnlyCollection<SmtFormula> falseBranchFacts,
+            ICollection<SmtFormula> facts)
+        {
             var existingKeys = new HashSet<string>(facts.Select(GetFormulaKey), StringComparer.Ordinal);
             var falseBranchKeys = new HashSet<string>(falseBranchFacts.Select(GetFormulaKey), StringComparer.Ordinal);
 
@@ -463,16 +532,19 @@ namespace PurelySharp.Symbolic
                 facts.Add(fact);
                 existingKeys.Add(key);
             }
+        }
 
-            if (AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken) ||
-                AnyConditionSymbolMutatedInStatement(ifStatement.Condition, elseStatement, semanticModel, cancellationToken) ||
-                !TryCreateBranchConditionFormula(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, out var trueCondition) ||
-                !TryCreateBranchConditionFormula(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, out var falseCondition))
-            {
-                return;
-            }
+        private static void AddConditionalMergedBranchFacts(
+            IReadOnlyCollection<SmtFormula> trueBranchFacts,
+            IReadOnlyCollection<SmtFormula> falseBranchFacts,
+            IEnumerable<SmtFormula> commonFacts,
+            SmtFormula trueCondition,
+            SmtFormula falseCondition,
+            ICollection<SmtFormula> facts)
+        {
+            var existingKeys = new HashSet<string>(facts.Select(GetFormulaKey), StringComparer.Ordinal);
+            var currentKeys = new HashSet<string>(commonFacts.Select(GetFormulaKey), StringComparer.Ordinal);
 
-            var currentKeys = new HashSet<string>(currentFacts.Select(GetFormulaKey), StringComparer.Ordinal);
             var falseFactsByTarget = falseBranchFacts
                 .Where(fact => !currentKeys.Contains(GetFormulaKey(fact)))
                 .Select(fact => new MergeableBranchFact(fact))

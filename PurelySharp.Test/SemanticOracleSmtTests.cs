@@ -1693,6 +1693,95 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesImplicitElseMergedImplication()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var divisor = 1;
+        if (flag)
+        {
+            divisor = 2;
+        }
+
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ImplicitElseMergedImplication.cs",
+                FindLine(source, "return 10 / divisor;"),
+                14,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotReuseMutatedImplicitElseConditionForMerge()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var divisor = 1;
+        if (flag)
+        {
+            flag = false;
+            divisor = 2;
+        }
+
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "MutatedImplicitElseMergedImplication.cs",
+                FindLine(source, "return 10 / divisor;"),
+                15,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_MergesIdenticalImplicitElseFactWithMutatedCondition()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var divisor = 1;
+        if (flag)
+        {
+            flag = false;
+            divisor = 1;
+        }
+
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "MutatedImplicitElseIdenticalFact.cs",
+                FindLine(source, "return 10 / divisor;"),
+                15,
+                "divisor == 1",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsDefaultLiteralAssignmentFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -2355,6 +2444,34 @@ public class TestClass
         if (x != 5)
         {
             Console.WriteLine(x);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_ImplicitElseMergedNonZeroGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(bool flag)
+    {
+        var divisor = 1;
+        if (flag)
+        {
+            divisor = 2;
+        }
+
+        if (divisor == 0)
+        {
+            Console.WriteLine(divisor);
         }
     }
 }");
