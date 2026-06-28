@@ -1452,6 +1452,91 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesLockReceiverNonNull()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(object gate)
+    {
+        lock (gate)
+        {
+            return gate.GetHashCode();
+        }
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "LockReceiverNonNull.cs",
+                FindLine(source, "return gate.GetHashCode();"),
+                13,
+                "gate != null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesNullGuardedLockBodyUnreachable()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(object gate)
+    {
+        if (gate == null)
+        {
+            lock (gate)
+            {
+                return 1;
+            }
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().AnalyzeSource(
+                source,
+                "NullGuardedLockBodyUnreachable.cs",
+                FindLine(source, "return 1;"),
+                17,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(result.PathConditions, Is.Not.Empty);
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+            Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ReassignedLockReceiverDoesNotKeepNonNullFact()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(object gate)
+    {
+        lock (gate)
+        {
+            gate = null;
+            return gate.GetHashCode();
+        }
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "LockReceiverReassigned.cs",
+                FindLine(source, "return gate.GetHashCode();"),
+                13,
+                "gate != null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_QuerySource_ProvesForLoopMonotonicIndexBounds()
         {
             const string source = @"

@@ -146,6 +146,23 @@ namespace PurelySharp.Symbolic
                         semanticModel,
                         cancellationToken);
                 }
+                else if (ancestor is LockStatementSyntax lockStatementSyntax &&
+                         lockStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
+                         IsLocalOrParameterReference(lockStatementSyntax.Expression, semanticModel, cancellationToken) &&
+                         !AnyReferencedSymbolAssignedBeforeUse(
+                             lockStatementSyntax.Expression,
+                             lockStatementSyntax.Statement,
+                             syntaxNode.SpanStart,
+                             semanticModel,
+                             cancellationToken))
+                {
+                    AddReferenceNullCondition(
+                        builder,
+                        lockStatementSyntax.Expression,
+                        isNull: false,
+                        semanticModel,
+                        cancellationToken);
+                }
                 else if (ancestor is WhileStatementSyntax whileStatementSyntax &&
                          whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
                          !AnyReferencedSymbolAssignedBeforeUse(
@@ -774,6 +791,15 @@ namespace PurelySharp.Symbolic
             }
 
             return false;
+        }
+
+        private static bool IsLocalOrParameterReference(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var symbol = semanticModel.GetSymbolInfo(UnwrapExpression(expression), cancellationToken).Symbol?.OriginalDefinition;
+            return symbol is ILocalSymbol or IParameterSymbol;
         }
 
         private static bool AnyReferencedSymbolAssignedBeforeUse(
