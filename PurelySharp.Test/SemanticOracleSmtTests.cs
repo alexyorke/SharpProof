@@ -2621,6 +2621,81 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesInlineFiniteArrayElementAssignedNonZeroValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = (new[] { 1, 2 })[0];
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "InlineFiniteArrayElementAssignedNonZeroValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                20,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesPriorFiniteArrayElementAssignedNonZeroValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = new[] { 1, 2 };
+        var divisor = values[0];
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "PriorFiniteArrayElementAssignedNonZeroValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                20,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotInferPriorFiniteArrayElementAfterUnknownReassignment()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] replacement)
+    {
+        var values = new[] { 1, 2 };
+        values = replacement;
+        var divisor = values[0];
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ReassignedFiniteArrayElementAssignedValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                20,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleElementAssignedNonZeroValue()
         {
             const string source = @"
@@ -5588,6 +5663,39 @@ public class TestClass
     public int TestMethod()
     {
         var (divisor, other) = (1, 2);
+        return 10 / divisor;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_InlineFiniteArrayElementAssignedNonZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = (new[] { 1, 2 })[0];
+        return 10 / divisor;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_PriorFiniteArrayElementAssignedNonZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = new[] { 1, 2 };
+        var divisor = values[0];
         return 10 / divisor;
     }
 }");

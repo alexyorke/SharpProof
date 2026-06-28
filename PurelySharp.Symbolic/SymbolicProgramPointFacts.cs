@@ -2124,6 +2124,7 @@ namespace PurelySharp.Symbolic
             }
 
             AddTupleElementAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+            AddFiniteElementAccessAssignedValueFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
 
             if (hasThrowGuard &&
                 guardExpression != null &&
@@ -2141,6 +2142,50 @@ namespace PurelySharp.Symbolic
                      !ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
             {
                 AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+        }
+
+        private static void AddFiniteElementAccessAssignedValueFact(
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            valueExpression = UnwrapExpression(valueExpression);
+            if (valueExpression is not ElementAccessExpressionSyntax elementAccess ||
+                elementAccess.ArgumentList.Arguments.Count != 1 ||
+                !TryGetIntegralConstant(elementAccess.ArgumentList.Arguments[0].Expression, semanticModel, cancellationToken, out var index) ||
+                index < 0)
+            {
+                return;
+            }
+
+            var containingStatement = valueExpression.AncestorsAndSelf().OfType<StatementSyntax>().FirstOrDefault();
+            var hasFiniteElements = TryGetFiniteElementExpressions(elementAccess.Expression, out var elementExpressions) ||
+                containingStatement != null &&
+                TryGetPriorAssignedFiniteElementExpressions(
+                    elementAccess.Expression,
+                    containingStatement,
+                    semanticModel,
+                    cancellationToken,
+                    out elementExpressions);
+
+            if (!hasFiniteElements ||
+                index >= elementExpressions.Length)
+            {
+                return;
+            }
+
+            var elementExpression = elementExpressions[(int)index];
+            if (ExpressionReferencesSymbol(elementExpression, assignedSymbol, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            if (TryCreateAssignedValueFact(assignedSymbol, elementExpression, semanticModel, cancellationToken, out var fact))
+            {
+                facts.Add(fact);
             }
         }
 
