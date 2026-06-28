@@ -848,15 +848,20 @@ namespace PurelySharp.Symbolic.Smt
                 return;
             }
 
-            var elementIndex = 0;
-            foreach (var subpattern in listPattern.Patterns)
+            for (var patternIndex = 0; patternIndex < listPattern.Patterns.Count; patternIndex++)
             {
+                var subpattern = listPattern.Patterns[patternIndex];
                 if (subpattern is SlicePatternSyntax)
                 {
-                    return;
+                    continue;
                 }
 
-                var elementValue = CreateListPatternElementFormula(matchedValue, elementIndex, elementKind);
+                if (!TryGetListPatternElementPosition(listPattern, patternIndex, out var elementIndex, out var fromEnd))
+                {
+                    continue;
+                }
+
+                var elementValue = CreateListPatternElementFormula(matchedValue, elementIndex, fromEnd, elementKind);
                 AddPatternBindingFacts(
                     elementValue,
                     elementType,
@@ -865,7 +870,6 @@ namespace PurelySharp.Symbolic.Smt
                     cancellationToken,
                     formulas,
                     getSymbolVersion);
-                elementIndex++;
             }
         }
 
@@ -1212,15 +1216,20 @@ namespace PurelySharp.Symbolic.Smt
                 return;
             }
 
-            var elementIndex = 0;
-            foreach (var subpattern in listPattern.Patterns)
+            for (var patternIndex = 0; patternIndex < listPattern.Patterns.Count; patternIndex++)
             {
+                var subpattern = listPattern.Patterns[patternIndex];
                 if (subpattern is SlicePatternSyntax)
                 {
-                    return;
+                    continue;
                 }
 
-                var elementValue = CreateListPatternElementFormula(value, elementIndex, elementKind);
+                if (!TryGetListPatternElementPosition(listPattern, patternIndex, out var elementIndex, out var fromEnd))
+                {
+                    continue;
+                }
+
+                var elementValue = CreateListPatternElementFormula(value, elementIndex, fromEnd, elementKind);
                 if (TryTranslatePattern(
                         elementValue,
                         subpattern,
@@ -1234,17 +1243,54 @@ namespace PurelySharp.Symbolic.Smt
                 {
                     formula = new SmtBinaryFormula(SmtBinaryOperator.And, formula, elementCondition);
                 }
-
-                elementIndex++;
             }
+        }
+
+        private static bool TryGetListPatternElementPosition(
+            ListPatternSyntax listPattern,
+            int patternIndex,
+            out int elementIndex,
+            out bool fromEnd)
+        {
+            elementIndex = 0;
+            fromEnd = false;
+
+            if (listPattern.Patterns[patternIndex] is SlicePatternSyntax)
+            {
+                return false;
+            }
+
+            var sliceIndex = -1;
+            for (var index = 0; index < listPattern.Patterns.Count; index++)
+            {
+                if (listPattern.Patterns[index] is SlicePatternSyntax)
+                {
+                    sliceIndex = index;
+                    break;
+                }
+            }
+
+            if (sliceIndex < 0 || patternIndex < sliceIndex)
+            {
+                elementIndex = patternIndex;
+                return true;
+            }
+
+            elementIndex = listPattern.Patterns.Count - patternIndex;
+            fromEnd = true;
+            return true;
         }
 
         private static SmtFormula CreateListPatternElementFormula(
             SmtFormula receiver,
             int elementIndex,
+            bool fromEnd,
             SmtValueKind elementKind)
         {
-            return new SmtVariable(receiver + "[" + elementIndex.ToString(CultureInfo.InvariantCulture) + "]", elementKind);
+            var indexText = fromEnd
+                ? "^" + elementIndex.ToString(CultureInfo.InvariantCulture)
+                : elementIndex.ToString(CultureInfo.InvariantCulture);
+            return new SmtVariable(receiver + "[" + indexText + "]", elementKind);
         }
 
         private static int GetListPatternMinimumLength(ListPatternSyntax listPattern)
