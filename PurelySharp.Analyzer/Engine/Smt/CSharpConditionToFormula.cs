@@ -120,7 +120,36 @@ namespace PurelySharp.Analyzer.Engine.Smt
             Func<ISymbol, int>? getSymbolVersion)
         {
             var originalCount = formulas.Count;
+            TryCollectDomainFacts(expression, semanticModel, cancellationToken, formulas, getSymbolVersion);
             AddBranchAssumptions(expression, branchWhenTrue, semanticModel, cancellationToken, formulas, getSymbolVersion);
+            return formulas.Count > originalCount;
+        }
+
+        public static bool TryCollectDomainFacts(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion = null)
+        {
+            var originalCount = formulas.Count;
+            expression = UnwrapExpression(expression);
+
+            foreach (var memberAccess in expression.DescendantNodesAndSelf().OfType<MemberAccessExpressionSyntax>())
+            {
+                if (!IsBuiltInNonNegativeLengthAccess(memberAccess, semanticModel, cancellationToken) ||
+                    !TryTranslateValue(memberAccess, semanticModel, cancellationToken, out var lengthFormula, getSymbolVersion) ||
+                    lengthFormula is not { Kind: SmtValueKind.Int })
+                {
+                    continue;
+                }
+
+                formulas.Add(new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThanOrEqual,
+                    lengthFormula,
+                    new SmtIntegerConstant(0)));
+            }
+
             return formulas.Count > originalCount;
         }
 
@@ -422,6 +451,28 @@ namespace PurelySharp.Analyzer.Engine.Smt
         {
             return valueType is IArrayTypeSymbol { Rank: 1 } ||
                 valueType?.SpecialType == SpecialType.System_String;
+        }
+
+        private static bool IsBuiltInNonNegativeLengthAccess(
+            MemberAccessExpressionSyntax memberAccess,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (memberAccess.Name.Identifier.ValueText != "Length")
+            {
+                return false;
+            }
+
+            var memberSymbol = semanticModel.GetSymbolInfo(memberAccess.Name, cancellationToken).Symbol;
+            if (memberSymbol is not IPropertySymbol and not IFieldSymbol)
+            {
+                return false;
+            }
+
+            var receiverType = semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).Type;
+            return receiverType is IArrayTypeSymbol ||
+                receiverType?.SpecialType == SpecialType.System_String;
         }
 
         private static bool IsUnconstrainedListSubpattern(PatternSyntax pattern)

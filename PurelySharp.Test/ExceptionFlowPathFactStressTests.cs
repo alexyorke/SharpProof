@@ -386,6 +386,45 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_ArrayLengthNegativeGuardedIndex_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values.Length < 0)
+        {
+            return values[-1];
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_SwitchExpressionArrayLengthNegativeArm_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        return values.Length switch
+        {
+            < 0 => values[-1],
+            _ => 0
+        };
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_OutOfRangeGuardReassignedBeforeUse_DoesNotReport()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

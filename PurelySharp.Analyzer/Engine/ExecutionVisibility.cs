@@ -357,12 +357,15 @@ namespace PurelySharp.Analyzer.Engine
                 return KnownBooleanValue.Unknown;
             }
 
-            if (IsBranchConditionUnreachable(formula, smtAnalysis))
+            var domainFacts = new List<SmtFormula>();
+            CSharpConditionToFormula.TryCollectDomainFacts(expression, semanticModel, cancellationToken, domainFacts);
+
+            if (IsBranchConditionUnreachable(formula, domainFacts, smtAnalysis))
             {
                 return KnownBooleanValue.False;
             }
 
-            if (IsBranchConditionUnreachable(new SmtUnaryFormula(SmtUnaryOperator.Not, formula), smtAnalysis))
+            if (IsBranchConditionUnreachable(new SmtUnaryFormula(SmtUnaryOperator.Not, formula), domainFacts, smtAnalysis))
             {
                 return KnownBooleanValue.True;
             }
@@ -370,10 +373,13 @@ namespace PurelySharp.Analyzer.Engine
             return KnownBooleanValue.Unknown;
         }
 
-        private static bool IsBranchConditionUnreachable(SmtFormula formula, SmtAnalysisService? smtAnalysis)
+        private static bool IsBranchConditionUnreachable(
+            SmtFormula formula,
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            SmtAnalysisService? smtAnalysis)
         {
             var query = new PurityProofQuery(
-                Array.Empty<SmtFormula>(),
+                pathConditions.ToArray(),
                 new PurityHazard(PurityHazardKind.BranchReachability, formula));
 
             var proofResult = (smtAnalysis ?? new SmtAnalysisService(SmtAnalysisOptions.Default)).Classify(query);

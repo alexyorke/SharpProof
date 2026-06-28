@@ -178,6 +178,30 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ExecutionVisibility_ArrayLengthNegative_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int[] values", "values.Length < 0"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringLengthNegative_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "text.Length < 0"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_CustomLengthNegative_RemainsUnknown()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("HasLength value", "value.Length < 0", "public sealed class HasLength { public int Length => -1; }"),
+                Is.False);
+        }
+
+        [Test]
         public void ExecutionVisibility_DeclarationPatternImpliesNonNull_IsAlwaysFalse()
         {
             Assert.That(
@@ -903,6 +927,100 @@ public class TestClass
 }");
 
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
+        }
+
+        [Test]
+        public async Task Ps0002_ArrayLengthNegativeGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int[] values)
+    {
+        if (values.Length < 0)
+        {
+            Console.WriteLine(values.Length);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_StringLengthNegativeGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (text.Length < 0)
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_CustomLengthNegativeGuard_RemainsConservativeReports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class HasLength
+{
+    public int Length => -1;
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(HasLength value)
+    {
+        if (value.Length < 0)
+        {
+            Console.WriteLine(value.Length);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
+        }
+
+        [Test]
+        public async Task Ps0002_SwitchExpressionArrayLengthNegativeArm_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(int[] values)
+    {
+        return values.Length switch
+        {
+            < 0 => Console.ReadLine(),
+            _ => string.Empty
+        };
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
         }
 
         [Test]
@@ -1670,9 +1788,9 @@ public class TestClass
                 ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
         }
 
-        private static bool IsConditionAlwaysFalse(string parameterList, string conditionExpression)
+        private static bool IsConditionAlwaysFalse(string parameterList, string conditionExpression, string extraSource = "")
         {
-            var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression);
+            var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);
             var method = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly
                 .GetType("PurelySharp.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!
                 .GetMethod("IsConditionAlwaysFalse", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;

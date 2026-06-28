@@ -99,7 +99,16 @@ namespace PurelySharp.Test
 
         public static ConditionContext CreateConditionContext(string parameterList, string conditionExpression)
         {
+            return CreateConditionContext(parameterList, conditionExpression, extraSource: "");
+        }
+
+        public static ConditionContext CreateConditionContext(
+            string parameterList,
+            string conditionExpression,
+            string extraSource)
+        {
             var source = $$"""
+{{extraSource}}
 public static class ConditionHost
 {
     public static bool Evaluate({{parameterList}})

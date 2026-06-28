@@ -46,6 +46,13 @@ namespace PurelySharp.Analyzer.Engine.Smt
         {
             formula = null!;
             var governingType = GetExpressionType(governingExpression, semanticModel, cancellationToken);
+            var domainFacts = new List<SmtFormula>();
+            CSharpConditionToFormula.TryCollectDomainFacts(
+                governingExpression,
+                semanticModel,
+                cancellationToken,
+                domainFacts);
+
             return TryTranslateSwitchGoverningValue(governingExpression, semanticModel, cancellationToken, out var governingValue) &&
                 TryCreatePatternAndGuardCondition(
                     governingValue,
@@ -54,6 +61,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
                     arm.WhenClause,
                     semanticModel,
                     cancellationToken,
+                    domainFacts,
                     out formula);
         }
 
@@ -71,6 +79,13 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 return false;
             }
 
+            var domainFacts = new List<SmtFormula>();
+            CSharpConditionToFormula.TryCollectDomainFacts(
+                governingExpression,
+                semanticModel,
+                cancellationToken,
+                domainFacts);
+
             if (label is CaseSwitchLabelSyntax caseLabel &&
                 CSharpConditionToFormula.TryTranslateValue(
                     caseLabel.Value,
@@ -81,8 +96,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 caseValue != null &&
                 AreComparableSmtValues(governingValue, caseValue))
             {
-                formula = new SmtBinaryFormula(SmtBinaryOperator.Equal, governingValue, caseValue);
-                return true;
+                domainFacts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, governingValue, caseValue));
+                return TryCreateConjunction(domainFacts, out formula);
             }
 
             if (label is CasePatternSwitchLabelSyntax patternLabel)
@@ -94,6 +109,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
                     patternLabel.WhenClause,
                     semanticModel,
                     cancellationToken,
+                    domainFacts,
                     out formula);
             }
 
@@ -130,10 +146,13 @@ namespace PurelySharp.Analyzer.Engine.Smt
             WhenClauseSyntax? whenClause,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
+            ICollection<SmtFormula>? initialConditions,
             out SmtFormula formula)
         {
             formula = null!;
-            var conditions = new List<SmtFormula>();
+            var conditions = initialConditions == null
+                ? new List<SmtFormula>()
+                : new List<SmtFormula>(initialConditions);
             if (CSharpConditionToFormula.TryTranslatePattern(
                     governingValue,
                     pattern,
@@ -147,16 +166,24 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 conditions.Add(patternFormula);
             }
 
-            if (whenClause != null &&
-                CSharpConditionToFormula.TryTranslate(
+            if (whenClause != null)
+            {
+                CSharpConditionToFormula.TryCollectDomainFacts(
+                    whenClause.Condition,
+                    semanticModel,
+                    cancellationToken,
+                    conditions);
+
+                if (CSharpConditionToFormula.TryTranslate(
                     whenClause.Condition,
                     semanticModel,
                     cancellationToken,
                     out var guardFormula,
                     getSymbolVersion: null) &&
-                guardFormula != null)
-            {
-                conditions.Add(guardFormula);
+                    guardFormula != null)
+                {
+                    conditions.Add(guardFormula);
+                }
             }
 
             return TryCreateConjunction(conditions, out formula);
