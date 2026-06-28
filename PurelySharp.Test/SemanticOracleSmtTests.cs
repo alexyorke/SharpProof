@@ -1598,6 +1598,22 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_WideningIntegralCastContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value", "(long)value > 0L && value <= 0"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NarrowingIntegralCast_RemainsUnknown()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value", "(byte)value == 0 && value == 256"),
+                Is.False);
+        }
+
+        [Test]
         public void ExecutionVisibility_PropertyPatternContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -2265,6 +2281,28 @@ public class TestClass
     public void TestMethod(int value)
     {
         if ((value == 0) & (value != 0))
+        {
+            Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_WideningIntegralCastContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int value)
+    {
+        if ((long)value > 0L && value <= 0)
         {
             Console.WriteLine(value);
         }
@@ -3378,6 +3416,31 @@ public class TestClass
     public int TestMethod(int value, int divisor, bool ready)
     {
         if ((divisor == 0) & ready)
+        {
+            return value / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_WideningIntegralCastGuardImpliesZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if ((long)divisor == 0L)
         {
             return value / divisor;
         }

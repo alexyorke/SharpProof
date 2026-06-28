@@ -1482,6 +1482,15 @@ namespace PurelySharp.Symbolic.Smt
                 }
             }
 
+            if (expression is CastExpressionSyntax castExpression &&
+                IsRepresentationPreservingIntegralCast(castExpression, semanticModel, cancellationToken) &&
+                TryTranslateValue(castExpression.Expression, semanticModel, cancellationToken, out var castOperand, getSymbolVersion, inlineDepth) &&
+                castOperand is { Kind: SmtValueKind.Int })
+            {
+                formula = castOperand;
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax binaryExpression)
             {
                 if (binaryExpression.IsKind(SyntaxKind.AddExpression) &&
@@ -1517,6 +1526,62 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
+        }
+
+        private static bool IsRepresentationPreservingIntegralCast(
+            CastExpressionSyntax castExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var sourceType = semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken).Type;
+            var targetType = semanticModel.GetTypeInfo(castExpression, cancellationToken).Type;
+            if (sourceType == null ||
+                targetType == null ||
+                !IsIntegralType(sourceType) ||
+                !IsIntegralType(targetType))
+            {
+                return false;
+            }
+
+            return IsSameOrWideningIntegralConversion(sourceType.SpecialType, targetType.SpecialType);
+        }
+
+        private static bool IsSameOrWideningIntegralConversion(
+            SpecialType sourceType,
+            SpecialType targetType)
+        {
+            if (sourceType == targetType)
+            {
+                return true;
+            }
+
+            return sourceType switch
+            {
+                SpecialType.System_SByte => targetType is
+                    SpecialType.System_Int16 or
+                    SpecialType.System_Int32 or
+                    SpecialType.System_Int64,
+                SpecialType.System_Byte => targetType is
+                    SpecialType.System_Int16 or
+                    SpecialType.System_UInt16 or
+                    SpecialType.System_Int32 or
+                    SpecialType.System_UInt32 or
+                    SpecialType.System_Int64 or
+                    SpecialType.System_UInt64,
+                SpecialType.System_Int16 => targetType is
+                    SpecialType.System_Int32 or
+                    SpecialType.System_Int64,
+                SpecialType.System_UInt16 => targetType is
+                    SpecialType.System_Int32 or
+                    SpecialType.System_UInt32 or
+                    SpecialType.System_Int64 or
+                    SpecialType.System_UInt64,
+                SpecialType.System_Int32 => targetType == SpecialType.System_Int64,
+                SpecialType.System_UInt32 => targetType is
+                    SpecialType.System_Int64 or
+                    SpecialType.System_UInt64,
+                _ => false
+            };
         }
 
         private static bool TryTranslateMemberValue(
