@@ -118,6 +118,19 @@ namespace PurelySharp.Symbolic.Smt
                     return true;
                 }
 
+                if (TryTranslateNullableValueComparison(
+                        binaryExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var nullableValueComparison,
+                        getSymbolVersion,
+                        inlineDepth) &&
+                    nullableValueComparison != null)
+                {
+                    formula = nullableValueComparison;
+                    return true;
+                }
+
                 if (TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue, getSymbolVersion, inlineDepth) &&
                     TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue, getSymbolVersion, inlineDepth) &&
                     leftValue != null &&
@@ -138,6 +151,129 @@ namespace PurelySharp.Symbolic.Smt
 
             formula = null;
             return false;
+        }
+
+        private static bool TryTranslateNullableValueComparison(
+            BinaryExpressionSyntax binaryExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!IsSupportedNullableValueComparison(binaryExpression.Kind()))
+            {
+                return false;
+            }
+
+            var leftIsNullable = TryTranslateNullableValueParts(
+                binaryExpression.Left,
+                semanticModel,
+                cancellationToken,
+                out var leftHasValue,
+                out var leftNullableValue,
+                getSymbolVersion,
+                inlineDepth);
+            var rightIsNullable = TryTranslateNullableValueParts(
+                binaryExpression.Right,
+                semanticModel,
+                cancellationToken,
+                out var rightHasValue,
+                out var rightNullableValue,
+                getSymbolVersion,
+                inlineDepth);
+
+            if (leftIsNullable &&
+                rightIsNullable &&
+                leftNullableValue != null &&
+                rightNullableValue != null &&
+                TryTranslateComparison(binaryExpression.Kind(), leftNullableValue, rightNullableValue, out var nullableComparison) &&
+                nullableComparison != null)
+            {
+                formula = CreateLiftedNullableComparison(
+                    binaryExpression.Kind(),
+                    leftHasValue,
+                    rightHasValue,
+                    nullableComparison);
+                return true;
+            }
+
+            if (leftIsNullable &&
+                leftNullableValue != null &&
+                TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue, getSymbolVersion, inlineDepth) &&
+                rightValue != null &&
+                TryTranslateComparison(binaryExpression.Kind(), leftNullableValue, rightValue, out var leftComparison) &&
+                leftComparison != null)
+            {
+                formula = CreateLiftedNullableComparison(binaryExpression.Kind(), leftHasValue, leftComparison);
+                return true;
+            }
+
+            if (rightIsNullable &&
+                rightNullableValue != null &&
+                TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue, getSymbolVersion, inlineDepth) &&
+                leftValue != null &&
+                TryTranslateComparison(binaryExpression.Kind(), leftValue, rightNullableValue, out var rightComparison) &&
+                rightComparison != null)
+            {
+                formula = CreateLiftedNullableComparison(binaryExpression.Kind(), rightHasValue, rightComparison);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsSupportedNullableValueComparison(SyntaxKind kind)
+        {
+            return kind is SyntaxKind.EqualsExpression or
+                SyntaxKind.NotEqualsExpression or
+                SyntaxKind.LessThanExpression or
+                SyntaxKind.LessThanOrEqualExpression or
+                SyntaxKind.GreaterThanExpression or
+                SyntaxKind.GreaterThanOrEqualExpression;
+        }
+
+        private static SmtFormula CreateLiftedNullableComparison(
+            SyntaxKind kind,
+            SmtFormula hasValue,
+            SmtFormula comparison)
+        {
+            return kind == SyntaxKind.NotEqualsExpression
+                ? new SmtBinaryFormula(
+                    SmtBinaryOperator.Or,
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, hasValue),
+                    comparison)
+                : new SmtBinaryFormula(SmtBinaryOperator.And, hasValue, comparison);
+        }
+
+        private static SmtFormula CreateLiftedNullableComparison(
+            SyntaxKind kind,
+            SmtFormula leftHasValue,
+            SmtFormula rightHasValue,
+            SmtFormula comparison)
+        {
+            var bothHaveValue = new SmtBinaryFormula(SmtBinaryOperator.And, leftHasValue, rightHasValue);
+            if (kind == SyntaxKind.EqualsExpression)
+            {
+                var neitherHasValue = new SmtBinaryFormula(
+                    SmtBinaryOperator.And,
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, leftHasValue),
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, rightHasValue));
+                return new SmtBinaryFormula(
+                    SmtBinaryOperator.Or,
+                    neitherHasValue,
+                    new SmtBinaryFormula(SmtBinaryOperator.And, bothHaveValue, comparison));
+            }
+
+            if (kind == SyntaxKind.NotEqualsExpression)
+            {
+                return new SmtUnaryFormula(
+                    SmtUnaryOperator.Not,
+                    CreateLiftedNullableComparison(SyntaxKind.EqualsExpression, leftHasValue, rightHasValue, comparison));
+            }
+
+            return new SmtBinaryFormula(SmtBinaryOperator.And, bothHaveValue, comparison);
         }
 
         private static bool TryTranslateNullableNullComparison(

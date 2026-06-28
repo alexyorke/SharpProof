@@ -3798,6 +3798,62 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableEqualsConstantGuardValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (value == 5)
+        {
+            return value.Value;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "NullableEqualsConstantGuardValue.cs",
+                FindLine(source, "return value.Value;"),
+                20,
+                "value.HasValue && value.Value == 5",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableGreaterThanGuardValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (value > 0)
+        {
+            return value.Value;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "NullableGreaterThanGuardValue.cs",
+                FindLine(source, "return value.Value;"),
+                20,
+                "value.HasValue && value.Value > 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableNotNullGuardHasValue()
         {
             const string source = @"
@@ -6359,6 +6415,66 @@ public class TestClass
         if (!value.HasValue)
         {
             Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_NullableEqualsConstantContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int? value)
+    {
+        if (value == 5)
+        {
+            if (!value.HasValue || value.Value != 5)
+            {
+                Console.WriteLine(value);
+            }
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_NullableGreaterThanContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int? value)
+    {
+        if (value > 0)
+        {
+            if (!value.HasValue || value.Value <= 0)
+            {
+                Console.WriteLine(value);
+            }
         }
     }
 }");
