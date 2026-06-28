@@ -10,6 +10,8 @@ namespace PurelySharp.Analyzer.Engine
 {
     internal partial class PurityAnalysisEngine
     {
+        private const int MaxMergedStatePathConditions = 32;
+
         private static ImmutableDictionary<ISymbol, PotentialTargets> MergeDelegateTargetMapsFromBlockStates(
             IEnumerable<PurityAnalysisState> states)
         {
@@ -166,11 +168,246 @@ namespace PurelySharp.Analyzer.Engine
         private static ImmutableArray<SmtFormula> MergePathConditionsAcrossAll(
             IEnumerable<ImmutableArray<SmtFormula>> pathConditionSets)
         {
-            return AggregateAcrossAll(
-                pathConditionSets,
-                ImmutableArray<SmtFormula>.Empty,
-                MergePathConditions,
-                static merged => merged.IsEmpty);
+            var sets = pathConditionSets.ToArray();
+            if (sets.Length == 0)
+            {
+                return ImmutableArray<SmtFormula>.Empty;
+            }
+
+            var common = GetCommonPathConditions(sets);
+            var builder = common.ToBuilder();
+            AddConditionalMergedPathConditions(sets, common, builder);
+            return builder.ToImmutable();
+        }
+
+        private static ImmutableArray<SmtFormula> GetCommonPathConditions(
+            IReadOnlyList<ImmutableArray<SmtFormula>> pathConditionSets)
+        {
+            if (pathConditionSets.Count == 0)
+            {
+                return ImmutableArray<SmtFormula>.Empty;
+            }
+
+            var commonKeys = new HashSet<string>(
+                pathConditionSets[0].Select(GetFormulaKey),
+                StringComparer.Ordinal);
+            for (var index = 1; index < pathConditionSets.Count; index++)
+            {
+                commonKeys.IntersectWith(pathConditionSets[index].Select(GetFormulaKey));
+            }
+
+            var builder = ImmutableArray.CreateBuilder<SmtFormula>();
+            var emittedKeys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var condition in pathConditionSets[0])
+            {
+                var key = GetFormulaKey(condition);
+                if (commonKeys.Contains(key) && emittedKeys.Add(key))
+                {
+                    builder.Add(condition);
+                }
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private static void AddConditionalMergedPathConditions(
+            IReadOnlyList<ImmutableArray<SmtFormula>> pathConditionSets,
+            ImmutableArray<SmtFormula> commonConditions,
+            ImmutableArray<SmtFormula>.Builder builder)
+        {
+            if (pathConditionSets.Count < 2)
+            {
+                return;
+            }
+
+            var existingKeys = new HashSet<string>(builder.Select(GetFormulaKey), StringComparer.Ordinal);
+            var commonKeys = new HashSet<string>(commonConditions.Select(GetFormulaKey), StringComparer.Ordinal);
+            var stateFacts = pathConditionSets
+                .Select(conditions => new StatePathFacts(conditions, commonKeys))
+                .ToArray();
+            if (stateFacts.Any(static state => state.FactsByTarget.Count == 0))
+            {
+                return;
+            }
+
+            var candidateTargets = new HashSet<string>(stateFacts[0].FactsByTarget.Keys, StringComparer.Ordinal);
+            for (var index = 1; index < stateFacts.Length; index++)
+            {
+                candidateTargets.IntersectWith(stateFacts[index].FactsByTarget.Keys);
+            }
+
+            var emittedCount = 0;
+            foreach (var target in candidateTargets)
+            {
+                var factChoices = stateFacts
+                    .Select(state => state.FactsByTarget[target][0])
+                    .ToArray();
+                if (factChoices.Select(static fact => fact.FactKey).Distinct(StringComparer.Ordinal).Count() == 1)
+                {
+                    continue;
+                }
+
+                var mergedFact = CreateConditionalMergedPathCondition(stateFacts, factChoices);
+                var mergedKey = GetFormulaKey(mergedFact);
+                if (!existingKeys.Add(mergedKey))
+                {
+                    continue;
+                }
+
+                builder.Add(mergedFact);
+                emittedCount++;
+                if (emittedCount >= MaxMergedStatePathConditions)
+                {
+                    return;
+                }
+            }
+        }
+
+        private static SmtFormula CreateConditionalMergedPathCondition(
+            IReadOnlyList<StatePathFacts> stateFacts,
+            IReadOnlyList<MergeablePathFact> factChoices)
+        {
+            var branchTerms = new SmtFormula[stateFacts.Count];
+            for (var index = 0; index < stateFacts.Count; index++)
+            {
+                branchTerms[index] = stateFacts[index].Condition is SmtBooleanConstant { Value: true }
+                    ? factChoices[index].Formula
+                    : new SmtBinaryFormula(
+                        SmtBinaryOperator.And,
+                        stateFacts[index].Condition,
+                        factChoices[index].Formula);
+            }
+
+            return CreateDisjunction(branchTerms);
+        }
+
+        private static SmtFormula CreateConjunction(IReadOnlyList<SmtFormula> formulas)
+        {
+            if (formulas.Count == 0)
+            {
+                return new SmtBooleanConstant(true);
+            }
+
+            var formula = formulas[0];
+            for (var index = 1; index < formulas.Count; index++)
+            {
+                formula = new SmtBinaryFormula(SmtBinaryOperator.And, formula, formulas[index]);
+            }
+
+            return formula;
+        }
+
+        private static SmtFormula CreateDisjunction(IReadOnlyList<SmtFormula> formulas)
+        {
+            var formula = formulas[0];
+            for (var index = 1; index < formulas.Count; index++)
+            {
+                formula = new SmtBinaryFormula(SmtBinaryOperator.Or, formula, formulas[index]);
+            }
+
+            return formula;
+        }
+
+        private static string GetFormulaKey(SmtFormula formula)
+        {
+            return formula.ToString() ?? string.Empty;
+        }
+
+        private sealed class StatePathFacts
+        {
+            public StatePathFacts(IEnumerable<SmtFormula> pathConditions, ISet<string> commonKeys)
+            {
+                var factsByTarget = new Dictionary<string, List<MergeablePathFact>>(StringComparer.Ordinal);
+                var branchConditions = new List<SmtFormula>();
+                foreach (var condition in pathConditions)
+                {
+                    var key = GetFormulaKey(condition);
+                    if (commonKeys.Contains(key))
+                    {
+                        continue;
+                    }
+
+                    if (MergeablePathFact.TryCreate(condition, out var mergeableFact))
+                    {
+                        if (!factsByTarget.TryGetValue(mergeableFact.TargetKey, out var facts))
+                        {
+                            facts = new List<MergeablePathFact>();
+                            factsByTarget.Add(mergeableFact.TargetKey, facts);
+                        }
+
+                        facts.Add(mergeableFact);
+                        continue;
+                    }
+
+                    branchConditions.Add(condition);
+                }
+
+                Condition = CreateConjunction(branchConditions);
+                FactsByTarget = factsByTarget.ToDictionary(
+                    static kvp => kvp.Key,
+                    static kvp => kvp.Value.ToArray(),
+                    StringComparer.Ordinal);
+            }
+
+            public SmtFormula Condition { get; }
+
+            public IReadOnlyDictionary<string, MergeablePathFact[]> FactsByTarget { get; }
+        }
+
+        private sealed class MergeablePathFact
+        {
+            private MergeablePathFact(SmtFormula formula, string targetKey)
+            {
+                Formula = formula;
+                FactKey = GetFormulaKey(formula);
+                TargetKey = targetKey;
+            }
+
+            public SmtFormula Formula { get; }
+
+            public string FactKey { get; }
+
+            public string TargetKey { get; }
+
+            public static bool TryCreate(SmtFormula formula, out MergeablePathFact fact)
+            {
+                if (TryGetMergeTargetKey(formula, out var targetKey))
+                {
+                    fact = new MergeablePathFact(formula, targetKey);
+                    return true;
+                }
+
+                fact = null!;
+                return false;
+            }
+
+            private static bool TryGetMergeTargetKey(SmtFormula formula, out string targetKey)
+            {
+                switch (formula)
+                {
+                    case SmtBinaryFormula
+                    {
+                        Operator: SmtBinaryOperator.Equal,
+                        Left: SmtVariable target,
+                        Right: { } right
+                    } when target.Kind == right.Kind:
+                        targetKey = GetFormulaKey(target);
+                        return true;
+                    case SmtVariable { Kind: SmtValueKind.Bool } target:
+                        targetKey = GetFormulaKey(target);
+                        return true;
+                    case SmtUnaryFormula
+                    {
+                        Operator: SmtUnaryOperator.Not,
+                        Operand: SmtVariable { Kind: SmtValueKind.Bool } target
+                    }:
+                        targetKey = GetFormulaKey(target);
+                        return true;
+                    default:
+                        targetKey = string.Empty;
+                        return false;
+                }
+            }
         }
 
         private static ImmutableDictionary<ISymbol, PotentialTargets> MergeDelegateTargetMapsAcrossAll(

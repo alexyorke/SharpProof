@@ -14,6 +14,7 @@ namespace PurelySharp.Symbolic
     public static class SymbolicProgramPointFacts
     {
         private const int MaxMergedIfElseFacts = 16;
+        private const int MaxMergedSwitchFacts = 32;
 
         public static List<SmtFormula> CollectPriorAssignmentFacts(
             SyntaxNode site,
@@ -383,6 +384,10 @@ namespace PurelySharp.Symbolic
             {
                 AddCompletedIfStatementFacts(ifStatement, factsBeforeStatement, semanticModel, cancellationToken, facts);
             }
+            else if (statement is SwitchStatementSyntax switchStatement)
+            {
+                AddCompletedSwitchStatementFacts(switchStatement, factsBeforeStatement, semanticModel, cancellationToken, facts);
+            }
             else
             {
                 AddCompletedLoopStatementFacts(statement, semanticModel, cancellationToken, facts);
@@ -717,6 +722,208 @@ namespace PurelySharp.Symbolic
                         return false;
                 }
             }
+        }
+
+        private static void AddCompletedSwitchStatementFacts(
+            SwitchStatementSyntax switchStatement,
+            IReadOnlyList<SmtFormula> factsBeforeStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (!switchStatement.Sections.Any(static section => section.Labels.Any(static label => label is DefaultSwitchLabelSyntax)))
+            {
+                return;
+            }
+
+            var branches = new List<SwitchBranchFacts>();
+            foreach (var section in switchStatement.Sections)
+            {
+                if (!SectionBreaksFromSwitch(section, switchStatement))
+                {
+                    continue;
+                }
+
+                if (!SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
+                        switchStatement.Expression,
+                        section,
+                        semanticModel,
+                        cancellationToken,
+                        out var sectionCondition))
+                {
+                    return;
+                }
+
+                var sectionFacts = new List<SmtFormula>(factsBeforeStatement);
+                sectionFacts.Add(sectionCondition);
+                foreach (var statement in section.Statements)
+                {
+                    if (statement is BreakStatementSyntax breakStatement &&
+                        BreakTargetsSwitch(breakStatement, switchStatement))
+                    {
+                        break;
+                    }
+
+                    AddPriorStatementFacts(statement, semanticModel, cancellationToken, sectionFacts);
+                }
+
+                branches.Add(new SwitchBranchFacts(sectionCondition, sectionFacts));
+            }
+
+            if (branches.Count == 0)
+            {
+                return;
+            }
+
+            AddIdenticalSwitchBranchFacts(branches, facts);
+            AddConditionalSwitchBranchFacts(branches, facts.ToArray(), facts);
+        }
+
+        private static void AddIdenticalSwitchBranchFacts(
+            IReadOnlyList<SwitchBranchFacts> branches,
+            ICollection<SmtFormula> facts)
+        {
+            var existingKeys = new HashSet<string>(facts.Select(GetFormulaKey), StringComparer.Ordinal);
+            var commonKeys = new HashSet<string>(branches[0].Facts.Select(GetFormulaKey), StringComparer.Ordinal);
+            for (var index = 1; index < branches.Count; index++)
+            {
+                commonKeys.IntersectWith(branches[index].Facts.Select(GetFormulaKey));
+            }
+
+            foreach (var fact in branches[0].Facts)
+            {
+                var key = GetFormulaKey(fact);
+                if (!commonKeys.Contains(key) || !existingKeys.Add(key))
+                {
+                    continue;
+                }
+
+                facts.Add(fact);
+            }
+        }
+
+        private static void AddConditionalSwitchBranchFacts(
+            IReadOnlyList<SwitchBranchFacts> branches,
+            IEnumerable<SmtFormula> commonFacts,
+            ICollection<SmtFormula> facts)
+        {
+            var existingKeys = new HashSet<string>(facts.Select(GetFormulaKey), StringComparer.Ordinal);
+            var commonKeys = new HashSet<string>(commonFacts.Select(GetFormulaKey), StringComparer.Ordinal);
+            var branchFactsByTarget = branches
+                .Select(branch => branch.Facts
+                    .Where(fact => !commonKeys.Contains(GetFormulaKey(fact)))
+                    .Select(fact => new MergeableBranchFact(fact))
+                    .Where(static fact => fact.TargetKey.Length > 0)
+                    .GroupBy(static fact => fact.TargetKey, StringComparer.Ordinal)
+                    .ToDictionary(static group => group.Key, static group => group.ToArray(), StringComparer.Ordinal))
+                .ToArray();
+
+            if (branchFactsByTarget.Length == 0)
+            {
+                return;
+            }
+
+            var candidateTargets = new HashSet<string>(branchFactsByTarget[0].Keys, StringComparer.Ordinal);
+            for (var index = 1; index < branchFactsByTarget.Length; index++)
+            {
+                candidateTargets.IntersectWith(branchFactsByTarget[index].Keys);
+            }
+
+            var mergedFactCount = 0;
+            foreach (var target in candidateTargets)
+            {
+                var factChoices = branchFactsByTarget
+                    .Select(branchFacts => branchFacts[target][0])
+                    .ToArray();
+                if (factChoices.Select(static fact => fact.FactKey).Distinct(StringComparer.Ordinal).Count() == 1)
+                {
+                    continue;
+                }
+
+                var mergedFact = CreateSwitchConditionalFact(branches, factChoices);
+                var mergedKey = GetFormulaKey(mergedFact);
+                if (!existingKeys.Add(mergedKey))
+                {
+                    continue;
+                }
+
+                facts.Add(mergedFact);
+                mergedFactCount++;
+                if (mergedFactCount >= MaxMergedSwitchFacts)
+                {
+                    return;
+                }
+            }
+        }
+
+        private static SmtFormula CreateSwitchConditionalFact(
+            IReadOnlyList<SwitchBranchFacts> branches,
+            IReadOnlyList<MergeableBranchFact> branchFacts)
+        {
+            var branchTerms = new SmtFormula[branches.Count];
+            for (var index = 0; index < branches.Count; index++)
+            {
+                branchTerms[index] = new SmtBinaryFormula(
+                    SmtBinaryOperator.And,
+                    branches[index].Condition,
+                    branchFacts[index].Formula);
+            }
+
+            return CreateDisjunction(branchTerms);
+        }
+
+        private static SmtFormula CreateDisjunction(IReadOnlyList<SmtFormula> formulas)
+        {
+            var formula = formulas[0];
+            for (var index = 1; index < formulas.Count; index++)
+            {
+                formula = new SmtBinaryFormula(SmtBinaryOperator.Or, formula, formulas[index]);
+            }
+
+            return formula;
+        }
+
+        private static bool SectionBreaksFromSwitch(
+            SwitchSectionSyntax section,
+            SwitchStatementSyntax switchStatement)
+        {
+            return section.Statements.Count > 0 &&
+                section.Statements[section.Statements.Count - 1] is BreakStatementSyntax breakStatement &&
+                BreakTargetsSwitch(breakStatement, switchStatement);
+        }
+
+        private static bool BreakTargetsSwitch(
+            BreakStatementSyntax breakStatement,
+            SwitchStatementSyntax switchStatement)
+        {
+            for (var ancestor = breakStatement.Parent; ancestor != null; ancestor = ancestor.Parent)
+            {
+                if (ReferenceEquals(ancestor, switchStatement))
+                {
+                    return true;
+                }
+
+                if (ancestor is SwitchStatementSyntax ||
+                    IsLoopStatement(ancestor))
+                {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        private sealed class SwitchBranchFacts
+        {
+            public SwitchBranchFacts(SmtFormula condition, IReadOnlyList<SmtFormula> facts)
+            {
+                Condition = condition;
+                Facts = facts;
+            }
+
+            public SmtFormula Condition { get; }
+
+            public IReadOnlyList<SmtFormula> Facts { get; }
         }
 
         private static void AddCompletedLoopStatementFacts(
