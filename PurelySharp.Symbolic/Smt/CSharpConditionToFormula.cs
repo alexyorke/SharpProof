@@ -11,6 +11,7 @@ namespace PurelySharp.Symbolic.Smt
     public static class CSharpConditionToFormula
     {
         private const int MaxSourcePredicateInlineDepth = 4;
+        private const string ImplicitThisVariableName = "this";
 
         public static bool TryTranslate(
             ExpressionSyntax expression,
@@ -863,6 +864,15 @@ namespace PurelySharp.Symbolic.Smt
                     TrySubstituteMemberVariable(variable, substitution.FormulaMemberPrefix, substitution.Replacement, out simpleMemberReplacement))
                 {
                     return simpleMemberReplacement;
+                }
+
+                var renderedReceiver = substitution.FormulaMemberPrefix.TrimEnd('.');
+                if (renderedReceiver.Length > 0 &&
+                    variable.Name.Contains(renderedReceiver, StringComparison.Ordinal))
+                {
+                    return new SmtVariable(
+                        variable.Name.Replace(renderedReceiver, substitution.Replacement.ToString()),
+                        variable.Kind);
                 }
             }
 
@@ -2656,6 +2666,12 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (expression is ThisExpressionSyntax)
+            {
+                formula = new SmtVariable(ImplicitThisVariableName, SmtValueKind.Reference);
+                return true;
+            }
+
             if (expression is ElementAccessExpressionSyntax elementAccessExpression &&
                 TryTranslateBuiltInElementAccessValue(
                     elementAccessExpression,
@@ -3234,6 +3250,11 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth)
         {
             formula = null;
+            if (TryTranslateImplicitThisMemberValue(expression, semanticModel, cancellationToken, out formula))
+            {
+                return true;
+            }
+
             if (expression is not MemberAccessExpressionSyntax memberAccess)
             {
                 return false;
@@ -3276,6 +3297,18 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
+            if (memberSymbol is IPropertySymbol propertySymbol &&
+                TryTranslateSourceBooleanProperty(
+                    propertySymbol,
+                    receiver,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    inlineDepth + 1))
+            {
+                return true;
+            }
+
             var type = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
             if (type == null)
             {
@@ -3283,6 +3316,129 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return TryCreateMemberFormula(receiver, memberSymbol.Name, type, out formula);
+        }
+
+        private static bool TryTranslateImplicitThisMemberValue(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula)
+        {
+            formula = null;
+            if (expression is not IdentifierNameSyntax ||
+                semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is not IPropertySymbol and not IFieldSymbol ||
+                semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is not { IsStatic: false } memberSymbol ||
+                !TryGetMemberType(memberSymbol, out var memberType))
+            {
+                return false;
+            }
+
+            return TryCreateMemberFormula(
+                new SmtVariable(ImplicitThisVariableName, SmtValueKind.Reference),
+                memberSymbol.Name,
+                memberType,
+                out formula);
+        }
+
+        private static bool TryTranslateSourceBooleanProperty(
+            IPropertySymbol propertySymbol,
+            SmtFormula receiver,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            int inlineDepth)
+        {
+            formula = null;
+            if (inlineDepth >= MaxSourcePredicateInlineDepth ||
+                !CanInlineSourceBooleanProperty(propertySymbol) ||
+                !TryGetSourceBooleanPropertyFormula(
+                    propertySymbol,
+                    semanticModel.Compilation,
+                    cancellationToken,
+                    inlineDepth,
+                    out var propertyFormula) ||
+                propertyFormula is not { Kind: SmtValueKind.Bool })
+            {
+                return false;
+            }
+
+            formula = SubstituteVariables(
+                propertyFormula,
+                new[]
+                {
+                    new SmtVariableSubstitution(
+                        ImplicitThisVariableName,
+                        ImplicitThisVariableName + ".",
+                        new SmtVariable(ImplicitThisVariableName, SmtValueKind.Reference) + ".",
+                        receiver)
+                });
+            return true;
+        }
+
+        private static bool CanInlineSourceBooleanProperty(IPropertySymbol propertySymbol)
+        {
+            return propertySymbol is
+            {
+                IsStatic: false,
+                IsIndexer: false,
+                Type.SpecialType: SpecialType.System_Boolean,
+                DeclaringSyntaxReferences.Length: > 0
+            };
+        }
+
+        private static bool TryGetSourceBooleanPropertyFormula(
+            IPropertySymbol propertySymbol,
+            Compilation compilation,
+            CancellationToken cancellationToken,
+            int inlineDepth,
+            out SmtFormula? formula)
+        {
+            formula = null;
+            var propertySyntax = propertySymbol.DeclaringSyntaxReferences
+                .Select(reference => reference.GetSyntax(cancellationToken))
+                .OfType<PropertyDeclarationSyntax>()
+                .FirstOrDefault();
+            if (propertySyntax == null)
+            {
+                return false;
+            }
+
+            var propertySemanticModel = compilation.GetSemanticModel(propertySyntax.SyntaxTree);
+            if (propertySyntax.ExpressionBody?.Expression != null)
+            {
+                return TryTranslate(
+                    propertySyntax.ExpressionBody.Expression,
+                    propertySemanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion: null,
+                    inlineDepth);
+            }
+
+            var getter = propertySyntax.AccessorList?.Accessors
+                .FirstOrDefault(static accessor => accessor.IsKind(SyntaxKind.GetAccessorDeclaration));
+            if (getter?.ExpressionBody?.Expression != null)
+            {
+                return TryTranslate(
+                    getter.ExpressionBody.Expression,
+                    propertySemanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion: null,
+                    inlineDepth);
+            }
+
+            if (getter?.Body != null)
+            {
+                return TryTranslateReturnedBooleanBlock(
+                    getter.Body,
+                    propertySemanticModel,
+                    cancellationToken,
+                    inlineDepth,
+                    out formula);
+            }
+
+            return false;
         }
 
         private static bool TryTranslateNullableMemberValue(
