@@ -1216,6 +1216,13 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (pattern is ConstantPatternSyntax nullConstantPattern &&
+                IsNullLikeNullableComparisonOperand(nullConstantPattern.Expression, semanticModel, cancellationToken))
+            {
+                formula = new SmtUnaryFormula(SmtUnaryOperator.Not, hasValueFormula);
+                return true;
+            }
+
             if (pattern is ConstantPatternSyntax constantPattern &&
                 TryTranslateValue(constantPattern.Expression, semanticModel, cancellationToken, out var constantValue, getSymbolVersion, inlineDepth) &&
                 constantValue != null &&

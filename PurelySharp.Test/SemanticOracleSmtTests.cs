@@ -3854,6 +3854,62 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableIsNotNullPatternHasValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (value is not null)
+        {
+            return value.Value;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "NullableIsNotNullPatternHasValue.cs",
+                FindLine(source, "return value.Value;"),
+                20,
+                "value.HasValue",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableIsNullPatternNoValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (value is null)
+        {
+            return 0;
+        }
+
+        return value.Value;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "NullableIsNullPatternNoValue.cs",
+                FindLine(source, "return 0;"),
+                20,
+                "!value.HasValue",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardedConditionalNullableHasValue()
         {
             const string source = @"
@@ -6302,6 +6358,66 @@ public class TestClass
     public void TestMethod(int? value)
     {
         if (value == null)
+        {
+            if (value.HasValue)
+            {
+                Console.WriteLine(value);
+            }
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_NullableIsNotNullPatternContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int? value)
+    {
+        if (value is not null)
+        {
+            if (!value.HasValue)
+            {
+                Console.WriteLine(value);
+            }
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_NullableIsNullPatternContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int? value)
+    {
+        if (value is null)
         {
             if (value.HasValue)
             {
