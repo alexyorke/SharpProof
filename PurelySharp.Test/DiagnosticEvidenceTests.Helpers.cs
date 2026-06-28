@@ -233,14 +233,8 @@ public class TestClass
 
         private static AnalyzerOptions CreateAnalyzerOptions(
             ImmutableDictionary<string, string>? globalOptions = null,
-            ImmutableArray<AdditionalText>? additionalFiles = null,
-            bool includeCheckedInEffectSummaries = false)
+            ImmutableArray<AdditionalText>? additionalFiles = null)
         {
-            if (includeCheckedInEffectSummaries)
-            {
-                Assert.Ignore("Effect summary JSON analysis is dormant during active analyzer development.");
-            }
-
             return AnalyzerTestHost.CreateAnalyzerOptions(globalOptions, additionalFiles);
         }
 
@@ -249,14 +243,8 @@ public class TestClass
             ImmutableDictionary<string, string>? globalOptions = null,
             bool allowUnsafe = false,
             ImmutableArray<AdditionalText>? additionalFiles = null,
-            ImmutableArray<MetadataReference>? additionalMetadataReferences = null,
-            bool includeCheckedInEffectSummaries = false)
+            ImmutableArray<MetadataReference>? additionalMetadataReferences = null)
         {
-            if (includeCheckedInEffectSummaries || !additionalFiles.HasValue)
-            {
-                Assert.Ignore("Effect summary JSON analysis is dormant during active analyzer development.");
-            }
-
             return await AnalyzerTestHost.GetDiagnosticsAsync(
                 source,
                 globalOptions,
@@ -268,7 +256,7 @@ public class TestClass
 
         private static AnalyzerOptions CreateGeneratedPurityAnalyzerOptions()
         {
-            return CreateAnalyzerOptions(includeCheckedInEffectSummaries: true);
+            return CreateAnalyzerOptions();
         }
 
         private static ImmutableArray<AdditionalText> CreateSyntheticGeneratedPurityAdditionalFiles(

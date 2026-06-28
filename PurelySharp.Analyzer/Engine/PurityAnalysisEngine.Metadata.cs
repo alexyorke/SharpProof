@@ -72,6 +72,23 @@ namespace PurelySharp.Analyzer.Engine
                 purity.IsDefinitive;
         }
 
+        internal static bool TryGetTrustedGeneratedPurityCoverage(
+            IMethodSymbol? methodSymbol,
+            Compilation compilation,
+            out GeneratedPurityCatalog.PurityEntry purity)
+        {
+            purity = default;
+
+            if (methodSymbol == null)
+            {
+                return false;
+            }
+
+            var originalDefinition = methodSymbol.OriginalDefinition;
+            return IsMetadataSymbol(methodSymbol) &&
+                TryGetTrustedGeneratedPurity(originalDefinition, compilation, out purity);
+        }
+
         internal readonly struct TrustedMethodPurityMetadata
         {
             public TrustedMethodPurityMetadata(
@@ -110,7 +127,7 @@ namespace PurelySharp.Analyzer.Engine
 
             GeneratedPurityCatalog.PurityEntry generatedPurity = default;
             var hasTrustedGeneratedPurity = !hasConfiguredKnownImpureMember &&
-                TryGetTrustedDefinitiveGeneratedPurity(originalDefinition, compilation, out generatedPurity);
+                TryGetTrustedGeneratedPurityCoverage(originalDefinition, compilation, out generatedPurity);
 
             return new TrustedMethodPurityMetadata(
                 knownImpureMemberSource,
@@ -148,7 +165,7 @@ namespace PurelySharp.Analyzer.Engine
             IMethodSymbol methodSymbol,
             Compilation compilation)
         {
-            return TryGetTrustedDefinitiveGeneratedPurity(methodSymbol, compilation, out _);
+            return TryGetTrustedGeneratedPurityCoverage(methodSymbol, compilation, out _);
         }
 
         internal static bool IsTrustedGeneratedFreshOwnedArrayReturningMember(

@@ -209,7 +209,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         return PurityAnalysisResult.Pure;
                     }
 
-				if (generatedPurity.IsNonPure)
+				if (!generatedPurity.IsPure)
 				{
 					PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' is trusted impure from generated purity summary.");
 					return PurityAnalysisEngine.PurityAnalysisResult.Impure(

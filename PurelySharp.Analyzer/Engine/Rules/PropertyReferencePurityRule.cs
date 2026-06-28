@@ -68,7 +68,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 context.EnforcePureAttributeSymbol,
                 context.PureAttributeSymbol);
             var getterSymbol = propertySymbol.GetMethod;
-            var hasTrustedGeneratedPurity = PurityAnalysisEngine.TryGetTrustedDefinitiveGeneratedPurity(
+            var hasTrustedGeneratedPurity = PurityAnalysisEngine.TryGetTrustedGeneratedPurityCoverage(
                 getterSymbol,
                 context.SemanticModel.Compilation,
                 out var generatedPurity);
@@ -163,7 +163,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (!requiresDispatchCheck && hasTrustedGeneratedPurity)
             {
-                if (generatedPurity.IsNonPure)
+                if (!generatedPurity.IsPure)
                 {
                     PurityAnalysisEngine.LogDebug($"    [PropRefRule] Getter '{getterSymbol.ToDisplayString()}' is trusted impure from generated purity summary.");
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(

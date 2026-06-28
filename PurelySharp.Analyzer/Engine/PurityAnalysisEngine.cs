@@ -1039,7 +1039,7 @@ namespace PurelySharp.Analyzer.Engine
 						return PurityAnalysisResult.Pure;
 					}
 
-					if (generatedPurity.IsNonPure)
+					if (!generatedPurity.IsPure)
 					{
 						LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is trusted impure from generated purity summary.");
 						var generatedResult = ImpureResult(
@@ -1147,7 +1147,7 @@ namespace PurelySharp.Analyzer.Engine
                         return PurityAnalysisResult.Pure;
                     }
 
-                    if (hasTrustedGeneratedPurity && generatedPurity.IsNonPure)
+                    if (hasTrustedGeneratedPurity && !generatedPurity.IsPure)
                     {
                         LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} has no body but does have trusted non-pure generated summary evidence.");
                         var generatedNoBodyResult = ImpureResult(
@@ -1428,7 +1428,7 @@ namespace PurelySharp.Analyzer.Engine
                                         continue;
                                     }
 
-                                    if (postCfgGeneratedPurity.IsNonPure)
+                                    if (!postCfgGeneratedPurity.IsPure)
                                     {
                                         LogDebug($"{indent}    Post-CFG: Found generated-summary impure invocation IMPURE: {invocationOp.Syntax} calling {invocationOp.TargetMethod.ToDisplayString()}");
                                         result = ImpureResult(
@@ -2777,7 +2777,7 @@ namespace PurelySharp.Analyzer.Engine
                     }
 
 
-                    var hasTrustedGeneratedPurity = TryGetTrustedDefinitiveGeneratedPurity(
+                    var hasTrustedGeneratedPurity = TryGetTrustedGeneratedPurityCoverage(
                         operatorMethod,
                         context.SemanticModel.Compilation,
                         out var generatedPurity);
@@ -2790,7 +2790,7 @@ namespace PurelySharp.Analyzer.Engine
 						return PurityAnalysisResult.Pure;
 					}
 
-					if (generatedPurity.IsNonPure)
+					if (!generatedPurity.IsPure)
 					{
 						LogDebug($"    [CSO] Checked operator method '{operatorMethod.Name}' is trusted impure from generated purity summary.");
 						return PurityAnalysisResult.Impure(

@@ -201,7 +201,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                 }
 
-                if (generatedPurity.IsNonPure)
+                if (!generatedPurity.IsPure)
                 {
                     return PurityAnalysisEngine.PurityAnalysisResult.Impure(
                         interpolation.Syntax,

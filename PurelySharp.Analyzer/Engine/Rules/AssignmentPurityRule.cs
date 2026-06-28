@@ -230,7 +230,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             IOperation operation,
             PurityAnalysisContext context)
         {
-            var hasTrustedGeneratedPurity = PurityAnalysisEngine.TryGetTrustedDefinitiveGeneratedPurity(
+            var hasTrustedGeneratedPurity = PurityAnalysisEngine.TryGetTrustedGeneratedPurityCoverage(
                 operatorMethod,
                 context.SemanticModel.Compilation,
                 out var generatedPurity);
@@ -249,7 +249,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 					return PurityAnalysisEngine.PurityAnalysisResult.Pure;
 				}
 
-				if (generatedPurity.IsNonPure)
+				if (!generatedPurity.IsPure)
 				{
 					return PurityAnalysisEngine.PurityAnalysisResult.Impure(
 						operation.Syntax,

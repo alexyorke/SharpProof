@@ -573,7 +573,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                 }
 
-                if (generatedPurity.IsNonPure)
+                if (!generatedPurity.IsPure)
                 {
                     PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (trusted generated purity summary)");
                     return PurityAnalysisEngine.ImpureResult(
