@@ -105,6 +105,19 @@ namespace PurelySharp.Symbolic.Smt
                     return true;
                 }
 
+                if (TryTranslateNullableNullComparison(
+                        binaryExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var nullableNullComparison,
+                        getSymbolVersion,
+                        inlineDepth) &&
+                    nullableNullComparison != null)
+                {
+                    formula = nullableNullComparison;
+                    return true;
+                }
+
                 if (TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue, getSymbolVersion, inlineDepth) &&
                     TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue, getSymbolVersion, inlineDepth) &&
                     leftValue != null &&
@@ -125,6 +138,78 @@ namespace PurelySharp.Symbolic.Smt
 
             formula = null;
             return false;
+        }
+
+        private static bool TryTranslateNullableNullComparison(
+            BinaryExpressionSyntax binaryExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!binaryExpression.IsKind(SyntaxKind.EqualsExpression) &&
+                !binaryExpression.IsKind(SyntaxKind.NotEqualsExpression))
+            {
+                return false;
+            }
+
+            var comparesNotNull = binaryExpression.IsKind(SyntaxKind.NotEqualsExpression);
+            if (TryTranslateNullableValueParts(
+                    binaryExpression.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out var leftHasValue,
+                    out _,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                IsNullLikeNullableComparisonOperand(binaryExpression.Right, semanticModel, cancellationToken))
+            {
+                formula = comparesNotNull
+                    ? leftHasValue
+                    : new SmtUnaryFormula(SmtUnaryOperator.Not, leftHasValue);
+                return true;
+            }
+
+            if (TryTranslateNullableValueParts(
+                    binaryExpression.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var rightHasValue,
+                    out _,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                IsNullLikeNullableComparisonOperand(binaryExpression.Left, semanticModel, cancellationToken))
+            {
+                formula = comparesNotNull
+                    ? rightHasValue
+                    : new SmtUnaryFormula(SmtUnaryOperator.Not, rightHasValue);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsNullLikeNullableComparisonOperand(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapExpression(expression);
+            if (semanticModel.GetConstantValue(expression, cancellationToken) is { HasValue: true, Value: null })
+            {
+                return true;
+            }
+
+            if (!expression.IsKind(SyntaxKind.DefaultLiteralExpression) &&
+                expression is not DefaultExpressionSyntax)
+            {
+                return false;
+            }
+
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            return TryGetNullableUnderlyingType(typeInfo.ConvertedType ?? typeInfo.Type, out _);
         }
 
         private static bool TryTranslateUnsignedCastBoundsComparison(
