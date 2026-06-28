@@ -1582,10 +1582,9 @@ public class TestClass
         }
 
         [Test]
-        public void SymbolicInvariantService_DoesNotMergeDivergentIfElseAssignmentFacts()
+        public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotCollapseDivergentIfElseToSingleValue()
         {
-            var facts = CollectProgramPointFacts(
-                @"
+            const string source = @"
 public class TestClass
 {
     public int TestMethod(bool flag)
@@ -1602,15 +1601,95 @@ public class TestClass
 
         return 10 / divisor;
     }
-}",
-                "return 10 / divisor;");
+}";
+            var service = new SymbolicSourceQueryService();
+            var divisorIsOne = service.ProveConditionAtSource(
+                source,
+                "DivergentIfElseSingleValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                16,
+                "divisor == 1",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+            var divisorIsTwo = service.ProveConditionAtSource(
+                source,
+                "DivergentIfElseSingleValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                16,
+                "divisor == 2",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
 
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
-                                           fact.Contains("divisor", StringComparison.Ordinal) &&
-                                           fact.Contains("1", StringComparison.Ordinal)), Is.False);
-            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
-                                           fact.Contains("divisor", StringComparison.Ordinal) &&
-                                           fact.Contains("2", StringComparison.Ordinal)), Is.False);
+            Assert.That(divisorIsOne.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+            Assert.That(divisorIsTwo.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesDivergentIfElseMergedImplication()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var divisor = 0;
+        if (flag)
+        {
+            divisor = 1;
+        }
+        else
+        {
+            divisor = 2;
+        }
+
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "DivergentIfElseMergedImplication.cs",
+                FindLine(source, "return 10 / divisor;"),
+                16,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotReuseMutatedBranchConditionForMerge()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var divisor = 0;
+        if (flag)
+        {
+            flag = false;
+            divisor = 1;
+        }
+        else
+        {
+            flag = true;
+            divisor = 2;
+        }
+
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "MutatedIfElseMergedImplication.cs",
+                FindLine(source, "return 10 / divisor;"),
+                18,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
         }
 
         [Test]

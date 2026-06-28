@@ -13,6 +13,8 @@ namespace PurelySharp.Symbolic
 {
     public static class SymbolicProgramPointFacts
     {
+        private const int MaxMergedIfElseFacts = 16;
+
         public static List<SmtFormula> CollectPriorAssignmentFacts(
             SyntaxNode site,
             SemanticModel semanticModel,
@@ -461,6 +463,58 @@ namespace PurelySharp.Symbolic
                 facts.Add(fact);
                 existingKeys.Add(key);
             }
+
+            if (AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken) ||
+                AnyConditionSymbolMutatedInStatement(ifStatement.Condition, elseStatement, semanticModel, cancellationToken) ||
+                !TryCreateBranchConditionFormula(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, out var trueCondition) ||
+                !TryCreateBranchConditionFormula(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, out var falseCondition))
+            {
+                return;
+            }
+
+            var currentKeys = new HashSet<string>(currentFacts.Select(GetFormulaKey), StringComparer.Ordinal);
+            var falseFactsByTarget = falseBranchFacts
+                .Where(fact => !currentKeys.Contains(GetFormulaKey(fact)))
+                .Select(fact => new MergeableBranchFact(fact))
+                .Where(static fact => fact.TargetKey.Length > 0)
+                .GroupBy(static fact => fact.TargetKey, StringComparer.Ordinal)
+                .ToDictionary(static group => group.Key, static group => group.ToArray(), StringComparer.Ordinal);
+            var mergedFactCount = 0;
+            foreach (var trueFact in trueBranchFacts.Where(fact => !currentKeys.Contains(GetFormulaKey(fact))))
+            {
+                var trueMergeableFact = new MergeableBranchFact(trueFact);
+                if (trueMergeableFact.TargetKey.Length == 0 ||
+                    !falseFactsByTarget.TryGetValue(trueMergeableFact.TargetKey, out var falseMergeableFacts))
+                {
+                    continue;
+                }
+
+                foreach (var falseMergeableFact in falseMergeableFacts)
+                {
+                    if (string.Equals(trueMergeableFact.FactKey, falseMergeableFact.FactKey, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    var mergedFact = CreateConditionalBranchFact(
+                        trueCondition,
+                        trueMergeableFact.Formula,
+                        falseCondition,
+                        falseMergeableFact.Formula);
+                    var mergedKey = GetFormulaKey(mergedFact);
+                    if (!existingKeys.Add(mergedKey))
+                    {
+                        continue;
+                    }
+
+                    facts.Add(mergedFact);
+                    mergedFactCount++;
+                    if (mergedFactCount >= MaxMergedIfElseFacts)
+                    {
+                        return;
+                    }
+                }
+            }
         }
 
         private static List<SmtFormula> CollectCompletedBranchFacts(
@@ -499,6 +553,98 @@ namespace PurelySharp.Symbolic
         private static string GetFormulaKey(SmtFormula formula)
         {
             return formula.ToString() ?? string.Empty;
+        }
+
+        private static bool TryCreateBranchConditionFormula(
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            var formulas = new List<SmtFormula>();
+            if (!CSharpConditionToFormula.TryCollectBranchAssumptions(
+                    condition,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    formulas))
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = CreateConjunction(formulas);
+            return true;
+        }
+
+        private static SmtFormula CreateConditionalBranchFact(
+            SmtFormula trueCondition,
+            SmtFormula trueFact,
+            SmtFormula falseCondition,
+            SmtFormula falseFact)
+        {
+            return new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                new SmtBinaryFormula(SmtBinaryOperator.And, trueCondition, trueFact),
+                new SmtBinaryFormula(SmtBinaryOperator.And, falseCondition, falseFact));
+        }
+
+        private static SmtFormula CreateConjunction(IReadOnlyList<SmtFormula> formulas)
+        {
+            var formula = formulas[0];
+            for (var index = 1; index < formulas.Count; index++)
+            {
+                formula = new SmtBinaryFormula(SmtBinaryOperator.And, formula, formulas[index]);
+            }
+
+            return formula;
+        }
+
+        private sealed class MergeableBranchFact
+        {
+            public MergeableBranchFact(SmtFormula formula)
+            {
+                Formula = formula;
+                FactKey = GetFormulaKey(formula);
+                TargetKey = TryGetMergeTargetKey(formula, out var targetKey)
+                    ? targetKey
+                    : string.Empty;
+            }
+
+            public SmtFormula Formula { get; }
+
+            public string FactKey { get; }
+
+            public string TargetKey { get; }
+
+            private static bool TryGetMergeTargetKey(SmtFormula formula, out string targetKey)
+            {
+                switch (formula)
+                {
+                    case SmtBinaryFormula
+                    {
+                        Operator: SmtBinaryOperator.Equal,
+                        Left: SmtVariable target,
+                        Right: { } right
+                    } when target.Kind == right.Kind:
+                        targetKey = GetFormulaKey(target);
+                        return true;
+                    case SmtVariable { Kind: SmtValueKind.Bool } target:
+                        targetKey = GetFormulaKey(target);
+                        return true;
+                    case SmtUnaryFormula
+                    {
+                        Operator: SmtUnaryOperator.Not,
+                        Operand: SmtVariable { Kind: SmtValueKind.Bool } target
+                    }:
+                        targetKey = GetFormulaKey(target);
+                        return true;
+                    default:
+                        targetKey = string.Empty;
+                        return false;
+                }
+            }
         }
 
         private static void AddCompletedLoopStatementFacts(
