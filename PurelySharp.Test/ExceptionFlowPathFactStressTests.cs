@@ -653,6 +653,46 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_StringIsNullOrEmptyNonNullIndex_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public char TestMethod(string text)
+    {
+        if (string.IsNullOrEmpty(text) && text != null)
+        {
+            return text[0];
+        }
+
+        return '\0';
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+        }
+
+        [Test]
+        public async Task Ps0010_StringIsNullOrEmptyFalseBranchIndex_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public char TestMethod(string text)
+    {
+        if (!string.IsNullOrEmpty(text))
+        {
+            return text[0];
+        }
+
+        return '\0';
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_ArrayCollectionExpressionSpreadIndex_DoesNotReport()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

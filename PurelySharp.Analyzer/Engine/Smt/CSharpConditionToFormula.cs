@@ -48,6 +48,14 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 return true;
             }
 
+            if (expression is InvocationExpressionSyntax invocationExpression &&
+                TryTranslateKnownBooleanInvocation(invocationExpression, semanticModel, cancellationToken, out var invocationFormula, getSymbolVersion) &&
+                invocationFormula != null)
+            {
+                formula = invocationFormula;
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax binaryExpression)
             {
                 if (binaryExpression.IsKind(SyntaxKind.IsExpression) &&
@@ -99,6 +107,66 @@ namespace PurelySharp.Analyzer.Engine.Smt
 
             formula = null;
             return false;
+        }
+
+        private static bool TryTranslateKnownBooleanInvocation(
+            InvocationExpressionSyntax invocationExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null;
+            if (semanticModel.GetSymbolInfo(invocationExpression, cancellationToken).Symbol is not IMethodSymbol
+                {
+                    Name: "IsNullOrEmpty",
+                    IsStatic: true,
+                    ContainingType.SpecialType: SpecialType.System_String,
+                    Parameters.Length: 1
+                } ||
+                invocationExpression.ArgumentList.Arguments.Count != 1)
+            {
+                return false;
+            }
+
+            var argument = invocationExpression.ArgumentList.Arguments[0].Expression;
+            var constantValue = semanticModel.GetConstantValue(argument, cancellationToken);
+            if (constantValue.HasValue)
+            {
+                if (constantValue.Value == null)
+                {
+                    formula = new SmtBooleanConstant(true);
+                    return true;
+                }
+
+                if (constantValue.Value is string stringValue)
+                {
+                    formula = new SmtBooleanConstant(stringValue.Length == 0);
+                    return true;
+                }
+            }
+
+            var argumentTypeInfo = semanticModel.GetTypeInfo(argument, cancellationToken);
+            var argumentType = argumentTypeInfo.ConvertedType ?? argumentTypeInfo.Type;
+            if (argumentType?.SpecialType != SpecialType.System_String ||
+                !TryTranslateValue(argument, semanticModel, cancellationToken, out var argumentFormula, getSymbolVersion) ||
+                argumentFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+            if (!TryCreateMemberFormula(argumentFormula, "Length", intType, out var lengthFormula) ||
+                lengthFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            formula = new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, argumentFormula, new SmtNullConstant()),
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, lengthFormula, new SmtIntegerConstant(0)));
+            return true;
         }
 
         public static bool TryCollectBranchAssumptions(

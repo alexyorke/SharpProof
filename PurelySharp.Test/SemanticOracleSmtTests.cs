@@ -202,6 +202,38 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ExecutionVisibility_StringIsNullOrEmptyTrueBranchLengthContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "string.IsNullOrEmpty(text) && text != null && text.Length > 0"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIsNullOrEmptyFalseBranchLengthContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "!string.IsNullOrEmpty(text) && text.Length <= 0"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIsNullOrEmptyEmptyLiteral_IsAlwaysTrue()
+        {
+            Assert.That(
+                IsConditionAlwaysTrue("", "string.IsNullOrEmpty(\"\")"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIsNullOrEmptyNonEmptyLiteral_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("", "string.IsNullOrEmpty(\"abc\")"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_DeclarationPatternImpliesNonNull_IsAlwaysFalse()
         {
             Assert.That(
@@ -1041,6 +1073,72 @@ public class TestClass
 }");
 
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_StringIsNullOrEmptyTrueBranchContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (string.IsNullOrEmpty(text) && text != null && text.Length > 0)
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_StringIsNullOrEmptyFalseBranchContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (!string.IsNullOrEmpty(text) && text.Length <= 0)
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_StringIsNullOrEmptyReachableImpureCall_Reports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
         }
 
         [Test]
