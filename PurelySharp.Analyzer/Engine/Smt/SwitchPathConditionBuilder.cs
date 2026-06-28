@@ -45,9 +45,11 @@ namespace PurelySharp.Analyzer.Engine.Smt
             out SmtFormula formula)
         {
             formula = null!;
+            var governingType = GetExpressionType(governingExpression, semanticModel, cancellationToken);
             return TryTranslateSwitchGoverningValue(governingExpression, semanticModel, cancellationToken, out var governingValue) &&
                 TryCreatePatternAndGuardCondition(
                     governingValue,
+                    governingType,
                     arm.Pattern,
                     arm.WhenClause,
                     semanticModel,
@@ -63,6 +65,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
             out SmtFormula formula)
         {
             formula = null!;
+            var governingType = GetExpressionType(governingExpression, semanticModel, cancellationToken);
             if (!TryTranslateSwitchGoverningValue(governingExpression, semanticModel, cancellationToken, out var governingValue))
             {
                 return false;
@@ -86,6 +89,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
             {
                 return TryCreatePatternAndGuardCondition(
                     governingValue,
+                    governingType,
                     patternLabel.Pattern,
                     patternLabel.WhenClause,
                     semanticModel,
@@ -121,6 +125,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
 
         private static bool TryCreatePatternAndGuardCondition(
             SmtFormula governingValue,
+            ITypeSymbol? governingType,
             PatternSyntax pattern,
             WhenClauseSyntax? whenClause,
             SemanticModel semanticModel,
@@ -135,7 +140,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
                     semanticModel,
                     cancellationToken,
                     out var patternFormula,
-                    getSymbolVersion: null) &&
+                    getSymbolVersion: null,
+                    governingType) &&
                 patternFormula != null)
             {
                 conditions.Add(patternFormula);
@@ -154,6 +160,15 @@ namespace PurelySharp.Analyzer.Engine.Smt
             }
 
             return TryCreateConjunction(conditions, out formula);
+        }
+
+        private static ITypeSymbol? GetExpressionType(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            return typeInfo.ConvertedType ?? typeInfo.Type;
         }
 
         private static bool TryCreateConjunction(IReadOnlyList<SmtFormula> formulas, out SmtFormula formula)

@@ -183,7 +183,9 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 return false;
             }
 
-            return TryTranslatePattern(value, expression.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion);
+            var valueType = semanticModel.GetTypeInfo(expression.Expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(expression.Expression, cancellationToken).Type;
+            return TryTranslatePattern(value, expression.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion, valueType);
         }
 
         public static bool TryTranslatePattern(
@@ -192,13 +194,14 @@ namespace PurelySharp.Analyzer.Engine.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula? formula,
-            Func<ISymbol, int>? getSymbolVersion)
+            Func<ISymbol, int>? getSymbolVersion,
+            ITypeSymbol? valueType = null)
         {
             formula = null;
 
             if (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
             {
-                return TryTranslatePattern(value, parenthesizedPattern.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion);
+                return TryTranslatePattern(value, parenthesizedPattern.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion, valueType);
             }
 
             if (pattern is DiscardPatternSyntax or VarPatternSyntax)
@@ -218,7 +221,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
 
             if (pattern is UnaryPatternSyntax unaryPattern &&
                 unaryPattern.OperatorToken.IsKind(SyntaxKind.NotKeyword) &&
-                TryTranslatePattern(value, unaryPattern.Pattern, semanticModel, cancellationToken, out var negatedPattern, getSymbolVersion) &&
+                TryTranslatePattern(value, unaryPattern.Pattern, semanticModel, cancellationToken, out var negatedPattern, getSymbolVersion, valueType) &&
                 negatedPattern != null)
             {
                 formula = new SmtUnaryFormula(SmtUnaryOperator.Not, negatedPattern);
@@ -226,8 +229,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
             }
 
             if (pattern is BinaryPatternSyntax binaryPattern &&
-                TryTranslatePattern(value, binaryPattern.Left, semanticModel, cancellationToken, out var leftPattern, getSymbolVersion) &&
-                TryTranslatePattern(value, binaryPattern.Right, semanticModel, cancellationToken, out var rightPattern, getSymbolVersion) &&
+                TryTranslatePattern(value, binaryPattern.Left, semanticModel, cancellationToken, out var leftPattern, getSymbolVersion, valueType) &&
+                TryTranslatePattern(value, binaryPattern.Right, semanticModel, cancellationToken, out var rightPattern, getSymbolVersion, valueType) &&
                 leftPattern != null &&
                 rightPattern != null)
             {
@@ -269,6 +272,11 @@ namespace PurelySharp.Analyzer.Engine.Smt
             if (pattern is RecursivePatternSyntax recursivePattern)
             {
                 return TryTranslateRecursivePattern(value, recursivePattern, semanticModel, cancellationToken, out formula, getSymbolVersion);
+            }
+
+            if (pattern is ListPatternSyntax listPattern)
+            {
+                return TryTranslateListPattern(value, valueType, listPattern, semanticModel, out formula);
             }
 
             if (pattern is DeclarationPatternSyntax or TypePatternSyntax)
@@ -344,7 +352,86 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 return false;
             }
 
-            return TryTranslatePattern(memberValue, subpattern.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion);
+            return TryTranslatePattern(memberValue, subpattern.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion, memberType);
+        }
+
+        private static bool TryTranslateListPattern(
+            SmtFormula value,
+            ITypeSymbol? valueType,
+            ListPatternSyntax listPattern,
+            SemanticModel semanticModel,
+            out SmtFormula? formula)
+        {
+            formula = null;
+            if (value.Kind != SmtValueKind.Reference ||
+                !IsSupportedBuiltInListPatternReceiver(valueType))
+            {
+                return false;
+            }
+
+            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+            if (!TryCreateMemberFormula(value, "Length", intType, out var lengthFormula) ||
+                lengthFormula == null)
+            {
+                return false;
+            }
+
+            var hasSlice = false;
+            var minimumLength = 0;
+            foreach (var subpattern in listPattern.Patterns)
+            {
+                if (subpattern is SlicePatternSyntax slicePattern)
+                {
+                    if (slicePattern.Pattern != null &&
+                        !IsUnconstrainedListSubpattern(slicePattern.Pattern))
+                    {
+                        return false;
+                    }
+
+                    hasSlice = true;
+                    continue;
+                }
+
+                if (!IsUnconstrainedListSubpattern(subpattern))
+                {
+                    return false;
+                }
+
+                minimumLength++;
+            }
+
+            var nonNullFormula = new SmtBinaryFormula(
+                SmtBinaryOperator.NotEqual,
+                value,
+                new SmtNullConstant());
+            var lengthFormulaCondition = hasSlice
+                ? new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThanOrEqual,
+                    lengthFormula,
+                    new SmtIntegerConstant(minimumLength))
+                : new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    lengthFormula,
+                    new SmtIntegerConstant(minimumLength));
+
+            formula = new SmtBinaryFormula(SmtBinaryOperator.And, nonNullFormula, lengthFormulaCondition);
+            return true;
+        }
+
+        private static bool IsSupportedBuiltInListPatternReceiver(ITypeSymbol? valueType)
+        {
+            return valueType is IArrayTypeSymbol { Rank: 1 } ||
+                valueType?.SpecialType == SpecialType.System_String;
+        }
+
+        private static bool IsUnconstrainedListSubpattern(PatternSyntax pattern)
+        {
+            while (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
+            {
+                pattern = parenthesizedPattern.Pattern;
+            }
+
+            return pattern is DiscardPatternSyntax or VarPatternSyntax;
         }
 
         private static bool TryTranslateComparison(

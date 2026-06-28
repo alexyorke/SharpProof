@@ -27,6 +27,24 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task StringListPattern_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public bool TestMethod(string text)
+    {
+        return text is [_, _];
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task CustomListPatternImpureLength_Diagnostic()
         {
             var test = @"

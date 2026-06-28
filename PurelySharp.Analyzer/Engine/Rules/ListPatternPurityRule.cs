@@ -27,29 +27,33 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 currentState,
                 context.SemanticModel.Compilation,
                 out var hasStableConcreteReceiver);
+            var hasBuiltInPureReceiver = IsBuiltInPureListPatternReceiver(matchedInputOperation.Type);
 
             if (operation is IListPatternOperation listPattern)
             {
-                var lengthResult = CheckMemberPurity(
-                    listPattern.LengthSymbol,
-                    receiverType,
-                    hasStableConcreteReceiver,
-                    operation,
-                    context);
-                if (!lengthResult.IsPure)
+                if (!hasBuiltInPureReceiver)
                 {
-                    return lengthResult;
-                }
+                    var lengthResult = CheckMemberPurity(
+                        listPattern.LengthSymbol,
+                        receiverType,
+                        hasStableConcreteReceiver,
+                        operation,
+                        context);
+                    if (!lengthResult.IsPure)
+                    {
+                        return lengthResult;
+                    }
 
-                var indexerResult = CheckMemberPurity(
-                    listPattern.IndexerSymbol,
-                    receiverType,
-                    hasStableConcreteReceiver,
-                    operation,
-                    context);
-                if (!indexerResult.IsPure)
-                {
-                    return indexerResult;
+                    var indexerResult = CheckMemberPurity(
+                        listPattern.IndexerSymbol,
+                        receiverType,
+                        hasStableConcreteReceiver,
+                        operation,
+                        context);
+                    if (!indexerResult.IsPure)
+                    {
+                        return indexerResult;
+                    }
                 }
 
                 foreach (var pattern in listPattern.Patterns)
@@ -59,6 +63,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             slicePattern,
                             receiverType,
                             hasStableConcreteReceiver,
+                            hasBuiltInPureReceiver,
                             context,
                             currentState)
                         : PurityAnalysisEngine.CheckSingleOperation(pattern, context, currentState);
@@ -78,18 +83,22 @@ namespace PurelySharp.Analyzer.Engine.Rules
             ISlicePatternOperation slicePattern,
             INamedTypeSymbol? receiverType,
             bool hasStableConcreteReceiver,
+            bool hasBuiltInPureReceiver,
             PurityAnalysisContext context,
             PurityAnalysisEngine.PurityAnalysisState currentState)
         {
-            var sliceResult = CheckMemberPurity(
-                slicePattern.SliceSymbol,
-                receiverType,
-                hasStableConcreteReceiver,
-                slicePattern,
-                context);
-            if (!sliceResult.IsPure)
+            if (!hasBuiltInPureReceiver)
             {
-                return sliceResult;
+                var sliceResult = CheckMemberPurity(
+                    slicePattern.SliceSymbol,
+                    receiverType,
+                    hasStableConcreteReceiver,
+                    slicePattern,
+                    context);
+                if (!sliceResult.IsPure)
+                {
+                    return sliceResult;
+                }
             }
 
             return slicePattern.Pattern == null
@@ -328,6 +337,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             return null;
+        }
+
+        private static bool IsBuiltInPureListPatternReceiver(ITypeSymbol? receiverType)
+        {
+            return receiverType is IArrayTypeSymbol { Rank: 1 } ||
+                receiverType?.SpecialType == SpecialType.System_String;
         }
 
         private static INamedTypeSymbol? GetKnownReceiverType(
