@@ -1223,6 +1223,29 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (pattern is RecursivePatternSyntax recursivePattern)
+            {
+                if (IsEmptyRecursivePattern(recursivePattern))
+                {
+                    formula = hasValueFormula;
+                    return true;
+                }
+
+                if (TryTranslateRecursivePattern(
+                        valueFormula,
+                        recursivePattern,
+                        semanticModel,
+                        cancellationToken,
+                        out var recursiveFormula,
+                        getSymbolVersion,
+                        inlineDepth) &&
+                    recursiveFormula != null)
+                {
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.And, hasValueFormula, recursiveFormula);
+                    return true;
+                }
+            }
+
             if (pattern is ConstantPatternSyntax constantPattern &&
                 TryTranslateValue(constantPattern.Expression, semanticModel, cancellationToken, out var constantValue, getSymbolVersion, inlineDepth) &&
                 constantValue != null &&
@@ -1301,6 +1324,12 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
+        }
+
+        private static bool IsEmptyRecursivePattern(RecursivePatternSyntax recursivePattern)
+        {
+            return recursivePattern.PropertyPatternClause is not { Subpatterns.Count: > 0 } &&
+                recursivePattern.PositionalPatternClause is not { Subpatterns.Count: > 0 };
         }
 
         private static bool TryTranslateRelationalPatternComparison(
