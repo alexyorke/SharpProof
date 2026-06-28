@@ -54,22 +54,47 @@ namespace PurelySharp.Symbolic
             {
                 if (ancestor is IfStatementSyntax ifStatementSyntax)
                 {
-                    if (ifStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
+                    if (ifStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
+                        !AnyReferencedSymbolAssignedBeforeUse(
+                            ifStatementSyntax.Condition,
+                            ifStatementSyntax.Statement,
+                            syntaxNode.SpanStart,
+                            semanticModel,
+                            cancellationToken))
                     {
                         AddReachabilityCondition(builder, ifStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
                     }
-                    else if (ifStatementSyntax.Else?.Statement.Span.Contains(syntaxNode.Span) == true)
+                    else if (ifStatementSyntax.Else?.Statement is { } elseStatement &&
+                             elseStatement.Span.Contains(syntaxNode.Span) &&
+                             !AnyReferencedSymbolAssignedBeforeUse(
+                                 ifStatementSyntax.Condition,
+                                 elseStatement,
+                                 syntaxNode.SpanStart,
+                                 semanticModel,
+                                 cancellationToken))
                     {
                         AddReachabilityCondition(builder, ifStatementSyntax.Condition, mustBeTrue: false, semanticModel, cancellationToken);
                     }
                 }
                 else if (ancestor is ConditionalExpressionSyntax conditionalExpressionSyntax)
                 {
-                    if (conditionalExpressionSyntax.WhenTrue.Span.Contains(syntaxNode.Span))
+                    if (conditionalExpressionSyntax.WhenTrue.Span.Contains(syntaxNode.Span) &&
+                        !AnyReferencedSymbolAssignedBeforeUse(
+                            conditionalExpressionSyntax.Condition,
+                            conditionalExpressionSyntax.WhenTrue,
+                            syntaxNode.SpanStart,
+                            semanticModel,
+                            cancellationToken))
                     {
                         AddReachabilityCondition(builder, conditionalExpressionSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
                     }
-                    else if (conditionalExpressionSyntax.WhenFalse.Span.Contains(syntaxNode.Span))
+                    else if (conditionalExpressionSyntax.WhenFalse.Span.Contains(syntaxNode.Span) &&
+                             !AnyReferencedSymbolAssignedBeforeUse(
+                                 conditionalExpressionSyntax.Condition,
+                                 conditionalExpressionSyntax.WhenFalse,
+                                 syntaxNode.SpanStart,
+                                 semanticModel,
+                                 cancellationToken))
                     {
                         AddReachabilityCondition(builder, conditionalExpressionSyntax.Condition, mustBeTrue: false, semanticModel, cancellationToken);
                     }
@@ -77,6 +102,16 @@ namespace PurelySharp.Symbolic
                 else if (ancestor is BinaryExpressionSyntax binaryExpressionSyntax &&
                          binaryExpressionSyntax.Right.Span.Contains(syntaxNode.Span))
                 {
+                    if (AnyReferencedSymbolAssignedBeforeUse(
+                            binaryExpressionSyntax.Left,
+                            binaryExpressionSyntax.Right,
+                            syntaxNode.SpanStart,
+                            semanticModel,
+                            cancellationToken))
+                    {
+                        continue;
+                    }
+
                     if (binaryExpressionSyntax.IsKind(SyntaxKind.LogicalAndExpression))
                     {
                         AddReachabilityCondition(builder, binaryExpressionSyntax.Left, mustBeTrue: true, semanticModel, cancellationToken);
@@ -96,7 +131,13 @@ namespace PurelySharp.Symbolic
                     }
                 }
                 else if (ancestor is ConditionalAccessExpressionSyntax conditionalAccessExpressionSyntax &&
-                         conditionalAccessExpressionSyntax.WhenNotNull.Span.Contains(syntaxNode.SpanStart))
+                         conditionalAccessExpressionSyntax.WhenNotNull.Span.Contains(syntaxNode.SpanStart) &&
+                         !AnyReferencedSymbolAssignedBeforeUse(
+                             conditionalAccessExpressionSyntax.Expression,
+                             conditionalAccessExpressionSyntax.WhenNotNull,
+                             syntaxNode.SpanStart,
+                             semanticModel,
+                             cancellationToken))
                 {
                     AddReferenceNullCondition(
                         builder,
@@ -106,13 +147,25 @@ namespace PurelySharp.Symbolic
                         cancellationToken);
                 }
                 else if (ancestor is WhileStatementSyntax whileStatementSyntax &&
-                         whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
+                         whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
+                         !AnyReferencedSymbolAssignedBeforeUse(
+                             whileStatementSyntax.Condition,
+                             whileStatementSyntax.Statement,
+                             syntaxNode.SpanStart,
+                             semanticModel,
+                             cancellationToken))
                 {
                     AddReachabilityCondition(builder, whileStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
                 }
                 else if (ancestor is ForStatementSyntax forStatementSyntax &&
                          forStatementSyntax.Condition != null &&
-                         forStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
+                         forStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
+                         !AnyReferencedSymbolAssignedBeforeUse(
+                             forStatementSyntax.Condition,
+                             forStatementSyntax.Statement,
+                             syntaxNode.SpanStart,
+                             semanticModel,
+                             cancellationToken))
                 {
                     AddReachabilityCondition(builder, forStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
                     AddForLoopMonotonicLowerBoundFacts(builder, forStatementSyntax, semanticModel, cancellationToken);
@@ -122,6 +175,12 @@ namespace PurelySharp.Symbolic
                     var matchingSection = switchStatementSyntax.Sections
                         .FirstOrDefault(section => section.Span.Contains(syntaxNode.SpanStart));
                     if (matchingSection != null &&
+                        !AnyReferencedSymbolAssignedBeforeUse(
+                            switchStatementSyntax.Expression,
+                            matchingSection,
+                            syntaxNode.SpanStart,
+                            semanticModel,
+                            cancellationToken) &&
                         SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
                             switchStatementSyntax.Expression,
                             matchingSection,
@@ -137,6 +196,12 @@ namespace PurelySharp.Symbolic
                     var matchingArm = switchExpressionSyntax.Arms
                         .FirstOrDefault(arm => arm.Expression.Span.Contains(syntaxNode.SpanStart));
                     if (matchingArm != null &&
+                        !AnyReferencedSymbolAssignedBeforeUse(
+                            switchExpressionSyntax.GoverningExpression,
+                            matchingArm,
+                            syntaxNode.SpanStart,
+                            semanticModel,
+                            cancellationToken) &&
                         SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
                             switchExpressionSyntax.GoverningExpression,
                             matchingArm,
@@ -441,6 +506,84 @@ namespace PurelySharp.Symbolic
             }
 
             return false;
+        }
+
+        private static bool AnyReferencedSymbolAssignedBeforeUse(
+            SyntaxNode condition,
+            SyntaxNode branchRoot,
+            int useSpanStart,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var referencedSymbols = GetReferencedLocalAndParameterSymbols(condition, semanticModel, cancellationToken);
+            if (referencedSymbols.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var symbol in referencedSymbols)
+            {
+                if (IsSymbolAssignedBetween(
+                        branchRoot,
+                        branchRoot.SpanStart - 1,
+                        useSpanStart,
+                        symbol,
+                        semanticModel,
+                        cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsSymbolAssignedBetween(
+            SyntaxNode root,
+            int afterSpanStart,
+            int beforeSpanStart,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var node in root.DescendantNodes(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+            {
+                if (node.SpanStart <= afterSpanStart || node.SpanStart >= beforeSpanStart)
+                {
+                    continue;
+                }
+
+                if (NodeMutatesSymbol(node, symbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool NodeMutatesSymbol(
+            SyntaxNode node,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var mutatedExpression = node switch
+            {
+                AssignmentExpressionSyntax assignment => assignment.Left,
+                PrefixUnaryExpressionSyntax prefixUnary
+                    when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) || prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
+                    prefixUnary.Operand,
+                PostfixUnaryExpressionSyntax postfixUnary
+                    when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) || postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
+                    postfixUnary.Operand,
+                ArgumentSyntax argument when !argument.RefKindKeyword.IsKind(SyntaxKind.None) => argument.Expression,
+                _ => null
+            };
+
+            return mutatedExpression != null &&
+                ExpressionReferencesSymbol(mutatedExpression, symbol, semanticModel, cancellationToken);
         }
 
         private static IReadOnlyList<ISymbol> GetReferencedLocalAndParameterSymbols(

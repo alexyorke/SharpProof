@@ -1209,6 +1209,71 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_QuerySource_DropsStaleIfConditionAfterReassignment()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        if (index < 0)
+        {
+            index = 0;
+            return values[index];
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "StaleIfConditionAfterReassignment.cs",
+                FindLine(source, "return values[index];"),
+                20,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
+                impliedConditions: new[] { "index < 0", "index >= 0", "values == null" });
+
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Reachable));
+            Assert.That(result.ConditionProofs, Has.Count.EqualTo(3));
+            Assert.That(result.ConditionProofs[0].TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse));
+            Assert.That(result.ConditionProofs[1].TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+            Assert.That(result.ConditionProofs[2].TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_QuerySource_DropsStaleWhileConditionAfterReassignment()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        while (index < values.Length)
+        {
+            index = values.Length;
+            return values[index];
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "StaleWhileConditionAfterReassignment.cs",
+                FindLine(source, "return values[index];"),
+                20,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
+                impliedConditions: new[] { "index < values.Length", "index >= values.Length" });
+
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Reachable));
+            Assert.That(result.ConditionProofs, Has.Count.EqualTo(2));
+            Assert.That(result.ConditionProofs[0].TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse));
+            Assert.That(result.ConditionProofs[1].TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesWhileNormalExitImplication()
         {
             const string source = @"
