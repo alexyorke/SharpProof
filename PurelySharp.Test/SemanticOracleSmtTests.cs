@@ -1335,6 +1335,66 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesForeachReceiverNonNull()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        foreach (var value in values)
+        {
+            return values.Length + value;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ForeachReceiverNonNull.cs",
+                FindLine(source, "return values.Length + value;"),
+                13,
+                "values != null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesForeachBodyAfterNullGuardUnreachable()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values == null)
+        {
+            foreach (var value in values)
+            {
+                return values.Length + value;
+            }
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().AnalyzeSource(
+                source,
+                "ForeachReceiverContradiction.cs",
+                FindLine(source, "return values.Length + value;"),
+                17,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(result.PathConditions, Is.Not.Empty);
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+            Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_QuerySource_ProvesForLoopMonotonicIndexBounds()
         {
             const string source = @"

@@ -170,6 +170,38 @@ namespace PurelySharp.Symbolic
                     AddReachabilityCondition(builder, forStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
                     builder.AddRange(CollectForLoopBodyInvariantFacts(forStatementSyntax, semanticModel, cancellationToken));
                 }
+                else if (ancestor is ForEachStatementSyntax forEachStatementSyntax &&
+                         forEachStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
+                         !AnyReferencedSymbolAssignedBeforeUse(
+                             forEachStatementSyntax.Expression,
+                             forEachStatementSyntax.Statement,
+                             syntaxNode.SpanStart,
+                             semanticModel,
+                             cancellationToken))
+                {
+                    AddReferenceNullCondition(
+                        builder,
+                        forEachStatementSyntax.Expression,
+                        isNull: false,
+                        semanticModel,
+                        cancellationToken);
+                }
+                else if (ancestor is ForEachVariableStatementSyntax forEachVariableStatementSyntax &&
+                         forEachVariableStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
+                         !AnyReferencedSymbolAssignedBeforeUse(
+                             forEachVariableStatementSyntax.Expression,
+                             forEachVariableStatementSyntax.Statement,
+                             syntaxNode.SpanStart,
+                             semanticModel,
+                             cancellationToken))
+                {
+                    AddReferenceNullCondition(
+                        builder,
+                        forEachVariableStatementSyntax.Expression,
+                        isNull: false,
+                        semanticModel,
+                        cancellationToken);
+                }
                 else if (ancestor is SwitchStatementSyntax switchStatementSyntax)
                 {
                     var matchingSection = switchStatementSyntax.Sections
