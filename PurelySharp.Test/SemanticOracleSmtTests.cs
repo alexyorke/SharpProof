@@ -2670,6 +2670,31 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalFiniteArrayElementAssignedNonZeroValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var values = new[] { 1, 2 };
+        var divisor = flag ? values[0] : values[1];
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ConditionalFiniteArrayElementAssignedNonZeroValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                20,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotInferPriorFiniteArrayElementAfterUnknownReassignment()
         {
             const string source = @"
@@ -2686,6 +2711,32 @@ public class TestClass
             var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
                 source,
                 "ReassignedFiniteArrayElementAssignedValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                20,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotInferPriorFiniteArrayElementFromTargetSelfReference()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool flag, int input)
+    {
+        var divisor = input;
+        var values = new[] { divisor, 2 };
+        divisor = flag ? values[0] : values[1];
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "SelfReferencingFiniteArrayElementAssignedValue.cs",
                 FindLine(source, "return 10 / divisor;"),
                 20,
                 "divisor != 0",
@@ -5696,6 +5747,23 @@ public class TestClass
     {
         var values = new[] { 1, 2 };
         var divisor = values[0];
+        return 10 / divisor;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_ConditionalFiniteArrayElementAssignedNonZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var values = new[] { 1, 2 };
+        var divisor = flag ? values[0] : values[1];
         return 10 / divisor;
     }
 }");

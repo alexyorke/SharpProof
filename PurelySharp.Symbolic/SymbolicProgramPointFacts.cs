@@ -2124,7 +2124,6 @@ namespace PurelySharp.Symbolic
             }
 
             AddTupleElementAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
-            AddFiniteElementAccessAssignedValueFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
 
             if (hasThrowGuard &&
                 guardExpression != null &&
@@ -2145,20 +2144,84 @@ namespace PurelySharp.Symbolic
             }
         }
 
-        private static void AddFiniteElementAccessAssignedValueFact(
-            ISymbol assignedSymbol,
+        private static bool TryTranslateAssignedValueExpression(
             ExpressionSyntax valueExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            List<SmtFormula> facts)
+            ISymbol? assignedSymbol,
+            out SmtFormula? formula)
         {
+            valueExpression = UnwrapExpression(valueExpression);
+            if (CSharpConditionToFormula.TryTranslateValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                formula != null)
+            {
+                return true;
+            }
+
+            if (TryTranslateFiniteElementAccessValue(
+                valueExpression,
+                semanticModel,
+                cancellationToken,
+                assignedSymbol,
+                out formula))
+            {
+                return true;
+            }
+
+            if (valueExpression is ConditionalExpressionSyntax conditionalExpression &&
+                CSharpConditionToFormula.TryTranslate(
+                    conditionalExpression.Condition,
+                    semanticModel,
+                    cancellationToken,
+                    out var conditionFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                conditionFormula != null &&
+                TryTranslateAssignedValueExpression(
+                    conditionalExpression.WhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    assignedSymbol,
+                    out var whenTrueFormula) &&
+                whenTrueFormula != null &&
+                TryTranslateAssignedValueExpression(
+                    conditionalExpression.WhenFalse,
+                    semanticModel,
+                    cancellationToken,
+                    assignedSymbol,
+                    out var whenFalseFormula) &&
+                whenFalseFormula != null &&
+                whenTrueFormula.Kind == whenFalseFormula.Kind)
+            {
+                formula = new SmtConditionalFormula(conditionFormula, whenTrueFormula, whenFalseFormula, whenTrueFormula.Kind);
+                return true;
+            }
+
+            formula = null;
+            return false;
+        }
+
+        private static bool TryTranslateFiniteElementAccessValue(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ISymbol? assignedSymbol,
+            out SmtFormula? formula)
+        {
+            formula = null;
             valueExpression = UnwrapExpression(valueExpression);
             if (valueExpression is not ElementAccessExpressionSyntax elementAccess ||
                 elementAccess.ArgumentList.Arguments.Count != 1 ||
                 !TryGetIntegralConstant(elementAccess.ArgumentList.Arguments[0].Expression, semanticModel, cancellationToken, out var index) ||
                 index < 0)
             {
-                return;
+                return false;
             }
 
             var containingStatement = valueExpression.AncestorsAndSelf().OfType<StatementSyntax>().FirstOrDefault();
@@ -2174,19 +2237,22 @@ namespace PurelySharp.Symbolic
             if (!hasFiniteElements ||
                 index >= elementExpressions.Length)
             {
-                return;
+                return false;
             }
 
             var elementExpression = elementExpressions[(int)index];
-            if (ExpressionReferencesSymbol(elementExpression, assignedSymbol, semanticModel, cancellationToken))
+            if (assignedSymbol != null &&
+                ExpressionReferencesSymbol(elementExpression, assignedSymbol, semanticModel, cancellationToken))
             {
-                return;
+                return false;
             }
 
-            if (TryCreateAssignedValueFact(assignedSymbol, elementExpression, semanticModel, cancellationToken, out var fact))
-            {
-                facts.Add(fact);
-            }
+            return TryTranslateAssignedValueExpression(
+                elementExpression,
+                semanticModel,
+                cancellationToken,
+                assignedSymbol,
+                out formula);
         }
 
         private static void AddTupleElementAssignedValueFacts(
@@ -2462,7 +2528,12 @@ namespace PurelySharp.Symbolic
         {
             fact = null!;
             if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) ||
-                !CSharpConditionToFormula.TryTranslateValue(valueExpression, semanticModel, cancellationToken, out var valueFormula, getSymbolVersion: null, inlineDepth: 0) ||
+                !TryTranslateAssignedValueExpression(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    targetSymbol,
+                    out var valueFormula) ||
                 valueFormula == null ||
                 !CanCompareSmtValues(targetFormula, valueFormula))
             {
