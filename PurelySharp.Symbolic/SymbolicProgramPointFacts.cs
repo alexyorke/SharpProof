@@ -2176,6 +2176,7 @@ namespace PurelySharp.Symbolic
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
             {
                 AddNullableAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+                AddAsExpressionAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
 
             AddTupleElementAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
@@ -2708,6 +2709,36 @@ namespace PurelySharp.Symbolic
 
             fact = CreateAssignedValueFact(targetFormula, valueFormula);
             return true;
+        }
+
+        private static void AddAsExpressionAssignedValueFacts(
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            valueExpression = UnwrapExpression(valueExpression);
+            if (valueExpression is not BinaryExpressionSyntax asExpression ||
+                !asExpression.IsKind(SyntaxKind.AsExpression) ||
+                !TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula) ||
+                targetFormula is not { Kind: SmtValueKind.Reference } ||
+                !CSharpConditionToFormula.TryTranslateValue(
+                    asExpression.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out var sourceFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) ||
+                sourceFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return;
+            }
+
+            facts.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, new SmtNullConstant()),
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, sourceFormula, new SmtNullConstant())));
         }
 
         private static void AddNullableAssignedValueFacts(
