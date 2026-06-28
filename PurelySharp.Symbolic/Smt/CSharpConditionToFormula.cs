@@ -1181,9 +1181,9 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth)
         {
             receiverExpression = UnwrapExpression(receiverExpression);
-            var receiverType = semanticModel.GetTypeInfo(receiverExpression, cancellationToken).ConvertedType ??
-                semanticModel.GetTypeInfo(receiverExpression, cancellationToken).Type;
-            if (receiverType is IArrayTypeSymbol { Rank: 1 } &&
+            var receiverTypeInfo = semanticModel.GetTypeInfo(receiverExpression, cancellationToken);
+            if ((receiverTypeInfo.Type is IArrayTypeSymbol { Rank: 1 } ||
+                 receiverTypeInfo.ConvertedType is IArrayTypeSymbol { Rank: 1 }) &&
                 TryCreateArrayLengthFormula(receiverExpression, semanticModel, cancellationToken, out lengthFormula, getSymbolVersion, inlineDepth))
             {
                 return true;

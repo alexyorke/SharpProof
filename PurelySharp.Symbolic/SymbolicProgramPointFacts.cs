@@ -179,10 +179,9 @@ namespace PurelySharp.Symbolic
                              semanticModel,
                              cancellationToken))
                 {
-                    AddReferenceNullCondition(
+                    AddForeachBodyEntryFacts(
                         builder,
                         forEachStatementSyntax.Expression,
-                        isNull: false,
                         semanticModel,
                         cancellationToken);
                 }
@@ -195,10 +194,9 @@ namespace PurelySharp.Symbolic
                              semanticModel,
                              cancellationToken))
                 {
-                    AddReferenceNullCondition(
+                    AddForeachBodyEntryFacts(
                         builder,
                         forEachVariableStatementSyntax.Expression,
-                        isNull: false,
                         semanticModel,
                         cancellationToken);
                 }
@@ -1639,6 +1637,52 @@ namespace PurelySharp.Symbolic
                 semanticModel,
                 cancellationToken,
                 facts);
+        }
+
+        private static void AddForeachBodyEntryFacts(
+            ICollection<SmtFormula> facts,
+            ExpressionSyntax expressionSyntax,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            AddReferenceNullCondition(facts, expressionSyntax, isNull: false, semanticModel, cancellationToken);
+
+            var typeInfo = semanticModel.GetTypeInfo(expressionSyntax, cancellationToken);
+            if (!IsSupportedForeachLengthReceiver(expressionSyntax) &&
+                !IsSupportedForeachLengthReceiver(typeInfo.Type) &&
+                !IsSupportedForeachLengthReceiver(typeInfo.ConvertedType))
+            {
+                return;
+            }
+
+            if (!CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+                    expressionSyntax,
+                    semanticModel,
+                    cancellationToken,
+                    out var lengthFormula,
+                    getSymbolVersion: null) ||
+                lengthFormula is not { Kind: SmtValueKind.Int })
+            {
+                return;
+            }
+
+            facts.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThan,
+                lengthFormula,
+                new SmtIntegerConstant(0)));
+        }
+
+        private static bool IsSupportedForeachLengthReceiver(ExpressionSyntax expressionSyntax)
+        {
+            expressionSyntax = UnwrapExpression(expressionSyntax);
+            return expressionSyntax is ArrayCreationExpressionSyntax or
+                ImplicitArrayCreationExpressionSyntax;
+        }
+
+        private static bool IsSupportedForeachLengthReceiver(ITypeSymbol? type)
+        {
+            return type is IArrayTypeSymbol { Rank: 1 } ||
+                type?.SpecialType == SpecialType.System_String;
         }
 
         private static void AddReferenceNullCondition(

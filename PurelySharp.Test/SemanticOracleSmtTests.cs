@@ -1363,6 +1363,63 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesForeachArrayLengthPositive()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        foreach (var value in values)
+        {
+            return values.Length + value;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ForeachArrayLengthPositive.cs",
+                FindLine(source, "return values.Length + value;"),
+                13,
+                "values.Length > 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesForeachNewEmptyArrayBodyUnreachable()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        foreach (var value in new int[0])
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().AnalyzeSource(
+                source,
+                "ForeachNewEmptyArrayUnreachable.cs",
+                FindLine(source, "return value;"),
+                13,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(result.PathConditions, Is.Not.Empty);
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+            Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesForeachBodyAfterNullGuardUnreachable()
         {
             const string source = @"
