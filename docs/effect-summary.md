@@ -73,13 +73,13 @@ Examples:
 
 ## Current CLI
 
-For ad hoc local refreshes, prefer the repo wrapper:
+For ad hoc local refreshes, run the tool through the repo's job-object .NET launcher:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Update-EffectSummaries.ps1 -SymbolPrefix System.String.Format -IncludeCallees -MaxDepth 2 -TransitiveRoots
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Invoke-PurelySharpDotnet.ps1 run --project Tools\PurelySharp.EffectSummary\PurelySharp.EffectSummary.csproj -- --framework net8.0 --symbol-prefix System.String.Format --include-callees --max-depth 2 --transitive-roots --output artifacts\effect-summary\string-format.PurelySharp.EffectSummary.json
 ```
 
-The wrapper builds `Tools\PurelySharp.EffectSummary` under the repo's job-object .NET launcher and writes a timestamped `*.PurelySharp.EffectSummary.json` file under ignored `artifacts\effect-summary\...` paths by default. Those outputs are for local inspection only, and broad runtime scans require an explicit `-AllowUnfilteredRuntimeScan`.
+Write ad hoc `*.PurelySharp.EffectSummary.json` files under ignored `artifacts\effect-summary\...` paths unless a test explicitly needs a temp path. Those outputs are for local inspection only; prefer symbol filters and limits for exploratory runs.
 
 Smoke run against the latest installed .NET 8 `System.Private.CoreLib.dll`:
 

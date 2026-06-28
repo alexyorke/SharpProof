@@ -351,7 +351,6 @@ namespace TestNamespace {
                 })
                 .Where(file =>
                     file.Content.Contains("ReviewedRuntimeArtifactSpec.json", StringComparison.Ordinal) ||
-                    file.Content.Contains("Update-EffectSummaries.ps1", StringComparison.Ordinal) ||
                     file.Content.Contains("PurelySharp.EffectSummary.json", StringComparison.Ordinal))
                 .Select(file => file.Path.Substring(repositoryRoot.Length).TrimStart(Path.DirectorySeparatorChar))
                 .ToArray();
