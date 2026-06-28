@@ -180,6 +180,14 @@
       ]
     },
     {
+      "OutputPath": "string-null-helpers.CoreLib.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Private.CoreLib.dll",
+      "SymbolPrefixes": [
+        "System.String.IsNullOrEmpty",
+        "System.String.IsNullOrWhiteSpace"
+      ]
+    },
+    {
       "OutputPath": "type-scalar-runtime.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.Private.CoreLib.dll",
       "SymbolPrefixes": [

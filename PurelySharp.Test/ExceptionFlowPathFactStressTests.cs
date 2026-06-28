@@ -14,6 +14,21 @@ namespace PurelySharp.Test
     [TestFixture]
     public class ExceptionFlowPathFactStressTests
     {
+        private const string SourcePredicateSource = @"
+public static class SourcePredicates
+{
+    public static bool IsNullOrEmptyLike(string value)
+    {
+        return value == null || value.Length == 0;
+    }
+
+    public static bool HasText(string value)
+    {
+        return value != null && value.Length > 0;
+    }
+}
+";
+
         [Test]
         public async Task Ps0010_AndConditionZeroDivisor_ReportsDivideByZeroException()
         {
@@ -701,14 +716,14 @@ public class TestClass
         }
 
         [Test]
-        public async Task Ps0010_StringIsNullOrEmptyNonNullIndex_ReportsIndexOutOfRangeException()
+        public async Task Ps0010_SourceNullOrEmptyPredicateNonNullIndex_ReportsIndexOutOfRangeException()
         {
-            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+            var diagnostic = await SingleExceptionDiagnosticAsync(SourcePredicateSource + @"
 public class TestClass
 {
     public char TestMethod(string text)
     {
-        if (string.IsNullOrEmpty(text) && text != null)
+        if (SourcePredicates.IsNullOrEmptyLike(text) && text != null)
         {
             return text[0];
         }
@@ -721,14 +736,14 @@ public class TestClass
         }
 
         [Test]
-        public async Task Ps0010_StringIsNullOrEmptyFalseBranchIndex_DoesNotReport()
+        public async Task Ps0010_SourceNullOrEmptyPredicateFalseBranchIndex_DoesNotReport()
         {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(SourcePredicateSource + @"
 public class TestClass
 {
     public char TestMethod(string text)
     {
-        if (!string.IsNullOrEmpty(text))
+        if (!SourcePredicates.IsNullOrEmptyLike(text))
         {
             return text[0];
         }
@@ -741,14 +756,14 @@ public class TestClass
         }
 
         [Test]
-        public async Task Ps0010_StringIsNullOrWhiteSpaceFalseBranchContradictoryIndex_DoesNotReport()
+        public async Task Ps0010_SourceHasTextPredicateContradictoryIndex_DoesNotReport()
         {
-            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(SourcePredicateSource + @"
 public class TestClass
 {
     public char TestMethod(string text)
     {
-        if (!string.IsNullOrWhiteSpace(text) && text.Length <= 0)
+        if (SourcePredicates.HasText(text) && text.Length <= 0)
         {
             return text[0];
         }

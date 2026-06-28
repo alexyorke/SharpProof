@@ -128,6 +128,10 @@ public static class ConditionHost
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var returnExpression = syntaxTree.GetRoot()
                 .DescendantNodes()
+                .OfType<MethodDeclarationSyntax>()
+                .Single(method => method.Identifier.ValueText == "Evaluate")
+                .Body!
+                .Statements
                 .OfType<ReturnStatementSyntax>()
                 .Single()
                 .Expression!;

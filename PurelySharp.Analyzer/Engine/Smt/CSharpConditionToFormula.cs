@@ -2,18 +2,22 @@ using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using SearchLib.Smt;
 
 namespace PurelySharp.Analyzer.Engine.Smt
 {
     internal static class CSharpConditionToFormula
     {
+        private const int MaxSourcePredicateInlineDepth = 4;
+
         public static bool TryTranslate(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula? formula,
-            Func<ISymbol, int>? getSymbolVersion = null)
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
         {
             expression = UnwrapExpression(expression);
 
@@ -24,7 +28,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 return true;
             }
 
-            if (TryTranslateValue(expression, semanticModel, cancellationToken, out var directValue, getSymbolVersion) &&
+            if (TryTranslateValue(expression, semanticModel, cancellationToken, out var directValue, getSymbolVersion, inlineDepth) &&
                 directValue is { Kind: SmtValueKind.Bool })
             {
                 formula = directValue;
@@ -33,7 +37,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
 
             if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
                 prefixUnary.IsKind(SyntaxKind.LogicalNotExpression) &&
-                TryTranslate(prefixUnary.Operand, semanticModel, cancellationToken, out var operand, getSymbolVersion) &&
+                TryTranslate(prefixUnary.Operand, semanticModel, cancellationToken, out var operand, getSymbolVersion, inlineDepth) &&
                 operand != null)
             {
                 formula = new SmtUnaryFormula(SmtUnaryOperator.Not, operand);
@@ -41,7 +45,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
             }
 
             if (expression is ConditionalExpressionSyntax conditionalExpression &&
-                TryTranslateValue(conditionalExpression, semanticModel, cancellationToken, out var conditionalValue, getSymbolVersion) &&
+                TryTranslateValue(conditionalExpression, semanticModel, cancellationToken, out var conditionalValue, getSymbolVersion, inlineDepth) &&
                 conditionalValue is { Kind: SmtValueKind.Bool })
             {
                 formula = conditionalValue;
@@ -49,7 +53,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
             }
 
             if (expression is InvocationExpressionSyntax invocationExpression &&
-                TryTranslateKnownBooleanInvocation(invocationExpression, semanticModel, cancellationToken, out var invocationFormula, getSymbolVersion) &&
+                TryTranslateSourceBooleanInvocation(invocationExpression, semanticModel, cancellationToken, out var invocationFormula, getSymbolVersion, inlineDepth) &&
                 invocationFormula != null)
             {
                 formula = invocationFormula;
@@ -60,7 +64,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
             {
                 if (binaryExpression.IsKind(SyntaxKind.IsExpression) &&
                     binaryExpression.Right is TypeSyntax &&
-                    TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var typeTestValue, getSymbolVersion) &&
+                    TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var typeTestValue, getSymbolVersion, inlineDepth) &&
                     typeTestValue is { Kind: SmtValueKind.Reference })
                 {
                     formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, typeTestValue, new SmtNullConstant());
@@ -68,8 +72,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 }
 
                 if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression) &&
-                    TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftAnd, getSymbolVersion) &&
-                    TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightAnd, getSymbolVersion) &&
+                    TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftAnd, getSymbolVersion, inlineDepth) &&
+                    TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightAnd, getSymbolVersion, inlineDepth) &&
                     leftAnd != null &&
                     rightAnd != null)
                 {
@@ -78,8 +82,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 }
 
                 if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression) &&
-                    TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftOr, getSymbolVersion) &&
-                    TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightOr, getSymbolVersion) &&
+                    TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftOr, getSymbolVersion, inlineDepth) &&
+                    TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightOr, getSymbolVersion, inlineDepth) &&
                     leftOr != null &&
                     rightOr != null)
                 {
@@ -87,8 +91,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
                     return true;
                 }
 
-                if (TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue, getSymbolVersion) &&
-                    TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue, getSymbolVersion) &&
+                if (TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue, getSymbolVersion, inlineDepth) &&
+                    TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue, getSymbolVersion, inlineDepth) &&
                     leftValue != null &&
                     rightValue != null &&
                     TryTranslateComparison(binaryExpression.Kind(), leftValue, rightValue, out var comparison))
@@ -99,7 +103,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
             }
 
             if (expression is IsPatternExpressionSyntax isPatternExpression &&
-                TryTranslatePatternExpression(isPatternExpression, semanticModel, cancellationToken, out var patternFormula, getSymbolVersion))
+                TryTranslatePatternExpression(isPatternExpression, semanticModel, cancellationToken, out var patternFormula, getSymbolVersion, inlineDepth))
             {
                 formula = patternFormula;
                 return true;
@@ -109,142 +113,251 @@ namespace PurelySharp.Analyzer.Engine.Smt
             return false;
         }
 
-        private static bool TryTranslateKnownBooleanInvocation(
+        private static bool TryTranslateSourceBooleanInvocation(
             InvocationExpressionSyntax invocationExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula? formula,
-            Func<ISymbol, int>? getSymbolVersion)
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
         {
             formula = null;
-            if (!TryGetKnownStringPredicateInvocation(
-                    invocationExpression,
+            if (inlineDepth >= MaxSourcePredicateInlineDepth ||
+                semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
+                !CanInlineSourceBooleanPredicate(invocationOperation.TargetMethod) ||
+                !TryGetReturnedBooleanExpression(
+                    invocationOperation.TargetMethod,
+                    semanticModel.Compilation,
+                    cancellationToken,
+                    out var returnedExpression,
+                    out var returnedSemanticModel) ||
+                !TryTranslate(returnedExpression, returnedSemanticModel, cancellationToken, out var returnedFormula, getSymbolVersion: null, inlineDepth + 1) ||
+                returnedFormula is not { Kind: SmtValueKind.Bool } ||
+                !TryCreateSourcePredicateSubstitutions(
+                    invocationOperation,
                     semanticModel,
                     cancellationToken,
-                    out var methodSymbol,
-                    out var argument))
+                    getSymbolVersion,
+                    inlineDepth,
+                    out var substitutions))
             {
                 return false;
             }
 
-            var constantValue = semanticModel.GetConstantValue(argument, cancellationToken);
-            if (constantValue is { HasValue: true, Value: null })
-            {
-                formula = new SmtBooleanConstant(true);
-                return true;
-            }
-
-            if (TryGetKnownStringLength(argument, semanticModel, cancellationToken, out var knownStringLength))
-            {
-                formula = new SmtBooleanConstant(methodSymbol.Name == "IsNullOrEmpty"
-                    ? knownStringLength == 0
-                    : knownStringLength == 0 || IsKnownWhitespaceString(argument, semanticModel, cancellationToken));
-                return true;
-            }
-
-            if (methodSymbol.Name != "IsNullOrEmpty")
-            {
-                return TryCreateStringIsNullOrWhiteSpaceFormula(
-                    argument,
-                    semanticModel,
-                    cancellationToken,
-                    out formula,
-                    getSymbolVersion);
-            }
-
-            var argumentTypeInfo = semanticModel.GetTypeInfo(argument, cancellationToken);
-            var argumentType = argumentTypeInfo.ConvertedType ?? argumentTypeInfo.Type;
-            if (argumentType?.SpecialType != SpecialType.System_String ||
-                !TryTranslateValue(argument, semanticModel, cancellationToken, out var argumentFormula, getSymbolVersion) ||
-                argumentFormula is not { Kind: SmtValueKind.Reference })
-            {
-                return false;
-            }
-
-            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
-            if (!TryCreateMemberFormula(argumentFormula, "Length", intType, out var lengthFormula) ||
-                lengthFormula is not { Kind: SmtValueKind.Int })
-            {
-                return false;
-            }
-
-            formula = new SmtBinaryFormula(
-                SmtBinaryOperator.Or,
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, argumentFormula, new SmtNullConstant()),
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, lengthFormula, new SmtIntegerConstant(0)));
+            formula = SubstituteVariables(returnedFormula, substitutions);
             return true;
         }
 
-        private static bool TryCreateStringIsNullOrWhiteSpaceFormula(
-            ExpressionSyntax argument,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula? formula,
-            Func<ISymbol, int>? getSymbolVersion)
+        private static bool CanInlineSourceBooleanPredicate(IMethodSymbol methodSymbol)
         {
-            formula = null;
-            var argumentTypeInfo = semanticModel.GetTypeInfo(argument, cancellationToken);
-            var argumentType = argumentTypeInfo.ConvertedType ?? argumentTypeInfo.Type;
-            if (argumentType?.SpecialType != SpecialType.System_String ||
-                !TryTranslateValue(argument, semanticModel, cancellationToken, out var argumentFormula, getSymbolVersion) ||
-                argumentFormula is not { Kind: SmtValueKind.Reference })
+            return methodSymbol is
+            {
+                ReturnsVoid: false,
+                ReturnsByRef: false,
+                ReturnsByRefReadonly: false,
+                ReturnType.SpecialType: SpecialType.System_Boolean,
+                DeclaringSyntaxReferences.Length: > 0
+            } &&
+                methodSymbol.Parameters.All(static parameter => parameter.RefKind == RefKind.None);
+        }
+
+        private static bool TryGetReturnedBooleanExpression(
+            IMethodSymbol methodSymbol,
+            Compilation compilation,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax returnedExpression,
+            out SemanticModel returnedSemanticModel)
+        {
+            returnedExpression = null!;
+            returnedSemanticModel = null!;
+
+            var callableSyntax = methodSymbol.DeclaringSyntaxReferences
+                .Select(reference => reference.GetSyntax(cancellationToken))
+                .FirstOrDefault();
+            if (callableSyntax == null ||
+                !TryGetSingleReturnedExpressionSyntax(callableSyntax, out returnedExpression))
             {
                 return false;
             }
 
-            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
-            if (!TryCreateMemberFormula(argumentFormula, "Length", intType, out var lengthFormula) ||
-                lengthFormula is not { Kind: SmtValueKind.Int })
-            {
-                return false;
-            }
-
-            var nullFormula = new SmtBinaryFormula(SmtBinaryOperator.Equal, argumentFormula, new SmtNullConstant());
-            var emptyFormula = new SmtBinaryFormula(SmtBinaryOperator.Equal, lengthFormula, new SmtIntegerConstant(0));
-            var whitespaceOnlyFormula = new SmtVariable(argumentFormula + ".IsWhiteSpaceOnly", SmtValueKind.Bool);
-
-            formula = new SmtBinaryFormula(
-                SmtBinaryOperator.Or,
-                new SmtBinaryFormula(SmtBinaryOperator.Or, nullFormula, emptyFormula),
-                whitespaceOnlyFormula);
+            returnedSemanticModel = compilation.GetSemanticModel(returnedExpression.SyntaxTree);
             return true;
         }
 
-        private static bool TryGetKnownStringPredicateInvocation(
-            InvocationExpressionSyntax invocationExpression,
+        private static bool TryGetSingleReturnedExpressionSyntax(
+            SyntaxNode callableSyntax,
+            out ExpressionSyntax returnedExpression)
+        {
+            switch (callableSyntax)
+            {
+                case MethodDeclarationSyntax methodDeclarationSyntax
+                    when methodDeclarationSyntax.ExpressionBody?.Expression != null:
+                    returnedExpression = methodDeclarationSyntax.ExpressionBody.Expression;
+                    return true;
+                case MethodDeclarationSyntax methodDeclarationSyntax
+                    when methodDeclarationSyntax.Body != null:
+                    return TryGetSingleReturnedExpressionSyntaxFromBody(methodDeclarationSyntax.Body, out returnedExpression);
+                case LocalFunctionStatementSyntax localFunctionStatementSyntax
+                    when localFunctionStatementSyntax.ExpressionBody?.Expression != null:
+                    returnedExpression = localFunctionStatementSyntax.ExpressionBody.Expression;
+                    return true;
+                case LocalFunctionStatementSyntax localFunctionStatementSyntax
+                    when localFunctionStatementSyntax.Body != null:
+                    return TryGetSingleReturnedExpressionSyntaxFromBody(localFunctionStatementSyntax.Body, out returnedExpression);
+                default:
+                    returnedExpression = null!;
+                    return false;
+            }
+        }
+
+        private static bool TryGetSingleReturnedExpressionSyntaxFromBody(
+            BlockSyntax bodySyntax,
+            out ExpressionSyntax returnedExpression)
+        {
+            if (bodySyntax.Statements.Count != 1 ||
+                bodySyntax.Statements[0] is not ReturnStatementSyntax returnStatement ||
+                returnStatement.Expression == null)
+            {
+                returnedExpression = null!;
+                return false;
+            }
+
+            returnedExpression = returnStatement.Expression!;
+            return true;
+        }
+
+        private static bool TryCreateSourcePredicateSubstitutions(
+            IInvocationOperation invocationOperation,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out IMethodSymbol methodSymbol,
-            out ExpressionSyntax argument)
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            out IReadOnlyList<SmtVariableSubstitution> substitutions)
         {
-            methodSymbol = null!;
-            argument = null!;
-            if (semanticModel.GetSymbolInfo(invocationExpression, cancellationToken).Symbol is not IMethodSymbol
+            var builder = new List<SmtVariableSubstitution>(invocationOperation.Arguments.Length);
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                var parameter = argument.Parameter;
+                if (parameter == null ||
+                    !TryGetValueKind(parameter.Type, out var parameterKind) ||
+                    argument.Value.Syntax is not ExpressionSyntax argumentExpression)
                 {
-                    IsStatic: true,
-                    ContainingType.SpecialType: SpecialType.System_String,
-                    Parameters.Length: 1
-                } candidate ||
-                invocationExpression.ArgumentList.Arguments.Count != 1 ||
-                candidate.Name is not ("IsNullOrEmpty" or "IsNullOrWhiteSpace"))
-            {
-                return false;
+                    substitutions = Array.Empty<SmtVariableSubstitution>();
+                    return false;
+                }
+
+                if (!TryTranslateValue(argumentExpression, semanticModel, cancellationToken, out var argumentFormula, getSymbolVersion, inlineDepth) ||
+                    argumentFormula == null ||
+                    argumentFormula.Kind != parameterKind)
+                {
+                    substitutions = Array.Empty<SmtVariableSubstitution>();
+                    return false;
+                }
+
+                var formalVariable = new SmtVariable(GetVariableName(parameter, getSymbolVersion: null), parameterKind);
+                builder.Add(new SmtVariableSubstitution(
+                    formalVariable.Name,
+                    formalVariable.Name + ".",
+                    formalVariable + ".",
+                    argumentFormula));
             }
 
-            methodSymbol = candidate;
-            argument = invocationExpression.ArgumentList.Arguments[0].Expression;
+            substitutions = builder;
             return true;
         }
 
-        private static bool IsKnownWhitespaceString(
-            ExpressionSyntax expression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+        private static SmtFormula SubstituteVariables(
+            SmtFormula formula,
+            IReadOnlyList<SmtVariableSubstitution> substitutions)
         {
-            expression = UnwrapExpression(expression);
-            var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
-            return constantValue is { HasValue: true, Value: string stringValue } &&
-                string.IsNullOrWhiteSpace(stringValue);
+            switch (formula)
+            {
+                case SmtVariable variable:
+                    return SubstituteVariable(variable, substitutions);
+                case SmtUnaryFormula unary:
+                    return new SmtUnaryFormula(unary.Operator, SubstituteVariables(unary.Operand, substitutions));
+                case SmtBinaryFormula binary:
+                    return new SmtBinaryFormula(
+                        binary.Operator,
+                        SubstituteVariables(binary.Left, substitutions),
+                        SubstituteVariables(binary.Right, substitutions));
+                case SmtIntegerUnaryTerm unary:
+                    return new SmtIntegerUnaryTerm(unary.Operator, SubstituteVariables(unary.Operand, substitutions));
+                case SmtIntegerBinaryTerm binary:
+                    return new SmtIntegerBinaryTerm(
+                        binary.Operator,
+                        SubstituteVariables(binary.Left, substitutions),
+                        SubstituteVariables(binary.Right, substitutions));
+                case SmtConditionalFormula conditional:
+                    return new SmtConditionalFormula(
+                        SubstituteVariables(conditional.Condition, substitutions),
+                        SubstituteVariables(conditional.WhenTrue, substitutions),
+                        SubstituteVariables(conditional.WhenFalse, substitutions),
+                        conditional.ResultKind);
+                default:
+                    return formula;
+            }
+        }
+
+        private static SmtFormula SubstituteVariable(
+            SmtVariable variable,
+            IReadOnlyList<SmtVariableSubstitution> substitutions)
+        {
+            foreach (var substitution in substitutions)
+            {
+                if (string.Equals(variable.Name, substitution.ExactName, StringComparison.Ordinal))
+                {
+                    return substitution.Replacement;
+                }
+
+                if (TrySubstituteMemberVariable(variable, substitution.SimpleMemberPrefix, substitution.Replacement, out var simpleMemberReplacement) ||
+                    TrySubstituteMemberVariable(variable, substitution.FormulaMemberPrefix, substitution.Replacement, out simpleMemberReplacement))
+                {
+                    return simpleMemberReplacement;
+                }
+            }
+
+            return variable;
+        }
+
+        private static bool TrySubstituteMemberVariable(
+            SmtVariable variable,
+            string memberPrefix,
+            SmtFormula replacement,
+            out SmtFormula substituted)
+        {
+            if (!variable.Name.StartsWith(memberPrefix, StringComparison.Ordinal))
+            {
+                substituted = null!;
+                return false;
+            }
+
+            var suffix = variable.Name.Substring(memberPrefix.Length - 1);
+            substituted = new SmtVariable(replacement + suffix, variable.Kind);
+            return true;
+        }
+
+        private sealed class SmtVariableSubstitution
+        {
+            public SmtVariableSubstitution(
+                string exactName,
+                string simpleMemberPrefix,
+                string formulaMemberPrefix,
+                SmtFormula replacement)
+            {
+                ExactName = exactName;
+                SimpleMemberPrefix = simpleMemberPrefix;
+                FormulaMemberPrefix = formulaMemberPrefix;
+                Replacement = replacement;
+            }
+
+            public string ExactName { get; }
+
+            public string SimpleMemberPrefix { get; }
+
+            public string FormulaMemberPrefix { get; }
+
+            public SmtFormula Replacement { get; }
         }
 
         public static bool TryGetKnownStringLength(
@@ -347,17 +460,6 @@ namespace PurelySharp.Analyzer.Engine.Smt
         {
             expression = UnwrapExpression(expression);
 
-            if (TryAddKnownInvocationBranchAssumptions(
-                    expression,
-                    branchWhenTrue,
-                    semanticModel,
-                    cancellationToken,
-                    formulas,
-                    getSymbolVersion))
-            {
-                return;
-            }
-
             if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
                 prefixUnary.IsKind(SyntaxKind.LogicalNotExpression))
             {
@@ -393,89 +495,16 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
         }
 
-        private static bool TryAddKnownInvocationBranchAssumptions(
-            ExpressionSyntax expression,
-            bool branchWhenTrue,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            ICollection<SmtFormula> formulas,
-            Func<ISymbol, int>? getSymbolVersion)
-        {
-            if (expression is not InvocationExpressionSyntax invocationExpression ||
-                !TryGetKnownStringPredicateInvocation(
-                    invocationExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var methodSymbol,
-                    out var argument))
-            {
-                return false;
-            }
-
-            if (TryTranslateKnownBooleanInvocation(
-                    invocationExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var constantOrExactFormula,
-                    getSymbolVersion) &&
-                constantOrExactFormula is SmtBooleanConstant booleanConstant)
-            {
-                formulas.Add(branchWhenTrue == booleanConstant.Value
-                    ? new SmtBooleanConstant(true)
-                    : new SmtBooleanConstant(false));
-                return true;
-            }
-
-            if (branchWhenTrue)
-            {
-                return false;
-            }
-
-            return TryAddKnownNonEmptyStringFacts(
-                argument,
-                semanticModel,
-                cancellationToken,
-                formulas,
-                getSymbolVersion);
-        }
-
-        private static bool TryAddKnownNonEmptyStringFacts(
-            ExpressionSyntax argument,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            ICollection<SmtFormula> formulas,
-            Func<ISymbol, int>? getSymbolVersion)
-        {
-            var argumentTypeInfo = semanticModel.GetTypeInfo(argument, cancellationToken);
-            var argumentType = argumentTypeInfo.ConvertedType ?? argumentTypeInfo.Type;
-            if (argumentType?.SpecialType != SpecialType.System_String ||
-                !TryTranslateValue(argument, semanticModel, cancellationToken, out var argumentFormula, getSymbolVersion) ||
-                argumentFormula is not { Kind: SmtValueKind.Reference })
-            {
-                return false;
-            }
-
-            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
-            if (!TryCreateMemberFormula(argumentFormula, "Length", intType, out var lengthFormula) ||
-                lengthFormula is not { Kind: SmtValueKind.Int })
-            {
-                return false;
-            }
-
-            formulas.Add(new SmtBinaryFormula(SmtBinaryOperator.NotEqual, argumentFormula, new SmtNullConstant()));
-            formulas.Add(new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, lengthFormula, new SmtIntegerConstant(0)));
-            return true;
-        }
-
         private static bool TryTranslatePatternExpression(
             IsPatternExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula? formula,
-            Func<ISymbol, int>? getSymbolVersion)
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
         {
             formula = null;
-            if (!TryTranslateValue(expression.Expression, semanticModel, cancellationToken, out var value, getSymbolVersion) ||
+            if (!TryTranslateValue(expression.Expression, semanticModel, cancellationToken, out var value, getSymbolVersion, inlineDepth) ||
                 value == null)
             {
                 return false;
@@ -483,7 +512,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
 
             var valueType = semanticModel.GetTypeInfo(expression.Expression, cancellationToken).ConvertedType ??
                 semanticModel.GetTypeInfo(expression.Expression, cancellationToken).Type;
-            return TryTranslatePattern(value, expression.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion, valueType);
+            return TryTranslatePattern(value, expression.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion, valueType, inlineDepth);
         }
 
         public static bool TryTranslatePattern(
@@ -493,13 +522,14 @@ namespace PurelySharp.Analyzer.Engine.Smt
             CancellationToken cancellationToken,
             out SmtFormula? formula,
             Func<ISymbol, int>? getSymbolVersion,
-            ITypeSymbol? valueType = null)
+            ITypeSymbol? valueType = null,
+            int inlineDepth = 0)
         {
             formula = null;
 
             if (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
             {
-                return TryTranslatePattern(value, parenthesizedPattern.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion, valueType);
+                return TryTranslatePattern(value, parenthesizedPattern.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion, valueType, inlineDepth);
             }
 
             if (pattern is DiscardPatternSyntax or VarPatternSyntax)
@@ -509,7 +539,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
             }
 
             if (pattern is ConstantPatternSyntax constantPattern &&
-                TryTranslateValue(constantPattern.Expression, semanticModel, cancellationToken, out var constantValue, getSymbolVersion) &&
+                TryTranslateValue(constantPattern.Expression, semanticModel, cancellationToken, out var constantValue, getSymbolVersion, inlineDepth) &&
                 constantValue != null &&
                 AreComparable(value, constantValue))
             {
@@ -519,7 +549,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
 
             if (pattern is UnaryPatternSyntax unaryPattern &&
                 unaryPattern.OperatorToken.IsKind(SyntaxKind.NotKeyword) &&
-                TryTranslatePattern(value, unaryPattern.Pattern, semanticModel, cancellationToken, out var negatedPattern, getSymbolVersion, valueType) &&
+                TryTranslatePattern(value, unaryPattern.Pattern, semanticModel, cancellationToken, out var negatedPattern, getSymbolVersion, valueType, inlineDepth) &&
                 negatedPattern != null)
             {
                 formula = new SmtUnaryFormula(SmtUnaryOperator.Not, negatedPattern);
@@ -527,8 +557,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
             }
 
             if (pattern is BinaryPatternSyntax binaryPattern &&
-                TryTranslatePattern(value, binaryPattern.Left, semanticModel, cancellationToken, out var leftPattern, getSymbolVersion, valueType) &&
-                TryTranslatePattern(value, binaryPattern.Right, semanticModel, cancellationToken, out var rightPattern, getSymbolVersion, valueType) &&
+                TryTranslatePattern(value, binaryPattern.Left, semanticModel, cancellationToken, out var leftPattern, getSymbolVersion, valueType, inlineDepth) &&
+                TryTranslatePattern(value, binaryPattern.Right, semanticModel, cancellationToken, out var rightPattern, getSymbolVersion, valueType, inlineDepth) &&
                 leftPattern != null &&
                 rightPattern != null)
             {
@@ -547,7 +577,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
 
             if (pattern is RelationalPatternSyntax relationalPattern &&
                 value.Kind == SmtValueKind.Int &&
-                TryTranslateValue(relationalPattern.Expression, semanticModel, cancellationToken, out var relationalValue, getSymbolVersion) &&
+                TryTranslateValue(relationalPattern.Expression, semanticModel, cancellationToken, out var relationalValue, getSymbolVersion, inlineDepth) &&
                 relationalValue is { Kind: SmtValueKind.Int })
             {
                 switch (relationalPattern.OperatorToken.Kind())
@@ -569,7 +599,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
 
             if (pattern is RecursivePatternSyntax recursivePattern)
             {
-                return TryTranslateRecursivePattern(value, recursivePattern, semanticModel, cancellationToken, out formula, getSymbolVersion);
+                return TryTranslateRecursivePattern(value, recursivePattern, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth);
             }
 
             if (pattern is ListPatternSyntax listPattern)
@@ -597,7 +627,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula? formula,
-            Func<ISymbol, int>? getSymbolVersion)
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
         {
             formula = null;
             SmtFormula? current = value.Kind == SmtValueKind.Reference
@@ -613,7 +644,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
 
             foreach (var subpattern in subpatterns.Value)
             {
-                if (!TryTranslatePropertySubpattern(value, subpattern, semanticModel, cancellationToken, out var subpatternFormula, getSymbolVersion) ||
+                if (!TryTranslatePropertySubpattern(value, subpattern, semanticModel, cancellationToken, out var subpatternFormula, getSymbolVersion, inlineDepth) ||
                     subpatternFormula == null)
                 {
                     return false;
@@ -634,7 +665,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula? formula,
-            Func<ISymbol, int>? getSymbolVersion)
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
         {
             formula = null;
             if (subpattern.NameColon?.Name == null)
@@ -650,7 +682,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 return false;
             }
 
-            return TryTranslatePattern(memberValue, subpattern.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion, memberType);
+            return TryTranslatePattern(memberValue, subpattern.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion, memberType, inlineDepth);
         }
 
         private static bool TryTranslateListPattern(
@@ -824,7 +856,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula? formula,
-            Func<ISymbol, int>? getSymbolVersion)
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth = 0)
         {
             expression = UnwrapExpression(expression);
             formula = null;
@@ -852,11 +885,11 @@ namespace PurelySharp.Analyzer.Engine.Smt
             }
 
             if (expression is ConditionalExpressionSyntax conditionalExpression &&
-                TryTranslate(conditionalExpression.Condition, semanticModel, cancellationToken, out var conditionFormula, getSymbolVersion) &&
+                TryTranslate(conditionalExpression.Condition, semanticModel, cancellationToken, out var conditionFormula, getSymbolVersion, inlineDepth) &&
                 conditionFormula != null &&
-                TryTranslateValue(conditionalExpression.WhenTrue, semanticModel, cancellationToken, out var whenTrueFormula, getSymbolVersion) &&
+                TryTranslateValue(conditionalExpression.WhenTrue, semanticModel, cancellationToken, out var whenTrueFormula, getSymbolVersion, inlineDepth) &&
                 whenTrueFormula != null &&
-                TryTranslateValue(conditionalExpression.WhenFalse, semanticModel, cancellationToken, out var whenFalseFormula, getSymbolVersion) &&
+                TryTranslateValue(conditionalExpression.WhenFalse, semanticModel, cancellationToken, out var whenFalseFormula, getSymbolVersion, inlineDepth) &&
                 whenFalseFormula != null &&
                 whenTrueFormula.Kind == whenFalseFormula.Kind)
             {
@@ -866,9 +899,9 @@ namespace PurelySharp.Analyzer.Engine.Smt
 
             if (expression is BinaryExpressionSyntax coalesceExpression &&
                 coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
-                TryTranslateValue(coalesceExpression.Left, semanticModel, cancellationToken, out var coalesceLeft, getSymbolVersion) &&
+                TryTranslateValue(coalesceExpression.Left, semanticModel, cancellationToken, out var coalesceLeft, getSymbolVersion, inlineDepth) &&
                 coalesceLeft is { Kind: SmtValueKind.Reference } &&
-                TryTranslateValue(coalesceExpression.Right, semanticModel, cancellationToken, out var coalesceRight, getSymbolVersion) &&
+                TryTranslateValue(coalesceExpression.Right, semanticModel, cancellationToken, out var coalesceRight, getSymbolVersion, inlineDepth) &&
                 coalesceRight is { Kind: SmtValueKind.Reference })
             {
                 formula = new SmtConditionalFormula(
@@ -879,7 +912,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 return true;
             }
 
-            if (TryTranslateIntegralTerm(expression, semanticModel, cancellationToken, out formula, getSymbolVersion))
+            if (TryTranslateIntegralTerm(expression, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth))
             {
                 return true;
             }
@@ -887,7 +920,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
             var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
             if (symbol is not ILocalSymbol && symbol is not IParameterSymbol)
             {
-                return TryTranslateMemberValue(expression, semanticModel, cancellationToken, out formula, getSymbolVersion);
+                return TryTranslateMemberValue(expression, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth);
             }
 
             var type = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
@@ -922,7 +955,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula? formula,
-            Func<ISymbol, int>? getSymbolVersion)
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
         {
             formula = null;
             if (!HasSupportedIntegralType(expression, semanticModel, cancellationToken))
@@ -934,12 +968,12 @@ namespace PurelySharp.Analyzer.Engine.Smt
             {
                 if (prefixUnary.IsKind(SyntaxKind.UnaryPlusExpression))
                 {
-                    return TryTranslateValue(prefixUnary.Operand, semanticModel, cancellationToken, out formula, getSymbolVersion) &&
+                    return TryTranslateValue(prefixUnary.Operand, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth) &&
                         formula is { Kind: SmtValueKind.Int };
                 }
 
                 if (prefixUnary.IsKind(SyntaxKind.UnaryMinusExpression) &&
-                    TryTranslateValue(prefixUnary.Operand, semanticModel, cancellationToken, out var operand, getSymbolVersion) &&
+                    TryTranslateValue(prefixUnary.Operand, semanticModel, cancellationToken, out var operand, getSymbolVersion, inlineDepth) &&
                     operand is { Kind: SmtValueKind.Int })
                 {
                     formula = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operand);
@@ -950,8 +984,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
             if (expression is BinaryExpressionSyntax binaryExpression)
             {
                 if (binaryExpression.IsKind(SyntaxKind.AddExpression) &&
-                    TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var addLeft, getSymbolVersion) &&
-                    TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var addRight, getSymbolVersion) &&
+                    TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var addLeft, getSymbolVersion, inlineDepth) &&
+                    TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var addRight, getSymbolVersion, inlineDepth) &&
                     addLeft is { Kind: SmtValueKind.Int } &&
                     addRight is { Kind: SmtValueKind.Int })
                 {
@@ -960,8 +994,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 }
 
                 if (binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
-                    TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var subtractLeft, getSymbolVersion) &&
-                    TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var subtractRight, getSymbolVersion) &&
+                    TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var subtractLeft, getSymbolVersion, inlineDepth) &&
+                    TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var subtractRight, getSymbolVersion, inlineDepth) &&
                     subtractLeft is { Kind: SmtValueKind.Int } &&
                     subtractRight is { Kind: SmtValueKind.Int })
                 {
@@ -970,8 +1004,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 }
 
                 if (binaryExpression.IsKind(SyntaxKind.MultiplyExpression) &&
-                    TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var multiplyLeft, getSymbolVersion) &&
-                    TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var multiplyRight, getSymbolVersion) &&
+                    TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var multiplyLeft, getSymbolVersion, inlineDepth) &&
+                    TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var multiplyRight, getSymbolVersion, inlineDepth) &&
                     multiplyLeft is { Kind: SmtValueKind.Int } &&
                     multiplyRight is { Kind: SmtValueKind.Int } &&
                     (multiplyLeft is SmtIntegerConstant || multiplyRight is SmtIntegerConstant))
@@ -989,7 +1023,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula? formula,
-            Func<ISymbol, int>? getSymbolVersion)
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
         {
             formula = null;
             if (expression is not MemberAccessExpressionSyntax memberAccess)
@@ -1010,7 +1045,7 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 return true;
             }
 
-            if (!TryTranslateValue(memberAccess.Expression, semanticModel, cancellationToken, out var receiver, getSymbolVersion) ||
+            if (!TryTranslateValue(memberAccess.Expression, semanticModel, cancellationToken, out var receiver, getSymbolVersion, inlineDepth) ||
                 receiver == null)
             {
                 return false;
@@ -1051,6 +1086,30 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 return true;
             }
 
+            return false;
+        }
+
+        private static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)
+        {
+            if (type.SpecialType == SpecialType.System_Boolean)
+            {
+                kind = SmtValueKind.Bool;
+                return true;
+            }
+
+            if (IsIntegralType(type))
+            {
+                kind = SmtValueKind.Int;
+                return true;
+            }
+
+            if (type.IsReferenceType)
+            {
+                kind = SmtValueKind.Reference;
+                return true;
+            }
+
+            kind = default;
             return false;
         }
 

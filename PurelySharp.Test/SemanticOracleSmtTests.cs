@@ -11,6 +11,25 @@ namespace PurelySharp.Test
     [TestFixture]
     public class SemanticOracleSmtTests
     {
+        private const string SourcePredicateSource = @"
+public static class SourcePredicates
+{
+    public static bool IsNullOrEmptyLike(string value)
+    {
+        return value == null || value.Length == 0;
+    }
+
+    public static bool HasText(string value) => value != null && value.Length > 0;
+
+    public static bool InRange(int value)
+    {
+        return value >= 10 && value <= 20;
+    }
+
+    public static bool IsPositive(int value) => value > 0;
+}
+";
+
         [Test]
         public void Oracle_ContradictoryIntegerCondition_IsUnsatisfiable()
         {
@@ -202,42 +221,66 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void ExecutionVisibility_StringIsNullOrEmptyTrueBranchLengthContradiction_IsAlwaysFalse()
+        public void ExecutionVisibility_SourceNullOrEmptyPredicateTrueBranchLengthContradiction_IsAlwaysFalse()
         {
             Assert.That(
-                IsConditionAlwaysFalse("string text", "string.IsNullOrEmpty(text) && text != null && text.Length > 0"),
+                IsConditionAlwaysFalse("string text", "SourcePredicates.IsNullOrEmptyLike(text) && text != null && text.Length > 0", SourcePredicateSource),
                 Is.True);
         }
 
         [Test]
-        public void ExecutionVisibility_StringIsNullOrEmptyFalseBranchLengthContradiction_IsAlwaysFalse()
+        public void ExecutionVisibility_SourceNullOrEmptyPredicateFalseBranchLengthContradiction_IsAlwaysFalse()
         {
             Assert.That(
-                IsConditionAlwaysFalse("string text", "!string.IsNullOrEmpty(text) && text.Length <= 0"),
+                IsConditionAlwaysFalse("string text", "!SourcePredicates.IsNullOrEmptyLike(text) && text.Length <= 0", SourcePredicateSource),
                 Is.True);
         }
 
         [Test]
-        public void ExecutionVisibility_StringIsNullOrEmptyEmptyLiteral_IsAlwaysTrue()
+        public void ExecutionVisibility_SourceRangePredicateContradiction_IsAlwaysFalse()
         {
             Assert.That(
-                IsConditionAlwaysTrue("", "string.IsNullOrEmpty(\"\")"),
+                IsConditionAlwaysFalse("int value", "SourcePredicates.InRange(value) && (value < 10 || value > 20)", SourcePredicateSource),
                 Is.True);
         }
 
         [Test]
-        public void ExecutionVisibility_StringIsNullOrEmptyNonEmptyLiteral_IsAlwaysFalse()
+        public void ExecutionVisibility_SourcePositivePredicateArgumentExpression_IsAlwaysFalse()
         {
             Assert.That(
-                IsConditionAlwaysFalse("", "string.IsNullOrEmpty(\"abc\")"),
+                IsConditionAlwaysFalse("int value", "SourcePredicates.IsPositive(value + 1) && value < -1", SourcePredicateSource),
                 Is.True);
         }
 
         [Test]
-        public void ExecutionVisibility_StringIsNullOrEmptyStringEmpty_IsAlwaysTrue()
+        public void ExecutionVisibility_SourcePositivePredicateReachable_RemainsUnknown()
         {
             Assert.That(
-                IsConditionAlwaysTrue("", "string.IsNullOrEmpty(string.Empty)"),
+                IsConditionAlwaysFalse("int value", "SourcePredicates.IsPositive(value) && value > 10", SourcePredicateSource),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_SourceRangePredicateConstant_IsAlwaysTrue()
+        {
+            Assert.That(
+                IsConditionAlwaysTrue("", "SourcePredicates.InRange(15)", SourcePredicateSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_SourceHasTextPredicateNullContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "SourcePredicates.HasText(text) && text == null", SourcePredicateSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_SourceHasTextPredicateLengthContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "SourcePredicates.HasText(text) && text.Length <= 0", SourcePredicateSource),
                 Is.True);
         }
 
@@ -258,51 +301,27 @@ namespace PurelySharp.Test
         }
 
         [Test]
-        public void ExecutionVisibility_StringIsNullOrWhiteSpaceFalseBranchLengthContradiction_IsAlwaysFalse()
+        public void ExecutionVisibility_SourceNullOrEmptyPredicateNestedInNegation_IsAlwaysFalse()
         {
             Assert.That(
-                IsConditionAlwaysFalse("string text", "!string.IsNullOrWhiteSpace(text) && text.Length <= 0"),
+                IsConditionAlwaysFalse("string text", "!(SourcePredicates.IsNullOrEmptyLike(text)) && text.Length <= 0", SourcePredicateSource),
                 Is.True);
         }
 
         [Test]
-        public void ExecutionVisibility_StringIsNullOrWhiteSpaceFalseBranchNullContradiction_IsAlwaysFalse()
+        public void ExecutionVisibility_SourceHasTextPredicateInOrFalseBranch_IsAlwaysFalse()
         {
             Assert.That(
-                IsConditionAlwaysFalse("string text", "!string.IsNullOrWhiteSpace(text) && text == null"),
+                IsConditionAlwaysFalse("string text", "!(SourcePredicates.HasText(text) || false) && text.Length > 0 && text != null", SourcePredicateSource),
                 Is.True);
         }
 
         [Test]
-        public void ExecutionVisibility_StringIsNullOrWhiteSpaceTrueBranchPositiveLength_RemainsUnknown()
+        public void ExecutionVisibility_SourceNullOrEmptyPredicateReachable_RemainsUnknown()
         {
             Assert.That(
-                IsConditionAlwaysFalse("string text", "string.IsNullOrWhiteSpace(text) && text != null && text.Length > 0"),
+                IsConditionAlwaysFalse("string text", "SourcePredicates.IsNullOrEmptyLike(text) && text != null && text.Length == 0", SourcePredicateSource),
                 Is.False);
-        }
-
-        [Test]
-        public void ExecutionVisibility_StringIsNullOrWhiteSpaceWhitespaceLiteral_IsAlwaysTrue()
-        {
-            Assert.That(
-                IsConditionAlwaysTrue("", "string.IsNullOrWhiteSpace(\"   \")"),
-                Is.True);
-        }
-
-        [Test]
-        public void ExecutionVisibility_StringIsNullOrWhiteSpaceNonWhitespaceLiteral_IsAlwaysFalse()
-        {
-            Assert.That(
-                IsConditionAlwaysFalse("", "string.IsNullOrWhiteSpace(\"abc\")"),
-                Is.True);
-        }
-
-        [Test]
-        public void ExecutionVisibility_StringIsNullOrWhiteSpaceStringEmpty_IsAlwaysTrue()
-        {
-            Assert.That(
-                IsConditionAlwaysTrue("", "string.IsNullOrWhiteSpace(string.Empty)"),
-                Is.True);
         }
 
         [Test]
@@ -1216,7 +1235,127 @@ public class TestClass
         }
 
         [Test]
-        public async Task Ps0002_StringIsNullOrEmptyTrueBranchContradictoryImpureCall_DoesNotReport()
+        public async Task Ps0002_SourceNullOrEmptyPredicateTrueBranchContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (SourcePredicates.IsNullOrEmptyLike(text) && text != null && text.Length > 0)
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_SourceNullOrEmptyPredicateFalseBranchContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (!SourcePredicates.IsNullOrEmptyLike(text) && text.Length <= 0)
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_SourceNullOrEmptyPredicateReachableImpureCall_Reports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (SourcePredicates.IsNullOrEmptyLike(text))
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
+        }
+
+        [Test]
+        public async Task Ps0002_SourceHasTextPredicateLengthContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (SourcePredicates.HasText(text) && text.Length <= 0)
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_SourceHasTextPredicateNullContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (SourcePredicates.HasText(text) && text == null)
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_MetadataStringPredicateContradictoryBranch_RemainsConservativeReports()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
@@ -1228,116 +1367,6 @@ public class TestClass
     public void TestMethod(string text)
     {
         if (string.IsNullOrEmpty(text) && text != null && text.Length > 0)
-        {
-            Console.WriteLine(text);
-        }
-    }
-}");
-
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
-        }
-
-        [Test]
-        public async Task Ps0002_StringIsNullOrEmptyFalseBranchContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
-using System;
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void TestMethod(string text)
-    {
-        if (!string.IsNullOrEmpty(text) && text.Length <= 0)
-        {
-            Console.WriteLine(text);
-        }
-    }
-}");
-
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
-        }
-
-        [Test]
-        public async Task Ps0002_StringIsNullOrEmptyReachableImpureCall_Reports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
-using System;
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void TestMethod(string text)
-    {
-        if (string.IsNullOrEmpty(text))
-        {
-            Console.WriteLine(text);
-        }
-    }
-}");
-
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
-        }
-
-        [Test]
-        public async Task Ps0002_StringIsNullOrWhiteSpaceFalseBranchContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
-using System;
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void TestMethod(string text)
-    {
-        if (!string.IsNullOrWhiteSpace(text) && text.Length <= 0)
-        {
-            Console.WriteLine(text);
-        }
-    }
-}");
-
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
-        }
-
-        [Test]
-        public async Task Ps0002_StringIsNullOrWhiteSpaceFalseBranchNullContradictoryImpureCall_DoesNotReport()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
-using System;
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void TestMethod(string text)
-    {
-        if (!string.IsNullOrWhiteSpace(text) && text == null)
-        {
-            Console.WriteLine(text);
-        }
-    }
-}");
-
-            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
-        }
-
-        [Test]
-        public async Task Ps0002_StringIsNullOrWhiteSpaceTrueBranchPositiveLength_RemainsConservativeReports()
-        {
-            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
-using System;
-using PurelySharp.Attributes;
-
-public class TestClass
-{
-    [EnforcePure]
-    public void TestMethod(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text) && text != null && text.Length > 0)
         {
             Console.WriteLine(text);
         }
@@ -2172,9 +2201,9 @@ public class TestClass
             return (bool)method.Invoke(null, new object?[] { context.Expression, context.SemanticModel, CancellationToken.None })!;
         }
 
-        private static bool IsConditionAlwaysTrue(string parameterList, string conditionExpression)
+        private static bool IsConditionAlwaysTrue(string parameterList, string conditionExpression, string extraSource = "")
         {
-            var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression);
+            var context = AnalyzerTestHost.CreateConditionContext(parameterList, conditionExpression, extraSource);
             var method = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly
                 .GetType("PurelySharp.Analyzer.Engine.ExecutionVisibility", throwOnError: true)!
                 .GetMethod("IsConditionAlwaysTrue", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;

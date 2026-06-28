@@ -1076,6 +1076,14 @@ internal static class PurityClassificationEngine
         {
             effectVisibilityClassification = "none";
         }
+        else if (HasPureCharScalarProjectionWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "none";
+        }
+        else if (HasPureGuardedStringCharScanWrapperPattern(summary))
+        {
+            effectVisibilityClassification = "none";
+        }
         else if (HasPureStringHashWrapperPattern(summary))
         {
             effectVisibilityClassification = "none";
@@ -1389,6 +1397,44 @@ internal static class PurityClassificationEngine
             summary.Calls.All(IsStringArrayConcatWrapperCall);
     }
 
+    private static bool HasPureCharScalarProjectionWrapperPattern(MethodEffectSummary summary)
+    {
+        if (!IsCharScalarProjectionSymbol(summary.ExactSymbolKey) ||
+            summary.Fields.Length != 0 ||
+            !CallsOnly(summary, "calls_method") ||
+            !RootsAreSemanticallyPureWrapperCompatible(summary))
+        {
+            return false;
+        }
+
+        var callSites = EnumerateCallSites(summary).ToArray();
+        return callSites.Length != 0 &&
+            callSites.All(static callSite =>
+                !callSite.UsesDynamicDispatch &&
+                IsCharScalarProjectionCall(callSite.ExactSymbolKey));
+    }
+
+    private static bool HasPureGuardedStringCharScanWrapperPattern(MethodEffectSummary summary)
+    {
+        if (!summary.ExactSymbolKey.EndsWith(")->bool", StringComparison.Ordinal) ||
+            summary.Fields.Length != 0 ||
+            !CallsOnly(summary, "calls_method") ||
+            !RootsAreSemanticallyPureWrapperCompatible(summary))
+        {
+            return false;
+        }
+
+        var callSites = EnumerateCallSites(summary).ToArray();
+        return callSites.Any(static callSite => IsStringLengthCall(callSite.ExactSymbolKey)) &&
+            callSites.Any(static callSite => IsStringGetCharsCall(callSite.ExactSymbolKey)) &&
+            callSites.Any(static callSite => IsCharScalarProjectionCall(callSite.ExactSymbolKey)) &&
+            callSites.All(static callSite =>
+                !callSite.UsesDynamicDispatch &&
+                (IsStringLengthCall(callSite.ExactSymbolKey) ||
+                 IsStringGetCharsCall(callSite.ExactSymbolKey) ||
+                 IsCharScalarProjectionCall(callSite.ExactSymbolKey)));
+    }
+
     private static bool HasPureGuardedImmutableStringRewriteWrapperPattern(MethodEffectSummary summary)
     {
         return summary.ExactSymbolKey.EndsWith(")->string", StringComparison.Ordinal) &&
@@ -1422,6 +1468,98 @@ internal static class PurityClassificationEngine
         return summary.RootCandidates.All(static root =>
             string.Equals(root, "safe_static_cache_read", StringComparison.Ordinal) ||
             string.Equals(root, "safe_static_constant_read", StringComparison.Ordinal));
+    }
+
+    private static bool IsCharScalarProjectionCall(string exactSymbolKey)
+    {
+        return IsCharScalarProjectionSymbol(exactSymbolKey) ||
+            IsCharScalarTableProjectionCall(exactSymbolKey) ||
+            IsScalarValueHelperCall(exactSymbolKey, "System.Globalization.CharUnicodeInfo") ||
+            IsScalarValueHelperCall(exactSymbolKey, "System.Globalization.TextInfo");
+    }
+
+    private static bool IsCharScalarTableProjectionCall(string exactSymbolKey)
+    {
+        return string.Equals(
+                exactSymbolKey,
+                "System.ReadOnlySpan`1<byte>.get_Item(int)->ref !0",
+                StringComparison.Ordinal) ||
+            (exactSymbolKey.StartsWith("char.get_", StringComparison.Ordinal) ||
+             exactSymbolKey.StartsWith("System.Char.get_", StringComparison.Ordinal)) &&
+            exactSymbolKey.EndsWith(")->System.ReadOnlySpan`1<byte>", StringComparison.Ordinal);
+    }
+
+    private static bool IsStringLengthCall(string exactSymbolKey)
+    {
+        return string.Equals(exactSymbolKey, "string.get_Length()->int", StringComparison.Ordinal) ||
+            string.Equals(exactSymbolKey, "System.String.get_Length()->int", StringComparison.Ordinal);
+    }
+
+    private static bool IsStringGetCharsCall(string exactSymbolKey)
+    {
+        return string.Equals(exactSymbolKey, "string.get_Chars(int)->char", StringComparison.Ordinal) ||
+            string.Equals(exactSymbolKey, "System.String.get_Chars(int)->char", StringComparison.Ordinal);
+    }
+
+    private static bool IsCharScalarProjectionSymbol(string exactSymbolKey)
+    {
+        return (IsScalarValueHelperCall(exactSymbolKey, "char") ||
+                IsScalarValueHelperCall(exactSymbolKey, "System.Char")) &&
+            HasOnlyCharScalarArguments(exactSymbolKey);
+    }
+
+    private static bool IsScalarValueHelperCall(string exactSymbolKey, string declaringType)
+    {
+        var openParenIndex = exactSymbolKey.IndexOf('(');
+        if (openParenIndex <= declaringType.Length ||
+            !exactSymbolKey.StartsWith(declaringType + ".", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var returnSeparatorIndex = exactSymbolKey.LastIndexOf(")->", StringComparison.Ordinal);
+        return returnSeparatorIndex >= 0 &&
+            IsScalarValueReturnType(exactSymbolKey.Substring(returnSeparatorIndex + 3));
+    }
+
+    private static bool IsScalarValueReturnType(string returnType)
+    {
+        return string.Equals(returnType, "bool", StringComparison.Ordinal) ||
+            string.Equals(returnType, "byte", StringComparison.Ordinal) ||
+            string.Equals(returnType, "char", StringComparison.Ordinal) ||
+            string.Equals(returnType, "double", StringComparison.Ordinal) ||
+            string.Equals(returnType, "int", StringComparison.Ordinal) ||
+            string.Equals(returnType, "uint", StringComparison.Ordinal) ||
+            string.Equals(returnType, "System.Globalization.UnicodeCategory", StringComparison.Ordinal);
+    }
+
+    private static bool HasOnlyCharScalarArguments(string exactSymbolKey)
+    {
+        var openParenIndex = exactSymbolKey.IndexOf('(');
+        var returnSeparatorIndex = exactSymbolKey.LastIndexOf(")->", StringComparison.Ordinal);
+        if (openParenIndex < 0 || returnSeparatorIndex < openParenIndex)
+        {
+            return false;
+        }
+
+        var argumentList = exactSymbolKey.Substring(openParenIndex + 1, returnSeparatorIndex - openParenIndex - 1);
+        if (argumentList.Length == 0)
+        {
+            return true;
+        }
+
+        foreach (var argument in argumentList.Split(','))
+        {
+            var trimmedArgument = argument.Trim();
+            if (!string.Equals(trimmedArgument, "char", StringComparison.Ordinal) &&
+                !string.Equals(trimmedArgument, "int", StringComparison.Ordinal) &&
+                !string.Equals(trimmedArgument, "uint", StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool RootsAreArrayBackedByRefLikeViewWrapperCompatible(MethodEffectSummary summary)
