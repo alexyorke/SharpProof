@@ -726,6 +726,14 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_ArrayNestedSliceListPatternContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int[] values", "values is [.. [_, _]] && values.Length < 2"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_StringListPatternExactLengthContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -2589,6 +2597,26 @@ public class TestClass
         if (values is [0, ..])
         {
             return values[0];
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_NestedSliceListPatternIndex_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values is [.. [_, _]])
+        {
+            return values[1];
         }
 
         return 0;

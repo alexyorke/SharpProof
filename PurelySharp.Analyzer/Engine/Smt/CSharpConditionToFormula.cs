@@ -835,8 +835,13 @@ namespace PurelySharp.Analyzer.Engine.Smt
             var minimumLength = 0;
             foreach (var subpattern in listPattern.Patterns)
             {
-                if (subpattern is SlicePatternSyntax)
+                if (subpattern is SlicePatternSyntax slicePattern)
                 {
+                    if (TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
+                    {
+                        minimumLength += GetListPatternMinimumLength(nestedListPattern);
+                    }
+
                     hasSlice = true;
                     continue;
                 }
@@ -860,6 +865,44 @@ namespace PurelySharp.Analyzer.Engine.Smt
 
             formula = new SmtBinaryFormula(SmtBinaryOperator.And, nonNullFormula, lengthFormulaCondition);
             return true;
+        }
+
+        private static int GetListPatternMinimumLength(ListPatternSyntax listPattern)
+        {
+            var minimumLength = 0;
+            foreach (var subpattern in listPattern.Patterns)
+            {
+                if (subpattern is SlicePatternSyntax slicePattern)
+                {
+                    if (TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
+                    {
+                        minimumLength += GetListPatternMinimumLength(nestedListPattern);
+                    }
+
+                    continue;
+                }
+
+                minimumLength++;
+            }
+
+            return minimumLength;
+        }
+
+        private static bool TryGetNestedListPattern(PatternSyntax? pattern, out ListPatternSyntax listPattern)
+        {
+            while (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
+            {
+                pattern = parenthesizedPattern.Pattern;
+            }
+
+            if (pattern is ListPatternSyntax candidate)
+            {
+                listPattern = candidate;
+                return true;
+            }
+
+            listPattern = null!;
+            return false;
         }
 
         private static bool IsSupportedBuiltInListPatternReceiver(ITypeSymbol? valueType)
