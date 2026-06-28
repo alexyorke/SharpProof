@@ -83,6 +83,62 @@ namespace PurelySharp.Analyzer.Engine.Smt
             return false;
         }
 
+        public static bool TryCollectBranchAssumptions(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas)
+        {
+            var originalCount = formulas.Count;
+            AddBranchAssumptions(expression, branchWhenTrue, semanticModel, cancellationToken, formulas);
+            return formulas.Count > originalCount;
+        }
+
+        private static void AddBranchAssumptions(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas)
+        {
+            expression = UnwrapExpression(expression);
+
+            if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
+                prefixUnary.IsKind(SyntaxKind.LogicalNotExpression))
+            {
+                AddBranchAssumptions(prefixUnary.Operand, !branchWhenTrue, semanticModel, cancellationToken, formulas);
+                return;
+            }
+
+            if (expression is BinaryExpressionSyntax binaryExpression)
+            {
+                if (branchWhenTrue && binaryExpression.IsKind(SyntaxKind.LogicalAndExpression))
+                {
+                    AddBranchAssumptions(binaryExpression.Left, branchWhenTrue: true, semanticModel, cancellationToken, formulas);
+                    AddBranchAssumptions(binaryExpression.Right, branchWhenTrue: true, semanticModel, cancellationToken, formulas);
+                    return;
+                }
+
+                if (!branchWhenTrue && binaryExpression.IsKind(SyntaxKind.LogicalOrExpression))
+                {
+                    AddBranchAssumptions(binaryExpression.Left, branchWhenTrue: false, semanticModel, cancellationToken, formulas);
+                    AddBranchAssumptions(binaryExpression.Right, branchWhenTrue: false, semanticModel, cancellationToken, formulas);
+                    return;
+                }
+            }
+
+            if (!TryTranslate(expression, semanticModel, cancellationToken, out var formula) ||
+                formula == null)
+            {
+                return;
+            }
+
+            formulas.Add(branchWhenTrue
+                ? formula
+                : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
+        }
+
         private static bool TryTranslatePatternExpression(
             IsPatternExpressionSyntax expression,
             SemanticModel semanticModel,

@@ -2140,31 +2140,71 @@ namespace PurelySharp.Analyzer.Engine
                 return true;
             }
 
-            if (!TryTranslateBranchValueToFormula(branchValue, currentState, out var formula) &&
-                (!CSharpConditionToFormula.TryTranslate(expressionSyntax, semanticModel, CancellationToken.None, out formula) ||
-                 formula == null))
+            var nextPathConditionsBuilder = currentState.PathConditions.ToBuilder();
+            var addedBranchAssumptions = CSharpConditionToFormula.TryCollectBranchAssumptions(
+                expressionSyntax,
+                takeConditionalSuccessor,
+                semanticModel,
+                CancellationToken.None,
+                nextPathConditionsBuilder);
+
+            SmtFormula branchFormula;
+            if (TryTranslateBranchValueToFormula(branchValue, currentState, out var operationFormula) &&
+                operationFormula != null)
             {
+                branchFormula = operationFormula;
+            }
+            else if (CSharpConditionToFormula.TryTranslate(expressionSyntax, semanticModel, CancellationToken.None, out var syntaxFormula) &&
+                     syntaxFormula != null)
+            {
+                branchFormula = syntaxFormula;
+            }
+            else
+            {
+                if (addedBranchAssumptions)
+                {
+                    var partialPathConditions = nextPathConditionsBuilder.ToImmutable();
+                    if (ArePathConditionsUnsatisfiable(currentState, partialPathConditions))
+                    {
+                        return false;
+                    }
+
+                    successorState = currentState.WithPathConditions(partialPathConditions);
+                }
+
                 return true;
             }
 
             var edgeFormula = takeConditionalSuccessor
-                ? formula
-                : new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
-            var nextPathConditions = currentState.PathConditions.Add(edgeFormula);
-            var proofPathConditions = AppendDefinitelyNullFacts(currentState, currentState.PathConditions);
-            var branchQuery = new PurityProofQuery(
-                proofPathConditions,
-                new PurityHazard(PurityHazardKind.BranchReachability, edgeFormula));
+                ? branchFormula
+                : new SmtUnaryFormula(SmtUnaryOperator.Not, branchFormula);
+            if (!addedBranchAssumptions)
+            {
+                nextPathConditionsBuilder.Add(edgeFormula);
+            }
 
-            using var search = new PurityProofSearch();
-            var proofResult = search.Classify(branchQuery, SmtTimeout);
-            if (proofResult.Outcome == PurityProofOutcome.ProvablyPure)
+            var nextPathConditions = nextPathConditionsBuilder.ToImmutable();
+            if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions))
             {
                 return false;
             }
 
             successorState = currentState.WithPathConditions(nextPathConditions);
             return true;
+        }
+
+        private static bool ArePathConditionsUnsatisfiable(
+            PurityAnalysisState currentState,
+            ImmutableArray<SmtFormula> pathConditions)
+        {
+            var proofPathConditions = AppendDefinitelyNullFacts(currentState, pathConditions);
+            var query = new PurityProofQuery(
+                proofPathConditions,
+                new PurityHazard(PurityHazardKind.BranchReachability, new SmtBooleanConstant(true)));
+
+            using var search = new PurityProofSearch();
+            var proofResult = search.Classify(query, SmtTimeout);
+            return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
         }
 
         private static bool TryTranslateBranchValueToFormula(

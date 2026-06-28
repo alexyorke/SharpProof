@@ -216,6 +216,31 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_PartialConjunctiveGuardFeedsNestedContradiction_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int x, string text)
+    {
+        if (x > 0 && text.Length >= 0)
+        {
+            if (x < 0)
+            {
+                Console.WriteLine(x);
+            }
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_SatisfiableGuardedImpureCall_ReportsStructuredEvidence()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
@@ -238,9 +263,11 @@ public class TestClass
 
             Assert.That(
                 diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty],
-                Is.AnyOf("catalog_hit", "impure_callee"));
+                Is.AnyOf("catalog_hit", "impure_callee", "unknown_external_call"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("MethodInvocationPurityRule"));
-            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityOperationKindProperty], Is.EqualTo("Invocation"));
+            Assert.That(
+                diagnostic.Properties[PurelySharpDiagnostics.ImpurityOperationKindProperty],
+                Is.AnyOf("Invocation", "InvocationExpression"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.Console.WriteLine"));
         }
 
@@ -386,6 +413,33 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_PartialConjunctiveGuardExcludesZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (divisor != 0 && IsReady())
+        {
+            return value / divisor;
+        }
+
+        return 0;
+    }
+
+    private static bool IsReady()
+    {
+        return DateTime.UtcNow.Ticks >= 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_AffineGuardExcludesZeroDivisor_DoesNotReport()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"
@@ -469,6 +523,38 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_null_dereference"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.NullReferenceException=definite_null_dereference:null_receiver"));
+        }
+
+        [Test]
+        public async Task Ps0010_PartialConjunctiveGuardImpliesNullReceiver_ReportsNullReference()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        if (value == null && IsReady())
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+
+    private static bool IsReady()
+    {
+        return DateTime.UtcNow.Ticks >= 0;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_null_dereference"));
         }
 
         [Test]

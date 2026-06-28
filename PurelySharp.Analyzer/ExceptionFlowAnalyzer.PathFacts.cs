@@ -283,18 +283,12 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             ICollection<SmtFormula> pathConditions)
         {
-            if (!CSharpConditionToFormula.TryTranslate(condition, semanticModel, cancellationToken, out var formula) ||
-                formula == null)
-            {
-                return;
-            }
-
-            if (!branchWhenTrue)
-            {
-                formula = new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
-            }
-
-            pathConditions.Add(formula);
+            CSharpConditionToFormula.TryCollectBranchAssumptions(
+                condition,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                pathConditions);
         }
 
         private static bool PathConditionsImplyFact(
