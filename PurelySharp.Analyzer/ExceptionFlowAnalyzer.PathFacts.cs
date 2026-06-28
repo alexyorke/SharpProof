@@ -456,16 +456,51 @@ namespace PurelySharp.Analyzer
             if (statement is ExpressionStatementSyntax expressionStatement &&
                 expressionStatement.Expression is AssignmentExpressionSyntax assignment)
             {
+                SmtFormula? previousAssignedValue = null;
+                if (TryGetMutatedLocalOrParameterSymbol(assignment, semanticModel, cancellationToken, out var assignedSymbol))
+                {
+                    TryGetCurrentSymbolValue(facts, assignedSymbol, out previousAssignedValue);
+                }
+
                 RemoveFactsInvalidatedByNestedMutations(assignment.Left, semanticModel, cancellationToken, facts);
                 RemoveFactsInvalidatedByNestedMutations(assignment.Right, semanticModel, cancellationToken, facts);
 
-                if (TryGetMutatedLocalOrParameterSymbol(assignment, semanticModel, cancellationToken, out var assignedSymbol))
+                if (TryGetMutatedLocalOrParameterSymbol(assignment, semanticModel, cancellationToken, out assignedSymbol))
                 {
                     RemoveFactsReferencingSymbol(facts, assignedSymbol);
                     if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
                     {
                         AddAssignedValueFacts(assignedSymbol, assignment.Right, semanticModel, cancellationToken, facts);
                     }
+                    else if (previousAssignedValue != null &&
+                             TryCreateCompoundAssignmentFact(
+                                 assignedSymbol,
+                                 previousAssignedValue,
+                                 assignment,
+                                 semanticModel,
+                                 cancellationToken,
+                                 out var compoundAssignmentFact))
+                    {
+                        facts.Add(compoundAssignmentFact);
+                    }
+                }
+
+                return;
+            }
+
+            if (statement is ExpressionStatementSyntax unaryExpressionStatement &&
+                TryGetIncrementedOrDecrementedSymbol(
+                    unaryExpressionStatement.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var incrementedSymbol,
+                    out var delta) &&
+                TryGetCurrentSymbolValue(facts, incrementedSymbol, out var previousIncrementedValue))
+            {
+                RemoveFactsReferencingSymbol(facts, incrementedSymbol);
+                if (TryCreateIncrementOrDecrementFact(incrementedSymbol, previousIncrementedValue, delta, out var mutationFact))
+                {
+                    facts.Add(mutationFact);
                 }
 
                 return;
@@ -834,6 +869,159 @@ namespace PurelySharp.Analyzer
             }
 
             return new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, valueFormula);
+        }
+
+        private static bool TryCreateCompoundAssignmentFact(
+            ISymbol targetSymbol,
+            SmtFormula previousValue,
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula fact)
+        {
+            fact = null!;
+            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) ||
+                targetFormula.Kind != SmtValueKind.Int ||
+                previousValue.Kind != SmtValueKind.Int ||
+                ReferencesSmtVariable(previousValue, GetSmtVariableName(targetSymbol)) ||
+                ExpressionReferencesSymbol(assignment.Right, targetSymbol, semanticModel, cancellationToken) ||
+                !CSharpConditionToFormula.TryTranslateValue(
+                    assignment.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var rightValue,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) ||
+                rightValue is not { Kind: SmtValueKind.Int } ||
+                !TryCreateCompoundAssignmentValue(assignment.Kind(), previousValue, rightValue, out var updatedValue))
+            {
+                return false;
+            }
+
+            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, updatedValue);
+            return true;
+        }
+
+        private static bool TryCreateIncrementOrDecrementFact(
+            ISymbol targetSymbol,
+            SmtFormula previousValue,
+            int delta,
+            out SmtFormula fact)
+        {
+            fact = null!;
+            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) ||
+                targetFormula.Kind != SmtValueKind.Int ||
+                previousValue.Kind != SmtValueKind.Int ||
+                ReferencesSmtVariable(previousValue, GetSmtVariableName(targetSymbol)))
+            {
+                return false;
+            }
+
+            var updatedValue = delta > 0
+                ? new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, previousValue, new SmtIntegerConstant(delta))
+                : new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, previousValue, new SmtIntegerConstant(-delta));
+            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, updatedValue);
+            return true;
+        }
+
+        private static bool TryCreateCompoundAssignmentValue(
+            SyntaxKind assignmentKind,
+            SmtFormula previousValue,
+            SmtFormula rightValue,
+            out SmtFormula updatedValue)
+        {
+            switch (assignmentKind)
+            {
+                case SyntaxKind.AddAssignmentExpression:
+                    updatedValue = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, previousValue, rightValue);
+                    return true;
+                case SyntaxKind.SubtractAssignmentExpression:
+                    updatedValue = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, previousValue, rightValue);
+                    return true;
+                case SyntaxKind.MultiplyAssignmentExpression
+                    when previousValue is SmtIntegerConstant || rightValue is SmtIntegerConstant:
+                    updatedValue = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, previousValue, rightValue);
+                    return true;
+                default:
+                    updatedValue = null!;
+                    return false;
+            }
+        }
+
+        private static bool TryGetCurrentSymbolValue(
+            List<SmtFormula> facts,
+            ISymbol symbol,
+            out SmtFormula value)
+        {
+            value = null!;
+            if (!TryCreateSymbolSmtValue(symbol, out var targetFormula))
+            {
+                return false;
+            }
+
+            for (var index = facts.Count - 1; index >= 0; index--)
+            {
+                if (facts[index] is not SmtBinaryFormula
+                    {
+                        Operator: SmtBinaryOperator.Equal,
+                        Left: var left,
+                        Right: var right
+                    })
+                {
+                    continue;
+                }
+
+                if (Equals(left, targetFormula) && right.Kind == targetFormula.Kind)
+                {
+                    value = right;
+                    return true;
+                }
+
+                if (Equals(right, targetFormula) && left.Kind == targetFormula.Kind)
+                {
+                    value = left;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryGetIncrementedOrDecrementedSymbol(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out ISymbol symbol,
+            out int delta)
+        {
+            expression = UnwrapFactExpression(expression);
+            ExpressionSyntax? operand = expression switch
+            {
+                PrefixUnaryExpressionSyntax prefixUnary
+                    when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) || prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
+                    prefixUnary.Operand,
+                PostfixUnaryExpressionSyntax postfixUnary
+                    when postfixUnary.IsKind(SyntaxKind.PostIncrementExpression) || postfixUnary.IsKind(SyntaxKind.PostDecrementExpression) =>
+                    postfixUnary.Operand,
+                _ => null
+            };
+
+            var expressionSymbol = operand == null
+                ? null
+                : semanticModel.GetSymbolInfo(operand, cancellationToken).Symbol;
+            if (expressionSymbol is not ILocalSymbol && expressionSymbol is not IParameterSymbol)
+            {
+                symbol = null!;
+                delta = 0;
+                return false;
+            }
+
+            symbol = expressionSymbol.OriginalDefinition;
+            delta = expression.IsKind(SyntaxKind.PreIncrementExpression) ||
+                expression.IsKind(SyntaxKind.PostIncrementExpression)
+                    ? 1
+                    : -1;
+            return true;
         }
 
         private static bool CanCompareSmtValues(SmtFormula left, SmtFormula right)
