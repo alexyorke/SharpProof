@@ -1118,6 +1118,40 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesEnumImplication()
+        {
+            const string source = @"
+public enum Mode
+{
+    None = 0,
+    Ready = 1
+}
+
+public class TestClass
+{
+    public int TestMethod(Mode state)
+    {
+        if (state == Mode.Ready)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ProveConditionEnum.cs",
+                FindLine(source, "return 1;"),
+                13,
+                "state != Mode.None",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionFalse()
         {
             const string source = @"
@@ -1602,6 +1636,17 @@ public class TestClass
         {
             Assert.That(
                 IsConditionAlwaysFalse("int value", "(long)value > 0L && value <= 0"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_EnumContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "Mode state",
+                    "state == Mode.Ready && state != Mode.Ready",
+                    "public enum Mode { None = 0, Ready = 1 }"),
                 Is.True);
         }
 
@@ -2305,6 +2350,34 @@ public class TestClass
         if ((long)value > 0L && value <= 0)
         {
             Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_EnumContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public enum Mode
+{
+    None = 0,
+    Ready = 1
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Mode state)
+    {
+        if (state == Mode.Ready && state != Mode.Ready)
+        {
+            Console.WriteLine(state);
         }
     }
 }");
@@ -3443,6 +3516,37 @@ public class TestClass
         if ((long)divisor == 0L)
         {
             return value / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_EnumGuardImpliesZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public enum Mode
+{
+    None = 0,
+    Ready = 1
+}
+
+public class TestClass
+{
+    public int TestMethod(int value, Mode state)
+    {
+        if (state == Mode.None)
+        {
+            return value / (int)state;
         }
 
         return 0;

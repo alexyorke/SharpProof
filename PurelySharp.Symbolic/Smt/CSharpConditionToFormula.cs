@@ -1283,7 +1283,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (IsIntegralType(type))
+            if (IsIntegralOrEnumType(type))
             {
                 formula = new SmtVariable(GetVariableName(symbol, getSymbolVersion), SmtValueKind.Int);
                 return true;
@@ -1324,7 +1324,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (IsIntegralType(type))
+            if (IsIntegralOrEnumType(type))
             {
                 formula = new SmtIntegerConstant(0);
                 return true;
@@ -1537,13 +1537,15 @@ namespace PurelySharp.Symbolic.Smt
             var targetType = semanticModel.GetTypeInfo(castExpression, cancellationToken).Type;
             if (sourceType == null ||
                 targetType == null ||
-                !IsIntegralType(sourceType) ||
-                !IsIntegralType(targetType))
+                !IsIntegralOrEnumType(sourceType) ||
+                !IsIntegralOrEnumType(targetType))
             {
                 return false;
             }
 
-            return IsSameOrWideningIntegralConversion(sourceType.SpecialType, targetType.SpecialType);
+            return TryGetIntegralSpecialType(sourceType, out var sourceSpecialType) &&
+                TryGetIntegralSpecialType(targetType, out var targetSpecialType) &&
+                IsSameOrWideningIntegralConversion(sourceSpecialType, targetSpecialType);
         }
 
         private static bool IsSameOrWideningIntegralConversion(
@@ -1611,6 +1613,14 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (memberSymbol is IFieldSymbol { HasConstantValue: true } constantField &&
+                constantField.ConstantValue != null &&
+                TryGetIntegralConstant(constantField.ConstantValue, out var integralConstant))
+            {
+                formula = new SmtIntegerConstant(integralConstant);
+                return true;
+            }
+
             if (!TryTranslateValue(memberAccess.Expression, semanticModel, cancellationToken, out var receiver, getSymbolVersion, inlineDepth) ||
                 receiver == null)
             {
@@ -1640,7 +1650,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (IsIntegralType(type))
+            if (IsIntegralOrEnumType(type))
             {
                 formula = new SmtVariable(variableName, SmtValueKind.Int);
                 return true;
@@ -1686,7 +1696,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (IsIntegralType(type))
+            if (IsIntegralOrEnumType(type))
             {
                 kind = SmtValueKind.Int;
                 return true;
@@ -1741,8 +1751,38 @@ namespace PurelySharp.Symbolic.Smt
                 SpecialType.System_UInt64;
         }
 
+        private static bool IsIntegralOrEnumType(ITypeSymbol typeSymbol)
+        {
+            return IsIntegralType(typeSymbol) ||
+                typeSymbol.TypeKind == TypeKind.Enum;
+        }
+
+        private static bool TryGetIntegralSpecialType(ITypeSymbol typeSymbol, out SpecialType specialType)
+        {
+            if (IsIntegralType(typeSymbol))
+            {
+                specialType = typeSymbol.SpecialType;
+                return true;
+            }
+
+            if (typeSymbol is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } underlyingType } &&
+                IsIntegralType(underlyingType))
+            {
+                specialType = underlyingType.SpecialType;
+                return true;
+            }
+
+            specialType = SpecialType.None;
+            return false;
+        }
+
         private static bool TryGetIntegralConstant(object value, out long integralValue)
         {
+            if (value is Enum enumValue)
+            {
+                value = Convert.ChangeType(enumValue, enumValue.GetTypeCode(), CultureInfo.InvariantCulture);
+            }
+
             switch (value)
             {
                 case sbyte signedByte:
@@ -1781,7 +1821,7 @@ namespace PurelySharp.Symbolic.Smt
             CancellationToken cancellationToken)
         {
             var type = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
-            return type != null && IsIntegralType(type);
+            return type != null && IsIntegralOrEnumType(type);
         }
 
         private static bool HasSupportedBooleanType(

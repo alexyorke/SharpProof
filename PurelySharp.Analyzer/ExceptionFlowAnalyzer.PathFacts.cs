@@ -19,13 +19,14 @@ namespace PurelySharp.Analyzer
             PathFactKind factKind,
             SmtAnalysisService smtAnalysis)
         {
-            var symbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
-            if (symbol == null)
+            var invalidatedSymbols = CollectLocalAndParameterSymbols(expression, semanticModel, cancellationToken);
+            if (invalidatedSymbols.Count == 0)
             {
                 return false;
             }
 
-            if (!TryCreateFactFormula(symbol, factKind, out var factFormula) || factFormula == null)
+            if (!TryCreateFactFormula(expression, factKind, semanticModel, cancellationToken, out var factFormula) ||
+                factFormula == null)
             {
                 return false;
             }
@@ -35,23 +36,23 @@ namespace PurelySharp.Analyzer
             foreach (var ifStatement in useNode.Ancestors().OfType<IfStatementSyntax>())
             {
                 if (ifStatement.Statement.Span.Contains(useNode.SpanStart) &&
-                    !IsSymbolAssignedBeforeUse(ifStatement.Statement, useNode.SpanStart, symbol, semanticModel, cancellationToken))
+                    !AnySymbolAssignedBeforeUse(ifStatement.Statement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
                 {
                     TryAddPathCondition(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
                 }
 
                 if (ifStatement.Else?.Statement is { } elseStatement &&
                     elseStatement.Span.Contains(useNode.SpanStart) &&
-                    !IsSymbolAssignedBeforeUse(elseStatement, useNode.SpanStart, symbol, semanticModel, cancellationToken))
+                    !AnySymbolAssignedBeforeUse(elseStatement, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
                 {
                     TryAddPathCondition(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, pathConditions);
                 }
             }
 
-            AddSwitchPathConditions(useNode, new[] { symbol }, semanticModel, cancellationToken, pathConditions);
-            AddLoopPathConditions(useNode, new[] { symbol }, semanticModel, cancellationToken, pathConditions);
-            AddExpressionBranchPathConditions(useNode, new[] { symbol }, semanticModel, cancellationToken, pathConditions);
-            AddPrecedingGuardConditions(symbol, useNode, semanticModel, cancellationToken, pathConditions);
+            AddSwitchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
+            AddLoopPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
+            AddExpressionBranchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
+            AddPrecedingGuardConditions(invalidatedSymbols, useNode, semanticModel, cancellationToken, pathConditions);
             return pathConditions.Count > 0 && PathConditionsImplyFact(pathConditions, factFormula, smtAnalysis);
         }
 
@@ -1519,6 +1520,52 @@ namespace PurelySharp.Analyzer
         }
 
         private static bool TryCreateFactFormula(
+            ExpressionSyntax expression,
+            PathFactKind factKind,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula? factFormula)
+        {
+            factFormula = null;
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueFormula,
+                    getSymbolVersion: null) ||
+                valueFormula == null)
+            {
+                var symbol = GetLocalOrParameterSymbol(expression, semanticModel, cancellationToken);
+                return symbol != null && TryCreateFactFormula(symbol, factKind, out factFormula);
+            }
+
+            if (factKind == PathFactKind.Null)
+            {
+                if (valueFormula.Kind != SmtValueKind.Reference)
+                {
+                    return false;
+                }
+
+                factFormula = new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    valueFormula,
+                    new SmtNullConstant());
+                return true;
+            }
+
+            if (valueFormula.Kind != SmtValueKind.Int)
+            {
+                return false;
+            }
+
+            factFormula = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                valueFormula,
+                new SmtIntegerConstant(0));
+            return true;
+        }
+
+        private static bool TryCreateFactFormula(
             ITypeSymbol typeSymbol,
             string variableName,
             PathFactKind factKind,
@@ -1553,7 +1600,7 @@ namespace PurelySharp.Analyzer
 
         private static bool IsSearchLibIntegralType(ITypeSymbol typeSymbol)
         {
-            return typeSymbol.SpecialType is
+            if (typeSymbol.SpecialType is
                 SpecialType.System_SByte or
                 SpecialType.System_Byte or
                 SpecialType.System_Int16 or
@@ -1561,7 +1608,13 @@ namespace PurelySharp.Analyzer
                 SpecialType.System_Int32 or
                 SpecialType.System_UInt32 or
                 SpecialType.System_Int64 or
-                SpecialType.System_UInt64;
+                SpecialType.System_UInt64)
+            {
+                return true;
+            }
+
+            return typeSymbol is INamedTypeSymbol { TypeKind: TypeKind.Enum, EnumUnderlyingType: { } underlyingType } &&
+                IsSearchLibIntegralType(underlyingType);
         }
 
         private static string GetSmtVariableName(ISymbol symbol)
