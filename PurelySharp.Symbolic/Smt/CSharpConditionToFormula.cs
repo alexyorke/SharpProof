@@ -1480,6 +1480,39 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (receiverExpression is BinaryExpressionSyntax coalesceExpression &&
+                coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                TryTranslateValue(
+                    coalesceExpression.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out var coalesceLeft,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                coalesceLeft is { Kind: SmtValueKind.Reference } &&
+                TryCreateBuiltInElementAccessLengthFormula(
+                    coalesceExpression.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out var coalesceLeftLength,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                TryCreateBuiltInElementAccessLengthFormula(
+                    coalesceExpression.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var coalesceRightLength,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                lengthFormula = new SmtConditionalFormula(
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, coalesceLeft, new SmtNullConstant()),
+                    coalesceLeftLength,
+                    coalesceRightLength,
+                    SmtValueKind.Int);
+                return true;
+            }
+
             var receiverTypeInfo = semanticModel.GetTypeInfo(receiverExpression, cancellationToken);
             if ((receiverTypeInfo.Type is IArrayTypeSymbol { Rank: 1 } ||
                  receiverTypeInfo.ConvertedType is IArrayTypeSymbol { Rank: 1 }) &&
