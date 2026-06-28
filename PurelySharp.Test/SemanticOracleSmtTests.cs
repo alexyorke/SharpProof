@@ -93,6 +93,8 @@ public sealed class SourcePredicateBox
 
     public bool HasText => Value != null && Value.Length > 0;
 
+    public bool HasTextMethod() => Value != null && Value.Length > 0;
+
     public bool IsZeroDivisor
     {
         get
@@ -100,6 +102,12 @@ public sealed class SourcePredicateBox
             var isZero = Divisor == 0;
             return isZero;
         }
+    }
+
+    public bool IsZeroDivisorMethod()
+    {
+        var isZero = Divisor == 0;
+        return isZero;
     }
 }
 ";
@@ -1605,6 +1613,62 @@ public class TestClass
             var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
                 source,
                 "SourceBooleanGetterLocalAliasExactValue.cs",
+                FindLine(source, "return 10 / box.Divisor;"),
+                13,
+                "box.Divisor == 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesInstanceSourceBooleanMethodImplications()
+        {
+            var source = SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(SourcePredicateBox box)
+    {
+        if (box.HasTextMethod())
+        {
+            return box.Value.Length;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "InstanceSourceBooleanMethodImplications.cs",
+                FindLine(source, "return box.Value.Length;"),
+                13,
+                "box.Value != null && box.Value.Length > 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesInstanceSourceBooleanMethodLocalAliasExactValue()
+        {
+            var source = SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(SourcePredicateBox box)
+    {
+        if (box.IsZeroDivisorMethod())
+        {
+            return 10 / box.Divisor;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "InstanceSourceBooleanMethodLocalAliasExactValue.cs",
                 FindLine(source, "return 10 / box.Divisor;"),
                 13,
                 "box.Divisor == 0",
@@ -4889,6 +4953,14 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_InstanceSourceBooleanMethodContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("SourcePredicateBox box", "box.HasTextMethod() && (box.Value == null || box.Value.Length <= 0)", SourcePredicateSource),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_StringLiteralLengthContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -6565,6 +6637,30 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_InstanceSourceBooleanMethodContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(SourcePredicateBox box)
+    {
+        if (box.HasTextMethod() && (box.Value == null || box.Value.Length <= 0))
+        {
+            Console.WriteLine(box.Value);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_MetadataStringPredicateContradictoryBranch_RemainsConservativeReports()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
@@ -7857,6 +7953,33 @@ public class TestClass
     public int TestMethod(SourcePredicateBox box)
     {
         if (box.IsZeroDivisor)
+        {
+            return 10 / box.Divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_InstanceSourceBooleanMethodImpliesZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    public int TestMethod(SourcePredicateBox box)
+    {
+        if (box.IsZeroDivisorMethod())
         {
             return 10 / box.Divisor;
         }

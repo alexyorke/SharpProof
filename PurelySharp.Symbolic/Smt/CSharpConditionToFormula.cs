@@ -784,7 +784,26 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth,
             out IReadOnlyList<SmtVariableSubstitution> substitutions)
         {
-            var builder = new List<SmtVariableSubstitution>(invocationOperation.Arguments.Length);
+            var builder = new List<SmtVariableSubstitution>(invocationOperation.Arguments.Length + 1);
+            if (!invocationOperation.TargetMethod.IsStatic)
+            {
+                if (invocationOperation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
+                    !TryTranslateValue(
+                        receiverExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var receiverFormula,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    receiverFormula is not { Kind: SmtValueKind.Reference })
+                {
+                    substitutions = Array.Empty<SmtVariableSubstitution>();
+                    return false;
+                }
+
+                builder.Add(CreateImplicitThisSubstitution(receiverFormula));
+            }
+
             foreach (var argument in invocationOperation.Arguments)
             {
                 var parameter = argument.Parameter;
@@ -814,6 +833,15 @@ namespace PurelySharp.Symbolic.Smt
 
             substitutions = builder;
             return true;
+        }
+
+        private static SmtVariableSubstitution CreateImplicitThisSubstitution(SmtFormula receiver)
+        {
+            return new SmtVariableSubstitution(
+                ImplicitThisVariableName,
+                ImplicitThisVariableName + ".",
+                new SmtVariable(ImplicitThisVariableName, SmtValueKind.Reference) + ".",
+                receiver);
         }
 
         private static SmtFormula SubstituteVariables(
@@ -3366,11 +3394,7 @@ namespace PurelySharp.Symbolic.Smt
                 propertyFormula,
                 new[]
                 {
-                    new SmtVariableSubstitution(
-                        ImplicitThisVariableName,
-                        ImplicitThisVariableName + ".",
-                        new SmtVariable(ImplicitThisVariableName, SmtValueKind.Reference) + ".",
-                        receiver)
+                    CreateImplicitThisSubstitution(receiver)
                 });
             return true;
         }
