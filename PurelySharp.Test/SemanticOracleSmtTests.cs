@@ -2601,6 +2601,72 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_QuerySource_ProvesArrayElementReadFromListPatternFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values is [> 0, ..])
+        {
+            var divisor = values[0];
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "QuerySourceArrayElementReadFromListPatternFacts.cs",
+                FindLine(source, "return 10 / divisor;"),
+                13,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
+                impliedConditions: new[] { "divisor != 0" });
+
+            Assert.That(result.Facts, Is.Not.Empty);
+            Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThan", StringComparison.Ordinal) &&
+                                                 fact.Contains("[0]", StringComparison.Ordinal) &&
+                                                 fact.Contains("0", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                                 fact.Contains("divisor", StringComparison.Ordinal) &&
+                                                 fact.Contains("[0]", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_QuerySource_DoesNotReuseListPatternElementFactAfterElementMutation()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values is [> 0, ..])
+        {
+            values[0] = 0;
+            var divisor = values[0];
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "QuerySourceArrayElementReadAfterElementMutation.cs",
+                FindLine(source, "return 10 / divisor;"),
+                13,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
+                impliedConditions: new[] { "divisor != 0" });
+
+            Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsCompoundAssignmentUpdateFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -6028,6 +6094,27 @@ public class TestClass
     {
         if (values is [.., > 0 and var divisor])
         {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_ArrayElementReadFromListPatternFacts_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values is [> 0, ..])
+        {
+            var divisor = values[0];
             return 10 / divisor;
         }
 

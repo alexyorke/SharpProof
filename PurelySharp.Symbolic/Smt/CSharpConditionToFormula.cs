@@ -1349,6 +1349,100 @@ namespace PurelySharp.Symbolic.Smt
             return false;
         }
 
+        private static bool TryTranslateBuiltInElementAccessValue(
+            ElementAccessExpressionSyntax elementAccess,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (elementAccess.ArgumentList.Arguments.Count != 1)
+            {
+                return false;
+            }
+
+            var receiverType = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).Type;
+            if (receiverType is not IArrayTypeSymbol { Rank: 1 } arrayType ||
+                !TryGetValueKind(arrayType.ElementType, out var elementKind) ||
+                !TryTranslateValue(
+                    elementAccess.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                receiverFormula is not { Kind: SmtValueKind.Reference } ||
+                !TryCreateElementAccessIndexText(
+                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var indexText,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            formula = new SmtVariable(receiverFormula + "[" + indexText + "]", elementKind);
+            return true;
+        }
+
+        private static bool TryCreateElementAccessIndexText(
+            ExpressionSyntax indexExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out string indexText,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            indexExpression = UnwrapElementAccessIndexExpression(indexExpression);
+            if (indexExpression is PrefixUnaryExpressionSyntax fromEndIndex &&
+                fromEndIndex.OperatorToken.IsKind(SyntaxKind.CaretToken))
+            {
+                if (!TryTranslateValue(
+                        fromEndIndex.Operand,
+                        semanticModel,
+                        cancellationToken,
+                        out var fromEndOffset,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    fromEndOffset is not { Kind: SmtValueKind.Int })
+                {
+                    indexText = string.Empty;
+                    return false;
+                }
+
+                indexText = "^" + CreateElementAccessIndexText(fromEndOffset);
+                return true;
+            }
+
+            if (!TryTranslateValue(
+                    indexExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var ordinaryIndex,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                ordinaryIndex is not { Kind: SmtValueKind.Int })
+            {
+                indexText = string.Empty;
+                return false;
+            }
+
+            indexText = CreateElementAccessIndexText(ordinaryIndex);
+            return indexText.Length > 0;
+        }
+
+        private static string CreateElementAccessIndexText(SmtFormula indexFormula)
+        {
+            return indexFormula is SmtIntegerConstant integerConstant
+                ? integerConstant.Value.ToString(CultureInfo.InvariantCulture)
+                : indexFormula.ToString() ?? string.Empty;
+        }
+
         private static bool TryCreateBuiltInElementAccessLengthFormula(
             ExpressionSyntax receiverExpression,
             SemanticModel semanticModel,
@@ -1661,6 +1755,18 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             if (TryTranslateDefaultValue(expression, semanticModel, cancellationToken, out formula))
+            {
+                return true;
+            }
+
+            if (expression is ElementAccessExpressionSyntax elementAccessExpression &&
+                TryTranslateBuiltInElementAccessValue(
+                    elementAccessExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
             {
                 return true;
             }

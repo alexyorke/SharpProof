@@ -2090,6 +2090,35 @@ namespace PurelySharp.Symbolic
                 {
                     RemoveFactsReferencingSymbol(facts, mutatedSymbol.OriginalDefinition);
                 }
+
+                foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel, cancellationToken))
+                {
+                    RemoveFactsReferencingSymbol(facts, receiverSymbol);
+                }
+            }
+        }
+
+        private static IEnumerable<ISymbol> GetMutatedReceiverSymbols(
+            ExpressionSyntax mutatedExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            ExpressionSyntax? receiverExpression = UnwrapExpression(mutatedExpression) switch
+            {
+                ElementAccessExpressionSyntax elementAccess => elementAccess.Expression,
+                MemberAccessExpressionSyntax memberAccess => memberAccess.Expression,
+                _ => null
+            };
+
+            if (receiverExpression == null)
+            {
+                yield break;
+            }
+
+            var receiverSymbol = semanticModel.GetSymbolInfo(UnwrapExpression(receiverExpression), cancellationToken).Symbol?.OriginalDefinition;
+            if (receiverSymbol is ILocalSymbol or IParameterSymbol)
+            {
+                yield return receiverSymbol;
             }
         }
 
@@ -2152,18 +2181,6 @@ namespace PurelySharp.Symbolic
             out SmtFormula? formula)
         {
             valueExpression = UnwrapExpression(valueExpression);
-            if (CSharpConditionToFormula.TryTranslateValue(
-                    valueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out formula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
-                formula != null)
-            {
-                return true;
-            }
-
             if (TryTranslateFiniteElementAccessValue(
                 valueExpression,
                 semanticModel,
@@ -2200,6 +2217,18 @@ namespace PurelySharp.Symbolic
                 whenTrueFormula.Kind == whenFalseFormula.Kind)
             {
                 formula = new SmtConditionalFormula(conditionFormula, whenTrueFormula, whenFalseFormula, whenTrueFormula.Kind);
+                return true;
+            }
+
+            if (CSharpConditionToFormula.TryTranslateValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                formula != null)
+            {
                 return true;
             }
 
