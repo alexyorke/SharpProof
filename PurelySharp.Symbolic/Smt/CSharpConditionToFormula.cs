@@ -820,6 +820,52 @@ namespace PurelySharp.Symbolic.Smt
                         formulas,
                         getSymbolVersion);
                     return;
+                case ListPatternSyntax listPattern:
+                    AddListPatternBindingFacts(
+                        matchedValue,
+                        matchedValueType,
+                        listPattern,
+                        semanticModel,
+                        cancellationToken,
+                        formulas,
+                        getSymbolVersion);
+                    return;
+            }
+        }
+
+        private static void AddListPatternBindingFacts(
+            SmtFormula matchedValue,
+            ITypeSymbol? matchedValueType,
+            ListPatternSyntax listPattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (!TryGetBuiltInListPatternElementType(matchedValueType, out var elementType) ||
+                !TryGetValueKind(elementType, out var elementKind))
+            {
+                return;
+            }
+
+            var elementIndex = 0;
+            foreach (var subpattern in listPattern.Patterns)
+            {
+                if (subpattern is SlicePatternSyntax)
+                {
+                    return;
+                }
+
+                var elementValue = CreateListPatternElementFormula(matchedValue, elementIndex, elementKind);
+                AddPatternBindingFacts(
+                    elementValue,
+                    elementType,
+                    subpattern,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion);
+                elementIndex++;
             }
         }
 
@@ -991,7 +1037,15 @@ namespace PurelySharp.Symbolic.Smt
 
             if (pattern is ListPatternSyntax listPattern)
             {
-                return TryTranslateListPattern(value, valueType, listPattern, semanticModel, out formula);
+                return TryTranslateListPattern(
+                    value,
+                    valueType,
+                    listPattern,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth);
             }
 
             if (pattern is DeclarationPatternSyntax or TypePatternSyntax)
@@ -1077,7 +1131,10 @@ namespace PurelySharp.Symbolic.Smt
             ITypeSymbol? valueType,
             ListPatternSyntax listPattern,
             SemanticModel semanticModel,
-            out SmtFormula? formula)
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
         {
             formula = null;
             if (value.Kind != SmtValueKind.Reference ||
@@ -1126,7 +1183,68 @@ namespace PurelySharp.Symbolic.Smt
                     new SmtIntegerConstant(minimumLength));
 
             formula = new SmtBinaryFormula(SmtBinaryOperator.And, nonNullFormula, lengthFormulaCondition);
+            AddListPatternElementConditions(
+                value,
+                valueType,
+                listPattern,
+                semanticModel,
+                cancellationToken,
+                ref formula,
+                getSymbolVersion,
+                inlineDepth);
             return true;
+        }
+
+        private static void AddListPatternElementConditions(
+            SmtFormula value,
+            ITypeSymbol? valueType,
+            ListPatternSyntax listPattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ref SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            if (formula == null ||
+                !TryGetBuiltInListPatternElementType(valueType, out var elementType) ||
+                !TryGetValueKind(elementType, out var elementKind))
+            {
+                return;
+            }
+
+            var elementIndex = 0;
+            foreach (var subpattern in listPattern.Patterns)
+            {
+                if (subpattern is SlicePatternSyntax)
+                {
+                    return;
+                }
+
+                var elementValue = CreateListPatternElementFormula(value, elementIndex, elementKind);
+                if (TryTranslatePattern(
+                        elementValue,
+                        subpattern,
+                        semanticModel,
+                        cancellationToken,
+                        out var elementCondition,
+                        getSymbolVersion,
+                        elementType,
+                        inlineDepth) &&
+                    elementCondition != null)
+                {
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.And, formula, elementCondition);
+                }
+
+                elementIndex++;
+            }
+        }
+
+        private static SmtFormula CreateListPatternElementFormula(
+            SmtFormula receiver,
+            int elementIndex,
+            SmtValueKind elementKind)
+        {
+            return new SmtVariable(receiver + "[" + elementIndex.ToString(CultureInfo.InvariantCulture) + "]", elementKind);
         }
 
         private static int GetListPatternMinimumLength(ListPatternSyntax listPattern)
@@ -1171,6 +1289,18 @@ namespace PurelySharp.Symbolic.Smt
         {
             return valueType is IArrayTypeSymbol { Rank: 1 } ||
                 valueType?.SpecialType == SpecialType.System_String;
+        }
+
+        private static bool TryGetBuiltInListPatternElementType(ITypeSymbol? valueType, out ITypeSymbol elementType)
+        {
+            if (valueType is IArrayTypeSymbol { Rank: 1 } arrayType)
+            {
+                elementType = arrayType.ElementType;
+                return true;
+            }
+
+            elementType = null!;
+            return false;
         }
 
         private static bool TryCreateBuiltInElementAccessLengthFormula(
