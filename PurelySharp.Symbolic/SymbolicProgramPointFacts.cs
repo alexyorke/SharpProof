@@ -264,6 +264,16 @@ namespace PurelySharp.Symbolic
             return builder.ToImmutable();
         }
 
+        public static ImmutableArray<SmtFormula> CollectCompletedLoopExitInvariantFacts(
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var builder = ImmutableArray.CreateBuilder<SmtFormula>();
+            AddCompletedLoopStatementFacts(statement, semanticModel, cancellationToken, builder);
+            return builder.ToImmutable();
+        }
+
         private static void AddForLoopMonotonicLowerBoundFacts(
             ICollection<SmtFormula> facts,
             ForStatementSyntax forStatement,

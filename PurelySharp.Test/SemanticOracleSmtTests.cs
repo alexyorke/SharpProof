@@ -625,6 +625,52 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_CollectCompletedLoopExitInvariantFacts_ReturnsForLoopExitFacts()
+        {
+            var facts = CollectCompletedLoopExitFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        for (; index < values.Length; index++)
+        {
+        }
+
+        return index;
+    }
+}",
+                "for (; index < values.Length; index++)");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
+                                           fact.Contains("LessThan", StringComparison.Ordinal) &&
+                                           fact.Contains("Length", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicProgramPointFacts_CollectCompletedLoopExitInvariantFacts_SuppressesLoopExitFactsWhenBreakCanExitLoop()
+        {
+            var facts = CollectCompletedLoopExitFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        while (index < values.Length)
+        {
+            break;
+        }
+
+        return index;
+    }
+}",
+                "while (index < values.Length)");
+
+            Assert.That(facts, Is.Empty);
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsAncestorReachabilityFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -5357,6 +5403,26 @@ public class TestClass
             var snapshot = new SymbolicInvariantService().GetInvariantsAt(statement, semanticModel, CancellationToken.None);
 
             return snapshot.Facts.ToArray();
+        }
+
+        private static string[] CollectCompletedLoopExitFacts(string source, string loopPrefix)
+        {
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "CompletedLoopFactHost",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var loopStatement = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<StatementSyntax>()
+                .Single(node => node.ToString().StartsWith(loopPrefix, StringComparison.Ordinal));
+
+            return SymbolicProgramPointFacts
+                .CollectCompletedLoopExitInvariantFacts(loopStatement, semanticModel, CancellationToken.None)
+                .Select(static fact => fact.ToString() ?? string.Empty)
+                .ToArray();
         }
 
         private static string[] CollectExpressionProgramPointFacts(string source, string expressionPrefix)

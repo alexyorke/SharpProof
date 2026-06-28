@@ -592,7 +592,10 @@ namespace PurelySharp.Analyzer
             }
             else
             {
-                AddCompletedLoopStatementFacts(statement, semanticModel, cancellationToken, facts);
+                foreach (var loopFact in SymbolicProgramPointFacts.CollectCompletedLoopExitInvariantFacts(statement, semanticModel, cancellationToken))
+                {
+                    facts.Add(loopFact);
+                }
             }
         }
 
@@ -657,91 +660,6 @@ namespace PurelySharp.Analyzer
             {
                 TryAddPathCondition(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, facts);
             }
-        }
-
-        private static void AddCompletedLoopStatementFacts(
-            StatementSyntax statement,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            ICollection<SmtFormula> facts)
-        {
-            switch (statement)
-            {
-                case WhileStatementSyntax whileStatement
-                    when CanAssumeLoopConditionFalseAfterNormalExit(whileStatement, whileStatement.Statement):
-                    CSharpConditionToFormula.TryCollectBranchAssumptions(
-                        whileStatement.Condition,
-                        branchWhenTrue: false,
-                        semanticModel,
-                        cancellationToken,
-                        facts);
-                    break;
-                case ForStatementSyntax { Condition: { } condition } forStatement
-                    when CanAssumeLoopConditionFalseAfterNormalExit(forStatement, forStatement.Statement):
-                    CSharpConditionToFormula.TryCollectBranchAssumptions(
-                        condition,
-                        branchWhenTrue: false,
-                        semanticModel,
-                        cancellationToken,
-                        facts);
-                    break;
-                case DoStatementSyntax doStatement
-                    when CanAssumeLoopConditionFalseAfterNormalExit(doStatement, doStatement.Statement):
-                    CSharpConditionToFormula.TryCollectBranchAssumptions(
-                        doStatement.Condition,
-                        branchWhenTrue: false,
-                        semanticModel,
-                        cancellationToken,
-                        facts);
-                    break;
-            }
-        }
-
-        private static bool CanAssumeLoopConditionFalseAfterNormalExit(
-            StatementSyntax loopStatement,
-            StatementSyntax loopBody)
-        {
-            if (loopBody.DescendantNodesAndSelf(
-                    descendIntoChildren: candidate => !ExecutionVisibility.IsNestedCallableBoundary(candidate))
-                .OfType<GotoStatementSyntax>()
-                .Any())
-            {
-                return false;
-            }
-
-            return !loopBody.DescendantNodesAndSelf(
-                    descendIntoChildren: candidate => !ExecutionVisibility.IsNestedCallableBoundary(candidate))
-                .OfType<BreakStatementSyntax>()
-                .Any(breakStatement => BreakTargetsLoop(breakStatement, loopStatement));
-        }
-
-        private static bool BreakTargetsLoop(
-            BreakStatementSyntax breakStatement,
-            StatementSyntax loopStatement)
-        {
-            for (var ancestor = breakStatement.Parent; ancestor != null; ancestor = ancestor.Parent)
-            {
-                if (ReferenceEquals(ancestor, loopStatement))
-                {
-                    return true;
-                }
-
-                if (ancestor is SwitchStatementSyntax ||
-                    IsLoopStatement(ancestor))
-                {
-                    return false;
-                }
-            }
-
-            return false;
-        }
-
-        private static bool IsLoopStatement(SyntaxNode node)
-        {
-            return node is WhileStatementSyntax or
-                ForStatementSyntax or
-                ForEachStatementSyntax or
-                DoStatementSyntax;
         }
 
         private static void AddAssignedValueFacts(
