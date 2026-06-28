@@ -26,12 +26,44 @@ public static class SourcePredicates
 
     public static bool HasText(string value) => value != null && value.Length > 0;
 
+    public static bool HasTextWithGuard(string value)
+    {
+        if (value == null)
+        {
+            return false;
+        }
+
+        return value.Length > 0;
+    }
+
+    public static bool HasTextWithIfElse(string value)
+    {
+        if (value == null)
+        {
+            return false;
+        }
+        else
+        {
+            return value.Length > 0;
+        }
+    }
+
     public static bool InRange(int value)
     {
         return value >= 10 && value <= 20;
     }
 
     public static bool IsPositive(int value) => value > 0;
+
+    public static bool IsZeroWithGuard(int value)
+    {
+        if (value != 0)
+        {
+            return false;
+        }
+
+        return true;
+    }
 }
 ";
 
@@ -1347,6 +1379,90 @@ public class TestClass
             Assert.That(result.SmtDiagnostics.MaxExpressionNodes, Is.EqualTo(2048));
             Assert.That(result.SmtDiagnostics.ExecutedQueryCount, Is.GreaterThanOrEqualTo(2));
             Assert.That(result.SmtDiagnostics.CacheEntryCount, Is.GreaterThanOrEqualTo(2));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardStyleSourcePredicateImplications()
+        {
+            var source = SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        if (SourcePredicates.HasTextWithGuard(value))
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "GuardStyleSourcePredicateImplications.cs",
+                FindLine(source, "return value.Length;"),
+                13,
+                "value != null && value.Length > 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesIfElseSourcePredicateImplications()
+        {
+            var source = SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        if (SourcePredicates.HasTextWithIfElse(value))
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "IfElseSourcePredicateImplications.cs",
+                FindLine(source, "return value.Length;"),
+                13,
+                "value != null && value.Length > 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesGuardStyleSourcePredicateExactValue()
+        {
+            var source = SourcePredicateSource + @"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (SourcePredicates.IsZeroWithGuard(divisor))
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "GuardStyleSourcePredicateExactValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                13,
+                "divisor == 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
         }
 
         [Test]
@@ -4592,6 +4708,22 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_SourceHasTextGuardPredicateContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "SourcePredicates.HasTextWithGuard(text) && (text == null || text.Length <= 0)", SourcePredicateSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_SourceHasTextIfElsePredicateContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "SourcePredicates.HasTextWithIfElse(text) && (text == null || text.Length <= 0)", SourcePredicateSource),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_StringLiteralLengthContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -6172,6 +6304,54 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_SourceHasTextGuardPredicateContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (SourcePredicates.HasTextWithGuard(text) && (text == null || text.Length <= 0))
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_SourceHasTextIfElsePredicateContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string text)
+    {
+        if (SourcePredicates.HasTextWithIfElse(text) && (text == null || text.Length <= 0))
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_MetadataStringPredicateContradictoryBranch_RemainsConservativeReports()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
@@ -7383,6 +7563,33 @@ public class TestClass
     {
         var isZero = divisor == 0;
         if (isZero)
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_SourceGuardPredicateImpliesZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+" + SourcePredicateSource + @"
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (SourcePredicates.IsZeroWithGuard(divisor))
         {
             return 10 / divisor;
         }

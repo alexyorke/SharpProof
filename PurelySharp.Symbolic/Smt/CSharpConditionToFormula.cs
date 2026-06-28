@@ -472,13 +472,12 @@ namespace PurelySharp.Symbolic.Smt
             if (inlineDepth >= MaxSourcePredicateInlineDepth ||
                 semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
                 !CanInlineSourceBooleanPredicate(invocationOperation.TargetMethod) ||
-                !TryGetReturnedBooleanExpression(
+                !TryGetReturnedBooleanFormula(
                     invocationOperation.TargetMethod,
                     semanticModel.Compilation,
                     cancellationToken,
-                    out var returnedExpression,
-                    out var returnedSemanticModel) ||
-                !TryTranslate(returnedExpression, returnedSemanticModel, cancellationToken, out var returnedFormula, getSymbolVersion: null, inlineDepth + 1) ||
+                    inlineDepth + 1,
+                    out var returnedFormula) ||
                 returnedFormula is not { Kind: SmtValueKind.Bool } ||
                 !TryCreateSourcePredicateSubstitutions(
                     invocationOperation,
@@ -508,69 +507,185 @@ namespace PurelySharp.Symbolic.Smt
                 methodSymbol.Parameters.All(static parameter => parameter.RefKind == RefKind.None);
         }
 
-        private static bool TryGetReturnedBooleanExpression(
+        private static bool TryGetReturnedBooleanFormula(
             IMethodSymbol methodSymbol,
             Compilation compilation,
             CancellationToken cancellationToken,
-            out ExpressionSyntax returnedExpression,
-            out SemanticModel returnedSemanticModel)
+            int inlineDepth,
+            out SmtFormula? formula)
         {
-            returnedExpression = null!;
-            returnedSemanticModel = null!;
+            formula = null;
 
             var callableSyntax = methodSymbol.DeclaringSyntaxReferences
                 .Select(reference => reference.GetSyntax(cancellationToken))
                 .FirstOrDefault();
-            if (callableSyntax == null ||
-                !TryGetSingleReturnedExpressionSyntax(callableSyntax, out returnedExpression))
+            if (callableSyntax == null)
             {
                 return false;
             }
 
-            returnedSemanticModel = compilation.GetSemanticModel(returnedExpression.SyntaxTree);
-            return true;
+            var returnedSemanticModel = compilation.GetSemanticModel(callableSyntax.SyntaxTree);
+            return TryTranslateReturnedBooleanSyntax(
+                callableSyntax,
+                returnedSemanticModel,
+                cancellationToken,
+                inlineDepth,
+                out formula);
         }
 
-        private static bool TryGetSingleReturnedExpressionSyntax(
+        private static bool TryTranslateReturnedBooleanSyntax(
             SyntaxNode callableSyntax,
-            out ExpressionSyntax returnedExpression)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            int inlineDepth,
+            out SmtFormula? formula)
         {
             switch (callableSyntax)
             {
                 case MethodDeclarationSyntax methodDeclarationSyntax
                     when methodDeclarationSyntax.ExpressionBody?.Expression != null:
-                    returnedExpression = methodDeclarationSyntax.ExpressionBody.Expression;
-                    return true;
+                    return TryTranslate(
+                        methodDeclarationSyntax.ExpressionBody.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        out formula,
+                        getSymbolVersion: null,
+                        inlineDepth);
                 case MethodDeclarationSyntax methodDeclarationSyntax
                     when methodDeclarationSyntax.Body != null:
-                    return TryGetSingleReturnedExpressionSyntaxFromBody(methodDeclarationSyntax.Body, out returnedExpression);
+                    return TryTranslateReturnedBooleanBlock(
+                        methodDeclarationSyntax.Body,
+                        semanticModel,
+                        cancellationToken,
+                        inlineDepth,
+                        out formula);
                 case LocalFunctionStatementSyntax localFunctionStatementSyntax
                     when localFunctionStatementSyntax.ExpressionBody?.Expression != null:
-                    returnedExpression = localFunctionStatementSyntax.ExpressionBody.Expression;
-                    return true;
+                    return TryTranslate(
+                        localFunctionStatementSyntax.ExpressionBody.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        out formula,
+                        getSymbolVersion: null,
+                        inlineDepth);
                 case LocalFunctionStatementSyntax localFunctionStatementSyntax
                     when localFunctionStatementSyntax.Body != null:
-                    return TryGetSingleReturnedExpressionSyntaxFromBody(localFunctionStatementSyntax.Body, out returnedExpression);
+                    return TryTranslateReturnedBooleanBlock(
+                        localFunctionStatementSyntax.Body,
+                        semanticModel,
+                        cancellationToken,
+                        inlineDepth,
+                        out formula);
                 default:
-                    returnedExpression = null!;
+                    formula = null;
                     return false;
             }
         }
 
-        private static bool TryGetSingleReturnedExpressionSyntaxFromBody(
+        private static bool TryTranslateReturnedBooleanBlock(
             BlockSyntax bodySyntax,
-            out ExpressionSyntax returnedExpression)
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            int inlineDepth,
+            out SmtFormula? formula)
         {
-            if (bodySyntax.Statements.Count != 1 ||
-                bodySyntax.Statements[0] is not ReturnStatementSyntax returnStatement ||
-                returnStatement.Expression == null)
+            formula = null;
+            if (bodySyntax.Statements.Count == 1)
             {
-                returnedExpression = null!;
+                if (bodySyntax.Statements[0] is ReturnStatementSyntax returnStatement &&
+                    returnStatement.Expression != null)
+                {
+                    return TryTranslate(
+                        returnStatement.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        out formula,
+                        getSymbolVersion: null,
+                        inlineDepth);
+                }
+
+                if (bodySyntax.Statements[0] is IfStatementSyntax ifStatement &&
+                    ifStatement.Else?.Statement != null &&
+                    TryGetSingleReturnExpression(ifStatement.Statement, out var trueReturn) &&
+                    TryGetSingleReturnExpression(ifStatement.Else.Statement, out var falseReturn))
+                {
+                    return TryTranslateReturnedBooleanConditional(
+                        ifStatement.Condition,
+                        trueReturn,
+                        falseReturn,
+                        semanticModel,
+                        cancellationToken,
+                        inlineDepth,
+                        out formula);
+                }
+            }
+
+            if (bodySyntax.Statements.Count == 2 &&
+                bodySyntax.Statements[0] is IfStatementSyntax leadingIf &&
+                leadingIf.Else == null &&
+                bodySyntax.Statements[1] is ReturnStatementSyntax finalReturnStatement &&
+                finalReturnStatement.Expression != null &&
+                TryGetSingleReturnExpression(leadingIf.Statement, out var earlyReturn))
+            {
+                return TryTranslateReturnedBooleanConditional(
+                    leadingIf.Condition,
+                    earlyReturn,
+                    finalReturnStatement.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    inlineDepth,
+                    out formula);
+            }
+
+            return false;
+        }
+
+        private static bool TryTranslateReturnedBooleanConditional(
+            ExpressionSyntax condition,
+            ExpressionSyntax whenTrue,
+            ExpressionSyntax whenFalse,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            int inlineDepth,
+            out SmtFormula? formula)
+        {
+            formula = null;
+            if (!TryTranslate(condition, semanticModel, cancellationToken, out var conditionFormula, getSymbolVersion: null, inlineDepth) ||
+                conditionFormula is not { Kind: SmtValueKind.Bool } ||
+                !TryTranslate(whenTrue, semanticModel, cancellationToken, out var whenTrueFormula, getSymbolVersion: null, inlineDepth) ||
+                whenTrueFormula is not { Kind: SmtValueKind.Bool } ||
+                !TryTranslate(whenFalse, semanticModel, cancellationToken, out var whenFalseFormula, getSymbolVersion: null, inlineDepth) ||
+                whenFalseFormula is not { Kind: SmtValueKind.Bool })
+            {
                 return false;
             }
 
-            returnedExpression = returnStatement.Expression!;
+            formula = new SmtConditionalFormula(conditionFormula, whenTrueFormula, whenFalseFormula, SmtValueKind.Bool);
             return true;
+        }
+
+        private static bool TryGetSingleReturnExpression(
+            StatementSyntax statement,
+            out ExpressionSyntax expression)
+        {
+            if (statement is ReturnStatementSyntax returnStatement &&
+                returnStatement.Expression != null)
+            {
+                expression = returnStatement.Expression;
+                return true;
+            }
+
+            if (statement is BlockSyntax block &&
+                block.Statements.Count == 1 &&
+                block.Statements[0] is ReturnStatementSyntax blockReturnStatement &&
+                blockReturnStatement.Expression != null)
+            {
+                expression = blockReturnStatement.Expression;
+                return true;
+            }
+
+            expression = null!;
+            return false;
         }
 
         private static bool TryCreateSourcePredicateSubstitutions(
