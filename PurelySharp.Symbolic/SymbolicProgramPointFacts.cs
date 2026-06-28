@@ -2739,6 +2739,7 @@ namespace PurelySharp.Symbolic
                 new SmtNullConstant());
 
             if (TryCreateNullableHasValueFormula(assignedSymbol, out var targetHasValue) &&
+                TryCreateNullableValueFormula(assignedSymbol, out var targetValue) &&
                 TryGetNullableUnderlyingType(GetSymbolType(assignedSymbol), out var underlyingType) &&
                 ConditionalAccessWhenNotNullHasType(
                     conditionalAccess,
@@ -2747,6 +2748,20 @@ namespace PurelySharp.Symbolic
                     cancellationToken))
             {
                 facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetHasValue, receiverNonNull));
+                if (TryCreateConditionalAccessWhenNotNullValueFormula(
+                        conditionalAccess,
+                        receiverFormula,
+                        semanticModel,
+                        cancellationToken,
+                        out var whenNotNullValue) &&
+                    CanCompareSmtValues(targetValue, whenNotNullValue))
+                {
+                    facts.Add(new SmtBinaryFormula(
+                        SmtBinaryOperator.Or,
+                        new SmtUnaryFormula(SmtUnaryOperator.Not, targetHasValue),
+                        new SmtBinaryFormula(SmtBinaryOperator.Equal, targetValue, whenNotNullValue)));
+                }
+
                 return;
             }
 
@@ -2770,6 +2785,43 @@ namespace PurelySharp.Symbolic
             var actualType = typeInfo.ConvertedType ?? typeInfo.Type;
             return actualType != null &&
                 SymbolEqualityComparer.Default.Equals(actualType, expectedType);
+        }
+
+        private static bool TryCreateConditionalAccessWhenNotNullValueFormula(
+            ConditionalAccessExpressionSyntax conditionalAccess,
+            SmtFormula receiverFormula,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula)
+        {
+            if (conditionalAccess.WhenNotNull is MemberBindingExpressionSyntax memberBinding &&
+                semanticModel.GetSymbolInfo(memberBinding.Name, cancellationToken).Symbol is { } memberSymbol)
+            {
+                return TryCreateMemberSmtValue(receiverFormula, memberSymbol, out formula);
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryCreateMemberSmtValue(SmtFormula receiverFormula, ISymbol memberSymbol, out SmtFormula formula)
+        {
+            var type = memberSymbol switch
+            {
+                IPropertySymbol propertySymbol => propertySymbol.Type,
+                IFieldSymbol fieldSymbol => fieldSymbol.Type,
+                _ => null
+            };
+
+            if (type == null ||
+                !TryGetValueKind(type, out var kind))
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(receiverFormula + "." + memberSymbol.Name, kind);
+            return true;
         }
 
         private static void AddAsExpressionAssignedValueFacts(
