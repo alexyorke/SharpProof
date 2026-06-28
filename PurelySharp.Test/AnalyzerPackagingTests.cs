@@ -215,31 +215,49 @@ namespace TestNamespace {
 
             var generatedSummaryArtifactSourceDirectory = document
                 .Descendants()
-                .Where(element => string.Equals(element.Name.LocalName, "GeneratedPurityArtifactSourceDirectory", StringComparison.Ordinal))
+                .Where(element => string.Equals(element.Name.LocalName, "GeneratedPurityArtifactSpecSourcePath", StringComparison.Ordinal))
                 .Select(element => element.Value.Trim())
                 .LastOrDefault();
-            Assert.That(generatedSummaryArtifactSourceDirectory, Is.EqualTo(@"$(MSBuildThisFileDirectory)..\artifacts\effect-summary"));
+            Assert.That(generatedSummaryArtifactSourceDirectory, Is.EqualTo(@"$(MSBuildThisFileDirectory)BuiltInEffectSummaryArtifactSpec.json"));
+
+            var generatedSummaryArtifactSpecPath = document
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "GeneratedPurityArtifactSpecPath", StringComparison.Ordinal))
+                .Select(element => element.Value.Trim())
+                .LastOrDefault();
+            Assert.That(generatedSummaryArtifactSpecPath, Is.EqualTo(@"$(GeneratedPurityBuiltInSummaryDirectory)\BuiltInEffectSummaryArtifactSpec.json"));
 
             var stageTarget = document
                 .Descendants()
                 .Single(element =>
                     string.Equals(element.Name.LocalName, "Target", StringComparison.Ordinal) &&
-                    string.Equals(element.Attribute("Name")?.Value, "StageGeneratedPurityBuiltInSummaries", StringComparison.Ordinal));
+                    string.Equals(element.Attribute("Name")?.Value, "GenerateBuiltInEffectSummaries", StringComparison.Ordinal));
             Assert.That(stageTarget.Attribute("BeforeTargets")?.Value, Is.EqualTo("AssignTargetPaths"));
-
-            var alreadyNamedInclude = stageTarget
-                .Descendants()
-                .Single(element => string.Equals(element.Name.LocalName, "_GeneratedPurityArtifactAlreadyNamed", StringComparison.Ordinal))
-                .Attribute("Include")?.Value;
-            Assert.That(alreadyNamedInclude, Is.EqualTo(@"$(GeneratedPurityArtifactSourceDirectory)\*.PurelySharp.EffectSummary.json"));
 
             var stageCopies = stageTarget
                 .Descendants()
                 .Where(element => string.Equals(element.Name.LocalName, "Copy", StringComparison.Ordinal))
                 .ToArray();
             Assert.That(stageCopies, Has.Length.EqualTo(1));
-            Assert.That(stageCopies[0].Attribute("SourceFiles")?.Value, Is.EqualTo("@(_GeneratedPurityArtifactAlreadyNamed)"));
-            Assert.That(stageCopies[0].Attribute("DestinationFolder")?.Value, Is.EqualTo("$(GeneratedPurityBuiltInSummaryDirectory)"));
+            Assert.That(stageCopies[0].Attribute("SourceFiles")?.Value, Is.EqualTo("$(GeneratedPurityArtifactSpecSourcePath)"));
+            Assert.That(stageCopies[0].Attribute("DestinationFiles")?.Value, Is.EqualTo("$(GeneratedPurityArtifactSpecPath)"));
+
+            var stageBuilds = stageTarget
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "MSBuild", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(stageBuilds, Has.Length.EqualTo(1));
+            Assert.That(stageBuilds[0].Attribute("Projects")?.Value, Is.EqualTo("$(GeneratedPurityToolProjectPath)"));
+            Assert.That(stageBuilds[0].Attribute("Targets")?.Value, Is.EqualTo("Build"));
+
+            var stageExecs = stageTarget
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "Exec", StringComparison.Ordinal))
+                .ToArray();
+            Assert.That(stageExecs, Has.Length.EqualTo(1));
+            Assert.That(
+                stageExecs[0].Attribute("Command")?.Value,
+                Is.EqualTo("dotnet \"$(GeneratedPurityToolDllPath)\" --artifact-spec \"$(GeneratedPurityArtifactSpecPath)\""));
 
             var includeTarget = document
                 .Descendants()
@@ -247,7 +265,7 @@ namespace TestNamespace {
                     string.Equals(element.Name.LocalName, "Target", StringComparison.Ordinal) &&
                     string.Equals(element.Attribute("Name")?.Value, "IncludeGeneratedPurityBuiltInSummaries", StringComparison.Ordinal));
             Assert.That(includeTarget.Attribute("BeforeTargets")?.Value, Is.EqualTo("AssignTargetPaths"));
-            Assert.That(includeTarget.Attribute("DependsOnTargets")?.Value, Is.EqualTo("StageGeneratedPurityBuiltInSummaries"));
+            Assert.That(includeTarget.Attribute("DependsOnTargets")?.Value, Is.EqualTo("GenerateBuiltInEffectSummaries"));
 
             var generatedSummaryInclude = includeTarget
                 .Descendants()
@@ -271,6 +289,7 @@ namespace TestNamespace {
         public void Repository_ShouldNotKeep_CheckedInEffectSummaryJsonArtifacts()
         {
             var repositoryRoot = FindRepositoryRoot();
+            var builtInArtifactSpecPath = Path.Combine(repositoryRoot, "PurelySharp.Analyzer", "BuiltInEffectSummaryArtifactSpec.json");
             var analyzerDirectory = Path.Combine(repositoryRoot, "PurelySharp.Analyzer");
             var checkedInSummaryFiles = Directory
                 .EnumerateFiles(analyzerDirectory, "*.PurelySharp.EffectSummary.json", SearchOption.TopDirectoryOnly)
@@ -281,6 +300,8 @@ namespace TestNamespace {
 
             Assert.That(checkedInSummaryFiles, Is.Empty,
                 "Checked-in effect-summary JSON artifacts should stay out of the repository.");
+            Assert.That(File.Exists(builtInArtifactSpecPath), Is.True,
+                "The analyzer should keep a checked-in build manifest for regenerating built-in effect summaries.");
 
             var reviewedSpecPath = Path.Combine(repositoryRoot, "Tools", "PurelySharp.EffectSummary", "ReviewedRuntimeArtifactSpec.json");
             Assert.That(File.Exists(reviewedSpecPath), Is.False,
@@ -338,7 +359,7 @@ namespace TestNamespace {
         }
 
         [Test]
-        public void GeneratedPurityCatalog_CreateBuiltInCatalog_LoadsGeneratedAnalyzerDirectorySummary()
+        public void GeneratedPurityCatalog_CreateBuiltInCatalog_DoesNotLoadLooseAnalyzerDirectorySummary()
         {
             var analyzerAssemblyPath = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly.Location;
             var analyzerAssemblyDirectory = Path.GetDirectoryName(analyzerAssemblyPath);
@@ -393,8 +414,8 @@ public static class TestClass
                     ? null
                     : (string?)purityEntry.GetType().GetProperty("Classification")!.GetValue(purityEntry);
 
-                Assert.That(matched, Is.True, "Built-in generated purity should load summaries emitted beside the analyzer assembly.");
-                Assert.That(classification, Is.EqualTo("pure"));
+                Assert.That(matched, Is.False, "Built-in generated purity should come only from embedded resources, not loose analyzer-directory summaries.");
+                Assert.That(classification, Is.Null);
             }
             finally
             {
@@ -406,7 +427,7 @@ public static class TestClass
         }
 
         [Test]
-        public void ExceptionSummaryCatalog_CreateBuiltInCatalog_LoadsGeneratedAnalyzerDirectorySummary()
+        public void ExceptionSummaryCatalog_CreateBuiltInCatalog_DoesNotLoadLooseAnalyzerDirectorySummary()
         {
             var analyzerAssemblyPath = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly.Location;
             var analyzerAssemblyDirectory = Path.GetDirectoryName(analyzerAssemblyPath);
@@ -432,7 +453,7 @@ public static class TestClass
                     throwOnError: true)!;
                 var createBuiltInCatalog = catalogType.GetMethod("CreateBuiltInCatalog", BindingFlags.NonPublic | BindingFlags.Static)!;
                 var tryGetExceptions = catalogType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                    .Single(method => method.Name == "TryGetExceptions" &&
+                    .Single(method => method.Name == "TryGetExceptionInfos" &&
                         method.GetParameters().Length == 3 &&
                         method.GetParameters()[1].ParameterType == typeof(Compilation));
                 var builtInCatalog = createBuiltInCatalog.Invoke(null, null)!;
@@ -461,12 +482,8 @@ public static class TestClass
 
                 var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
                 var matched = (bool)tryGetExceptions.Invoke(builtInCatalog, args)!;
-                var exceptionTypes = args[2] is ImmutableArray<string> values
-                    ? values
-                    : ImmutableArray<string>.Empty;
 
-                Assert.That(matched, Is.True, "Built-in generated exception summaries should load summaries emitted beside the analyzer assembly.");
-                Assert.That(exceptionTypes.ToArray(), Is.EqualTo(new[] { "System.ArgumentException" }));
+                Assert.That(matched, Is.False, "Built-in generated exception summaries should come only from embedded resources, not loose analyzer-directory summaries.");
             }
             finally
             {
@@ -516,7 +533,7 @@ public static class ThrowingBoundary
                     throwOnError: true)!;
                 var createBuiltInCatalog = catalogType.GetMethod("CreateBuiltInCatalog", BindingFlags.NonPublic | BindingFlags.Static)!;
                 var tryGetExceptions = catalogType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                    .Single(method => method.Name == "TryGetExceptions" &&
+                    .Single(method => method.Name == "TryGetExceptionInfos" &&
                         method.GetParameters().Length == 3 &&
                         method.GetParameters()[1].ParameterType == typeof(Compilation));
                 var builtInCatalog = createBuiltInCatalog.Invoke(null, null)!;
@@ -545,12 +562,8 @@ public static class TestClass
 
                 var args = new object?[] { methodSymbol.OriginalDefinition, compilation, null };
                 var matched = (bool)tryGetExceptions.Invoke(builtInCatalog, args)!;
-                var exceptionTypes = args[2] is ImmutableArray<string> values
-                    ? values
-                    : ImmutableArray<string>.Empty;
 
                 Assert.That(matched, Is.False, "Only *.PurelySharp.EffectSummary.json files should be consumed as built-in exception summaries.");
-                Assert.That(exceptionTypes, Is.Empty);
             }
             finally
             {

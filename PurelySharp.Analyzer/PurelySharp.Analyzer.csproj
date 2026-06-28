@@ -9,7 +9,10 @@
     <ImplicitUsings>enable</ImplicitUsings> 
     <NoWarn>$(NoWarn);RS2007;RS1035</NoWarn> 
     <GeneratedPurityBuiltInSummaryDirectory Condition="'$(GeneratedPurityBuiltInSummaryDirectory)' == ''">$(BaseIntermediateOutputPath)$(Configuration)\$(TargetFramework)\GeneratedPurity</GeneratedPurityBuiltInSummaryDirectory>
-    <GeneratedPurityArtifactSourceDirectory Condition="'$(GeneratedPurityArtifactSourceDirectory)' == ''">$(MSBuildThisFileDirectory)..\artifacts\effect-summary</GeneratedPurityArtifactSourceDirectory>
+    <GeneratedPurityArtifactSpecSourcePath Condition="'$(GeneratedPurityArtifactSpecSourcePath)' == ''">$(MSBuildThisFileDirectory)BuiltInEffectSummaryArtifactSpec.json</GeneratedPurityArtifactSpecSourcePath>
+    <GeneratedPurityArtifactSpecPath Condition="'$(GeneratedPurityArtifactSpecPath)' == ''">$(GeneratedPurityBuiltInSummaryDirectory)\BuiltInEffectSummaryArtifactSpec.json</GeneratedPurityArtifactSpecPath>
+    <GeneratedPurityToolProjectPath Condition="'$(GeneratedPurityToolProjectPath)' == ''">$(MSBuildThisFileDirectory)..\Tools\PurelySharp.EffectSummary\PurelySharp.EffectSummary.csproj</GeneratedPurityToolProjectPath>
+    <GeneratedPurityToolDllPath Condition="'$(GeneratedPurityToolDllPath)' == ''">$(MSBuildThisFileDirectory)..\Tools\PurelySharp.EffectSummary\bin\$(Configuration)\net8.0\PurelySharp.EffectSummary.dll</GeneratedPurityToolDllPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -34,7 +37,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PurelySharp.Attributes\PurelySharp.Attributes.csproj" />
     <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
-    
+    <Compile Include="..\Shared\Constants.cs" Link="Engine\Constants.cs" />
   </ItemGroup>
   
   <ItemGroup>
@@ -50,25 +53,24 @@
     </Compile>
   </ItemGroup>
 
-  <Target Name="StageGeneratedPurityBuiltInSummaries" BeforeTargets="AssignTargetPaths">
-    <ItemGroup Condition="Exists('$(GeneratedPurityArtifactSourceDirectory)')">
-      <_GeneratedPurityArtifactAlreadyNamed Include="$(GeneratedPurityArtifactSourceDirectory)\*.PurelySharp.EffectSummary.json" />
-    </ItemGroup>
-
+  <Target Name="GenerateBuiltInEffectSummaries" BeforeTargets="AssignTargetPaths">
     <RemoveDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)"
                Condition="Exists('$(GeneratedPurityBuiltInSummaryDirectory)')" />
-    <MakeDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)"
-             Condition="'@(_GeneratedPurityArtifactAlreadyNamed)' != ''" />
+    <MakeDir Directories="$(GeneratedPurityBuiltInSummaryDirectory)" />
 
-    <Copy SourceFiles="@(_GeneratedPurityArtifactAlreadyNamed)"
-          DestinationFolder="$(GeneratedPurityBuiltInSummaryDirectory)"
-          SkipUnchangedFiles="true"
-          Condition="'@(_GeneratedPurityArtifactAlreadyNamed)' != ''" />
+    <Copy SourceFiles="$(GeneratedPurityArtifactSpecSourcePath)"
+          DestinationFiles="$(GeneratedPurityArtifactSpecPath)" />
+
+    <MSBuild Projects="$(GeneratedPurityToolProjectPath)"
+             Targets="Build"
+             Properties="Configuration=$(Configuration)" />
+
+    <Exec Command='dotnet &quot;$(GeneratedPurityToolDllPath)&quot; --artifact-spec &quot;$(GeneratedPurityArtifactSpecPath)&quot;' />
   </Target>
 
   <Target Name="IncludeGeneratedPurityBuiltInSummaries"
           BeforeTargets="AssignTargetPaths"
-          DependsOnTargets="StageGeneratedPurityBuiltInSummaries">
+          DependsOnTargets="GenerateBuiltInEffectSummaries">
     <ItemGroup Condition="Exists('$(GeneratedPurityBuiltInSummaryDirectory)')">
       <_GeneratedPurityBuiltInSummary Include="$(GeneratedPurityBuiltInSummaryDirectory)\*.PurelySharp.EffectSummary.json" />
       <EmbeddedResource Include="@(_GeneratedPurityBuiltInSummary)">

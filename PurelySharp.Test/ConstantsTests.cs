@@ -3358,6 +3358,7 @@ public static class UriCatalogSignatureSamples
         [Test]
         public void AppContextImpureHelpers_AreSourcedFromGeneratedImpureEvidence_NotStaticCatalogs()
         {
+            AssertNotInManualCatalogs("System.AppContext.TargetFrameworkName.get");
             AssertNotInManualCatalogs("System.AppContext.BaseDirectory.get");
             AssertNotInManualCatalogs("System.AppContext.GetData(string)");
             AssertNotInManualCatalogs("System.AppContext.SetData(string, object?)");
@@ -3492,7 +3493,6 @@ public static class StopwatchCatalogSignatureSamples
         {
             var members = new[]
             {
-                "System.AppContext.TargetFrameworkName.get",
                 "System.AppDomain.Id.get",
                 "System.OperatingSystem.IsAndroid()",
                 "System.OperatingSystem.IsAndroidVersionAtLeast(int, int, int, int)",

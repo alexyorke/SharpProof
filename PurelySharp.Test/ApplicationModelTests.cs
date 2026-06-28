@@ -109,7 +109,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task AppContextTargetFrameworkName_NoDiagnostic()
+        public async Task AppContextTargetFrameworkName_Diagnostic()
         {
             var test = @"
 #nullable enable
@@ -119,7 +119,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string? TestMethod()
+    public string? {|PS0002:TestMethod|}()
     {
         return AppContext.TargetFrameworkName;
     }

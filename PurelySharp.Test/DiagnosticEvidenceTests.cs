@@ -1237,7 +1237,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task GeneratedPurityCatalog_Resolves_AppContextTargetFrameworkName_Getter()
+        public async Task Ps0002_AppContextTargetFrameworkName_UsesGeneratedPurityCatalogSource()
         {
             const string source = @"
 #nullable enable
@@ -1272,12 +1272,17 @@ public class TestClass
             var catalog = fromOptions.Invoke(null, new object[] { CreateGeneratedPurityAnalyzerOptions(), CancellationToken.None })!;
             var tryGetPurityArgs = new object?[] { getter.OriginalDefinition, compilation, null };
             var matched = (bool)tryGetPurity.Invoke(catalog, tryGetPurityArgs)!;
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
 
             Assert.That(
                 diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.PurityNotVerifiedId),
-                Is.False,
-                "Trusted generated purity should allow AppContext.TargetFrameworkName.");
+                Is.True,
+                "Generated runtime evidence should treat AppContext.TargetFrameworkName as an impure ambient read.");
             Assert.That(matched, Is.True, "Generated purity catalog should resolve AppContext.TargetFrameworkName.get to its runtime implementation assembly.");
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("global_state_write"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityRuleProperty], Is.EqualTo("PropertyReferencePurityRule"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("System.AppContext.TargetFrameworkName"));
         }
 
         [Test]

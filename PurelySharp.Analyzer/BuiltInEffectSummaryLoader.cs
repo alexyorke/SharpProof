@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -12,14 +11,6 @@ namespace PurelySharp.Analyzer
 
         internal static void LoadBuiltInSummaryJsonDocuments(Action<string> addJson)
         {
-            var summaryDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            AddSummaryDirectory(summaryDirectories, Path.GetDirectoryName(typeof(BuiltInEffectSummaryLoader).Assembly.Location));
-            AddSummaryDirectory(summaryDirectories, AppContext.BaseDirectory);
-            foreach (var summaryDirectory in summaryDirectories)
-            {
-                LoadBuiltInSummaryJsonDocuments(addJson, summaryDirectory);
-            }
-
             LoadEmbeddedSummaryJsonDocuments(addJson);
         }
 
@@ -50,33 +41,6 @@ namespace PurelySharp.Analyzer
             var fileName = Path.GetFileName(path);
             return string.Equals(fileName, SummaryFileName, StringComparison.OrdinalIgnoreCase) ||
                 fileName.EndsWith("." + SummaryFileName, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static void AddSummaryDirectory(HashSet<string> directories, string? path)
-        {
-            if (path != null && !string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
-            {
-                directories.Add(path);
-            }
-        }
-
-        private static void LoadBuiltInSummaryJsonDocuments(Action<string> addJson, string summaryDirectory)
-        {
-            var builtInSummaryPath = Path.Combine(summaryDirectory, SummaryFileName);
-            if (File.Exists(builtInSummaryPath))
-            {
-                addJson(File.ReadAllText(builtInSummaryPath));
-            }
-
-            foreach (var domainSummaryPath in Directory.EnumerateFiles(summaryDirectory, "*." + SummaryFileName, SearchOption.TopDirectoryOnly))
-            {
-                if (string.Equals(Path.GetFileName(domainSummaryPath), SummaryFileName, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                addJson(File.ReadAllText(domainSummaryPath));
-            }
         }
 
         private static void LoadEmbeddedSummaryJsonDocuments(Action<string> addJson)
