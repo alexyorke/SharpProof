@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using PurelySharp.Analyzer.Engine;
 using PurelySharp.Analyzer.Engine.Smt;
+using PurelySharp.Symbolic.Smt;
 using SearchLib.Purity;
 using SearchLib.Smt;
 

@@ -3,7 +3,7 @@ using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using PurelySharp.Analyzer.Engine.Symbolic;
+using PurelySharp.Symbolic;
 
 var options = SymbolicCliOptions.Parse(args);
 if (options.ShowHelp || options.FilePath == null)

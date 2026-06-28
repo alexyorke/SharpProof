@@ -6,12 +6,12 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using PurelySharp.Analyzer.Engine.Smt;
+using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
 
-namespace PurelySharp.Analyzer.Engine.Symbolic
+namespace PurelySharp.Symbolic
 {
-    internal static class SymbolicProgramPointFacts
+    public static class SymbolicProgramPointFacts
     {
         public static List<SmtFormula> CollectPriorAssignmentFacts(
             SyntaxNode site,
@@ -349,7 +349,7 @@ namespace PurelySharp.Analyzer.Engine.Symbolic
             List<SmtFormula> facts)
         {
             foreach (var node in root.DescendantNodesAndSelf(
-                         descendIntoChildren: candidate => !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
             {
                 var mutatedExpression = node switch
                 {
@@ -687,7 +687,7 @@ namespace PurelySharp.Analyzer.Engine.Symbolic
             CancellationToken cancellationToken)
         {
             foreach (var node in root.DescendantNodesAndSelf(
-                         descendIntoChildren: candidate => !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
             {
                 if (node is not ExpressionSyntax expression)
                 {

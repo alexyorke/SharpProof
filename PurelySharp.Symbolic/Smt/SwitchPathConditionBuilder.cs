@@ -3,9 +3,9 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SearchLib.Smt;
 
-namespace PurelySharp.Analyzer.Engine.Smt
+namespace PurelySharp.Symbolic.Smt
 {
-    internal static class SwitchPathConditionBuilder
+    public static class SwitchPathConditionBuilder
     {
         public static bool TryCreateSwitchStatementSectionCondition(
             ExpressionSyntax governingExpression,

@@ -4,7 +4,7 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace PurelySharp.Analyzer.Engine.Symbolic
+namespace PurelySharp.Symbolic
 {
     public sealed class SymbolicInvariantService
     {

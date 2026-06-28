@@ -8,7 +8,8 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SearchLib.Purity;
 using PurelySharp.Analyzer.Engine.Smt;
-using PurelySharp.Analyzer.Engine.Symbolic;
+using PurelySharp.Symbolic;
+using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
 
 namespace PurelySharp.Analyzer.Engine

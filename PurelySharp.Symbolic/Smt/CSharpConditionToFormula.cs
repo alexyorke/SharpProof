@@ -5,9 +5,9 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using SearchLib.Smt;
 
-namespace PurelySharp.Analyzer.Engine.Smt
+namespace PurelySharp.Symbolic.Smt
 {
-    internal static class CSharpConditionToFormula
+    public static class CSharpConditionToFormula
     {
         private const int MaxSourcePredicateInlineDepth = 4;
 

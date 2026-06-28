@@ -361,7 +361,7 @@ namespace TestNamespace {
         }
 
         [Test]
-        public void AnalyzerPackage_ShouldInclude_SearchLibAndZ3Dependencies()
+        public void AnalyzerPackage_ShouldInclude_SymbolicSearchLibAndZ3Dependencies()
         {
             var repositoryRoot = FindRepositoryRoot();
             var packageProjectPath = Path.Combine(repositoryRoot, "PurelySharp.Package", "PurelySharp.Package.csproj");
@@ -375,13 +375,14 @@ namespace TestNamespace {
                 .Select(Path.GetFileName)
                 .ToArray();
 
+            Assert.That(analyzerPackageFiles, Does.Contain("PurelySharp.Symbolic.dll"));
             Assert.That(analyzerPackageFiles, Does.Contain("SearchLib.dll"));
             Assert.That(analyzerPackageFiles, Does.Contain("Microsoft.Z3.dll"));
             Assert.That(analyzerPackageFiles, Does.Contain("libz3.dll"));
         }
 
         [Test]
-        public void BuiltAnalyzerPackage_ShouldShip_SearchLibAndZ3Dependencies_WhenPackageExists()
+        public void BuiltAnalyzerPackage_ShouldShip_SymbolicSearchLibAndZ3Dependencies_WhenPackageExists()
         {
             var repositoryRoot = FindRepositoryRoot();
             var packagePath = Path.Combine(repositoryRoot, "PurelySharp.Package", "bin", "Release", "PurelySharp.0.0.4.nupkg");
@@ -393,9 +394,27 @@ namespace TestNamespace {
             using var archive = ZipFile.OpenRead(packagePath);
             var entryNames = archive.Entries.Select(entry => entry.FullName.Replace('\\', '/')).ToArray();
 
+            Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/PurelySharp.Symbolic.dll"));
             Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/SearchLib.dll"));
             Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/Microsoft.Z3.dll"));
             Assert.That(entryNames, Does.Contain("analyzers/dotnet/cs/libz3.dll"));
+        }
+
+        [Test]
+        public void SymbolicCli_ShouldUseSymbolicLibrary_NotAnalyzerProject()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var cliProjectPath = Path.Combine(repositoryRoot, "Tools", "PurelySharp.SymbolicCli", "PurelySharp.SymbolicCli.csproj");
+            var project = XDocument.Load(cliProjectPath);
+            var projectReferences = project
+                .Descendants()
+                .Where(element => string.Equals(element.Name.LocalName, "ProjectReference", StringComparison.Ordinal))
+                .Select(element => element.Attribute("Include")?.Value)
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToArray();
+
+            Assert.That(projectReferences, Does.Contain(@"..\..\PurelySharp.Symbolic\PurelySharp.Symbolic.csproj"));
+            Assert.That(projectReferences, Does.Not.Contain(@"..\..\PurelySharp.Analyzer\PurelySharp.Analyzer.csproj"));
         }
 
         [Test]

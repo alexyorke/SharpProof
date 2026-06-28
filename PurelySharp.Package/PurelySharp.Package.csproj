@@ -41,6 +41,7 @@
   <Target Name="_AddAnalyzersToOutput">
     <ItemGroup>
       <TfmSpecificPackageFile Include="..\PurelySharp.Analyzer\bin\$(Configuration)\netstandard2.0\PurelySharp.Analyzer.dll" PackagePath="analyzers/dotnet/cs" />
+      <TfmSpecificPackageFile Include="..\PurelySharp.Analyzer\bin\$(Configuration)\netstandard2.0\PurelySharp.Symbolic.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="..\PurelySharp.Analyzer\bin\$(Configuration)\netstandard2.0\SearchLib.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="..\PurelySharp.Analyzer\bin\$(Configuration)\netstandard2.0\Microsoft.Z3.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="..\PurelySharp.Analyzer\bin\$(Configuration)\netstandard2.0\libz3.dll" PackagePath="analyzers/dotnet/cs" />

@@ -36,6 +36,7 @@
     
     <ProjectReference Include="..\PurelySharp.Attributes\PurelySharp.Attributes.csproj" />
     <ProjectReference Include="..\PurelySharp.Analyzer\PurelySharp.Analyzer.csproj" />
+    <ProjectReference Include="..\PurelySharp.Symbolic\PurelySharp.Symbolic.csproj" />
     <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
     <ProjectReference Include="..\Tools\PurelySharp.CorpusReport\PurelySharp.CorpusReport.csproj" />
     <ProjectReference Include="..\Tools\PurelySharp.Fuzz\PurelySharp.Fuzz.csproj" />
