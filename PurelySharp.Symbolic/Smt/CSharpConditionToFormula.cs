@@ -590,21 +590,66 @@ namespace PurelySharp.Symbolic.Smt
             out SmtFormula? formula)
         {
             formula = null;
-            if (bodySyntax.Statements.Count == 1)
+            var substitutions = new List<SmtVariableSubstitution>();
+            var statementIndex = 0;
+            while (statementIndex < bodySyntax.Statements.Count &&
+                bodySyntax.Statements[statementIndex] is LocalDeclarationStatementSyntax localDeclaration)
             {
-                if (bodySyntax.Statements[0] is ReturnStatementSyntax returnStatement &&
+                if (!TryCollectLocalDeclarationSubstitutions(
+                        localDeclaration,
+                        semanticModel,
+                        cancellationToken,
+                        inlineDepth,
+                        substitutions))
+                {
+                    return false;
+                }
+
+                statementIndex++;
+            }
+
+            return TryTranslateReturnedBooleanStatements(
+                bodySyntax.Statements,
+                statementIndex,
+                substitutions,
+                semanticModel,
+                cancellationToken,
+                inlineDepth,
+                out formula);
+        }
+
+        private static bool TryTranslateReturnedBooleanStatements(
+            SyntaxList<StatementSyntax> statements,
+            int statementIndex,
+            IReadOnlyList<SmtVariableSubstitution> substitutions,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            int inlineDepth,
+            out SmtFormula? formula)
+        {
+            formula = null;
+            var remainingStatementCount = statements.Count - statementIndex;
+            if (remainingStatementCount == 1)
+            {
+                if (statements[statementIndex] is ReturnStatementSyntax returnStatement &&
                     returnStatement.Expression != null)
                 {
-                    return TryTranslate(
+                    if (!TryTranslate(
                         returnStatement.Expression,
                         semanticModel,
                         cancellationToken,
                         out formula,
                         getSymbolVersion: null,
-                        inlineDepth);
+                        inlineDepth))
+                    {
+                        return false;
+                    }
+
+                    formula = SubstituteVariables(formula!, substitutions);
+                    return true;
                 }
 
-                if (bodySyntax.Statements[0] is IfStatementSyntax ifStatement &&
+                if (statements[statementIndex] is IfStatementSyntax ifStatement &&
                     ifStatement.Else?.Statement != null &&
                     TryGetSingleReturnExpression(ifStatement.Statement, out var trueReturn) &&
                     TryGetSingleReturnExpression(ifStatement.Else.Statement, out var falseReturn))
@@ -616,14 +661,15 @@ namespace PurelySharp.Symbolic.Smt
                         semanticModel,
                         cancellationToken,
                         inlineDepth,
+                        substitutions,
                         out formula);
                 }
             }
 
-            if (bodySyntax.Statements.Count == 2 &&
-                bodySyntax.Statements[0] is IfStatementSyntax leadingIf &&
+            if (remainingStatementCount == 2 &&
+                statements[statementIndex] is IfStatementSyntax leadingIf &&
                 leadingIf.Else == null &&
-                bodySyntax.Statements[1] is ReturnStatementSyntax finalReturnStatement &&
+                statements[statementIndex + 1] is ReturnStatementSyntax finalReturnStatement &&
                 finalReturnStatement.Expression != null &&
                 TryGetSingleReturnExpression(leadingIf.Statement, out var earlyReturn))
             {
@@ -634,10 +680,48 @@ namespace PurelySharp.Symbolic.Smt
                     semanticModel,
                     cancellationToken,
                     inlineDepth,
+                    substitutions,
                     out formula);
             }
 
             return false;
+        }
+
+        private static bool TryCollectLocalDeclarationSubstitutions(
+            LocalDeclarationStatementSyntax localDeclaration,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            int inlineDepth,
+            ICollection<SmtVariableSubstitution> substitutions)
+        {
+            foreach (var variable in localDeclaration.Declaration.Variables)
+            {
+                if (variable.Initializer == null ||
+                    semanticModel.GetDeclaredSymbol(variable, cancellationToken) is not ILocalSymbol localSymbol ||
+                    !TryGetValueKind(localSymbol.Type, out var localKind) ||
+                    !TryTranslateValue(
+                        variable.Initializer.Value,
+                        semanticModel,
+                        cancellationToken,
+                        out var initializerFormula,
+                        getSymbolVersion: null,
+                        inlineDepth) ||
+                    initializerFormula == null ||
+                    initializerFormula.Kind != localKind)
+                {
+                    return false;
+                }
+
+                var replacement = SubstituteVariables(initializerFormula, substitutions.ToArray());
+                var localVariable = new SmtVariable(GetVariableName(localSymbol, getSymbolVersion: null), localKind);
+                substitutions.Add(new SmtVariableSubstitution(
+                    localVariable.Name,
+                    localVariable.Name + ".",
+                    localVariable + ".",
+                    replacement));
+            }
+
+            return true;
         }
 
         private static bool TryTranslateReturnedBooleanConditional(
@@ -647,6 +731,7 @@ namespace PurelySharp.Symbolic.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             int inlineDepth,
+            IReadOnlyList<SmtVariableSubstitution> substitutions,
             out SmtFormula? formula)
         {
             formula = null;
@@ -660,7 +745,9 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            formula = new SmtConditionalFormula(conditionFormula, whenTrueFormula, whenFalseFormula, SmtValueKind.Bool);
+            formula = SubstituteVariables(
+                new SmtConditionalFormula(conditionFormula, whenTrueFormula, whenFalseFormula, SmtValueKind.Bool),
+                substitutions);
             return true;
         }
 
