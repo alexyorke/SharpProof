@@ -31,6 +31,7 @@ namespace PurelySharp.Analyzer
             }
 
             var pathConditions = new List<SmtFormula>();
+            AddPriorAssignmentPathConditions(useNode, semanticModel, cancellationToken, pathConditions);
             foreach (var ifStatement in useNode.Ancestors().OfType<IfStatementSyntax>())
             {
                 if (ifStatement.Statement.Span.Contains(useNode.SpanStart) &&

@@ -1237,6 +1237,11 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (TryTranslateBooleanTerm(expression, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth))
+            {
+                return true;
+            }
+
             if (TryTranslateIntegralTerm(expression, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth))
             {
                 return true;
@@ -1311,6 +1316,88 @@ namespace PurelySharp.Symbolic.Smt
             {
                 formula = new SmtNullConstant();
                 return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryTranslateBooleanTerm(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!HasSupportedBooleanType(expression, semanticModel, cancellationToken))
+            {
+                return false;
+            }
+
+            if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
+                prefixUnary.IsKind(SyntaxKind.LogicalNotExpression) &&
+                TryTranslate(prefixUnary.Operand, semanticModel, cancellationToken, out var operand, getSymbolVersion, inlineDepth) &&
+                operand != null)
+            {
+                formula = new SmtUnaryFormula(SmtUnaryOperator.Not, operand);
+                return true;
+            }
+
+            if (expression is BinaryExpressionSyntax binaryExpression)
+            {
+                if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression) &&
+                    TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftAnd, getSymbolVersion, inlineDepth) &&
+                    TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightAnd, getSymbolVersion, inlineDepth) &&
+                    leftAnd != null &&
+                    rightAnd != null)
+                {
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.And, leftAnd, rightAnd);
+                    return true;
+                }
+
+                if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression) &&
+                    TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftOr, getSymbolVersion, inlineDepth) &&
+                    TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightOr, getSymbolVersion, inlineDepth) &&
+                    leftOr != null &&
+                    rightOr != null)
+                {
+                    formula = new SmtBinaryFormula(SmtBinaryOperator.Or, leftOr, rightOr);
+                    return true;
+                }
+
+                if (TryTranslateUnsignedCastBoundsComparison(
+                        binaryExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var unsignedBoundsFormula,
+                        getSymbolVersion,
+                        inlineDepth) &&
+                    unsignedBoundsFormula != null)
+                {
+                    formula = unsignedBoundsFormula;
+                    return true;
+                }
+
+                if (TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue, getSymbolVersion, inlineDepth) &&
+                    TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue, getSymbolVersion, inlineDepth) &&
+                    leftValue != null &&
+                    rightValue != null &&
+                    TryTranslateComparison(binaryExpression.Kind(), leftValue, rightValue, out var comparison))
+                {
+                    formula = comparison;
+                    return true;
+                }
+            }
+
+            if (expression is IsPatternExpressionSyntax isPatternExpression)
+            {
+                return TryTranslatePatternExpression(isPatternExpression, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth);
+            }
+
+            if (expression is InvocationExpressionSyntax invocationExpression)
+            {
+                return TryTranslateSourceBooleanInvocation(invocationExpression, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth);
             }
 
             return false;
@@ -1582,6 +1669,16 @@ namespace PurelySharp.Symbolic.Smt
         {
             var type = semanticModel.GetTypeInfo(expression, cancellationToken).Type;
             return type != null && IsIntegralType(type);
+        }
+
+        private static bool HasSupportedBooleanType(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            var type = typeInfo.ConvertedType ?? typeInfo.Type;
+            return type?.SpecialType == SpecialType.System_Boolean;
         }
 
         private static ExpressionSyntax UnwrapExpression(ExpressionSyntax expression)

@@ -588,6 +588,33 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsBooleanPredicateAliasFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        var inRange = index >= 0 && index < values.Length;
+        if (inRange)
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}",
+                "return values[index];");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("inRange", StringComparison.Ordinal) &&
+                                           fact.Contains("And", StringComparison.Ordinal) &&
+                                           fact.Contains("LessThan", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains("inRange", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsSwitchStatementSectionFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -1872,6 +1899,29 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_BooleanPredicateAliasContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int value)
+    {
+        var isZero = value == 0;
+        if (isZero && value != 0)
+        {
+            Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_LargeUlongConstantGuard_RemainsConservativeReports()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
@@ -3077,6 +3127,32 @@ public class TestClass
     {
         int divisor = default;
         return 10 / divisor;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_BooleanPredicateAliasImpliesZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        var isZero = divisor == 0;
+        if (isZero)
+        {
+            return 10 / divisor;
+        }
+
+        return 0;
     }
 }");
 
