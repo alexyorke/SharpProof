@@ -30,6 +30,38 @@ namespace PurelySharp.Symbolic.Smt
 
         public int CacheEntryCount => _queryCache.Count;
 
+        public PurityProofResult ClassifyPathFeasibility(IEnumerable<SmtFormula> pathConditions)
+        {
+            return Classify(new PurityProofQuery(
+                pathConditions.ToArray(),
+                new PurityHazard(
+                    PurityHazardKind.BranchReachability,
+                    new SmtBooleanConstant(true))));
+        }
+
+        public PurityProofResult ClassifyImplication(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula factFormula)
+        {
+            if (factFormula == null)
+            {
+                throw new ArgumentNullException(nameof(factFormula));
+            }
+
+            return Classify(new PurityProofQuery(
+                pathConditions.ToArray(),
+                new PurityHazard(
+                    PurityHazardKind.BranchReachability,
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, factFormula))));
+        }
+
+        public bool PathConditionsImply(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtFormula factFormula)
+        {
+            return ClassifyImplication(pathConditions, factFormula).Outcome == PurityProofOutcome.ProvablyPure;
+        }
+
         public PurityProofResult Classify(PurityProofQuery query)
         {
             if (!Options.IsEnabled)

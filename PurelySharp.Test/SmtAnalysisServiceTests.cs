@@ -98,6 +98,62 @@ namespace PurelySharp.Test
             Assert.That(service.CacheEntryCount, Is.EqualTo(1));
         }
 
+        [Test]
+        public void ClassifyImplication_ProvesFactFromPathConditions()
+        {
+            var x = new SmtVariable("x", SmtValueKind.Int);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0)),
+            };
+            var fact = new SmtBinaryFormula(SmtBinaryOperator.LessThanOrEqual, x, new SmtIntegerConstant(1));
+
+            var result = service.ClassifyImplication(pathConditions, fact);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Satisfiable));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(service.PathConditionsImply(pathConditions, fact), Is.True);
+        }
+
+        [Test]
+        public void ClassifyImplication_ReturnsReachableWhenFactDoesNotFollow()
+        {
+            var x = new SmtVariable("x", SmtValueKind.Int);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, x, new SmtIntegerConstant(0)),
+            };
+            var fact = new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(0));
+
+            var result = service.ClassifyImplication(pathConditions, fact);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Satisfiable));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Satisfiable));
+            Assert.That(service.PathConditionsImply(pathConditions, fact), Is.False);
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_ReportsContradictoryPathUnsatisfiable()
+        {
+            var x = new SmtVariable("x", SmtValueKind.Int);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(0)),
+                new SmtBinaryFormula(SmtBinaryOperator.LessThan, x, new SmtIntegerConstant(0)),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+        }
+
         private static PurityProofQuery CreateQuery(
             IReadOnlyList<SmtFormula> pathConditions,
             SmtFormula triggerCondition)

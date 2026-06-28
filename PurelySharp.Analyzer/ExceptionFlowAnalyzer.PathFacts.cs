@@ -5,7 +5,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using PurelySharp.Analyzer.Engine;
 using PurelySharp.Symbolic.Smt;
-using SearchLib.Purity;
 using SearchLib.Smt;
 
 namespace PurelySharp.Analyzer
@@ -1489,14 +1488,7 @@ namespace PurelySharp.Analyzer
             SmtFormula factFormula,
             SmtAnalysisService smtAnalysis)
         {
-            var query = new PurityProofQuery(
-                pathConditions.ToArray(),
-                new PurityHazard(
-                    PurityHazardKind.BranchReachability,
-                    new SmtUnaryFormula(SmtUnaryOperator.Not, factFormula)));
-
-            var proofResult = smtAnalysis.Classify(query);
-            return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
+            return smtAnalysis.PathConditionsImply(pathConditions, factFormula);
         }
 
         private static bool IsSymbolAssignedBeforeUse(
