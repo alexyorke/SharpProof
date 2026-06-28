@@ -163,6 +163,16 @@ namespace PurelySharp.Symbolic
                         semanticModel,
                         cancellationToken);
                 }
+                else if (ancestor is CatchClauseSyntax catchClauseSyntax &&
+                         catchClauseSyntax.Block.Span.Contains(syntaxNode.Span))
+                {
+                    AddCatchBodyEntryFacts(
+                        builder,
+                        catchClauseSyntax,
+                        syntaxNode.SpanStart,
+                        semanticModel,
+                        cancellationToken);
+                }
                 else if (ancestor is WhileStatementSyntax whileStatementSyntax &&
                          whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
                          !AnyReferencedSymbolAssignedBeforeUse(
@@ -1663,6 +1673,54 @@ namespace PurelySharp.Symbolic
                 semanticModel,
                 cancellationToken,
                 facts);
+        }
+
+        private static void AddCatchBodyEntryFacts(
+            ICollection<SmtFormula> facts,
+            CatchClauseSyntax catchClause,
+            int useSpanStart,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (catchClause.Declaration != null &&
+                semanticModel.GetDeclaredSymbol(catchClause.Declaration, cancellationToken) is ILocalSymbol localSymbol &&
+                !IsSymbolAssignedBetween(
+                    catchClause.Block,
+                    catchClause.Block.SpanStart - 1,
+                    useSpanStart,
+                    localSymbol.OriginalDefinition,
+                    semanticModel,
+                    cancellationToken))
+            {
+                AddSymbolNonNullCondition(facts, localSymbol.OriginalDefinition);
+            }
+
+            if (catchClause.Filter?.FilterExpression is { } filterExpression &&
+                !AnyReferencedSymbolAssignedBeforeUse(
+                    filterExpression,
+                    catchClause.Block,
+                    useSpanStart,
+                    semanticModel,
+                    cancellationToken))
+            {
+                AddBranchConditionFacts(filterExpression, branchWhenTrue: true, semanticModel, cancellationToken, facts);
+            }
+        }
+
+        private static void AddSymbolNonNullCondition(
+            ICollection<SmtFormula> facts,
+            ISymbol symbol)
+        {
+            if (!TryCreateSymbolSmtValue(symbol, out var formula) ||
+                formula is not { Kind: SmtValueKind.Reference })
+            {
+                return;
+            }
+
+            facts.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.NotEqual,
+                formula,
+                new SmtNullConstant()));
         }
 
         private static void AddForeachBodyEntryFacts(

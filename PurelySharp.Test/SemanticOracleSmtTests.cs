@@ -1537,6 +1537,108 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCatchExceptionVariableNonNull()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        try
+        {
+            throw new InvalidOperationException();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ex.Message.Length;
+        }
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "CatchExceptionVariableNonNull.cs",
+                FindLine(source, "return ex.Message.Length;"),
+                13,
+                "ex != null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCatchFilterCondition()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        try
+        {
+            throw new InvalidOperationException();
+        }
+        catch (InvalidOperationException) when (value > 0)
+        {
+            return 10 / value;
+        }
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "CatchFilterCondition.cs",
+                FindLine(source, "return 10 / value;"),
+                13,
+                "value > 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesContradictoryCatchFilterBranchUnreachable()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        try
+        {
+            throw new InvalidOperationException();
+        }
+        catch (InvalidOperationException) when (value > 0)
+        {
+            if (value <= 0)
+            {
+                return value;
+            }
+
+            return 0;
+        }
+    }
+}";
+            var result = new SymbolicSourceQueryService().AnalyzeSource(
+                source,
+                "ContradictoryCatchFilterBranch.cs",
+                FindLine(source, "return value;"),
+                17,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(result.PathConditions, Is.Not.Empty);
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+            Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_QuerySource_ProvesForLoopMonotonicIndexBounds()
         {
             const string source = @"
