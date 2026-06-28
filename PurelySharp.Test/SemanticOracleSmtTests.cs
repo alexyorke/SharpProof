@@ -205,6 +205,38 @@ public static class SourcePredicates
         }
 
         [Test]
+        public void ExecutionVisibility_UnsignedCastBoundsCheckImpliesNonNegativeIndex()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int[] values, int index", "(uint)index < (uint)values.Length && index < 0"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_UnsignedCastBoundsCheckImpliesUpperBound()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int[] values, int index", "(uint)index < (uint)values.Length && index >= values.Length"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_UnsignedCastBoundsCheckFalseBranchImpliesOutOfRange()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int[] values, int index", "!((uint)index < (uint)values.Length) && index >= 0 && index < values.Length"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_UnsignedCastUpperBoundGuardImpliesOutOfRange()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text, int index", "(uint)index >= (uint)text.Length && index >= 0 && index < text.Length"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_StringLengthNegative_IsAlwaysFalse()
         {
             Assert.That(

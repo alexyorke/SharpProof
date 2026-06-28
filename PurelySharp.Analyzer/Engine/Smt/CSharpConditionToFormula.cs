@@ -91,6 +91,19 @@ namespace PurelySharp.Analyzer.Engine.Smt
                     return true;
                 }
 
+                if (TryTranslateUnsignedCastBoundsComparison(
+                        binaryExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var unsignedBoundsFormula,
+                        getSymbolVersion,
+                        inlineDepth) &&
+                    unsignedBoundsFormula != null)
+                {
+                    formula = unsignedBoundsFormula;
+                    return true;
+                }
+
                 if (TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue, getSymbolVersion, inlineDepth) &&
                     TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue, getSymbolVersion, inlineDepth) &&
                     leftValue != null &&
@@ -111,6 +124,118 @@ namespace PurelySharp.Analyzer.Engine.Smt
 
             formula = null;
             return false;
+        }
+
+        private static bool TryTranslateUnsignedCastBoundsComparison(
+            BinaryExpressionSyntax binaryExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!binaryExpression.IsKind(SyntaxKind.LessThanExpression) &&
+                !binaryExpression.IsKind(SyntaxKind.GreaterThanOrEqualExpression))
+            {
+                return false;
+            }
+
+            if (!TryCreateUnsignedCastBoundsInRangeFormula(
+                    binaryExpression.Left,
+                    binaryExpression.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var inRangeFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            formula = binaryExpression.IsKind(SyntaxKind.LessThanExpression)
+                ? inRangeFormula
+                : new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+            return true;
+        }
+
+        private static bool TryCreateUnsignedCastBoundsInRangeFormula(
+            ExpressionSyntax leftExpression,
+            ExpressionSyntax rightExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null!;
+            if (!TryGetUnsignedCastOperand(leftExpression, semanticModel, cancellationToken, out var indexExpression, out var leftUnsignedType) ||
+                !TryGetUnsignedCastOperand(rightExpression, semanticModel, cancellationToken, out var lengthExpression, out var rightUnsignedType) ||
+                leftUnsignedType != rightUnsignedType ||
+                !IsKnownNonNegativeIntegralExpression(lengthExpression, semanticModel, cancellationToken) ||
+                !TryTranslateValue(indexExpression, semanticModel, cancellationToken, out var indexFormula, getSymbolVersion, inlineDepth) ||
+                indexFormula is not { Kind: SmtValueKind.Int } ||
+                !TryTranslateValue(lengthExpression, semanticModel, cancellationToken, out var lengthFormula, getSymbolVersion, inlineDepth) ||
+                lengthFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            var lowerBound = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                indexFormula,
+                new SmtIntegerConstant(0));
+            var upperBound = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThan,
+                indexFormula,
+                lengthFormula);
+            formula = new SmtBinaryFormula(SmtBinaryOperator.And, lowerBound, upperBound);
+            return true;
+        }
+
+        private static bool TryGetUnsignedCastOperand(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax operand,
+            out SpecialType unsignedType)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is not CastExpressionSyntax castExpression)
+            {
+                operand = null!;
+                unsignedType = SpecialType.None;
+                return false;
+            }
+
+            var castType = semanticModel.GetTypeInfo(castExpression.Type, cancellationToken).Type;
+            if (castType?.SpecialType is not SpecialType.System_UInt32 and not SpecialType.System_UInt64)
+            {
+                operand = null!;
+                unsignedType = SpecialType.None;
+                return false;
+            }
+
+            operand = castExpression.Expression;
+            unsignedType = castType.SpecialType;
+            return true;
+        }
+
+        private static bool IsKnownNonNegativeIntegralExpression(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapExpression(expression);
+            var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
+            if (constantValue.HasValue &&
+                TryGetIntegralConstant(constantValue.Value!, out var integralValue))
+            {
+                return integralValue >= 0;
+            }
+
+            return expression is MemberAccessExpressionSyntax memberAccess &&
+                IsBuiltInNonNegativeLengthAccess(memberAccess, semanticModel, cancellationToken);
         }
 
         private static bool TryTranslateSourceBooleanInvocation(
