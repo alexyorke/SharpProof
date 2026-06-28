@@ -50,6 +50,7 @@ namespace PurelySharp.Analyzer
 
             AddSwitchPathConditions(useNode, new[] { symbol }, semanticModel, cancellationToken, pathConditions);
             AddLoopPathConditions(useNode, new[] { symbol }, semanticModel, cancellationToken, pathConditions);
+            AddExpressionBranchPathConditions(useNode, new[] { symbol }, semanticModel, cancellationToken, pathConditions);
             AddPrecedingGuardConditions(symbol, useNode, semanticModel, cancellationToken, pathConditions);
             return pathConditions.Count > 0 && PathConditionsImplyFact(pathConditions, factFormula, smtAnalysis);
         }
@@ -179,8 +180,71 @@ namespace PurelySharp.Analyzer
 
             AddSwitchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
             AddLoopPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
+            AddExpressionBranchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
             AddPrecedingGuardConditions(invalidatedSymbols, useNode, semanticModel, cancellationToken, pathConditions);
             return pathConditions;
+        }
+
+        private static void AddExpressionBranchPathConditions(
+            SyntaxNode useNode,
+            IReadOnlyCollection<ISymbol> invalidatedSymbols,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
+        {
+            foreach (var conditionalExpression in useNode.Ancestors().OfType<ConditionalExpressionSyntax>())
+            {
+                if (AnySymbolMutatedInSyntax(conditionalExpression.Condition, invalidatedSymbols, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                if (conditionalExpression.WhenTrue.Span.Contains(useNode.SpanStart) &&
+                    !AnySymbolAssignedBeforeUse(conditionalExpression.WhenTrue, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                {
+                    TryAddPathCondition(conditionalExpression.Condition, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
+                }
+                else if (conditionalExpression.WhenFalse.Span.Contains(useNode.SpanStart) &&
+                         !AnySymbolAssignedBeforeUse(conditionalExpression.WhenFalse, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                {
+                    TryAddPathCondition(conditionalExpression.Condition, branchWhenTrue: false, semanticModel, cancellationToken, pathConditions);
+                }
+            }
+
+            foreach (var binaryExpression in useNode.Ancestors().OfType<BinaryExpressionSyntax>())
+            {
+                if (!binaryExpression.Right.Span.Contains(useNode.SpanStart) ||
+                    AnySymbolMutatedInSyntax(binaryExpression.Left, invalidatedSymbols, semanticModel, cancellationToken) ||
+                    AnySymbolAssignedBeforeUse(binaryExpression.Right, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression))
+                {
+                    TryAddPathCondition(binaryExpression.Left, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
+                }
+                else if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression))
+                {
+                    TryAddPathCondition(binaryExpression.Left, branchWhenTrue: false, semanticModel, cancellationToken, pathConditions);
+                }
+                else if (binaryExpression.IsKind(SyntaxKind.CoalesceExpression))
+                {
+                    TryAddReferenceNullCondition(binaryExpression.Left, isNull: true, semanticModel, cancellationToken, pathConditions);
+                }
+            }
+
+            foreach (var conditionalAccess in useNode.Ancestors().OfType<ConditionalAccessExpressionSyntax>())
+            {
+                if (!conditionalAccess.WhenNotNull.Span.Contains(useNode.SpanStart) ||
+                    AnySymbolMutatedInSyntax(conditionalAccess.Expression, invalidatedSymbols, semanticModel, cancellationToken) ||
+                    AnySymbolAssignedBeforeUse(conditionalAccess.WhenNotNull, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                TryAddReferenceNullCondition(conditionalAccess.Expression, isNull: false, semanticModel, cancellationToken, pathConditions);
+            }
         }
 
         private static void AddLoopPathConditions(
@@ -879,6 +943,30 @@ namespace PurelySharp.Analyzer
                 semanticModel,
                 cancellationToken,
                 pathConditions);
+        }
+
+        private static void TryAddReferenceNullCondition(
+            ExpressionSyntax expression,
+            bool isNull,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
+        {
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var formula,
+                    getSymbolVersion: null) ||
+                formula is not { Kind: SmtValueKind.Reference })
+            {
+                return;
+            }
+
+            pathConditions.Add(new SmtBinaryFormula(
+                isNull ? SmtBinaryOperator.Equal : SmtBinaryOperator.NotEqual,
+                formula,
+                new SmtNullConstant()));
         }
 
         private static bool PathConditionsImplyFact(
