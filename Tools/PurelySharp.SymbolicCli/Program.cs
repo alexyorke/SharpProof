@@ -12,8 +12,8 @@ if (options.ShowHelp || options.FilePath == null)
 
 try
 {
-    var smtAnalysis = options.CheckReachability || options.ImpliedConditions.Count != 0
-        ? new SmtAnalysisService(SmtAnalysisOptions.Default)
+    var smtAnalysis = options.RequiresSmt
+        ? new SmtAnalysisService(options.CreateSmtOptions())
         : null;
 
     var queryService = new SymbolicSourceQueryService();
@@ -81,6 +81,15 @@ Options:
   --check-reachability
                       Use bounded SMT to classify whether the queried program point is reachable.
   --implies <expr>    Use bounded SMT to prove whether invariants at the queried point imply expr. Can be repeated.
+  --smt-mode <mode>   SMT mode: off, bounded, or deep. Default: bounded.
+  --smt-timeout-ms <n>
+                      Per-query SMT timeout in milliseconds.
+  --smt-method-budget-ms <n>
+                      Total SMT budget for this CLI query in milliseconds.
+  --smt-max-path-conditions <n>
+                      Maximum path conditions before conservative fallback.
+  --smt-max-expression-nodes <n>
+                      Maximum formula nodes before conservative fallback.
   --json              Emit JSON instead of text.
 """;
 
@@ -99,6 +108,18 @@ Options:
     public List<string> ImpliedConditions { get; } = new();
 
     public bool ShowHelp { get; private set; }
+
+    public SmtAnalysisMode SmtMode { get; private set; } = SmtAnalysisOptions.Default.Mode;
+
+    public int? SmtTimeoutMs { get; private set; }
+
+    public int? SmtMethodBudgetMs { get; private set; }
+
+    public int? SmtMaxPathConditions { get; private set; }
+
+    public int? SmtMaxExpressionNodes { get; private set; }
+
+    public bool RequiresSmt => CheckReachability || ImpliedConditions.Count != 0;
 
     public static SymbolicCliOptions Parse(string[] args)
     {
@@ -134,6 +155,21 @@ Options:
                 case "--implies":
                     options.ImpliedConditions.Add(ReadString(args, ref index, arg));
                     break;
+                case "--smt-mode":
+                    options.SmtMode = ReadSmtMode(args, ref index, arg);
+                    break;
+                case "--smt-timeout-ms":
+                    options.SmtTimeoutMs = ReadPositiveInt(args, ref index, arg);
+                    break;
+                case "--smt-method-budget-ms":
+                    options.SmtMethodBudgetMs = ReadPositiveInt(args, ref index, arg);
+                    break;
+                case "--smt-max-path-conditions":
+                    options.SmtMaxPathConditions = ReadPositiveInt(args, ref index, arg);
+                    break;
+                case "--smt-max-expression-nodes":
+                    options.SmtMaxExpressionNodes = ReadPositiveInt(args, ref index, arg);
+                    break;
                 default:
                     throw new ArgumentException($"Unknown option '{arg}'.");
             }
@@ -168,6 +204,15 @@ Options:
         return options;
     }
 
+    public SmtAnalysisOptions CreateSmtOptions()
+    {
+        return SmtAnalysisOptions.ForMode(SmtMode).WithOverrides(
+            SmtTimeoutMs.HasValue ? TimeSpan.FromMilliseconds(SmtTimeoutMs.Value) : null,
+            SmtMethodBudgetMs.HasValue ? TimeSpan.FromMilliseconds(SmtMethodBudgetMs.Value) : null,
+            SmtMaxPathConditions,
+            SmtMaxExpressionNodes);
+    }
+
     public IEnumerable<MetadataReference>? CreateReferences()
     {
         if (ReferencePaths.Count == 0)
@@ -197,5 +242,37 @@ Options:
         }
 
         return parsed;
+    }
+
+    private static int ReadPositiveInt(string[] args, ref int index, string optionName)
+    {
+        var parsed = ReadInt(args, ref index, optionName);
+        if (parsed <= 0)
+        {
+            throw new ArgumentException(optionName + " requires a positive integer value.");
+        }
+
+        return parsed;
+    }
+
+    private static SmtAnalysisMode ReadSmtMode(string[] args, ref int index, string optionName)
+    {
+        var value = ReadString(args, ref index, optionName).Trim().ToLowerInvariant();
+        switch (value)
+        {
+            case "off":
+            case "false":
+            case "disabled":
+                return SmtAnalysisMode.Off;
+            case "bounded":
+            case "default":
+            case "true":
+                return SmtAnalysisMode.Bounded;
+            case "deep":
+            case "aggressive":
+                return SmtAnalysisMode.Deep;
+            default:
+                throw new ArgumentException(optionName + " must be off, bounded, or deep.");
+        }
     }
 }

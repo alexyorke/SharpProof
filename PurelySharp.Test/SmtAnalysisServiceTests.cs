@@ -11,6 +11,34 @@ namespace PurelySharp.Test
     public class SmtAnalysisServiceTests
     {
         [Test]
+        public void ForMode_Deep_ReturnsExpandedBudgetPreset()
+        {
+            var options = SmtAnalysisOptions.ForMode(SmtAnalysisMode.Deep);
+
+            Assert.That(options.Mode, Is.EqualTo(SmtAnalysisMode.Deep));
+            Assert.That(options.QueryTimeout, Is.EqualTo(TimeSpan.FromMilliseconds(2000)));
+            Assert.That(options.MethodBudget, Is.EqualTo(TimeSpan.FromMilliseconds(15000)));
+            Assert.That(options.MaxPathConditions, Is.EqualTo(512));
+            Assert.That(options.MaxExpressionNodes, Is.EqualTo(8192));
+        }
+
+        [Test]
+        public void WithOverrides_PreservesModeAndAppliesExplicitBudgets()
+        {
+            var options = SmtAnalysisOptions.ForMode(SmtAnalysisMode.Deep).WithOverrides(
+                queryTimeout: TimeSpan.FromMilliseconds(123),
+                methodBudget: TimeSpan.FromMilliseconds(456),
+                maxPathConditions: 7,
+                maxExpressionNodes: 89);
+
+            Assert.That(options.Mode, Is.EqualTo(SmtAnalysisMode.Deep));
+            Assert.That(options.QueryTimeout, Is.EqualTo(TimeSpan.FromMilliseconds(123)));
+            Assert.That(options.MethodBudget, Is.EqualTo(TimeSpan.FromMilliseconds(456)));
+            Assert.That(options.MaxPathConditions, Is.EqualTo(7));
+            Assert.That(options.MaxExpressionNodes, Is.EqualTo(89));
+        }
+
+        [Test]
         public void Classify_OffMode_ReturnsConservativeUnknown()
         {
             var service = new SmtAnalysisService(new SmtAnalysisOptions(

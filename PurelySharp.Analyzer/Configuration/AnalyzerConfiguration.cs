@@ -337,16 +337,12 @@ namespace PurelySharp.Analyzer.Configuration
 
         private static SmtAnalysisOptions GetSmtOptions(AnalyzerOptions options)
         {
-            var defaults = SmtAnalysisOptions.Default;
-            var mode = GetSmtMode(options, defaults.Mode);
-            var timeoutFallback = mode == SmtAnalysisMode.Deep ? 2000 : (int)defaults.QueryTimeout.TotalMilliseconds;
-            var methodBudgetFallback = mode == SmtAnalysisMode.Deep ? 15000 : (int)defaults.MethodBudget.TotalMilliseconds;
-            var pathConditionFallback = mode == SmtAnalysisMode.Deep ? 512 : defaults.MaxPathConditions;
-            var expressionNodeFallback = mode == SmtAnalysisMode.Deep ? 8192 : defaults.MaxExpressionNodes;
-            var timeoutMs = GetPositiveInt(options, ConfigKeys.SmtTimeoutMs, timeoutFallback);
-            var methodBudgetMs = GetPositiveInt(options, ConfigKeys.SmtMethodBudgetMs, methodBudgetFallback);
-            var maxPathConditions = GetPositiveInt(options, ConfigKeys.SmtMaxPathConditions, pathConditionFallback);
-            var maxExpressionNodes = GetPositiveInt(options, ConfigKeys.SmtMaxExpressionNodes, expressionNodeFallback);
+            var mode = GetSmtMode(options, SmtAnalysisOptions.Default.Mode);
+            var defaults = SmtAnalysisOptions.ForMode(mode);
+            var timeoutMs = GetPositiveInt(options, ConfigKeys.SmtTimeoutMs, (int)defaults.QueryTimeout.TotalMilliseconds);
+            var methodBudgetMs = GetPositiveInt(options, ConfigKeys.SmtMethodBudgetMs, (int)defaults.MethodBudget.TotalMilliseconds);
+            var maxPathConditions = GetPositiveInt(options, ConfigKeys.SmtMaxPathConditions, defaults.MaxPathConditions);
+            var maxExpressionNodes = GetPositiveInt(options, ConfigKeys.SmtMaxExpressionNodes, defaults.MaxExpressionNodes);
             return new SmtAnalysisOptions(
                 mode,
                 TimeSpan.FromMilliseconds(timeoutMs),

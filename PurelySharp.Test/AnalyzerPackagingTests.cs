@@ -418,6 +418,22 @@ namespace TestNamespace {
         }
 
         [Test]
+        public void SymbolicCli_ShouldExposeSmtBudgetOptions()
+        {
+            var repositoryRoot = FindRepositoryRoot();
+            var cliProgramPath = Path.Combine(repositoryRoot, "Tools", "PurelySharp.SymbolicCli", "Program.cs");
+            var source = File.ReadAllText(cliProgramPath);
+
+            Assert.That(source, Does.Contain("--smt-mode <mode>"));
+            Assert.That(source, Does.Contain("--smt-timeout-ms <n>"));
+            Assert.That(source, Does.Contain("--smt-method-budget-ms <n>"));
+            Assert.That(source, Does.Contain("--smt-max-path-conditions <n>"));
+            Assert.That(source, Does.Contain("--smt-max-expression-nodes <n>"));
+            Assert.That(source, Does.Contain("options.CreateSmtOptions()"));
+            Assert.That(source, Does.Not.Contain("new SmtAnalysisService(SmtAnalysisOptions.Default)"));
+        }
+
+        [Test]
         public void GeneratedPurityCatalog_EmptyScope_DoesNotMaskBuiltInFallback()
         {
             var catalogType = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly.GetType(
