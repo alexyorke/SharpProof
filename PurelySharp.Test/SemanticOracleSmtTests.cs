@@ -515,6 +515,30 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicProgramPointFacts_CollectPriorAssignmentFacts_ReturnsReusableFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = new int[2];
+        if (values.Length != 2)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}",
+                "if (values.Length != 2)");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Length", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_UlongZeroContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -2627,6 +2651,27 @@ public class TestClass
                 .GetMethod("IsInStaticallyUnreachableBranch", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
 
             return (bool)method.Invoke(null, new object?[] { statement, semanticModel, CancellationToken.None })!;
+        }
+
+        private static string[] CollectProgramPointFacts(string source, string statementPrefix)
+        {
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ProgramPointFactHost",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var statement = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<StatementSyntax>()
+                .Single(node => node.ToString().StartsWith(statementPrefix, StringComparison.Ordinal));
+            var method = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly
+                .GetType("PurelySharp.Analyzer.Engine.Symbolic.SymbolicProgramPointFacts", throwOnError: true)!
+                .GetMethod("CollectPriorAssignmentFacts", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+            var facts = (System.Collections.IEnumerable)method.Invoke(null, new object?[] { statement, semanticModel, CancellationToken.None })!;
+
+            return facts.Cast<object>().Select(static fact => fact.ToString() ?? string.Empty).ToArray();
         }
 
         private static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions)
