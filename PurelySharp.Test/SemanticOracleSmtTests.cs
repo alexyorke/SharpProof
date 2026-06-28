@@ -1180,6 +1180,36 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_QuerySource_ProvesReverseForLoopMonotonicIndexBounds()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        var sum = 0;
+        for (var index = values.Length - 1; index >= 0; index--)
+        {
+            sum += values[index];
+        }
+
+        return sum;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "ReverseForLoopMonotonicIndexBounds.cs",
+                FindLine(source, "sum += values[index];"),
+                20,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
+                impliedConditions: new[] { "index >= 0", "index < values.Length" });
+
+            Assert.That(result.ConditionProofs, Has.Count.EqualTo(2));
+            Assert.That(result.ConditionProofs.Select(static proof => proof.TruthValue), Is.All.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_QuerySource_DoesNotInferForLoopLowerBoundWhenUpdaterDecrements()
         {
             const string source = @"
@@ -1206,6 +1236,35 @@ public class TestClass
 
             Assert.That(result.ConditionProofs, Has.Count.EqualTo(1));
             Assert.That(result.ConditionProofs[0].TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_QuerySource_DoesNotInferReverseForLoopUpperBoundWhenUpdaterIncrements()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        for (var index = values.Length - 1; index >= 0; index++)
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "ReverseForLoopIncrementNoUpperBound.cs",
+                FindLine(source, "return values[index];"),
+                20,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
+                impliedConditions: new[] { "index < values.Length" });
+
+            Assert.That(result.ConditionProofs, Has.Count.EqualTo(1));
+            Assert.That(result.ConditionProofs[0].TruthValue, Is.Not.EqualTo(SymbolicTruthValue.ProvenTrue));
         }
 
         [Test]

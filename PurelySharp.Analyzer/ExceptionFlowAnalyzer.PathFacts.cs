@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using PurelySharp.Analyzer.Engine;
+using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
 
@@ -280,6 +281,10 @@ namespace PurelySharp.Analyzer
                 }
 
                 TryAddPathCondition(forStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
+                foreach (var loopFact in SymbolicProgramPointFacts.CollectForLoopBodyInvariantFacts(forStatement, semanticModel, cancellationToken))
+                {
+                    pathConditions.Add(loopFact);
+                }
             }
         }
 

@@ -562,6 +562,27 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_ForLoopReverseIndexBounds_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        var sum = 0;
+        for (var index = values.Length - 1; index >= 0; index--)
+        {
+            sum += values[index];
+        }
+
+        return sum;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_LoopConditionIndexReassignedBeforeUse_DoesNotReport()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
