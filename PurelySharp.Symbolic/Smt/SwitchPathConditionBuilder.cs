@@ -13,7 +13,8 @@ namespace PurelySharp.Symbolic.Smt
             SwitchSectionSyntax section,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula formula)
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion = null)
         {
             formula = null!;
             var labelConditions = new List<SmtFormula>();
@@ -24,7 +25,8 @@ namespace PurelySharp.Symbolic.Smt
                     section,
                     semanticModel,
                     cancellationToken,
-                    sectionConditions))
+                    sectionConditions,
+                    getSymbolVersion))
             {
                 return false;
             }
@@ -42,7 +44,8 @@ namespace PurelySharp.Symbolic.Smt
                     label,
                     semanticModel,
                     cancellationToken,
-                    out var labelCondition))
+                    out var labelCondition,
+                    getSymbolVersion))
                 {
                     labelConditions.Add(labelCondition);
                 }
@@ -59,7 +62,8 @@ namespace PurelySharp.Symbolic.Smt
                         section,
                         semanticModel,
                         cancellationToken,
-                        out var defaultCondition))
+                        out var defaultCondition,
+                        getSymbolVersion))
                 {
                     return false;
                 }
@@ -76,7 +80,8 @@ namespace PurelySharp.Symbolic.Smt
             SwitchExpressionArmSyntax arm,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula formula)
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion = null)
         {
             formula = null!;
             var governingType = GetExpressionType(governingExpression, semanticModel, cancellationToken);
@@ -85,16 +90,18 @@ namespace PurelySharp.Symbolic.Smt
                 governingExpression,
                 semanticModel,
                 cancellationToken,
-                domainFacts);
+                domainFacts,
+                getSymbolVersion);
 
-            return TryTranslateSwitchGoverningValue(governingExpression, semanticModel, cancellationToken, out var governingValue) &&
+            return TryTranslateSwitchGoverningValue(governingExpression, semanticModel, cancellationToken, out var governingValue, getSymbolVersion) &&
                 TryAddPriorSwitchExpressionArmExclusions(
                     governingValue,
                     governingType,
                     arm,
                     semanticModel,
                     cancellationToken,
-                    domainFacts) &&
+                    domainFacts,
+                    getSymbolVersion) &&
                 TryCreatePatternAndGuardCondition(
                     governingValue,
                     governingType,
@@ -104,7 +111,8 @@ namespace PurelySharp.Symbolic.Smt
                     cancellationToken,
                     domainFacts,
                     includePatternBindings: true,
-                    out formula);
+                    out formula,
+                    getSymbolVersion);
         }
 
         private static bool TryCreateSwitchLabelCondition(
@@ -112,7 +120,8 @@ namespace PurelySharp.Symbolic.Smt
             SwitchLabelSyntax label,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula formula)
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion = null)
         {
             return TryCreateSwitchLabelCondition(
                 governingExpression,
@@ -120,7 +129,8 @@ namespace PurelySharp.Symbolic.Smt
                 semanticModel,
                 cancellationToken,
                 includePatternBindings: true,
-                out formula);
+                out formula,
+                getSymbolVersion);
         }
 
         private static bool TryCreateSwitchDefaultCondition(
@@ -128,7 +138,8 @@ namespace PurelySharp.Symbolic.Smt
             SwitchSectionSyntax defaultSection,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula formula)
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion)
         {
             formula = null!;
             if (defaultSection.Parent is not SwitchStatementSyntax switchStatement)
@@ -152,7 +163,8 @@ namespace PurelySharp.Symbolic.Smt
                             semanticModel,
                             cancellationToken,
                             includePatternBindings: false,
-                            out var labelCondition))
+                            out var labelCondition,
+                            getSymbolVersion))
                     {
                         return false;
                     }
@@ -176,7 +188,8 @@ namespace PurelySharp.Symbolic.Smt
             SwitchSectionSyntax currentSection,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            ICollection<SmtFormula> conditions)
+            ICollection<SmtFormula> conditions,
+            Func<ISymbol, int>? getSymbolVersion)
         {
             if (currentSection.Parent is not SwitchStatementSyntax switchStatement)
             {
@@ -204,7 +217,8 @@ namespace PurelySharp.Symbolic.Smt
                             semanticModel,
                             cancellationToken,
                             includePatternBindings: false,
-                            out var labelCondition))
+                            out var labelCondition,
+                            getSymbolVersion))
                     {
                         return false;
                     }
@@ -231,14 +245,15 @@ namespace PurelySharp.Symbolic.Smt
             ExpressionSyntax governingExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula formula)
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion)
         {
             if (CSharpConditionToFormula.TryTranslateValue(
                     governingExpression,
                     semanticModel,
                     cancellationToken,
                     out var governingValue,
-                    getSymbolVersion: null) &&
+                    getSymbolVersion) &&
                 governingValue != null &&
                 governingValue.Kind is SmtValueKind.Bool or SmtValueKind.Int or SmtValueKind.Reference)
             {
@@ -256,11 +271,12 @@ namespace PurelySharp.Symbolic.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             bool includePatternBindings,
-            out SmtFormula formula)
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion)
         {
             formula = null!;
             var governingType = GetExpressionType(governingExpression, semanticModel, cancellationToken);
-            if (!TryTranslateSwitchGoverningValue(governingExpression, semanticModel, cancellationToken, out var governingValue))
+            if (!TryTranslateSwitchGoverningValue(governingExpression, semanticModel, cancellationToken, out var governingValue, getSymbolVersion))
             {
                 return false;
             }
@@ -270,7 +286,8 @@ namespace PurelySharp.Symbolic.Smt
                 governingExpression,
                 semanticModel,
                 cancellationToken,
-                domainFacts);
+                domainFacts,
+                getSymbolVersion);
 
             if (label is CaseSwitchLabelSyntax caseLabel &&
                 CSharpConditionToFormula.TryTranslateValue(
@@ -278,7 +295,7 @@ namespace PurelySharp.Symbolic.Smt
                     semanticModel,
                     cancellationToken,
                     out var caseValue,
-                    getSymbolVersion: null) &&
+                    getSymbolVersion) &&
                 caseValue != null &&
                 AreComparableSmtValues(governingValue, caseValue))
             {
@@ -297,7 +314,8 @@ namespace PurelySharp.Symbolic.Smt
                     cancellationToken,
                     domainFacts,
                     includePatternBindings,
-                    out formula);
+                    out formula,
+                    getSymbolVersion);
             }
 
             return false;
@@ -309,7 +327,8 @@ namespace PurelySharp.Symbolic.Smt
             SwitchExpressionArmSyntax currentArm,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            ICollection<SmtFormula> conditions)
+            ICollection<SmtFormula> conditions,
+            Func<ISymbol, int>? getSymbolVersion)
         {
             if (currentArm.Parent is not SwitchExpressionSyntax switchExpression)
             {
@@ -333,7 +352,8 @@ namespace PurelySharp.Symbolic.Smt
                         cancellationToken,
                         initialConditions: null,
                         includePatternBindings: false,
-                        out var priorArmCondition))
+                        out var priorArmCondition,
+                        getSymbolVersion))
                 {
                     return false;
                 }
@@ -364,7 +384,8 @@ namespace PurelySharp.Symbolic.Smt
             CancellationToken cancellationToken,
             ICollection<SmtFormula>? initialConditions,
             bool includePatternBindings,
-            out SmtFormula formula)
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion)
         {
             formula = null!;
             var conditions = initialConditions == null
@@ -376,7 +397,7 @@ namespace PurelySharp.Symbolic.Smt
                     semanticModel,
                     cancellationToken,
                     out var patternFormula,
-                    getSymbolVersion: null,
+                    getSymbolVersion,
                     governingType) &&
                 patternFormula != null)
             {
@@ -391,7 +412,8 @@ namespace PurelySharp.Symbolic.Smt
                     pattern,
                     semanticModel,
                     cancellationToken,
-                    conditions);
+                    conditions,
+                    getSymbolVersion);
             }
 
             if (whenClause != null)
@@ -400,14 +422,15 @@ namespace PurelySharp.Symbolic.Smt
                     whenClause.Condition,
                     semanticModel,
                     cancellationToken,
-                    conditions);
+                    conditions,
+                    getSymbolVersion);
 
                 if (CSharpConditionToFormula.TryTranslate(
                     whenClause.Condition,
                     semanticModel,
                     cancellationToken,
                     out var guardFormula,
-                    getSymbolVersion: null) &&
+                    getSymbolVersion) &&
                     guardFormula != null)
                 {
                     conditions.Add(guardFormula);

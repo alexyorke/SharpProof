@@ -1152,6 +1152,65 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesSwitchExpressionValueImplication()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int mode)
+    {
+        var divisor = mode switch
+        {
+            0 => 1,
+            1 => 2,
+            _ => 3
+        };
+
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "SwitchExpressionValueImplication.cs",
+                FindLine(source, "return 10 / divisor;"),
+                16,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_DoesNotLowerSwitchExpressionWithoutDiscardFallback()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int mode)
+    {
+        var divisor = mode switch
+        {
+            0 => 1,
+            1 => 2
+        };
+
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "SwitchExpressionNoFallback.cs",
+                FindLine(source, "return 10 / divisor;"),
+                15,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionFalse()
         {
             const string source = @"
@@ -3471,6 +3530,35 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_SwitchExpressionAssignedNonZeroGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int mode)
+    {
+        var divisor = mode switch
+        {
+            0 => 1,
+            1 => 2,
+            _ => 3
+        };
+
+        if (divisor == 0)
+        {
+            Console.WriteLine(divisor);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_ElementConstrainedListPatternFalseBranchRemainsReachable_Reports()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
@@ -4148,6 +4236,28 @@ public class TestClass
             0 => 0,
             _ => 10 / value
         };
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_SwitchExpressionAssignedNonZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value, int mode)
+    {
+        var divisor = mode switch
+        {
+            0 => 1,
+            1 => 2,
+            _ => 3
+        };
+
+        return value / divisor;
     }
 }");
 

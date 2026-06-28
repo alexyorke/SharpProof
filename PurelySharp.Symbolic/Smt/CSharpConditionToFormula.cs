@@ -1240,6 +1240,12 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (expression is SwitchExpressionSyntax switchExpression &&
+                TryTranslateSwitchExpressionValue(switchExpression, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth))
+            {
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax coalesceExpression &&
                 coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
                 TryTranslateValue(coalesceExpression.Left, semanticModel, cancellationToken, out var coalesceLeft, getSymbolVersion, inlineDepth) &&
@@ -1337,6 +1343,70 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
+        }
+
+        private static bool TryTranslateSwitchExpressionValue(
+            SwitchExpressionSyntax switchExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (switchExpression.Arms.Count < 2 ||
+                !HasUnguardedDiscardFallback(switchExpression.Arms[switchExpression.Arms.Count - 1]))
+            {
+                return false;
+            }
+
+            var armConditions = new List<SmtFormula>();
+            var armValues = new List<SmtFormula>();
+            foreach (var arm in switchExpression.Arms)
+            {
+                if (!TryTranslateValue(arm.Expression, semanticModel, cancellationToken, out var armValue, getSymbolVersion, inlineDepth) ||
+                    armValue == null ||
+                    !SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
+                        switchExpression.GoverningExpression,
+                        arm,
+                        semanticModel,
+                        cancellationToken,
+                        out var armCondition,
+                        getSymbolVersion))
+                {
+                    formula = null;
+                    return false;
+                }
+
+                if (armValues.Count > 0 &&
+                    armValues[0].Kind != armValue.Kind)
+                {
+                    formula = null;
+                    return false;
+                }
+
+                armConditions.Add(armCondition);
+                armValues.Add(armValue);
+            }
+
+            var result = armValues[armValues.Count - 1];
+            for (var index = armValues.Count - 2; index >= 0; index--)
+            {
+                result = new SmtConditionalFormula(
+                    armConditions[index],
+                    armValues[index],
+                    result,
+                    result.Kind);
+            }
+
+            formula = result;
+            return true;
+        }
+
+        private static bool HasUnguardedDiscardFallback(SwitchExpressionArmSyntax arm)
+        {
+            return arm.WhenClause == null &&
+                arm.Pattern is DiscardPatternSyntax;
         }
 
         private static bool TryTranslateBooleanTerm(
