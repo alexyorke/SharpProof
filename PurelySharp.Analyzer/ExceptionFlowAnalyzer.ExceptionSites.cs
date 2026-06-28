@@ -272,23 +272,22 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            var indexExpression = elementAccess.ArgumentList.Arguments[0].Expression;
-            if (!CSharpConditionToFormula.TryTranslateValue(
-                    indexExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var indexFormula,
-                    getSymbolVersion: null) ||
-                indexFormula is not { Kind: SmtValueKind.Int })
-            {
-                return false;
-            }
-
             if (!TryCreateBuiltInLengthValueFormula(
                     elementAccess.Expression,
                     semanticModel,
                     cancellationToken,
                     out var lengthFormula))
+            {
+                return false;
+            }
+
+            var indexExpression = elementAccess.ArgumentList.Arguments[0].Expression;
+            if (!TryCreateEffectiveBuiltInIndexFormula(
+                    indexExpression,
+                    lengthFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out var indexFormula))
             {
                 return false;
             }
@@ -313,6 +312,61 @@ namespace PurelySharp.Analyzer
                 cancellationToken);
 
             return PathConditionsImplyFact(pathConditions, outOfRangeFormula, smtAnalysis);
+        }
+
+        private static bool TryCreateEffectiveBuiltInIndexFormula(
+            ExpressionSyntax indexExpression,
+            SmtFormula lengthFormula,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula indexFormula)
+        {
+            indexFormula = null!;
+            indexExpression = UnwrapIndexExpression(indexExpression);
+            if (indexExpression is PrefixUnaryExpressionSyntax fromEndIndex &&
+                fromEndIndex.OperatorToken.IsKind(SyntaxKind.CaretToken))
+            {
+                if (!CSharpConditionToFormula.TryTranslateValue(
+                        fromEndIndex.Operand,
+                        semanticModel,
+                        cancellationToken,
+                        out var fromEndOffset,
+                        getSymbolVersion: null) ||
+                    fromEndOffset is not { Kind: SmtValueKind.Int })
+                {
+                    return false;
+                }
+
+                indexFormula = new SmtIntegerBinaryTerm(
+                    SmtIntegerBinaryOperator.Subtract,
+                    lengthFormula,
+                    fromEndOffset);
+                return true;
+            }
+
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    indexExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var ordinaryIndex,
+                    getSymbolVersion: null) ||
+                ordinaryIndex is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            indexFormula = ordinaryIndex;
+            return true;
+        }
+
+        private static ExpressionSyntax UnwrapIndexExpression(ExpressionSyntax expression)
+        {
+            while (expression is ParenthesizedExpressionSyntax parenthesized)
+            {
+                expression = parenthesized.Expression;
+            }
+
+            return expression;
         }
 
         private static bool IsReferenceType(ITypeSymbol? typeSymbol)
