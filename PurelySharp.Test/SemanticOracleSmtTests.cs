@@ -23,6 +23,17 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void Oracle_ContradictoryUlongCondition_IsUnsatisfiable()
+        {
+            var context = AnalyzerTestHost.CreateConditionContext("ulong x", "x == 0UL && x != 0UL");
+            using var oracle = new SmtPathOracle();
+
+            Assert.That(
+                oracle.IsSatisfiable(context.Expression, context.SemanticModel, TimeSpan.FromMilliseconds(50)),
+                Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void Oracle_AffineContradictoryIntegerCondition_IsUnsatisfiable()
         {
             var context = AnalyzerTestHost.CreateConditionContext("int x", "x + 1 <= 0 && x >= 0");
@@ -115,6 +126,14 @@ namespace PurelySharp.Test
         {
             Assert.That(
                 IsConditionAlwaysFalse("int x", "x + 1 <= 0 && x >= 0"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_UlongZeroContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("ulong x", "x == 0UL && x != 0UL"),
                 Is.True);
         }
 
@@ -462,6 +481,50 @@ public class TestClass
 }");
 
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_UlongZeroContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(ulong value)
+    {
+        if (value == 0UL && value != 0UL)
+        {
+            Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_LargeUlongConstantGuard_RemainsConservativeReports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(ulong value)
+    {
+        if (value == 18446744073709551615UL && value == 0UL)
+        {
+            Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
         }
 
         [Test]
@@ -1052,6 +1115,56 @@ public class TestClass
         }
 
         return 0;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_UlongGuardImpliesZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public ulong TestMethod(ulong value, ulong divisor)
+    {
+        if (divisor == 0UL)
+        {
+            return value / divisor;
+        }
+
+        return 0UL;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_UlongGuardImpliesZeroModulo_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public ulong TestMethod(ulong value, ulong divisor)
+    {
+        if (divisor == 0UL)
+        {
+            return value % divisor;
+        }
+
+        return 0UL;
     }
 }");
 

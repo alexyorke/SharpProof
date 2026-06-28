@@ -762,7 +762,8 @@ namespace PurelySharp.Analyzer.Engine.Smt
                 SpecialType.System_UInt16 or
                 SpecialType.System_Int32 or
                 SpecialType.System_UInt32 or
-                SpecialType.System_Int64;
+                SpecialType.System_Int64 or
+                SpecialType.System_UInt64;
         }
 
         private static bool TryGetIntegralConstant(object value, out long integralValue)
@@ -789,6 +790,9 @@ namespace PurelySharp.Analyzer.Engine.Smt
                     return true;
                 case long signedLong:
                     integralValue = signedLong;
+                    return true;
+                case ulong unsignedLong when unsignedLong <= long.MaxValue:
+                    integralValue = (long)unsignedLong;
                     return true;
                 default:
                     integralValue = default;

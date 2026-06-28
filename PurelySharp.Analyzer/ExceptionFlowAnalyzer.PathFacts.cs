@@ -745,7 +745,8 @@ namespace PurelySharp.Analyzer
                 SpecialType.System_UInt16 or
                 SpecialType.System_Int32 or
                 SpecialType.System_UInt32 or
-                SpecialType.System_Int64;
+                SpecialType.System_Int64 or
+                SpecialType.System_UInt64;
         }
 
         private static string GetSmtVariableName(ISymbol symbol)
