@@ -200,12 +200,15 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                TryAddSwitchStatementSectionCondition(
+                if (SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
                     switchStatement.Expression,
                     matchingSection,
                     semanticModel,
                     cancellationToken,
-                    pathConditions);
+                    out var sectionCondition))
+                {
+                    pathConditions.Add(sectionCondition);
+                }
             }
 
             foreach (var switchExpression in useNode.Ancestors().OfType<SwitchExpressionSyntax>())
@@ -219,191 +222,16 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                TryAddSwitchExpressionArmCondition(
+                if (SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
                     switchExpression.GoverningExpression,
                     matchingArm,
                     semanticModel,
                     cancellationToken,
-                    pathConditions);
-            }
-        }
-
-        private static void TryAddSwitchStatementSectionCondition(
-            ExpressionSyntax governingExpression,
-            SwitchSectionSyntax section,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            ICollection<SmtFormula> pathConditions)
-        {
-            var labelConditions = new List<SmtFormula>();
-            foreach (var label in section.Labels)
-            {
-                if (TryCreateSwitchLabelCondition(
-                    governingExpression,
-                    label,
-                    semanticModel,
-                    cancellationToken,
-                    out var labelCondition))
+                    out var armCondition))
                 {
-                    labelConditions.Add(labelCondition);
+                    pathConditions.Add(armCondition);
                 }
             }
-
-            if (TryCreateDisjunction(labelConditions, out var sectionCondition))
-            {
-                pathConditions.Add(sectionCondition);
-            }
-        }
-
-        private static void TryAddSwitchExpressionArmCondition(
-            ExpressionSyntax governingExpression,
-            SwitchExpressionArmSyntax arm,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            ICollection<SmtFormula> pathConditions)
-        {
-            if (TryTranslateSwitchGoverningValue(governingExpression, semanticModel, cancellationToken, out var governingValue) &&
-                TryCreatePatternAndGuardCondition(
-                    governingValue,
-                    arm.Pattern,
-                    arm.WhenClause,
-                    semanticModel,
-                    cancellationToken,
-                    out var armCondition))
-            {
-                pathConditions.Add(armCondition);
-            }
-        }
-
-        private static bool TryCreateSwitchLabelCondition(
-            ExpressionSyntax governingExpression,
-            SwitchLabelSyntax label,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            out SmtFormula formula)
-        {
-            formula = null!;
-            if (!TryTranslateSwitchGoverningValue(governingExpression, semanticModel, cancellationToken, out var governingValue))
-            {
-                return false;
-            }
-
-            if (label is CaseSwitchLabelSyntax caseLabel &&
-                CSharpConditionToFormula.TryTranslateValue(
-                    caseLabel.Value,
-                    semanticModel,
-                    cancellationToken,
-                    out var caseValue,
-                    getSymbolVersion: null) &&
-                caseValue != null &&
-                CanCompareSmtValues(governingValue, caseValue))
-            {
-                formula = new SmtBinaryFormula(SmtBinaryOperator.Equal, governingValue, caseValue);
-                return true;
-            }
-
-            if (label is CasePatternSwitchLabelSyntax patternLabel)
-            {
-                return TryCreatePatternAndGuardCondition(
-                    governingValue,
-                    patternLabel.Pattern,
-                    patternLabel.WhenClause,
-                    semanticModel,
-                    cancellationToken,
-                    out formula);
-            }
-
-            return false;
-        }
-
-        private static bool TryTranslateSwitchGoverningValue(
-            ExpressionSyntax governingExpression,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            out SmtFormula formula)
-        {
-            if (CSharpConditionToFormula.TryTranslateValue(
-                    governingExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out var governingValue,
-                    getSymbolVersion: null) &&
-                governingValue != null &&
-                governingValue.Kind is SmtValueKind.Bool or SmtValueKind.Int or SmtValueKind.Reference)
-            {
-                formula = governingValue;
-                return true;
-            }
-
-            formula = null!;
-            return false;
-        }
-
-        private static bool TryCreatePatternAndGuardCondition(
-            SmtFormula governingValue,
-            PatternSyntax pattern,
-            WhenClauseSyntax? whenClause,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken,
-            out SmtFormula formula)
-        {
-            formula = null!;
-            var conditions = new List<SmtFormula>();
-            if (CSharpConditionToFormula.TryTranslatePattern(
-                    governingValue,
-                    pattern,
-                    semanticModel,
-                    cancellationToken,
-                    out var patternFormula,
-                    getSymbolVersion: null) &&
-                patternFormula != null)
-            {
-                conditions.Add(patternFormula);
-            }
-
-            if (whenClause != null &&
-                CSharpConditionToFormula.TryTranslate(
-                    whenClause.Condition,
-                    semanticModel,
-                    cancellationToken,
-                    out var guardFormula,
-                    getSymbolVersion: null) &&
-                guardFormula != null)
-            {
-                conditions.Add(guardFormula);
-            }
-
-            return TryCreateConjunction(conditions, out formula);
-        }
-
-        private static bool TryCreateConjunction(IReadOnlyList<SmtFormula> formulas, out SmtFormula formula)
-        {
-            return TryCreateAssociativeFormula(SmtBinaryOperator.And, formulas, out formula);
-        }
-
-        private static bool TryCreateDisjunction(IReadOnlyList<SmtFormula> formulas, out SmtFormula formula)
-        {
-            return TryCreateAssociativeFormula(SmtBinaryOperator.Or, formulas, out formula);
-        }
-
-        private static bool TryCreateAssociativeFormula(
-            SmtBinaryOperator smtOperator,
-            IReadOnlyList<SmtFormula> formulas,
-            out SmtFormula formula)
-        {
-            formula = null!;
-            if (formulas.Count == 0)
-            {
-                return false;
-            }
-
-            formula = formulas[0];
-            for (var index = 1; index < formulas.Count; index++)
-            {
-                formula = new SmtBinaryFormula(smtOperator, formula, formulas[index]);
-            }
-
-            return true;
         }
 
         private static void AddPrecedingGuardConditions(

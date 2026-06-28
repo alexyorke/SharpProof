@@ -566,6 +566,124 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_SwitchStatementContradictoryPatternGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int x)
+    {
+        switch (x)
+        {
+            case > 0 when x < 0:
+                Console.WriteLine(x);
+                break;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_SwitchStatementReachablePatternGuardedImpureCall_Reports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int x)
+    {
+        switch (x)
+        {
+            case > 0 when x > 0:
+                Console.WriteLine(x);
+                break;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
+        }
+
+        [Test]
+        public async Task Ps0002_SwitchStatementContradictoryConstantCaseGuard_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int x)
+    {
+        switch (x)
+        {
+            case 0 when x != 0:
+                Console.WriteLine(x);
+                break;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_SwitchExpressionContradictoryPatternGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(int x)
+    {
+        return x switch
+        {
+            > 0 when x < 0 => Console.ReadLine(),
+            _ => string.Empty
+        };
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_SwitchExpressionReachablePatternGuardedImpureCall_Reports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(int x)
+    {
+        return x switch
+        {
+            > 0 when x > 0 => Console.ReadLine(),
+            _ => string.Empty
+        };
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
+        }
+
+        [Test]
         public async Task Ps0002_PartialConjunctiveGuardFeedsNestedContradiction_DoesNotReport()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"

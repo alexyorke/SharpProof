@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -115,9 +117,83 @@ namespace PurelySharp.Analyzer.Engine
                         }
                     }
                 }
+                else if (ancestor is SwitchStatementSyntax switchStatement &&
+                         IsInUnreachableSwitchStatementSection(syntaxNode, switchStatement, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    return true;
+                }
+                else if (ancestor is SwitchExpressionSyntax switchExpression &&
+                         IsInUnreachableSwitchExpressionArm(syntaxNode, switchExpression, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    return true;
+                }
             }
 
             return false;
+        }
+
+        private static bool IsInUnreachableSwitchStatementSection(
+            SyntaxNode syntaxNode,
+            SwitchStatementSyntax switchStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            if (smtAnalysis == null)
+            {
+                return false;
+            }
+
+            var section = switchStatement.Sections.FirstOrDefault(candidate => candidate.Span.Contains(syntaxNode.SpanStart));
+            if (section == null ||
+                !SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
+                    switchStatement.Expression,
+                    section,
+                    semanticModel,
+                    cancellationToken,
+                    out var sectionCondition))
+            {
+                return false;
+            }
+
+            return IsFormulaAlwaysFalseUsingSmt(sectionCondition, smtAnalysis);
+        }
+
+        private static bool IsInUnreachableSwitchExpressionArm(
+            SyntaxNode syntaxNode,
+            SwitchExpressionSyntax switchExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            if (smtAnalysis == null)
+            {
+                return false;
+            }
+
+            var arm = switchExpression.Arms.FirstOrDefault(candidate => candidate.Expression.Span.Contains(syntaxNode.SpanStart));
+            if (arm == null ||
+                !SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
+                    switchExpression.GoverningExpression,
+                    arm,
+                    semanticModel,
+                    cancellationToken,
+                    out var armCondition))
+            {
+                return false;
+            }
+
+            return IsFormulaAlwaysFalseUsingSmt(armCondition, smtAnalysis);
+        }
+
+        private static bool IsFormulaAlwaysFalseUsingSmt(SmtFormula formula, SmtAnalysisService smtAnalysis)
+        {
+            var query = new PurityProofQuery(
+                Array.Empty<SmtFormula>(),
+                new PurityHazard(PurityHazardKind.BranchReachability, formula));
+
+            var proofResult = smtAnalysis.Classify(query);
+            return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
         }
 
         public static bool IsConditionAlwaysTrue(
