@@ -1851,6 +1851,19 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (expression is BinaryExpressionSyntax nullableCoalesceExpression &&
+                nullableCoalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                TryTranslateNullableCoalesceValue(
+                    nullableCoalesceExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax coalesceExpression &&
                 coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
                 TryTranslateValue(coalesceExpression.Left, semanticModel, cancellationToken, out var coalesceLeft, getSymbolVersion, inlineDepth) &&
@@ -2201,6 +2214,121 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
+        }
+
+        private static bool TryTranslateNullableCoalesceValue(
+            BinaryExpressionSyntax coalesceExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!TryTranslateNullableValueParts(
+                    coalesceExpression.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out var hasValueFormula,
+                    out var nullableValueFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                nullableValueFormula == null ||
+                !TryTranslateValue(
+                    coalesceExpression.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var fallbackFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                fallbackFormula == null ||
+                nullableValueFormula.Kind != fallbackFormula.Kind)
+            {
+                return false;
+            }
+
+            formula = new SmtConditionalFormula(
+                hasValueFormula,
+                nullableValueFormula,
+                fallbackFormula,
+                fallbackFormula.Kind);
+            return true;
+        }
+
+        private static bool TryTranslateNullableValueParts(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula hasValueFormula,
+            out SmtFormula? valueFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            expression = UnwrapExpression(expression);
+            if (semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol is { } symbol &&
+                symbol is ILocalSymbol or IParameterSymbol &&
+                TryGetNullableUnderlyingType(
+                    semanticModel.GetTypeInfo(expression, cancellationToken).Type,
+                    out var underlyingType) &&
+                TryGetValueKind(underlyingType, out var nullableValueKind))
+            {
+                var variableName = GetVariableName(symbol.OriginalDefinition, getSymbolVersion);
+                hasValueFormula = new SmtVariable(variableName + ".HasValue", SmtValueKind.Bool);
+                valueFormula = new SmtVariable(variableName + ".Value", nullableValueKind);
+                return true;
+            }
+
+            if (expression is ConditionalAccessExpressionSyntax conditionalAccess &&
+                TryGetNullableUnderlyingType(
+                    semanticModel.GetTypeInfo(conditionalAccess, cancellationToken).Type,
+                    out var conditionalAccessUnderlyingType) &&
+                TryTranslateValue(
+                    conditionalAccess.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverFormula,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                receiverFormula is { Kind: SmtValueKind.Reference } &&
+                TryCreateConditionalAccessWhenNotNullValueFormula(
+                    conditionalAccess,
+                    receiverFormula,
+                    conditionalAccessUnderlyingType,
+                    semanticModel,
+                    cancellationToken,
+                    out valueFormula))
+            {
+                hasValueFormula = new SmtBinaryFormula(
+                    SmtBinaryOperator.NotEqual,
+                    receiverFormula,
+                    new SmtNullConstant());
+                return true;
+            }
+
+            hasValueFormula = null!;
+            valueFormula = null;
+            return false;
+        }
+
+        private static bool TryCreateConditionalAccessWhenNotNullValueFormula(
+            ConditionalAccessExpressionSyntax conditionalAccess,
+            SmtFormula receiverFormula,
+            ITypeSymbol expectedType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula)
+        {
+            formula = null;
+            if (conditionalAccess.WhenNotNull is not MemberBindingExpressionSyntax memberBinding ||
+                semanticModel.GetSymbolInfo(memberBinding.Name, cancellationToken).Symbol is not { } memberSymbol ||
+                !TryGetMemberType(memberSymbol, out var memberType) ||
+                !SymbolEqualityComparer.Default.Equals(memberType, expectedType))
+            {
+                return false;
+            }
+
+            return TryCreateMemberFormula(receiverFormula, memberSymbol.Name, memberType, out formula) &&
+                formula != null;
         }
 
         private static bool IsRepresentationPreservingIntegralCast(

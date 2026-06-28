@@ -3854,6 +3854,56 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableCoalesceFromConditionalAccessWhenReceiverNonNull()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        string text = ""abc"";
+        int length = text?.Length ?? 0;
+        return length;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "NullableCoalesceFromConditionalAccessWhenReceiverNonNull.cs",
+                FindLine(source, "return length;"),
+                16,
+                "length == 3",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableCoalesceFromConditionalAccessWhenReceiverNull()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        string text = null;
+        int length = text?.Length ?? 0;
+        return length;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "NullableCoalesceFromConditionalAccessWhenReceiverNull.cs",
+                FindLine(source, "return length;"),
+                16,
+                "length == 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessReferenceNullSourceResultNull()
         {
             const string source = @"
@@ -6053,6 +6103,64 @@ public class TestClass
         string text = ""abc"";
         int? length = text?.Length;
         if (length.HasValue && length.Value != 3)
+        {
+            Console.ReadLine();
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_NullableCoalesceConditionalAccessNonNullReceiverContradictoryGuard_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        string text = ""abc"";
+        int length = text?.Length ?? 0;
+        if (length != 3)
+        {
+            Console.ReadLine();
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_NullableCoalesceConditionalAccessNullReceiverContradictoryGuard_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        string text = null;
+        int length = text?.Length ?? 0;
+        if (length != 0)
         {
             Console.ReadLine();
         }
