@@ -456,6 +456,11 @@ namespace PurelySharp.Analyzer
             if (statement is ExpressionStatementSyntax expressionStatement &&
                 expressionStatement.Expression is AssignmentExpressionSyntax assignment)
             {
+                if (TryHandleTupleAssignment(assignment, semanticModel, cancellationToken, facts))
+                {
+                    return;
+                }
+
                 SmtFormula? previousAssignedValue = null;
                 if (TryGetMutatedLocalOrParameterSymbol(assignment, semanticModel, cancellationToken, out var assignedSymbol))
                 {
@@ -871,6 +876,53 @@ namespace PurelySharp.Analyzer
             return new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, valueFormula);
         }
 
+        private static bool TryHandleTupleAssignment(
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                UnwrapFactExpression(assignment.Left) is not TupleExpressionSyntax leftTuple)
+            {
+                return false;
+            }
+
+            var targetSymbols = new List<ISymbol>();
+            foreach (var argument in leftTuple.Arguments)
+            {
+                if (GetLocalOrParameterSymbol(argument.Expression, semanticModel, cancellationToken) is { } targetSymbol)
+                {
+                    targetSymbols.Add(targetSymbol);
+                }
+            }
+
+            foreach (var targetSymbol in targetSymbols)
+            {
+                RemoveFactsReferencingSymbol(facts, targetSymbol);
+            }
+
+            if (targetSymbols.Count != leftTuple.Arguments.Count ||
+                UnwrapFactExpression(assignment.Right) is not TupleExpressionSyntax rightTuple ||
+                rightTuple.Arguments.Count != leftTuple.Arguments.Count ||
+                rightTuple.Arguments.Any(argument => ExpressionReferencesAnySymbol(argument.Expression, targetSymbols, semanticModel, cancellationToken)))
+            {
+                return true;
+            }
+
+            for (var index = 0; index < leftTuple.Arguments.Count; index++)
+            {
+                AddAssignedValueFacts(
+                    targetSymbols[index],
+                    rightTuple.Arguments[index].Expression,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
+
+            return true;
+        }
+
         private static bool TryCreateCompoundAssignmentFact(
             ISymbol targetSymbol,
             SmtFormula previousValue,
@@ -1120,6 +1172,23 @@ namespace PurelySharp.Analyzer
             {
                 if (node is ExpressionSyntax expression &&
                     ExpressionMatchesSymbol(expression, symbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ExpressionReferencesAnySymbol(
+            SyntaxNode root,
+            IReadOnlyCollection<ISymbol> symbols,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            foreach (var symbol in symbols)
+            {
+                if (ExpressionReferencesSymbol(root, symbol, semanticModel, cancellationToken))
                 {
                     return true;
                 }
@@ -1378,7 +1447,8 @@ namespace PurelySharp.Analyzer
             return node switch
             {
                 AssignmentExpressionSyntax assignment =>
-                    ExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken),
+                    ExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken) ||
+                    TupleAssignmentMutatesSymbol(assignment, symbol, semanticModel, cancellationToken),
                 PrefixUnaryExpressionSyntax prefixUnary
                     when prefixUnary.IsKind(SyntaxKind.PreIncrementExpression) || prefixUnary.IsKind(SyntaxKind.PreDecrementExpression) =>
                     ExpressionMatchesSymbol(prefixUnary.Operand, symbol, semanticModel, cancellationToken),
@@ -1389,6 +1459,21 @@ namespace PurelySharp.Analyzer
                     ExpressionMatchesSymbol(argument.Expression, symbol, semanticModel, cancellationToken),
                 _ => false
             };
+        }
+
+        private static bool TupleAssignmentMutatesSymbol(
+            AssignmentExpressionSyntax assignment,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            if (UnwrapFactExpression(assignment.Left) is not TupleExpressionSyntax leftTuple)
+            {
+                return false;
+            }
+
+            return leftTuple.Arguments.Any(argument =>
+                ExpressionMatchesSymbol(argument.Expression, symbol, semanticModel, cancellationToken));
         }
 
         private static bool TryGetMutatedLocalOrParameterSymbol(

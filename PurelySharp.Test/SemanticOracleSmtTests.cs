@@ -1055,6 +1055,50 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsTupleAssignmentFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = 0;
+        var other = 0;
+        (divisor, other) = (1, 2);
+        return 10 / divisor;
+    }
+}",
+                "return 10 / divisor;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("divisor", StringComparison.Ordinal) &&
+                                           fact.Contains("1", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicInvariantService_TupleAssignmentSwapInvalidatesTargetFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = 1;
+        var other = 2;
+        (divisor, other) = (other, divisor);
+        return 10 / divisor;
+    }
+}",
+                "return 10 / divisor;");
+
+            Assert.That(facts.Any(fact => fact.Contains("divisor", StringComparison.Ordinal) &&
+                                           fact.Contains("Equal", StringComparison.Ordinal)), Is.False);
+        }
+
+        [Test]
         public void ExecutionVisibility_UlongZeroContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -3055,6 +3099,24 @@ public class TestClass
     {
         var divisor = 0;
         divisor++;
+        return 10 / divisor;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_TupleAssignedNonZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = 0;
+        var other = 0;
+        (divisor, other) = (1, 2);
         return 10 / divisor;
     }
 }");

@@ -236,6 +236,11 @@ namespace PurelySharp.Symbolic
             if (statement is ExpressionStatementSyntax expressionStatement &&
                 expressionStatement.Expression is AssignmentExpressionSyntax assignment)
             {
+                if (TryHandleTupleAssignment(assignment, semanticModel, cancellationToken, facts))
+                {
+                    return;
+                }
+
                 var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
                 SmtFormula? previousAssignedValue = null;
                 if (assignedSymbol is ILocalSymbol or IParameterSymbol)
@@ -550,6 +555,54 @@ namespace PurelySharp.Symbolic
             }
 
             fact = CreateAssignedValueFact(targetFormula, valueFormula);
+            return true;
+        }
+
+        private static bool TryHandleTupleAssignment(
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                UnwrapExpression(assignment.Left) is not TupleExpressionSyntax leftTuple)
+            {
+                return false;
+            }
+
+            var targetSymbols = new List<ISymbol>();
+            foreach (var argument in leftTuple.Arguments)
+            {
+                var targetSymbol = semanticModel.GetSymbolInfo(argument.Expression, cancellationToken).Symbol;
+                if (targetSymbol is ILocalSymbol or IParameterSymbol)
+                {
+                    targetSymbols.Add(targetSymbol.OriginalDefinition);
+                }
+            }
+
+            foreach (var targetSymbol in targetSymbols)
+            {
+                RemoveFactsReferencingSymbol(facts, targetSymbol);
+            }
+
+            if (targetSymbols.Count != leftTuple.Arguments.Count ||
+                UnwrapExpression(assignment.Right) is not TupleExpressionSyntax rightTuple ||
+                rightTuple.Arguments.Count != leftTuple.Arguments.Count ||
+                rightTuple.Arguments.Any(argument => ExpressionReferencesAnySymbol(argument.Expression, targetSymbols, semanticModel, cancellationToken)))
+            {
+                return true;
+            }
+
+            for (var index = 0; index < leftTuple.Arguments.Count; index++)
+            {
+                AddAssignedValueFacts(
+                    targetSymbols[index],
+                    rightTuple.Arguments[index].Expression,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
+
             return true;
         }
 
@@ -985,6 +1038,23 @@ namespace PurelySharp.Symbolic
                 var expressionSymbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
                 if (expressionSymbol != null &&
                     SymbolEqualityComparer.Default.Equals(expressionSymbol.OriginalDefinition, symbol))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ExpressionReferencesAnySymbol(
+            SyntaxNode root,
+            IReadOnlyCollection<ISymbol> symbols,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var symbol in symbols)
+            {
+                if (ExpressionReferencesSymbol(root, symbol, semanticModel, cancellationToken))
                 {
                     return true;
                 }
