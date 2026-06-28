@@ -2177,6 +2177,7 @@ namespace PurelySharp.Symbolic
             {
                 AddNullableAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
                 AddAsExpressionAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+                AddConditionalAccessAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
 
             AddTupleElementAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
@@ -2709,6 +2710,66 @@ namespace PurelySharp.Symbolic
 
             fact = CreateAssignedValueFact(targetFormula, valueFormula);
             return true;
+        }
+
+        private static void AddConditionalAccessAssignedValueFacts(
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            valueExpression = UnwrapExpression(valueExpression);
+            if (valueExpression is not ConditionalAccessExpressionSyntax conditionalAccess ||
+                !CSharpConditionToFormula.TryTranslateValue(
+                    conditionalAccess.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) ||
+                receiverFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return;
+            }
+
+            var receiverNonNull = new SmtBinaryFormula(
+                SmtBinaryOperator.NotEqual,
+                receiverFormula,
+                new SmtNullConstant());
+
+            if (TryCreateNullableHasValueFormula(assignedSymbol, out var targetHasValue) &&
+                TryGetNullableUnderlyingType(GetSymbolType(assignedSymbol), out var underlyingType) &&
+                ConditionalAccessWhenNotNullHasType(
+                    conditionalAccess,
+                    underlyingType,
+                    semanticModel,
+                    cancellationToken))
+            {
+                facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetHasValue, receiverNonNull));
+                return;
+            }
+
+            if (TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula) &&
+                targetFormula is { Kind: SmtValueKind.Reference })
+            {
+                facts.Add(new SmtBinaryFormula(
+                    SmtBinaryOperator.Or,
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, new SmtNullConstant()),
+                    receiverNonNull));
+            }
+        }
+
+        private static bool ConditionalAccessWhenNotNullHasType(
+            ConditionalAccessExpressionSyntax conditionalAccess,
+            ITypeSymbol expectedType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var typeInfo = semanticModel.GetTypeInfo(conditionalAccess.WhenNotNull, cancellationToken);
+            var actualType = typeInfo.ConvertedType ?? typeInfo.Type;
+            return actualType != null &&
+                SymbolEqualityComparer.Default.Equals(actualType, expectedType);
         }
 
         private static void AddAsExpressionAssignedValueFacts(

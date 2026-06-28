@@ -3770,6 +3770,90 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessNullSourceNullableResultHasNoValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        string text = null;
+        int? length = text?.Length;
+        return length.GetValueOrDefault();
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ConditionalAccessNullSourceNullableResultHasNoValue.cs",
+                FindLine(source, "return length.GetValueOrDefault();"),
+                16,
+                "!length.HasValue",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessHasValueImpliesReceiverNonNull()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        int? length = text?.Length;
+        if (length.HasValue)
+        {
+            return length.Value;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ConditionalAccessHasValueImpliesReceiverNonNull.cs",
+                FindLine(source, "return length.Value;"),
+                20,
+                "text != null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessReferenceNullSourceResultNull()
+        {
+            const string source = @"
+public sealed class Holder
+{
+    public string Text;
+}
+
+public class TestClass
+{
+    public string TestMethod()
+    {
+        Holder holder = null;
+        var text = holder?.Text;
+        return text;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ConditionalAccessReferenceNullSourceResultNull.cs",
+                FindLine(source, "return text;"),
+                16,
+                "text == null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicInvariantService_TupleAssignmentSwapInvalidatesTargetFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -5869,6 +5953,59 @@ public class TestClass
                     diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
                     symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
                 Is.True);
+        }
+
+        [Test]
+        public async Task Ps0002_ConditionalAccessNullSourceHasValueGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        string text = null;
+        int? length = text?.Length;
+        if (length.HasValue)
+        {
+            Console.ReadLine();
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.ReadLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_ConditionalAccessNonNullSourceHasValueGuard_Reports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        string text = ""value"";
+        int? length = text?.Length;
+        if (length.HasValue)
+        {
+            Console.ReadLine();
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
         }
 
         [Test]
