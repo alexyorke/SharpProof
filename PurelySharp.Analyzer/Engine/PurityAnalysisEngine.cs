@@ -826,8 +826,7 @@ namespace PurelySharp.Analyzer.Engine
                 switch (formula)
                 {
                     case SmtVariable variable:
-                        return variable.Name == variablePrefix ||
-                            variable.Name.StartsWith(variablePrefix + "@v", StringComparison.Ordinal);
+                        return variable.Name.Contains(variablePrefix, StringComparison.Ordinal);
                     case SmtUnaryFormula unary:
                         return ReferencesSmtVariable(unary.Operand, variablePrefix);
                     case SmtBinaryFormula binary:
@@ -4172,22 +4171,39 @@ namespace PurelySharp.Analyzer.Engine
             PurityAnalysisState valueState,
             SemanticModel semanticModel)
         {
-            if (valueOperation?.Syntax is not ExpressionSyntax valueExpression ||
-                !TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetFormula) ||
-                !CSharpConditionToFormula.TryTranslateValue(
-                    valueExpression,
-                    semanticModel,
-                    CancellationToken.None,
-                    out var valueFormula,
-                    valueState.GetSmtSymbolVersion) ||
-                valueFormula == null ||
-                !CanCompareSmtValues(targetFormula, valueFormula))
+            if (valueOperation?.Syntax is not ExpressionSyntax valueExpression)
             {
                 return currentState;
             }
 
-            var assignedFact = CreateAssignedValueFact(targetFormula, valueFormula);
-            return currentState.WithPathConditions(currentState.PathConditions.Add(assignedFact));
+            var nextState = currentState;
+            if (TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetFormula) &&
+                CSharpConditionToFormula.TryTranslateValue(
+                    valueExpression,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var valueFormula,
+                    valueState.GetSmtSymbolVersion) &&
+                valueFormula != null &&
+                CanCompareSmtValues(targetFormula, valueFormula))
+            {
+                var assignedFact = CreateAssignedValueFact(targetFormula, valueFormula);
+                nextState = nextState.WithPathConditions(nextState.PathConditions.Add(assignedFact));
+            }
+
+            if (TryCreateArrayLengthFormula(targetSymbol, currentState, out var targetLengthFormula) &&
+                TryCreateArrayLengthValueFormula(
+                    valueExpression,
+                    semanticModel,
+                    CancellationToken.None,
+                    valueState.GetSmtSymbolVersion,
+                    out var valueLengthFormula))
+            {
+                nextState = nextState.WithPathConditions(nextState.PathConditions.Add(
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula)));
+            }
+
+            return nextState;
         }
 
         private static SmtFormula CreateAssignedValueFact(SmtFormula targetFormula, SmtFormula valueFormula)
@@ -4242,6 +4258,126 @@ namespace PurelySharp.Analyzer.Engine
 
             formula = null!;
             return false;
+        }
+
+        private static bool TryCreateArrayLengthFormula(
+            ISymbol symbol,
+            PurityAnalysisState currentState,
+            out SmtFormula formula)
+        {
+            if (symbol is ILocalSymbol { Type: IArrayTypeSymbol { Rank: 1 } } or
+                IParameterSymbol { Type: IArrayTypeSymbol { Rank: 1 } })
+            {
+                var receiverFormula = new SmtVariable(GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion), SmtValueKind.Reference);
+                formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryCreateArrayLengthValueFormula(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int> getSymbolVersion,
+            out SmtFormula formula)
+        {
+            valueExpression = UnwrapSmtFactExpression(valueExpression);
+            var valueTypeInfo = semanticModel.GetTypeInfo(valueExpression, cancellationToken);
+            var valueType = valueTypeInfo.ConvertedType ?? valueTypeInfo.Type;
+            if (valueType is not IArrayTypeSymbol { Rank: 1 })
+            {
+                formula = null!;
+                return false;
+            }
+
+            if (valueExpression is ArrayCreationExpressionSyntax arrayCreation)
+            {
+                if (arrayCreation.Type.RankSpecifiers.Count == 1 &&
+                    arrayCreation.Type.RankSpecifiers[0].Sizes.Count == 1 &&
+                    !arrayCreation.Type.RankSpecifiers[0].Sizes[0].IsKind(SyntaxKind.OmittedArraySizeExpression) &&
+                    CSharpConditionToFormula.TryTranslateValue(
+                        arrayCreation.Type.RankSpecifiers[0].Sizes[0],
+                        semanticModel,
+                        cancellationToken,
+                        out var sizeFormula,
+                        getSymbolVersion) &&
+                    sizeFormula is { Kind: SmtValueKind.Int })
+                {
+                    formula = sizeFormula;
+                    return true;
+                }
+
+                if (arrayCreation.Initializer != null)
+                {
+                    formula = new SmtIntegerConstant(arrayCreation.Initializer.Expressions.Count);
+                    return true;
+                }
+            }
+
+            if (valueExpression is ImplicitArrayCreationExpressionSyntax implicitArrayCreation)
+            {
+                formula = new SmtIntegerConstant(implicitArrayCreation.Initializer.Expressions.Count);
+                return true;
+            }
+
+            if (IsArrayEmptyInvocation(valueExpression, semanticModel, cancellationToken))
+            {
+                formula = new SmtIntegerConstant(0);
+                return true;
+            }
+
+            if (CSharpConditionToFormula.TryTranslateValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverFormula,
+                    getSymbolVersion) &&
+                receiverFormula is SmtVariable { Kind: SmtValueKind.Reference })
+            {
+                formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static ExpressionSyntax UnwrapSmtFactExpression(ExpressionSyntax expression)
+        {
+            while (true)
+            {
+                if (expression is ParenthesizedExpressionSyntax parenthesized)
+                {
+                    expression = parenthesized.Expression;
+                    continue;
+                }
+
+                if (expression is PostfixUnaryExpressionSyntax postfixUnary &&
+                    postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression))
+                {
+                    expression = postfixUnary.Operand;
+                    continue;
+                }
+
+                return expression;
+            }
+        }
+
+        private static bool IsArrayEmptyInvocation(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return valueExpression is InvocationExpressionSyntax invocation &&
+                semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is IMethodSymbol
+                {
+                    Name: "Empty",
+                    IsStatic: true,
+                    ContainingType.SpecialType: SpecialType.System_Array
+                };
         }
 
         private static bool CanCompareSmtValues(SmtFormula left, SmtFormula right)

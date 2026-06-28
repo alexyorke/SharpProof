@@ -488,6 +488,169 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ArrayCreationLengthContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        var values = new int[0];
+        if (values.Length > 0)
+        {
+            Console.WriteLine(values.Length);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_ArrayCreationLengthReachableGuard_Reports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        var values = new int[1];
+        if (values.Length > 0)
+        {
+            Console.WriteLine(values.Length);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
+        }
+
+        [Test]
+        public async Task Ps0002_SymbolicArrayLengthContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int length)
+    {
+        var values = new int[length];
+        if (values.Length != length)
+        {
+            Console.WriteLine(values.Length);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_ArrayInitializerLengthContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        var values = new[] { 1, 2 };
+        if (values.Length != 2)
+        {
+            Console.WriteLine(values.Length);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_ArrayEmptyLengthContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        var values = Array.Empty<int>();
+        if (values.Length != 0)
+        {
+            Console.WriteLine(values.Length);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_ArrayAliasLengthContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int length)
+    {
+        var values = new int[length];
+        var alias = values;
+        if (alias.Length != length)
+        {
+            Console.WriteLine(alias.Length);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_ArrayLengthFactInvalidatedAfterReassignment_Reports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int[] input)
+    {
+        var values = new int[0];
+        values = input;
+        if (values.Length > 0)
+        {
+            Console.WriteLine(values.Length);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
+        }
+
+        [Test]
         public async Task Ps0002_DisjunctiveContradictoryGuardedImpureCall_DoesNotReport()
         {
             Assert.That(
