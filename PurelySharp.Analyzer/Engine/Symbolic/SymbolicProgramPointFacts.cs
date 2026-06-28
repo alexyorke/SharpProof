@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -37,6 +38,65 @@ namespace PurelySharp.Analyzer.Engine.Symbolic
             }
 
             return facts;
+        }
+
+        public static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditions(
+            SyntaxNode syntaxNode,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var builder = ImmutableArray.CreateBuilder<SmtFormula>();
+
+            foreach (var ancestor in syntaxNode.Ancestors())
+            {
+                if (ancestor is IfStatementSyntax ifStatementSyntax)
+                {
+                    if (ifStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
+                    {
+                        AddReachabilityCondition(builder, ifStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                    }
+                    else if (ifStatementSyntax.Else?.Statement.Span.Contains(syntaxNode.Span) == true)
+                    {
+                        AddReachabilityCondition(builder, ifStatementSyntax.Condition, mustBeTrue: false, semanticModel, cancellationToken);
+                    }
+                }
+                else if (ancestor is ConditionalExpressionSyntax conditionalExpressionSyntax)
+                {
+                    if (conditionalExpressionSyntax.WhenTrue.Span.Contains(syntaxNode.Span))
+                    {
+                        AddReachabilityCondition(builder, conditionalExpressionSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                    }
+                    else if (conditionalExpressionSyntax.WhenFalse.Span.Contains(syntaxNode.Span))
+                    {
+                        AddReachabilityCondition(builder, conditionalExpressionSyntax.Condition, mustBeTrue: false, semanticModel, cancellationToken);
+                    }
+                }
+                else if (ancestor is BinaryExpressionSyntax binaryExpressionSyntax &&
+                         binaryExpressionSyntax.Right.Span.Contains(syntaxNode.Span))
+                {
+                    if (binaryExpressionSyntax.IsKind(SyntaxKind.LogicalAndExpression))
+                    {
+                        AddReachabilityCondition(builder, binaryExpressionSyntax.Left, mustBeTrue: true, semanticModel, cancellationToken);
+                    }
+                    else if (binaryExpressionSyntax.IsKind(SyntaxKind.LogicalOrExpression))
+                    {
+                        AddReachabilityCondition(builder, binaryExpressionSyntax.Left, mustBeTrue: false, semanticModel, cancellationToken);
+                    }
+                }
+                else if (ancestor is WhileStatementSyntax whileStatementSyntax &&
+                         whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
+                {
+                    AddReachabilityCondition(builder, whileStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                }
+                else if (ancestor is ForStatementSyntax forStatementSyntax &&
+                         forStatementSyntax.Condition != null &&
+                         forStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
+                {
+                    AddReachabilityCondition(builder, forStatementSyntax.Condition, mustBeTrue: true, semanticModel, cancellationToken);
+                }
+            }
+
+            return builder.ToImmutable();
         }
 
         public static IEnumerable<SmtFormula> CollectForInitializerFacts(
@@ -144,6 +204,24 @@ namespace PurelySharp.Analyzer.Engine.Symbolic
             }
 
             RemoveFactsInvalidatedByNestedMutations(statement, semanticModel, cancellationToken, facts);
+        }
+
+        private static void AddReachabilityCondition(
+            ImmutableArray<SmtFormula>.Builder builder,
+            ExpressionSyntax expressionSyntax,
+            bool mustBeTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (!CSharpConditionToFormula.TryTranslate(expressionSyntax, semanticModel, cancellationToken, out var formula) ||
+                formula == null)
+            {
+                return;
+            }
+
+            builder.Add(mustBeTrue
+                ? formula
+                : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
         }
 
         private static void RemoveFactsInvalidatedByNestedMutations(

@@ -12,6 +12,7 @@ using System.IO;
 using System.Globalization;
 using PurelySharp.Analyzer.Engine.Smt;
 using PurelySharp.Analyzer.Engine.Rules;
+using PurelySharp.Analyzer.Engine.Symbolic;
 using SearchLib.Purity;
 using SearchLib.Smt;
 using System.Threading;
@@ -2500,7 +2501,7 @@ namespace PurelySharp.Analyzer.Engine
                 }
             }
 
-            var pathConditions = CollectAncestorReachabilityConditions(syntaxNode, semanticModel);
+            var pathConditions = SymbolicProgramPointFacts.CollectAncestorReachabilityConditions(syntaxNode, semanticModel, CancellationToken.None);
             if (pathConditions.Length == 0)
             {
                 return false;
@@ -2512,81 +2513,6 @@ namespace PurelySharp.Analyzer.Engine
 
             var proofResult = smtAnalysis.Classify(query);
             return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
-        }
-
-        private static ImmutableArray<SmtFormula> CollectAncestorReachabilityConditions(
-            SyntaxNode syntaxNode,
-            SemanticModel semanticModel)
-        {
-            var builder = ImmutableArray.CreateBuilder<SmtFormula>();
-
-            foreach (var ancestor in syntaxNode.Ancestors())
-            {
-                if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.IfStatementSyntax ifStatementSyntax)
-                {
-                    if (ifStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
-                    {
-            AddReachabilityCondition(builder, ifStatementSyntax.Condition, mustBeTrue: true, semanticModel);
-                    }
-                    else if (ifStatementSyntax.Else?.Statement.Span.Contains(syntaxNode.Span) == true)
-                    {
-                        AddReachabilityCondition(builder, ifStatementSyntax.Condition, mustBeTrue: false, semanticModel);
-                    }
-                }
-                else if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.ConditionalExpressionSyntax conditionalExpressionSyntax)
-                {
-                    if (conditionalExpressionSyntax.WhenTrue.Span.Contains(syntaxNode.Span))
-                    {
-                        AddReachabilityCondition(builder, conditionalExpressionSyntax.Condition, mustBeTrue: true, semanticModel);
-                    }
-                    else if (conditionalExpressionSyntax.WhenFalse.Span.Contains(syntaxNode.Span))
-                    {
-                        AddReachabilityCondition(builder, conditionalExpressionSyntax.Condition, mustBeTrue: false, semanticModel);
-                    }
-                }
-                else if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.BinaryExpressionSyntax binaryExpressionSyntax &&
-                         binaryExpressionSyntax.Right.Span.Contains(syntaxNode.Span))
-                {
-                    if (binaryExpressionSyntax.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.LogicalAndExpression))
-                    {
-                        AddReachabilityCondition(builder, binaryExpressionSyntax.Left, mustBeTrue: true, semanticModel);
-                    }
-                    else if (binaryExpressionSyntax.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.LogicalOrExpression))
-                    {
-                        AddReachabilityCondition(builder, binaryExpressionSyntax.Left, mustBeTrue: false, semanticModel);
-                    }
-                }
-                else if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.WhileStatementSyntax whileStatementSyntax &&
-                         whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
-                {
-                    AddReachabilityCondition(builder, whileStatementSyntax.Condition, mustBeTrue: true, semanticModel);
-                }
-                else if (ancestor is Microsoft.CodeAnalysis.CSharp.Syntax.ForStatementSyntax forStatementSyntax &&
-                         forStatementSyntax.Condition != null &&
-                         forStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
-                {
-                    AddReachabilityCondition(builder, forStatementSyntax.Condition, mustBeTrue: true, semanticModel);
-                }
-            }
-
-            return builder.ToImmutable();
-        }
-
-        private static void AddReachabilityCondition(
-            ImmutableArray<SmtFormula>.Builder builder,
-            ExpressionSyntax expressionSyntax,
-            bool mustBeTrue,
-            SemanticModel semanticModel)
-        {
-            if (!CSharpConditionToFormula.TryTranslate(expressionSyntax, semanticModel, CancellationToken.None, out var formula) ||
-                formula == null)
-            {
-                return;
-            }
-
-            builder.Add(mustBeTrue
-                ? formula
-                : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
         }
 
         private static bool IsInUnmatchedConstantSwitchExpressionArm(

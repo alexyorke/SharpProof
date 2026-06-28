@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NUnit.Framework;
 using PurelySharp.Analyzer;
+using PurelySharp.Analyzer.Engine.Symbolic;
 using PurelySharp.Test.Smt;
 using SearchLib.Smt;
 
@@ -536,6 +537,30 @@ public class TestClass
 
             Assert.That(facts, Is.Not.Empty);
             Assert.That(facts.Any(fact => fact.Contains("Length", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicInvariantService_CollectsAncestorReachabilityFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values.Length == 2)
+        {
+            return values[0];
+        }
+
+        return 0;
+    }
+}",
+                "return values[0];");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Length", StringComparison.Ordinal) &&
+                                           fact.Contains("2", StringComparison.Ordinal)), Is.True);
         }
 
         [Test]
@@ -2666,12 +2691,9 @@ public class TestClass
                 .DescendantNodes()
                 .OfType<StatementSyntax>()
                 .Single(node => node.ToString().StartsWith(statementPrefix, StringComparison.Ordinal));
-            var method = typeof(PurelySharp.Analyzer.PurelySharpAnalyzer).Assembly
-                .GetType("PurelySharp.Analyzer.Engine.Symbolic.SymbolicProgramPointFacts", throwOnError: true)!
-                .GetMethod("CollectPriorAssignmentFacts", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
-            var facts = (System.Collections.IEnumerable)method.Invoke(null, new object?[] { statement, semanticModel, CancellationToken.None })!;
+            var snapshot = new SymbolicInvariantService().GetInvariantsAt(statement, semanticModel, CancellationToken.None);
 
-            return facts.Cast<object>().Select(static fact => fact.ToString() ?? string.Empty).ToArray();
+            return snapshot.Facts.ToArray();
         }
 
         private static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions)
