@@ -993,14 +993,23 @@ namespace PurelySharp.Symbolic
                 if (assignedSymbol is ILocalSymbol or IParameterSymbol)
                 {
                     var originalAssignedSymbol = assignedSymbol.OriginalDefinition;
-                    RemoveFactsReferencingSymbol(facts, originalAssignedSymbol);
+                    var coalesceAssignmentIsKnownNoOp = assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) &&
+                        IsKnownNonNullReferenceSymbol(facts, originalAssignedSymbol);
+                    if (!coalesceAssignmentIsKnownNoOp)
+                    {
+                        RemoveFactsReferencingSymbol(facts, originalAssignedSymbol);
+                    }
+
                     if (assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
                     {
                         AddAssignedValueFacts(originalAssignedSymbol, assignment.Right, semanticModel, cancellationToken, facts);
                     }
                     else if (assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression))
                     {
-                        AddCoalesceAssignmentFacts(originalAssignedSymbol, assignment.Right, previousAssignedValue, semanticModel, cancellationToken, facts);
+                        if (!coalesceAssignmentIsKnownNoOp)
+                        {
+                            AddCoalesceAssignmentFacts(originalAssignedSymbol, assignment.Right, previousAssignedValue, semanticModel, cancellationToken, facts);
+                        }
                     }
                     else if (previousAssignedValue != null &&
                              TryCreateCompoundAssignmentFact(
@@ -2994,6 +3003,52 @@ namespace PurelySharp.Symbolic
             }
 
             return false;
+        }
+
+        private static bool IsKnownNonNullReferenceSymbol(List<SmtFormula> facts, ISymbol symbol)
+        {
+            if (!TryCreateSymbolSmtValue(symbol, out var targetFormula) ||
+                targetFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            for (var index = facts.Count - 1; index >= 0; index--)
+            {
+                if (facts[index] is SmtBinaryFormula
+                    {
+                        Operator: SmtBinaryOperator.NotEqual,
+                        Left: var notEqualLeft,
+                        Right: var notEqualRight
+                    } &&
+                    IsFormulaPair(targetFormula, new SmtNullConstant(), notEqualLeft, notEqualRight))
+                {
+                    return true;
+                }
+
+                if (facts[index] is SmtUnaryFormula
+                    {
+                        Operator: SmtUnaryOperator.Not,
+                        Operand: SmtBinaryFormula
+                        {
+                            Operator: SmtBinaryOperator.Equal,
+                            Left: var equalLeft,
+                            Right: var equalRight
+                        }
+                    } &&
+                    IsFormulaPair(targetFormula, new SmtNullConstant(), equalLeft, equalRight))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsFormulaPair(SmtFormula expectedLeft, SmtFormula expectedRight, SmtFormula actualLeft, SmtFormula actualRight)
+        {
+            return Equals(actualLeft, expectedLeft) && Equals(actualRight, expectedRight) ||
+                Equals(actualLeft, expectedRight) && Equals(actualRight, expectedLeft);
         }
 
         private static bool TryGetIncrementedOrDecrementedSymbol(
