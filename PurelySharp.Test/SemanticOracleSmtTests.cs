@@ -678,6 +678,61 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_QuerySource_CollectsStatementGuardFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        if (index < 0 || index >= values.Length)
+        {
+            return 0;
+        }
+
+        return values[index];
+    }
+}";
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "QuerySourceStatementFacts.cs",
+                FindLine(source, "return values[index];"),
+                9,
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(result.NodeKind, Is.EqualTo("ReturnStatement"));
+            Assert.That(result.Facts, Is.Not.Empty);
+            Assert.That(result.Facts.Any(fact => fact.Contains("LessThan", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThanOrEqual", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_QuerySource_CollectsExpressionContextFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public string TestMethod(string first, string second)
+    {
+        return first ?? second;
+    }
+}";
+            var line = FindLine(source, "return first ?? second;");
+            var result = new SymbolicSourceQueryService().QuerySource(
+                source,
+                "QuerySourceExpressionFacts.cs",
+                line,
+                source.Split('\n')[line - 1].IndexOf("second", StringComparison.Ordinal) + 1,
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(result.NodeKind, Is.EqualTo("IdentifierName"));
+            Assert.That(result.Facts, Is.Not.Empty);
+            Assert.That(result.Facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                                 fact.Contains("first", StringComparison.Ordinal) &&
+                                                 fact.Contains("Null", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_UlongZeroContradiction_IsAlwaysFalse()
         {
             Assert.That(
@@ -2964,6 +3019,20 @@ public class TestClass
             var snapshot = new SymbolicInvariantService().GetInvariantsAt(expression, semanticModel, CancellationToken.None);
 
             return snapshot.Facts.ToArray();
+        }
+
+        private static int FindLine(string source, string text)
+        {
+            var lines = source.Split('\n');
+            for (var index = 0; index < lines.Length; index++)
+            {
+                if (lines[index].Contains(text, StringComparison.Ordinal))
+                {
+                    return index + 1;
+                }
+            }
+
+            throw new InvalidOperationException("Text was not found in source.");
         }
 
         private static SmtOptionsSnapshot ReadSmtOptions(ImmutableDictionary<string, string> globalOptions)

@@ -1,8 +1,4 @@
-using System.Collections.Immutable;
 using System.Text.Json;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using PurelySharp.Symbolic;
 
 var options = SymbolicCliOptions.Parse(args);
@@ -14,27 +10,10 @@ if (options.ShowHelp || options.FilePath == null)
 
 try
 {
-    var source = File.ReadAllText(options.FilePath);
-    var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview), options.FilePath);
-    var compilation = CSharpCompilation.Create(
-        "PurelySharp.SymbolicCli.Query",
-        new[] { syntaxTree },
-        GetTrustedPlatformReferences(),
-        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-    var semanticModel = compilation.GetSemanticModel(syntaxTree);
-    var root = syntaxTree.GetRoot();
-    var position = GetPosition(syntaxTree, options.Line, options.Column);
-    var node = FindQueryNode(root, position);
-    var service = new SymbolicInvariantService();
-    var snapshot = node is ForStatementSyntax forStatement
-        ? service.GetForInitialEntryInvariants(forStatement, semanticModel)
-        : service.GetInvariantsAt(node, semanticModel);
-    var result = new SymbolicCliResult(
-        Path.GetFullPath(options.FilePath),
+    var result = new SymbolicSourceQueryService().QueryFile(
+        options.FilePath,
         options.Line,
-        options.Column,
-        node.Kind().ToString(),
-        snapshot.Facts);
+        options.Column);
 
     if (options.Json)
     {
@@ -42,7 +21,7 @@ try
     }
     else
     {
-        Console.WriteLine($"{result.File}:{result.Line}:{result.Column}");
+        Console.WriteLine($"{result.FilePath}:{result.Line}:{result.Column}");
         Console.WriteLine($"Node: {result.NodeKind}");
         Console.WriteLine("Facts:");
         if (result.Facts.Count == 0)
@@ -65,104 +44,6 @@ catch (ArgumentException ex)
     Console.Error.WriteLine(ex.Message);
     Console.Error.WriteLine(SymbolicCliOptions.Usage);
     return 64;
-}
-
-static SyntaxNode FindQueryNode(SyntaxNode root, int position)
-{
-    var token = root.FindToken(position);
-    var expressionContextNode = FindExpressionContextNode(token, position);
-    if (expressionContextNode != null)
-    {
-        return expressionContextNode;
-    }
-
-    return root
-        .DescendantNodesAndSelf()
-        .Where(node => node.Span.Contains(position))
-        .OfType<StatementSyntax>()
-        .OrderBy(node => node.Span.Length)
-        .FirstOrDefault()
-        ?? token.Parent
-        ?? root;
-}
-
-static SyntaxNode? FindExpressionContextNode(SyntaxToken token, int position)
-{
-    foreach (var node in token.Parent?.AncestorsAndSelf() ?? Enumerable.Empty<SyntaxNode>())
-    {
-        switch (node)
-        {
-            case SwitchExpressionArmSyntax switchArm when switchArm.Expression.Span.Contains(position):
-                return FindInnermostExpression(switchArm.Expression, position);
-            case ConditionalExpressionSyntax conditionalExpression when conditionalExpression.WhenTrue.Span.Contains(position):
-                return FindInnermostExpression(conditionalExpression.WhenTrue, position);
-            case ConditionalExpressionSyntax conditionalExpression when conditionalExpression.WhenFalse.Span.Contains(position):
-                return FindInnermostExpression(conditionalExpression.WhenFalse, position);
-            case BinaryExpressionSyntax binaryExpression
-                when binaryExpression.IsKind(SyntaxKind.CoalesceExpression) &&
-                     binaryExpression.Right.Span.Contains(position):
-                return FindInnermostExpression(binaryExpression.Right, position);
-            case ConditionalAccessExpressionSyntax conditionalAccess
-                when conditionalAccess.WhenNotNull.Span.Contains(position):
-                return FindInnermostExpression(conditionalAccess.WhenNotNull, position);
-        }
-    }
-
-    return null;
-}
-
-static ExpressionSyntax FindInnermostExpression(ExpressionSyntax expression, int position)
-{
-    return expression
-        .DescendantNodesAndSelf()
-        .Where(node => node.Span.Contains(position))
-        .OfType<ExpressionSyntax>()
-        .OrderBy(node => node.Span.Length)
-        .FirstOrDefault()
-        ?? expression;
-}
-
-static int GetPosition(SyntaxTree syntaxTree, int line, int column)
-{
-    if (line < 1)
-    {
-        throw new ArgumentException("--line must be 1 or greater.");
-    }
-
-    if (column < 1)
-    {
-        throw new ArgumentException("--column must be 1 or greater.");
-    }
-
-    var text = syntaxTree.GetText();
-    if (line > text.Lines.Count)
-    {
-        throw new ArgumentException("--line exceeds the file line count.");
-    }
-
-    var textLine = text.Lines[line - 1];
-    var zeroBasedColumn = column - 1;
-    if (zeroBasedColumn > textLine.Span.Length)
-    {
-        throw new ArgumentException("--column exceeds the line length.");
-    }
-
-    return textLine.Start + zeroBasedColumn;
-}
-
-static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
-{
-    var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
-    if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
-    {
-        throw new InvalidOperationException("TRUSTED_PLATFORM_ASSEMBLIES is not available.");
-    }
-
-    return trustedPlatformAssemblies
-        .Split(Path.PathSeparator)
-        .Where(static path => !string.IsNullOrWhiteSpace(path))
-        .Select(static path => MetadataReference.CreateFromFile(path))
-        .ToImmutableArray<MetadataReference>();
 }
 
 internal sealed class SymbolicCliOptions
@@ -257,26 +138,4 @@ Options:
 
         return parsed;
     }
-}
-
-internal sealed class SymbolicCliResult
-{
-    public SymbolicCliResult(string file, int line, int column, string nodeKind, IReadOnlyList<string> facts)
-    {
-        File = file;
-        Line = line;
-        Column = column;
-        NodeKind = nodeKind;
-        Facts = facts;
-    }
-
-    public string File { get; }
-
-    public int Line { get; }
-
-    public int Column { get; }
-
-    public string NodeKind { get; }
-
-    public IReadOnlyList<string> Facts { get; }
 }
