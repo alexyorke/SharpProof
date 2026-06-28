@@ -17,13 +17,21 @@ try
         : null;
 
     var queryService = new SymbolicSourceQueryService();
-    var query = new SymbolicFileQuery(
-        options.FilePath,
-        options.Line,
-        options.Column,
-        options.CreateReferences(),
-        options.ImpliedConditions);
-    var result = queryService.QueryFile(query, smtAnalysis: smtAnalysis);
+    var result = options.Position.HasValue
+        ? queryService.QueryFileAtPosition(
+            options.FilePath,
+            options.Position.Value,
+            options.CreateReferences(),
+            smtAnalysis: smtAnalysis,
+            impliedConditions: options.ImpliedConditions)
+        : queryService.QueryFile(
+            new SymbolicFileQuery(
+                options.FilePath,
+                options.Line,
+                options.Column,
+                options.CreateReferences(),
+                options.ImpliedConditions),
+            smtAnalysis: smtAnalysis);
 
     if (options.Json)
     {
@@ -71,12 +79,13 @@ catch (ArgumentException ex)
 internal sealed class SymbolicCliOptions
 {
     public const string Usage = """
-Usage: PurelySharp.SymbolicCli --file <path> --line <n> [--column <n>] [--json]
+Usage: PurelySharp.SymbolicCli --file <path> (--line <n> [--column <n>] | --position <n>) [--json]
 
 Options:
   --file <path>       C# source file to query.
   --line <n>          1-based source line to query.
   --column <n>        1-based source column to query. Default: 1.
+  --position <n>      0-based absolute source position to query.
   --reference <path>  Metadata reference path. Can be repeated.
   --check-reachability
                       Use bounded SMT to classify whether the queried program point is reachable.
@@ -98,6 +107,8 @@ Options:
     public int Line { get; private set; }
 
     public int Column { get; private set; } = 1;
+
+    public int? Position { get; private set; }
 
     public List<string> ReferencePaths { get; } = new();
 
@@ -141,6 +152,9 @@ Options:
                     break;
                 case "--column":
                     options.Column = ReadInt(args, ref index, arg);
+                    break;
+                case "--position":
+                    options.Position = ReadNonNegativeInt(args, ref index, arg);
                     break;
                 case "--reference":
                 case "-r":
@@ -187,9 +201,14 @@ Options:
                 throw new ArgumentException("--file does not exist.");
             }
 
-            if (options.Line == 0)
+            if (options.Position.HasValue && options.Line != 0)
             {
-                throw new ArgumentException("--line is required.");
+                throw new ArgumentException("--position cannot be combined with --line.");
+            }
+
+            if (!options.Position.HasValue && options.Line == 0)
+            {
+                throw new ArgumentException("--line or --position is required.");
             }
 
             foreach (var referencePath in options.ReferencePaths)
@@ -250,6 +269,17 @@ Options:
         if (parsed <= 0)
         {
             throw new ArgumentException(optionName + " requires a positive integer value.");
+        }
+
+        return parsed;
+    }
+
+    private static int ReadNonNegativeInt(string[] args, ref int index, string optionName)
+    {
+        var parsed = ReadInt(args, ref index, optionName);
+        if (parsed < 0)
+        {
+            throw new ArgumentException(optionName + " requires a non-negative integer value.");
         }
 
         return parsed;

@@ -1187,6 +1187,37 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_QuerySourceAtPosition_ProvesImplication()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}";
+            var position = source.IndexOf("return value;", StringComparison.Ordinal);
+            var result = new SymbolicSourceQueryService().QuerySourceAtPosition(
+                source,
+                "QuerySourceAtPosition.cs",
+                position,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default),
+                impliedConditions: new[] { "value > 0" });
+
+            Assert.That(result.Position, Is.EqualTo(position));
+            Assert.That(result.Line, Is.EqualTo(8));
+            Assert.That(result.NodeKind, Is.EqualTo("ReturnStatement"));
+            Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesProgramPointReachability()
         {
             const string source = @"

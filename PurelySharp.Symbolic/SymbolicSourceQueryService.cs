@@ -77,6 +77,34 @@ namespace PurelySharp.Symbolic
                 impliedConditions);
         }
 
+        public SymbolicSourceQueryResult QueryFileAtPosition(
+            string filePath,
+            int position,
+            IEnumerable<MetadataReference>? references = null,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null,
+            IEnumerable<string>? impliedConditions = null)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                throw new ArgumentException("File path is required.", nameof(filePath));
+            }
+
+            if (!File.Exists(filePath))
+            {
+                throw new FileNotFoundException("Source file does not exist.", filePath);
+            }
+
+            return QuerySourceAtPosition(
+                File.ReadAllText(filePath),
+                Path.GetFullPath(filePath),
+                position,
+                references,
+                cancellationToken,
+                smtAnalysis,
+                impliedConditions);
+        }
+
         public SymbolicProgramPointQueryResult AnalyzeFile(
             SymbolicFileQuery query,
             CancellationToken cancellationToken = default,
@@ -124,6 +152,32 @@ namespace PurelySharp.Symbolic
                 smtAnalysis);
         }
 
+        public SymbolicProgramPointQueryResult AnalyzeFileAtPosition(
+            string filePath,
+            int position,
+            IEnumerable<MetadataReference>? references = null,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                throw new ArgumentException("File path is required.", nameof(filePath));
+            }
+
+            if (!File.Exists(filePath))
+            {
+                throw new FileNotFoundException("Source file does not exist.", filePath);
+            }
+
+            return AnalyzeSourceAtPosition(
+                File.ReadAllText(filePath),
+                Path.GetFullPath(filePath),
+                position,
+                references,
+                cancellationToken,
+                smtAnalysis);
+        }
+
         public SymbolicSourceQueryResult QuerySource(
             string sourceText,
             string filePath,
@@ -165,6 +219,45 @@ namespace PurelySharp.Symbolic
                 impliedConditions);
         }
 
+        public SymbolicSourceQueryResult QuerySourceAtPosition(
+            string sourceText,
+            string filePath,
+            int position,
+            IEnumerable<MetadataReference>? references = null,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null,
+            IEnumerable<string>? impliedConditions = null)
+        {
+            if (sourceText == null)
+            {
+                throw new ArgumentNullException(nameof(sourceText));
+            }
+
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                filePath = "PurelySharp.Symbolic.Query.cs";
+            }
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                sourceText,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                filePath,
+                cancellationToken: cancellationToken);
+            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
+            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query",
+                new[] { syntaxTree },
+                referenceArray,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            return QuerySyntaxTreeAtPosition(
+                syntaxTree,
+                compilation,
+                position,
+                cancellationToken,
+                smtAnalysis,
+                impliedConditions);
+        }
+
         public SymbolicProgramPointQueryResult AnalyzeSource(
             string sourceText,
             string filePath,
@@ -200,6 +293,43 @@ namespace PurelySharp.Symbolic
                 compilation,
                 line,
                 column,
+                cancellationToken,
+                smtAnalysis);
+        }
+
+        public SymbolicProgramPointQueryResult AnalyzeSourceAtPosition(
+            string sourceText,
+            string filePath,
+            int position,
+            IEnumerable<MetadataReference>? references = null,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null)
+        {
+            if (sourceText == null)
+            {
+                throw new ArgumentNullException(nameof(sourceText));
+            }
+
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                filePath = "PurelySharp.Symbolic.Query.cs";
+            }
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                sourceText,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                filePath,
+                cancellationToken: cancellationToken);
+            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
+            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query",
+                new[] { syntaxTree },
+                referenceArray,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            return AnalyzeSyntaxTreeAtPosition(
+                syntaxTree,
+                compilation,
+                position,
                 cancellationToken,
                 smtAnalysis);
         }
@@ -251,6 +381,52 @@ namespace PurelySharp.Symbolic
                 conditionProofs);
         }
 
+        public SymbolicSourceQueryResult QuerySyntaxTreeAtPosition(
+            SyntaxTree syntaxTree,
+            Compilation compilation,
+            int position,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null,
+            IEnumerable<string>? impliedConditions = null)
+        {
+            if (syntaxTree == null)
+            {
+                throw new ArgumentNullException(nameof(syntaxTree));
+            }
+
+            if (compilation == null)
+            {
+                throw new ArgumentNullException(nameof(compilation));
+            }
+
+            var query = AnalyzeProgramPointAtPosition(
+                syntaxTree,
+                compilation,
+                position,
+                smtAnalysis,
+                cancellationToken);
+            var lineColumn = GetLineAndColumn(syntaxTree, position, cancellationToken);
+            var conditionProofs = ProveConditions(
+                query.SemanticModel,
+                query.Position,
+                query.Analysis,
+                impliedConditions,
+                smtAnalysis,
+                cancellationToken);
+
+            return new SymbolicSourceQueryResult(
+                syntaxTree.FilePath,
+                lineColumn.Line,
+                lineColumn.Column,
+                query.Position,
+                query.Node.SpanStart,
+                query.Node.Kind().ToString(),
+                query.Analysis.Facts,
+                query.Analysis.Reachability,
+                query.Analysis.ReachabilityReason,
+                conditionProofs);
+        }
+
         public SymbolicProgramPointQueryResult AnalyzeSyntaxTree(
             SyntaxTree syntaxTree,
             Compilation compilation,
@@ -280,6 +456,40 @@ namespace PurelySharp.Symbolic
                 syntaxTree.FilePath,
                 line,
                 column,
+                query.Position,
+                query.Node.SpanStart,
+                query.Node.Kind().ToString(),
+                query.Analysis);
+        }
+
+        public SymbolicProgramPointQueryResult AnalyzeSyntaxTreeAtPosition(
+            SyntaxTree syntaxTree,
+            Compilation compilation,
+            int position,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null)
+        {
+            if (syntaxTree == null)
+            {
+                throw new ArgumentNullException(nameof(syntaxTree));
+            }
+
+            if (compilation == null)
+            {
+                throw new ArgumentNullException(nameof(compilation));
+            }
+
+            var query = AnalyzeProgramPointAtPosition(
+                syntaxTree,
+                compilation,
+                position,
+                smtAnalysis,
+                cancellationToken);
+            var lineColumn = GetLineAndColumn(syntaxTree, position, cancellationToken);
+            return new SymbolicProgramPointQueryResult(
+                syntaxTree.FilePath,
+                lineColumn.Line,
+                lineColumn.Column,
                 query.Position,
                 query.Node.SpanStart,
                 query.Node.Kind().ToString(),
@@ -413,6 +623,29 @@ namespace PurelySharp.Symbolic
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var root = syntaxTree.GetRoot(cancellationToken);
             var position = GetPosition(syntaxTree, line, column, cancellationToken);
+            var node = FindQueryNode(root, position);
+            var analysis = node is ForStatementSyntax forStatement
+                ? _invariantService.AnalyzeForInitialEntry(forStatement, semanticModel, smtAnalysis, cancellationToken)
+                : _invariantService.AnalyzeAt(node, semanticModel, smtAnalysis, cancellationToken);
+
+            return new ProgramPointQueryContext(semanticModel, position, node, analysis);
+        }
+
+        private ProgramPointQueryContext AnalyzeProgramPointAtPosition(
+            SyntaxTree syntaxTree,
+            Compilation compilation,
+            int position,
+            SmtAnalysisService? smtAnalysis,
+            CancellationToken cancellationToken)
+        {
+            var text = syntaxTree.GetText(cancellationToken);
+            if (position < 0 || position > text.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(position), "--position must be within the source text span.");
+            }
+
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var root = syntaxTree.GetRoot(cancellationToken);
             var node = FindQueryNode(root, position);
             var analysis = node is ForStatementSyntax forStatement
                 ? _invariantService.AnalyzeForInitialEntry(forStatement, semanticModel, smtAnalysis, cancellationToken)
@@ -657,6 +890,34 @@ namespace PurelySharp.Symbolic
             }
 
             return textLine.Start + zeroBasedColumn;
+        }
+
+        private static LineColumn GetLineAndColumn(
+            SyntaxTree syntaxTree,
+            int position,
+            CancellationToken cancellationToken)
+        {
+            var text = syntaxTree.GetText(cancellationToken);
+            if (position < 0 || position > text.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(position), "--position must be within the source text span.");
+            }
+
+            var line = text.Lines.GetLineFromPosition(position);
+            return new LineColumn(line.LineNumber + 1, position - line.Start + 1);
+        }
+
+        private readonly struct LineColumn
+        {
+            public LineColumn(int line, int column)
+            {
+                Line = line;
+                Column = column;
+            }
+
+            public int Line { get; }
+
+            public int Column { get; }
         }
 
         private sealed class ProgramPointQueryContext

@@ -429,6 +429,8 @@ namespace TestNamespace {
             Assert.That(source, Does.Contain("--smt-method-budget-ms <n>"));
             Assert.That(source, Does.Contain("--smt-max-path-conditions <n>"));
             Assert.That(source, Does.Contain("--smt-max-expression-nodes <n>"));
+            Assert.That(source, Does.Contain("--position <n>"));
+            Assert.That(source, Does.Contain("QueryFileAtPosition"));
             Assert.That(source, Does.Contain("options.CreateSmtOptions()"));
             Assert.That(source, Does.Not.Contain("new SmtAnalysisService(SmtAnalysisOptions.Default)"));
         }
