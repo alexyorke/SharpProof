@@ -234,6 +234,14 @@ namespace PurelySharp.Symbolic.Smt
                 conditions.Add(patternFormula);
             }
 
+            CSharpConditionToFormula.TryCollectPatternBindingFacts(
+                governingValue,
+                governingType,
+                pattern,
+                semanticModel,
+                cancellationToken,
+                conditions);
+
             if (whenClause != null)
             {
                 CSharpConditionToFormula.TryCollectDomainFacts(

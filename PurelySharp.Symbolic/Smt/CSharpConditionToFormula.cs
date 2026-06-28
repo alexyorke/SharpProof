@@ -547,6 +547,27 @@ namespace PurelySharp.Symbolic.Smt
             return formulas.Count > originalCount;
         }
 
+        public static bool TryCollectPatternBindingFacts(
+            SmtFormula matchedValue,
+            ITypeSymbol? matchedValueType,
+            PatternSyntax pattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion = null)
+        {
+            var originalCount = formulas.Count;
+            AddPatternBindingFacts(
+                matchedValue,
+                matchedValueType,
+                pattern,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion);
+            return formulas.Count > originalCount;
+        }
+
         public static bool TryCollectDomainFacts(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
