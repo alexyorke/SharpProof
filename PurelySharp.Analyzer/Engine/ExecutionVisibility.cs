@@ -147,7 +147,28 @@ namespace PurelySharp.Analyzer.Engine
                 }
             }
 
+            if (IsProgramPointUnreachableUsingSharedFacts(syntaxNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                return true;
+            }
+
             return false;
+        }
+
+        private static bool IsProgramPointUnreachableUsingSharedFacts(
+            SyntaxNode syntaxNode,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            if (smtAnalysis == null)
+            {
+                return false;
+            }
+
+            var analysis = new SymbolicInvariantService().AnalyzeAt(syntaxNode, semanticModel, smtAnalysis, cancellationToken);
+            return analysis.PathConditions.Count > 0 &&
+                analysis.Reachability == SymbolicReachability.Unreachable;
         }
 
         private static bool IsInUnreachableSwitchStatementSection(

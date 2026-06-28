@@ -1328,6 +1328,49 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_ForeachNewEmptyArrayConstantDivide_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        foreach (var value in new int[0])
+        {
+            return 1 / 0;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_NullGuardedForeachBodyConstantDivide_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        if (values == null)
+        {
+            foreach (var value in values)
+            {
+                return 1 / 0;
+            }
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_CatchFilterNonZeroDivisor_DoesNotReport()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
