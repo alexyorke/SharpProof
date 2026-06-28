@@ -668,6 +668,36 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsSwitchStatementPriorSectionExclusionFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        switch (value)
+        {
+            case 0:
+                return 0;
+            case var divisor:
+                return 10 / divisor;
+        }
+    }
+}",
+                "return 10 / divisor;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
+                                           fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("value", StringComparison.Ordinal) &&
+                                           fact.Contains("0", StringComparison.Ordinal)), Is.True);
+            Assert.That(facts.Any(fact => fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("divisor", StringComparison.Ordinal) &&
+                                           fact.Contains("value", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsSwitchExpressionArmFacts()
         {
             var facts = CollectExpressionProgramPointFacts(
@@ -2849,6 +2879,27 @@ public class TestClass
                 return 10 / divisor;
             default:
                 return 0;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_SwitchStatementPriorSectionExcludesZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        switch (value)
+        {
+            case 0:
+                return 0;
+            case var divisor:
+                return 10 / divisor;
         }
     }
 }");

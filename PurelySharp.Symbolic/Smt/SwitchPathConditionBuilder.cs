@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SearchLib.Smt;
@@ -17,6 +18,17 @@ namespace PurelySharp.Symbolic.Smt
             formula = null!;
             var labelConditions = new List<SmtFormula>();
             var hasDefaultLabel = false;
+            var sectionConditions = new List<SmtFormula>();
+            if (!TryAddPriorSwitchStatementSectionExclusions(
+                    governingExpression,
+                    section,
+                    semanticModel,
+                    cancellationToken,
+                    sectionConditions))
+            {
+                return false;
+            }
+
             foreach (var label in section.Labels)
             {
                 if (label is DefaultSwitchLabelSyntax)
@@ -55,7 +67,8 @@ namespace PurelySharp.Symbolic.Smt
                 labelConditions.Add(defaultCondition);
             }
 
-            return TryCreateDisjunction(labelConditions, out formula);
+            return TryCreateDisjunction(labelConditions, out var sectionLabelCondition) &&
+                TryCreateConjunction(sectionConditions.Concat(new[] { sectionLabelCondition }).ToArray(), out formula);
         }
 
         public static bool TryCreateSwitchExpressionArmCondition(
@@ -156,6 +169,62 @@ namespace PurelySharp.Symbolic.Smt
 
             return TryCreateDisjunction(nonDefaultLabelConditions, out var explicitCaseCondition) &&
                 CreateNegation(explicitCaseCondition, out formula);
+        }
+
+        private static bool TryAddPriorSwitchStatementSectionExclusions(
+            ExpressionSyntax governingExpression,
+            SwitchSectionSyntax currentSection,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> conditions)
+        {
+            if (currentSection.Parent is not SwitchStatementSyntax switchStatement)
+            {
+                return true;
+            }
+
+            var priorLabelConditions = new List<SmtFormula>();
+            foreach (var section in switchStatement.Sections)
+            {
+                if (ReferenceEquals(section, currentSection))
+                {
+                    break;
+                }
+
+                foreach (var label in section.Labels)
+                {
+                    if (label is DefaultSwitchLabelSyntax)
+                    {
+                        continue;
+                    }
+
+                    if (!TryCreateSwitchLabelCondition(
+                            governingExpression,
+                            label,
+                            semanticModel,
+                            cancellationToken,
+                            includePatternBindings: false,
+                            out var labelCondition))
+                    {
+                        return false;
+                    }
+
+                    priorLabelConditions.Add(labelCondition);
+                }
+            }
+
+            if (priorLabelConditions.Count == 0)
+            {
+                return true;
+            }
+
+            if (!TryCreateDisjunction(priorLabelConditions, out var priorLabelDisjunction))
+            {
+                return false;
+            }
+
+            conditions.Add(new SmtUnaryFormula(SmtUnaryOperator.Not, priorLabelDisjunction));
+            return true;
         }
 
         private static bool TryTranslateSwitchGoverningValue(
