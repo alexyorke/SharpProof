@@ -1044,7 +1044,7 @@ namespace PurelySharp.Symbolic.Smt
 
             if (pattern is DeclarationPatternSyntax declarationPattern)
             {
-                AddDesignationBindingFact(nullableValue, declarationPattern.Designation, semanticModel, formulas, getSymbolVersion);
+                AddDesignationBindingFact(nullableValue, declarationPattern.Designation, semanticModel, formulas, getSymbolVersion, out _);
                 return;
             }
 
@@ -1093,13 +1093,19 @@ namespace PurelySharp.Symbolic.Smt
             switch (pattern)
             {
                 case VarPatternSyntax varPattern:
-                    AddDesignationBindingFact(matchedValue, varPattern.Designation, semanticModel, formulas, getSymbolVersion);
+                    AddDesignationBindingFact(matchedValue, varPattern.Designation, semanticModel, formulas, getSymbolVersion, out _);
                     return;
                 case DeclarationPatternSyntax declarationPattern:
-                    AddDesignationBindingFact(matchedValue, declarationPattern.Designation, semanticModel, formulas, getSymbolVersion);
+                    AddDesignationBindingFact(matchedValue, declarationPattern.Designation, semanticModel, formulas, getSymbolVersion, out _);
                     return;
                 case RecursivePatternSyntax recursivePattern:
-                    AddDesignationBindingFact(matchedValue, recursivePattern.Designation, semanticModel, formulas, getSymbolVersion);
+                    AddDesignationBindingFact(
+                        matchedValue,
+                        recursivePattern.Designation,
+                        semanticModel,
+                        formulas,
+                        getSymbolVersion,
+                        out var designationValue);
                     AddRecursivePropertyPatternBindingFacts(
                         matchedValue,
                         recursivePattern,
@@ -1107,6 +1113,27 @@ namespace PurelySharp.Symbolic.Smt
                         cancellationToken,
                         formulas,
                         getSymbolVersion);
+                    if (designationValue != null &&
+                        !Equals(designationValue, matchedValue))
+                    {
+                        AddSubstitutedPatternFactsForDesignationReceiver(
+                            matchedValue,
+                            designationValue,
+                            matchedValueType,
+                            recursivePattern,
+                            semanticModel,
+                            cancellationToken,
+                            formulas,
+                            getSymbolVersion);
+                        AddRecursivePropertyPatternBindingFacts(
+                            designationValue,
+                            recursivePattern,
+                            semanticModel,
+                            cancellationToken,
+                            formulas,
+                            getSymbolVersion);
+                    }
+
                     return;
                 case BinaryPatternSyntax binaryPattern when binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword):
                     AddPatternBindingFacts(
@@ -1137,6 +1164,42 @@ namespace PurelySharp.Symbolic.Smt
                         getSymbolVersion);
                     return;
             }
+        }
+
+        private static void AddSubstitutedPatternFactsForDesignationReceiver(
+            SmtFormula matchedValue,
+            SmtFormula designationValue,
+            ITypeSymbol? matchedValueType,
+            PatternSyntax pattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (matchedValue is not SmtVariable matchedVariable ||
+                !TryTranslatePattern(
+                    matchedValue,
+                    pattern,
+                    semanticModel,
+                    cancellationToken,
+                    out var patternFormula,
+                    getSymbolVersion,
+                    matchedValueType,
+                    inlineDepth: 0) ||
+                patternFormula == null)
+            {
+                return;
+            }
+
+            var substitutions = new[]
+            {
+                new SmtVariableSubstitution(
+                    matchedVariable.Name,
+                    matchedVariable.Name + ".",
+                    matchedVariable + ".",
+                    designationValue)
+            };
+            formulas.Add(SubstituteVariables(patternFormula, substitutions));
         }
 
         private static void AddListPatternBindingFacts(
@@ -1224,18 +1287,36 @@ namespace PurelySharp.Symbolic.Smt
             VariableDesignationSyntax? designation,
             SemanticModel semanticModel,
             ICollection<SmtFormula> formulas,
-            Func<ISymbol, int>? getSymbolVersion)
+            Func<ISymbol, int>? getSymbolVersion,
+            out SmtFormula? localValue)
         {
-            if (designation is not SingleVariableDesignationSyntax singleVariableDesignation ||
-                singleVariableDesignation.Identifier.ValueText == "_" ||
-                semanticModel.GetDeclaredSymbol(singleVariableDesignation) is not ILocalSymbol localSymbol ||
-                !TryCreateSymbolFormula(localSymbol, getSymbolVersion, out var localValue) ||
-                !AreComparable(localValue, matchedValue))
+            localValue = null;
+            if (!TryCreateDesignationFormula(designation, semanticModel, getSymbolVersion, out var designationValue) ||
+                designationValue == null ||
+                !AreComparable(designationValue, matchedValue))
             {
                 return;
             }
 
+            localValue = designationValue;
             formulas.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, localValue, matchedValue));
+        }
+
+        private static bool TryCreateDesignationFormula(
+            VariableDesignationSyntax? designation,
+            SemanticModel semanticModel,
+            Func<ISymbol, int>? getSymbolVersion,
+            out SmtFormula formula)
+        {
+            formula = null!;
+            if (designation is not SingleVariableDesignationSyntax singleVariableDesignation ||
+                singleVariableDesignation.Identifier.ValueText == "_" ||
+                semanticModel.GetDeclaredSymbol(singleVariableDesignation) is not ILocalSymbol localSymbol)
+            {
+                return false;
+            }
+
+            return TryCreateSymbolFormula(localSymbol, getSymbolVersion, out formula);
         }
 
         private static bool TryTranslatePatternExpression(
