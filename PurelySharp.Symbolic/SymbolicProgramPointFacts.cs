@@ -2428,6 +2428,22 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
+        private static bool TryCreateAssignedValueFact(
+            ISymbol targetSymbol,
+            SmtFormula valueFormula,
+            out SmtFormula fact)
+        {
+            fact = null!;
+            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) ||
+                !CanCompareSmtValues(targetFormula, valueFormula))
+            {
+                return false;
+            }
+
+            fact = CreateAssignedValueFact(targetFormula, valueFormula);
+            return true;
+        }
+
         private static bool TryHandleTupleDeconstructionDeclaration(
             AssignmentExpressionSyntax assignment,
             SemanticModel semanticModel,
@@ -2436,9 +2452,7 @@ namespace PurelySharp.Symbolic
         {
             if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
                 UnwrapExpression(assignment.Left) is not DeclarationExpressionSyntax declarationExpression ||
-                declarationExpression.Designation is not ParenthesizedVariableDesignationSyntax leftDesignation ||
-                UnwrapExpression(assignment.Right) is not TupleExpressionSyntax rightTuple ||
-                rightTuple.Arguments.Count != leftDesignation.Variables.Count)
+                declarationExpression.Designation is not ParenthesizedVariableDesignationSyntax leftDesignation)
             {
                 return false;
             }
@@ -2456,16 +2470,17 @@ namespace PurelySharp.Symbolic
                 targetSymbols.Add(localSymbol.OriginalDefinition);
             }
 
-            for (var index = 0; index < targetSymbols.Count; index++)
+            if (ExpressionReferencesAnySymbol(assignment.Right, targetSymbols, semanticModel, cancellationToken))
             {
-                AddAssignedValueFacts(
-                    targetSymbols[index],
-                    rightTuple.Arguments[index].Expression,
-                    semanticModel,
-                    cancellationToken,
-                    facts);
+                return true;
             }
 
+            AddTupleElementTargetFacts(
+                targetSymbols,
+                assignment.Right,
+                semanticModel,
+                cancellationToken,
+                facts);
             return true;
         }
 
@@ -2497,23 +2512,95 @@ namespace PurelySharp.Symbolic
             }
 
             if (targetSymbols.Count != leftTuple.Arguments.Count ||
-                UnwrapExpression(assignment.Right) is not TupleExpressionSyntax rightTuple ||
-                rightTuple.Arguments.Count != leftTuple.Arguments.Count ||
-                rightTuple.Arguments.Any(argument => ExpressionReferencesAnySymbol(argument.Expression, targetSymbols, semanticModel, cancellationToken)))
+                ExpressionReferencesAnySymbol(assignment.Right, targetSymbols, semanticModel, cancellationToken))
             {
                 return true;
             }
 
-            for (var index = 0; index < leftTuple.Arguments.Count; index++)
+            AddTupleElementTargetFacts(
+                targetSymbols,
+                assignment.Right,
+                semanticModel,
+                cancellationToken,
+                facts);
+            return true;
+        }
+
+        private static void AddTupleElementTargetFacts(
+            IReadOnlyList<ISymbol> targetSymbols,
+            ExpressionSyntax rightExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            rightExpression = UnwrapExpression(rightExpression);
+            if (rightExpression is TupleExpressionSyntax rightTuple)
             {
-                AddAssignedValueFacts(
-                    targetSymbols[index],
-                    rightTuple.Arguments[index].Expression,
-                    semanticModel,
-                    cancellationToken,
-                    facts);
+                if (rightTuple.Arguments.Count != targetSymbols.Count)
+                {
+                    return;
+                }
+
+                for (var index = 0; index < targetSymbols.Count; index++)
+                {
+                    AddAssignedValueFacts(
+                        targetSymbols[index],
+                        rightTuple.Arguments[index].Expression,
+                        semanticModel,
+                        cancellationToken,
+                        facts);
+                }
+
+                return;
             }
 
+            if (!TryGetTupleElementValueFormulas(
+                    rightExpression,
+                    targetSymbols.Count,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueFormulas))
+            {
+                return;
+            }
+
+            for (var index = 0; index < targetSymbols.Count; index++)
+            {
+                if (TryCreateAssignedValueFact(targetSymbols[index], valueFormulas[index], out var fact))
+                {
+                    facts.Add(fact);
+                }
+            }
+        }
+
+        private static bool TryGetTupleElementValueFormulas(
+            ExpressionSyntax expression,
+            int expectedCount,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ImmutableArray<SmtFormula> valueFormulas)
+        {
+            valueFormulas = ImmutableArray<SmtFormula>.Empty;
+            var receiverSymbol = semanticModel.GetSymbolInfo(UnwrapExpression(expression), cancellationToken).Symbol?.OriginalDefinition;
+            if (receiverSymbol is not ILocalSymbol and not IParameterSymbol ||
+                !TryGetTupleElementStorageNames(receiverSymbol, expectedCount, out var elementNames))
+            {
+                return false;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<SmtFormula>(expectedCount);
+            foreach (var elementName in elementNames)
+            {
+                if (!TryCreateTupleElementSmtValue(receiverSymbol, elementName, out var elementFormula))
+                {
+                    valueFormulas = ImmutableArray<SmtFormula>.Empty;
+                    return false;
+                }
+
+                builder.Add(elementFormula);
+            }
+
+            valueFormulas = builder.ToImmutable();
             return true;
         }
 
