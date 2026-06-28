@@ -693,6 +693,31 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsSwitchExpressionFallbackExclusionFacts()
+        {
+            var facts = CollectExpressionProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return value switch
+        {
+            0 => 0,
+            _ => 10 / value
+        };
+    }
+}",
+                "10 / value");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("Not", StringComparison.Ordinal) &&
+                                           fact.Contains("Equal", StringComparison.Ordinal) &&
+                                           fact.Contains("value", StringComparison.Ordinal) &&
+                                           fact.Contains("0", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsSwitchExpressionPatternBindingFacts()
         {
             var facts = CollectExpressionProgramPointFacts(
@@ -2843,6 +2868,25 @@ public class TestClass
         {
             > 0 and var divisor => 10 / divisor,
             _ => 0
+        };
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_SwitchExpressionFallbackExcludesZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return value switch
+        {
+            0 => 0,
+            _ => 10 / value
         };
     }
 }");

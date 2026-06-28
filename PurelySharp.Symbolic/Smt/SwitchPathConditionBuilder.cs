@@ -75,6 +75,13 @@ namespace PurelySharp.Symbolic.Smt
                 domainFacts);
 
             return TryTranslateSwitchGoverningValue(governingExpression, semanticModel, cancellationToken, out var governingValue) &&
+                TryAddPriorSwitchExpressionArmExclusions(
+                    governingValue,
+                    governingType,
+                    arm,
+                    semanticModel,
+                    cancellationToken,
+                    domainFacts) &&
                 TryCreatePatternAndGuardCondition(
                     governingValue,
                     governingType,
@@ -83,6 +90,7 @@ namespace PurelySharp.Symbolic.Smt
                     semanticModel,
                     cancellationToken,
                     domainFacts,
+                    includePatternBindings: true,
                     out formula);
         }
 
@@ -93,48 +101,13 @@ namespace PurelySharp.Symbolic.Smt
             CancellationToken cancellationToken,
             out SmtFormula formula)
         {
-            formula = null!;
-            var governingType = GetExpressionType(governingExpression, semanticModel, cancellationToken);
-            if (!TryTranslateSwitchGoverningValue(governingExpression, semanticModel, cancellationToken, out var governingValue))
-            {
-                return false;
-            }
-
-            var domainFacts = new List<SmtFormula>();
-            CSharpConditionToFormula.TryCollectDomainFacts(
+            return TryCreateSwitchLabelCondition(
                 governingExpression,
+                label,
                 semanticModel,
                 cancellationToken,
-                domainFacts);
-
-            if (label is CaseSwitchLabelSyntax caseLabel &&
-                CSharpConditionToFormula.TryTranslateValue(
-                    caseLabel.Value,
-                    semanticModel,
-                    cancellationToken,
-                    out var caseValue,
-                    getSymbolVersion: null) &&
-                caseValue != null &&
-                AreComparableSmtValues(governingValue, caseValue))
-            {
-                domainFacts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, governingValue, caseValue));
-                return TryCreateConjunction(domainFacts, out formula);
-            }
-
-            if (label is CasePatternSwitchLabelSyntax patternLabel)
-            {
-                return TryCreatePatternAndGuardCondition(
-                    governingValue,
-                    governingType,
-                    patternLabel.Pattern,
-                    patternLabel.WhenClause,
-                    semanticModel,
-                    cancellationToken,
-                    domainFacts,
-                    out formula);
-            }
-
-            return false;
+                includePatternBindings: true,
+                out formula);
         }
 
         private static bool TryCreateSwitchDefaultCondition(
@@ -165,6 +138,7 @@ namespace PurelySharp.Symbolic.Smt
                             label,
                             semanticModel,
                             cancellationToken,
+                            includePatternBindings: false,
                             out var labelCondition))
                     {
                         return false;
@@ -207,6 +181,111 @@ namespace PurelySharp.Symbolic.Smt
             return false;
         }
 
+        private static bool TryCreateSwitchLabelCondition(
+            ExpressionSyntax governingExpression,
+            SwitchLabelSyntax label,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            bool includePatternBindings,
+            out SmtFormula formula)
+        {
+            formula = null!;
+            var governingType = GetExpressionType(governingExpression, semanticModel, cancellationToken);
+            if (!TryTranslateSwitchGoverningValue(governingExpression, semanticModel, cancellationToken, out var governingValue))
+            {
+                return false;
+            }
+
+            var domainFacts = new List<SmtFormula>();
+            CSharpConditionToFormula.TryCollectDomainFacts(
+                governingExpression,
+                semanticModel,
+                cancellationToken,
+                domainFacts);
+
+            if (label is CaseSwitchLabelSyntax caseLabel &&
+                CSharpConditionToFormula.TryTranslateValue(
+                    caseLabel.Value,
+                    semanticModel,
+                    cancellationToken,
+                    out var caseValue,
+                    getSymbolVersion: null) &&
+                caseValue != null &&
+                AreComparableSmtValues(governingValue, caseValue))
+            {
+                domainFacts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, governingValue, caseValue));
+                return TryCreateConjunction(domainFacts, out formula);
+            }
+
+            if (label is CasePatternSwitchLabelSyntax patternLabel)
+            {
+                return TryCreatePatternAndGuardCondition(
+                    governingValue,
+                    governingType,
+                    patternLabel.Pattern,
+                    patternLabel.WhenClause,
+                    semanticModel,
+                    cancellationToken,
+                    domainFacts,
+                    includePatternBindings,
+                    out formula);
+            }
+
+            return false;
+        }
+
+        private static bool TryAddPriorSwitchExpressionArmExclusions(
+            SmtFormula governingValue,
+            ITypeSymbol? governingType,
+            SwitchExpressionArmSyntax currentArm,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> conditions)
+        {
+            if (currentArm.Parent is not SwitchExpressionSyntax switchExpression)
+            {
+                return true;
+            }
+
+            var priorArmConditions = new List<SmtFormula>();
+            foreach (var arm in switchExpression.Arms)
+            {
+                if (ReferenceEquals(arm, currentArm))
+                {
+                    break;
+                }
+
+                if (!TryCreatePatternAndGuardCondition(
+                        governingValue,
+                        governingType,
+                        arm.Pattern,
+                        arm.WhenClause,
+                        semanticModel,
+                        cancellationToken,
+                        initialConditions: null,
+                        includePatternBindings: false,
+                        out var priorArmCondition))
+                {
+                    return false;
+                }
+
+                priorArmConditions.Add(priorArmCondition);
+            }
+
+            if (priorArmConditions.Count == 0)
+            {
+                return true;
+            }
+
+            if (!TryCreateDisjunction(priorArmConditions, out var priorArmDisjunction))
+            {
+                return false;
+            }
+
+            conditions.Add(new SmtUnaryFormula(SmtUnaryOperator.Not, priorArmDisjunction));
+            return true;
+        }
+
         private static bool TryCreatePatternAndGuardCondition(
             SmtFormula governingValue,
             ITypeSymbol? governingType,
@@ -215,6 +294,7 @@ namespace PurelySharp.Symbolic.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             ICollection<SmtFormula>? initialConditions,
+            bool includePatternBindings,
             out SmtFormula formula)
         {
             formula = null!;
@@ -234,13 +314,16 @@ namespace PurelySharp.Symbolic.Smt
                 conditions.Add(patternFormula);
             }
 
-            CSharpConditionToFormula.TryCollectPatternBindingFacts(
-                governingValue,
-                governingType,
-                pattern,
-                semanticModel,
-                cancellationToken,
-                conditions);
+            if (includePatternBindings)
+            {
+                CSharpConditionToFormula.TryCollectPatternBindingFacts(
+                    governingValue,
+                    governingType,
+                    pattern,
+                    semanticModel,
+                    cancellationToken,
+                    conditions);
+            }
 
             if (whenClause != null)
             {
