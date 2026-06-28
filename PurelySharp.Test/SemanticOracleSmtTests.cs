@@ -2621,6 +2621,56 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleElementAssignedNonZeroValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (1, 2);
+        var divisor = pair.Item1;
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "TupleElementAssignedNonZeroValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                20,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNamedTupleElementAssignedNonZeroValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (divisor: 1, other: 2);
+        var divisor = pair.divisor;
+        return 10 / divisor;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "NamedTupleElementAssignedNonZeroValue.cs",
+                FindLine(source, "return 10 / divisor;"),
+                20,
+                "divisor != 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsIfElseThenExitFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -5486,6 +5536,40 @@ public class TestClass
     public int TestMethod()
     {
         var (divisor, other) = (1, 2);
+        return 10 / divisor;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_TupleElementAssignedNonZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (1, 2);
+        var divisor = pair.Item1;
+        return 10 / divisor;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_NamedTupleElementAssignedNonZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (divisor: 1, other: 2);
+        var divisor = pair.divisor;
         return 10 / divisor;
     }
 }");

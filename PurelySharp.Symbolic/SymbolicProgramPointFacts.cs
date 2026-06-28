@@ -2123,6 +2123,8 @@ namespace PurelySharp.Symbolic
                 facts.Add(lengthFact);
             }
 
+            AddTupleElementAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+
             if (hasThrowGuard &&
                 guardExpression != null &&
                 !ExpressionReferencesSymbol(guardExpression, assignedSymbol, semanticModel, cancellationToken))
@@ -2140,6 +2142,126 @@ namespace PurelySharp.Symbolic
             {
                 AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
+        }
+
+        private static void AddTupleElementAssignedValueFacts(
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            valueExpression = UnwrapExpression(valueExpression);
+            if (valueExpression is not TupleExpressionSyntax tupleExpression ||
+                !TryGetTupleElementStorageNames(assignedSymbol, tupleExpression.Arguments.Count, out var elementNames))
+            {
+                return;
+            }
+
+            for (var index = 0; index < tupleExpression.Arguments.Count; index++)
+            {
+                var argumentExpression = tupleExpression.Arguments[index].Expression;
+                if (ExpressionReferencesSymbol(argumentExpression, assignedSymbol, semanticModel, cancellationToken) ||
+                    !TryCreateTupleElementSmtValue(assignedSymbol, elementNames[index], out var targetFormula) ||
+                    !CSharpConditionToFormula.TryTranslateValue(
+                        argumentExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var valueFormula,
+                        getSymbolVersion: null,
+                        inlineDepth: 0) ||
+                    valueFormula == null ||
+                    !CanCompareSmtValues(targetFormula, valueFormula))
+                {
+                    continue;
+                }
+
+                facts.Add(CreateAssignedValueFact(targetFormula, valueFormula));
+            }
+        }
+
+        private static bool TryGetTupleElementStorageNames(
+            ISymbol assignedSymbol,
+            int expectedCount,
+            out string[] elementNames)
+        {
+            elementNames = Array.Empty<string>();
+            var type = assignedSymbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                _ => null
+            };
+
+            if (type is not INamedTypeSymbol { IsTupleType: true } tupleType ||
+                tupleType.TupleElements.Length != expectedCount)
+            {
+                return false;
+            }
+
+            elementNames = new string[tupleType.TupleElements.Length];
+            for (var index = 0; index < tupleType.TupleElements.Length; index++)
+            {
+                var field = tupleType.TupleElements[index].CorrespondingTupleField ?? tupleType.TupleElements[index];
+                if (string.IsNullOrWhiteSpace(field.Name))
+                {
+                    return false;
+                }
+
+                elementNames[index] = field.Name;
+            }
+
+            return true;
+        }
+
+        private static bool TryCreateTupleElementSmtValue(
+            ISymbol tupleSymbol,
+            string elementName,
+            out SmtFormula formula)
+        {
+            var type = tupleSymbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                _ => null
+            };
+
+            if (type is not INamedTypeSymbol { IsTupleType: true } tupleType)
+            {
+                formula = null!;
+                return false;
+            }
+
+            var element = tupleType.TupleElements
+                .FirstOrDefault(field => string.Equals((field.CorrespondingTupleField ?? field).Name, elementName, StringComparison.Ordinal));
+            if (element == null)
+            {
+                formula = null!;
+                return false;
+            }
+
+            var elementType = element.Type;
+            var variableName = GetSmtVariableName(tupleSymbol) + "." + elementName;
+            if (elementType.SpecialType == SpecialType.System_Boolean)
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Bool);
+                return true;
+            }
+
+            if (IsIntegralType(elementType))
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Int);
+                return true;
+            }
+
+            if (elementType.IsReferenceType)
+            {
+                formula = new SmtVariable(variableName, SmtValueKind.Reference);
+                return true;
+            }
+
+            formula = null!;
+            return false;
         }
 
         private static void AddCoalesceAssignmentFacts(

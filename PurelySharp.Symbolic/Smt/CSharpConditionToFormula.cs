@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -1952,6 +1953,11 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (TryTranslateTupleElementValue(memberAccess, memberSymbol, semanticModel, cancellationToken, out formula, getSymbolVersion))
+            {
+                return true;
+            }
+
             if (!TryTranslateValue(memberAccess.Expression, semanticModel, cancellationToken, out var receiver, getSymbolVersion, inlineDepth) ||
                 receiver == null)
             {
@@ -1965,6 +1971,43 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return TryCreateMemberFormula(receiver, memberSymbol.Name, type, out formula);
+        }
+
+        private static bool TryTranslateTupleElementValue(
+            MemberAccessExpressionSyntax memberAccess,
+            ISymbol memberSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null;
+            if (memberSymbol is not IFieldSymbol fieldSymbol ||
+                !TryGetTupleElementStorageName(fieldSymbol, out var storageName) ||
+                semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not { } receiverSymbol ||
+                receiverSymbol is not ILocalSymbol and not IParameterSymbol ||
+                !TryGetValueKind(fieldSymbol.Type, out var kind))
+            {
+                return false;
+            }
+
+            formula = new SmtVariable(GetVariableName(receiverSymbol.OriginalDefinition, getSymbolVersion) + "." + storageName, kind);
+            return true;
+        }
+
+        private static bool TryGetTupleElementStorageName(IFieldSymbol fieldSymbol, out string storageName)
+        {
+            var tupleField = fieldSymbol.CorrespondingTupleField ?? fieldSymbol;
+            if (tupleField.Name.Length > 4 &&
+                tupleField.Name.StartsWith("Item", StringComparison.Ordinal) &&
+                tupleField.Name.Skip(4).All(char.IsDigit))
+            {
+                storageName = tupleField.Name;
+                return true;
+            }
+
+            storageName = string.Empty;
+            return false;
         }
 
         private static bool TryCreateMemberFormula(
