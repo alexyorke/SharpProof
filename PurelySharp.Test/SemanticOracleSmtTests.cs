@@ -5415,6 +5415,46 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_ConstantDivisionContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value", "value / 2 == 3 && value < 6"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_ConstantRemainderContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value", "value % 5 == 3 && value % 5 == 4"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_GuardedDivisionContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value, int divisor", "divisor != 0 && value / divisor == 2 && value / divisor != 2"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_GuardedRemainderContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value, int divisor", "divisor != 0 && value % divisor == 0 && value % divisor != 0"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_UnguardedVariableDivision_RemainsUnknown()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int value, int divisor", "value / divisor == 2 && value / divisor != 2"),
+                Is.False);
+        }
+
+        [Test]
         public void ExecutionVisibility_EnumContradiction_IsAlwaysFalse()
         {
             Assert.That(

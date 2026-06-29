@@ -165,6 +165,25 @@ namespace PurelySharp.Symbolic.Smt
             Func<ISymbol, int>? getSymbolVersion = null,
             int inlineDepth = 0)
         {
+            return TryTranslateCore(
+                expression,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth,
+                nonZeroDivisors: null);
+        }
+
+        private static bool TryTranslateCore(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            ISet<string>? nonZeroDivisors)
+        {
             expression = UnwrapExpression(expression);
 
             var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
@@ -183,7 +202,7 @@ namespace PurelySharp.Symbolic.Smt
 
             if (expression is PrefixUnaryExpressionSyntax prefixUnary &&
                 prefixUnary.IsKind(SyntaxKind.LogicalNotExpression) &&
-                TryTranslate(prefixUnary.Operand, semanticModel, cancellationToken, out var operand, getSymbolVersion, inlineDepth) &&
+                TryTranslateCore(prefixUnary.Operand, semanticModel, cancellationToken, out var operand, getSymbolVersion, inlineDepth, nonZeroDivisors) &&
                 operand != null)
             {
                 formula = new SmtUnaryFormula(SmtUnaryOperator.Not, operand);
@@ -227,23 +246,43 @@ namespace PurelySharp.Symbolic.Smt
                 }
 
                 if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression) &&
-                    TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftAnd, getSymbolVersion, inlineDepth) &&
-                    TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightAnd, getSymbolVersion, inlineDepth) &&
-                    leftAnd != null &&
-                    rightAnd != null)
+                    TryTranslateCore(binaryExpression.Left, semanticModel, cancellationToken, out var leftAnd, getSymbolVersion, inlineDepth, nonZeroDivisors) &&
+                    leftAnd != null)
                 {
-                    formula = new SmtBinaryFormula(SmtBinaryOperator.And, leftAnd, rightAnd);
-                    return true;
+                    var rightNonZeroDivisors = AddNonZeroDivisorFacts(
+                        binaryExpression.Left,
+                        branchWhenTrue: true,
+                        semanticModel,
+                        cancellationToken,
+                        nonZeroDivisors,
+                        getSymbolVersion,
+                        inlineDepth);
+                    if (TryTranslateCore(binaryExpression.Right, semanticModel, cancellationToken, out var rightAnd, getSymbolVersion, inlineDepth, rightNonZeroDivisors) &&
+                        rightAnd != null)
+                    {
+                        formula = new SmtBinaryFormula(SmtBinaryOperator.And, leftAnd, rightAnd);
+                        return true;
+                    }
                 }
 
                 if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression) &&
-                    TryTranslate(binaryExpression.Left, semanticModel, cancellationToken, out var leftOr, getSymbolVersion, inlineDepth) &&
-                    TryTranslate(binaryExpression.Right, semanticModel, cancellationToken, out var rightOr, getSymbolVersion, inlineDepth) &&
-                    leftOr != null &&
-                    rightOr != null)
+                    TryTranslateCore(binaryExpression.Left, semanticModel, cancellationToken, out var leftOr, getSymbolVersion, inlineDepth, nonZeroDivisors) &&
+                    leftOr != null)
                 {
-                    formula = new SmtBinaryFormula(SmtBinaryOperator.Or, leftOr, rightOr);
-                    return true;
+                    var rightNonZeroDivisors = AddNonZeroDivisorFacts(
+                        binaryExpression.Left,
+                        branchWhenTrue: false,
+                        semanticModel,
+                        cancellationToken,
+                        nonZeroDivisors,
+                        getSymbolVersion,
+                        inlineDepth);
+                    if (TryTranslateCore(binaryExpression.Right, semanticModel, cancellationToken, out var rightOr, getSymbolVersion, inlineDepth, rightNonZeroDivisors) &&
+                        rightOr != null)
+                    {
+                        formula = new SmtBinaryFormula(SmtBinaryOperator.Or, leftOr, rightOr);
+                        return true;
+                    }
                 }
 
                 if (TryTranslateUnsignedCastBoundsComparison(
@@ -298,8 +337,8 @@ namespace PurelySharp.Symbolic.Smt
                     return true;
                 }
 
-                if (TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue, getSymbolVersion, inlineDepth) &&
-                    TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue, getSymbolVersion, inlineDepth) &&
+                if (TryTranslateValueWithSafeDivisors(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue, getSymbolVersion, inlineDepth, nonZeroDivisors) &&
+                    TryTranslateValueWithSafeDivisors(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue, getSymbolVersion, inlineDepth, nonZeroDivisors) &&
                     leftValue != null &&
                     rightValue != null &&
                     TryTranslateComparison(binaryExpression.Kind(), leftValue, rightValue, out var comparison))
@@ -4594,6 +4633,147 @@ namespace PurelySharp.Symbolic.Smt
                 (right is SmtNullConstant && left.Kind == SmtValueKind.Reference);
         }
 
+        private static ISet<string>? AddNonZeroDivisorFacts(
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ISet<string>? currentFacts,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            var facts = currentFacts == null
+                ? new HashSet<string>(StringComparer.Ordinal)
+                : new HashSet<string>(currentFacts, StringComparer.Ordinal);
+            var initialCount = facts.Count;
+            CollectNonZeroDivisorFacts(
+                condition,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                facts,
+                getSymbolVersion,
+                inlineDepth);
+
+            return facts.Count == initialCount ? currentFacts : facts;
+        }
+
+        private static void CollectNonZeroDivisorFacts(
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ISet<string> facts,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            condition = UnwrapExpression(condition);
+
+            if (condition is PrefixUnaryExpressionSyntax prefixUnary &&
+                prefixUnary.IsKind(SyntaxKind.LogicalNotExpression))
+            {
+                CollectNonZeroDivisorFacts(
+                    prefixUnary.Operand,
+                    !branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    facts,
+                    getSymbolVersion,
+                    inlineDepth);
+                return;
+            }
+
+            if (condition is not BinaryExpressionSyntax binaryExpression)
+            {
+                return;
+            }
+
+            if (branchWhenTrue && binaryExpression.IsKind(SyntaxKind.LogicalAndExpression))
+            {
+                CollectNonZeroDivisorFacts(binaryExpression.Left, branchWhenTrue: true, semanticModel, cancellationToken, facts, getSymbolVersion, inlineDepth);
+                CollectNonZeroDivisorFacts(binaryExpression.Right, branchWhenTrue: true, semanticModel, cancellationToken, facts, getSymbolVersion, inlineDepth);
+                return;
+            }
+
+            if (!branchWhenTrue && binaryExpression.IsKind(SyntaxKind.LogicalOrExpression))
+            {
+                CollectNonZeroDivisorFacts(binaryExpression.Left, branchWhenTrue: false, semanticModel, cancellationToken, facts, getSymbolVersion, inlineDepth);
+                CollectNonZeroDivisorFacts(binaryExpression.Right, branchWhenTrue: false, semanticModel, cancellationToken, facts, getSymbolVersion, inlineDepth);
+                return;
+            }
+
+            if (!IsNonZeroComparisonKind(binaryExpression.Kind(), branchWhenTrue))
+            {
+                return;
+            }
+
+            if (!TryGetZeroComparisonCandidate(
+                    binaryExpression.Left,
+                    binaryExpression.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var candidate))
+            {
+                return;
+            }
+
+            if (TryTranslateValue(candidate, semanticModel, cancellationToken, out var candidateFormula, getSymbolVersion, inlineDepth) &&
+                candidateFormula is { Kind: SmtValueKind.Int } &&
+                !IsZeroIntegerConstant(candidateFormula))
+            {
+                facts.Add(CreateDivisorKey(candidateFormula));
+            }
+        }
+
+        private static bool IsNonZeroComparisonKind(SyntaxKind kind, bool branchWhenTrue)
+        {
+            return branchWhenTrue
+                ? kind is SyntaxKind.NotEqualsExpression or SyntaxKind.LessThanExpression or SyntaxKind.GreaterThanExpression
+                : kind is SyntaxKind.EqualsExpression or SyntaxKind.LessThanOrEqualExpression or SyntaxKind.GreaterThanOrEqualExpression;
+        }
+
+        private static bool TryGetZeroComparisonCandidate(
+            ExpressionSyntax left,
+            ExpressionSyntax right,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax candidate)
+        {
+            if (IsZeroIntegralExpression(right, semanticModel, cancellationToken))
+            {
+                candidate = left;
+                return true;
+            }
+
+            if (IsZeroIntegralExpression(left, semanticModel, cancellationToken))
+            {
+                candidate = right;
+                return true;
+            }
+
+            candidate = null!;
+            return false;
+        }
+
+        private static bool IsZeroIntegralExpression(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return TryTranslateValue(expression, semanticModel, cancellationToken, out var formula, getSymbolVersion: null) &&
+                IsZeroIntegerConstant(formula);
+        }
+
+        private static bool IsZeroIntegerConstant(SmtFormula? formula)
+        {
+            return formula is SmtIntegerConstant integerConstant && integerConstant.Value == 0;
+        }
+
+        private static string CreateDivisorKey(SmtFormula formula)
+        {
+            return formula.ToString();
+        }
+
         public static bool TryTranslateValue(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
@@ -4611,6 +4791,36 @@ namespace PurelySharp.Symbolic.Smt
                 getSymbolVersion,
                 inlineDepth,
                 TryTranslateValueCore);
+        }
+
+        private static bool TryTranslateValueWithSafeDivisors(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            ISet<string>? nonZeroDivisors)
+        {
+            if (TryTranslateValue(expression, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth))
+            {
+                return true;
+            }
+
+            if (nonZeroDivisors == null ||
+                nonZeroDivisors.Count == 0)
+            {
+                return false;
+            }
+
+            return TryTranslateIntegralTermWithSafeDivisors(
+                expression,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth,
+                nonZeroDivisors);
         }
 
         private static bool TryTranslateValueCore(
@@ -5168,9 +5378,188 @@ namespace PurelySharp.Symbolic.Smt
                     formula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, multiplyLeft, multiplyRight);
                     return true;
                 }
+
+                if ((binaryExpression.IsKind(SyntaxKind.DivideExpression) ||
+                        binaryExpression.IsKind(SyntaxKind.ModuloExpression)) &&
+                    TryTranslateValue(binaryExpression.Left, semanticModel, cancellationToken, out var dividend, getSymbolVersion, inlineDepth) &&
+                    TryTranslateValue(binaryExpression.Right, semanticModel, cancellationToken, out var divisor, getSymbolVersion, inlineDepth) &&
+                    dividend is { Kind: SmtValueKind.Int } &&
+                    divisor is { Kind: SmtValueKind.Int } &&
+                    IsSafeIntegerDivisor(divisor, nonZeroDivisors: null))
+                {
+                    formula = new SmtIntegerBinaryTerm(
+                        binaryExpression.IsKind(SyntaxKind.DivideExpression)
+                            ? SmtIntegerBinaryOperator.Divide
+                            : SmtIntegerBinaryOperator.Remainder,
+                        dividend,
+                        divisor);
+                    return true;
+                }
             }
 
             return false;
+        }
+
+        private static bool TryTranslateIntegralTermWithSafeDivisors(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            ISet<string> nonZeroDivisors)
+        {
+            formula = null;
+            expression = UnwrapExpression(expression);
+            if (!HasSupportedIntegralType(expression, semanticModel, cancellationToken))
+            {
+                return false;
+            }
+
+            if (expression is PrefixUnaryExpressionSyntax prefixUnary)
+            {
+                if (prefixUnary.IsKind(SyntaxKind.UnaryPlusExpression))
+                {
+                    return TryTranslateIntegralOperandWithSafeDivisors(
+                            prefixUnary.Operand,
+                            semanticModel,
+                            cancellationToken,
+                            out formula,
+                            getSymbolVersion,
+                            inlineDepth,
+                            nonZeroDivisors) &&
+                        formula is { Kind: SmtValueKind.Int };
+                }
+
+                if (prefixUnary.IsKind(SyntaxKind.UnaryMinusExpression) &&
+                    TryTranslateIntegralOperandWithSafeDivisors(
+                        prefixUnary.Operand,
+                        semanticModel,
+                        cancellationToken,
+                        out var operand,
+                        getSymbolVersion,
+                        inlineDepth,
+                        nonZeroDivisors) &&
+                    operand is { Kind: SmtValueKind.Int })
+                {
+                    formula = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operand);
+                    return true;
+                }
+            }
+
+            if (expression is CastExpressionSyntax castExpression &&
+                IsRepresentationPreservingIntegralCast(castExpression, semanticModel, cancellationToken) &&
+                TryTranslateIntegralOperandWithSafeDivisors(
+                    castExpression.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var castOperand,
+                    getSymbolVersion,
+                    inlineDepth,
+                    nonZeroDivisors) &&
+                castOperand is { Kind: SmtValueKind.Int })
+            {
+                formula = castOperand;
+                return true;
+            }
+
+            if (expression is not BinaryExpressionSyntax binaryExpression)
+            {
+                return false;
+            }
+
+            if (!TryTranslateIntegralOperandWithSafeDivisors(
+                    binaryExpression.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out var left,
+                    getSymbolVersion,
+                    inlineDepth,
+                    nonZeroDivisors) ||
+                left is not { Kind: SmtValueKind.Int } ||
+                !TryTranslateIntegralOperandWithSafeDivisors(
+                    binaryExpression.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var right,
+                    getSymbolVersion,
+                    inlineDepth,
+                    nonZeroDivisors) ||
+                right is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            if (binaryExpression.IsKind(SyntaxKind.AddExpression))
+            {
+                formula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, left, right);
+                return true;
+            }
+
+            if (binaryExpression.IsKind(SyntaxKind.SubtractExpression))
+            {
+                formula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, left, right);
+                return true;
+            }
+
+            if (binaryExpression.IsKind(SyntaxKind.MultiplyExpression) &&
+                (left is SmtIntegerConstant || right is SmtIntegerConstant))
+            {
+                formula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Multiply, left, right);
+                return true;
+            }
+
+            if ((binaryExpression.IsKind(SyntaxKind.DivideExpression) ||
+                    binaryExpression.IsKind(SyntaxKind.ModuloExpression)) &&
+                IsSafeIntegerDivisor(right, nonZeroDivisors))
+            {
+                formula = new SmtIntegerBinaryTerm(
+                    binaryExpression.IsKind(SyntaxKind.DivideExpression)
+                        ? SmtIntegerBinaryOperator.Divide
+                        : SmtIntegerBinaryOperator.Remainder,
+                    left,
+                    right);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryTranslateIntegralOperandWithSafeDivisors(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            ISet<string> nonZeroDivisors)
+        {
+            if (TryTranslateValue(expression, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth) &&
+                formula is { Kind: SmtValueKind.Int })
+            {
+                return true;
+            }
+
+            return TryTranslateIntegralTermWithSafeDivisors(
+                expression,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth,
+                nonZeroDivisors) &&
+                formula is { Kind: SmtValueKind.Int };
+        }
+
+        private static bool IsSafeIntegerDivisor(SmtFormula divisor, ISet<string>? nonZeroDivisors)
+        {
+            if (divisor is SmtIntegerConstant integerConstant)
+            {
+                return integerConstant.Value != 0;
+            }
+
+            return nonZeroDivisors != null &&
+                nonZeroDivisors.Contains(CreateDivisorKey(divisor));
         }
 
         private static bool TryTranslateNullableCoalesceValue(
