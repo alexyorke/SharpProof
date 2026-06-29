@@ -50,9 +50,22 @@ public class TestClass
             Assert.That(result.MergedInvariantText, Is.EqualTo(summary.MergedInvariantText));
             Assert.That(result.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion));
             Assert.That(result.MergedInvariant.ConditionCount, Is.EqualTo(result.Facts.Count));
+            Assert.That(result.ProgramPointSummary.ProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
+            Assert.That(
+                result.ProgramPointSummary.TotalPathConditionCount,
+                Is.EqualTo(result.ProgramPoints.Sum(point => point.PathConditionCount)));
+            Assert.That(
+                result.ProgramPointSummary.MaxPathConditionCount,
+                Is.EqualTo(result.ProgramPoints.Max(point => point.PathConditionCount)));
+            Assert.That(
+                result.ProgramPointSummary.ProofOutcomes.TotalCount,
+                Is.EqualTo(result.ProgramPoints.Sum(point => point.ConditionProofs.Count)));
             Assert.That(returnPoint.Invariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.Conjunction));
             Assert.That(returnPoint.Invariant.MergedInvariantText, Is.EqualTo(returnPoint.MergedInvariantText));
             Assert.That(returnPoint.PathConditions.Select(condition => condition.Text), Is.EquivalentTo(returnPoint.Facts));
+            Assert.That(returnPoint.PathConditionCount, Is.EqualTo(returnPoint.PathConditions.Count));
+            Assert.That(returnPoint.ProofOutcomes.TotalCount, Is.EqualTo(returnPoint.ConditionProofs.Count));
+            Assert.That(returnPoint.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
             Assert.That(returnPoint.PathConditions.All(condition => condition.HasSmtFormula), Is.True);
             Assert.That(returnPoint.PathConditions.All(condition => !string.IsNullOrWhiteSpace(condition.FormulaKind)), Is.True);
         }
@@ -91,6 +104,9 @@ public class TestClass
             Assert.That(filtered.MergedInvariantText, Is.EqualTo(filtered.ProgramPoints.Single().MergedInvariantText));
             Assert.That(filtered.MergedInvariant.Conditions.Select(condition => condition.Text), Is.EquivalentTo(filtered.Facts));
             Assert.That(filtered.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion));
+            Assert.That(filtered.ProgramPointSummary.ProgramPointCount, Is.EqualTo(filtered.ProgramPoints.Count));
+            Assert.That(filtered.ProgramPointSummary.TotalPathConditionCount, Is.EqualTo(filtered.ProgramPoints.Single().PathConditionCount));
+            Assert.That(filtered.ProgramPointSummary.ProofOutcomes.TotalCount, Is.Zero);
         }
 
         [Test]
@@ -117,6 +133,10 @@ public class TestClass
             Assert.That(result.MergedInvariantText, Is.EqualTo("true"));
             Assert.That(result.MergedInvariant.IsTrivial, Is.True);
             Assert.That(result.MergedInvariant.ConditionCount, Is.Zero);
+            Assert.That(result.ProgramPointSummary.ProgramPointCount, Is.Zero);
+            Assert.That(result.ProgramPointSummary.TotalPathConditionCount, Is.Zero);
+            Assert.That(result.ProgramPointSummary.MaxPathConditionCount, Is.Zero);
+            Assert.That(result.ProgramPointSummary.ProofOutcomes.TotalCount, Is.Zero);
         }
 
         [Test]
@@ -159,12 +179,22 @@ public class TestClass
             Assert.That(result.ObservedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion));
             Assert.That(result.ObservedInvariant.ConditionCount, Is.EqualTo(result.ObservedFactCount));
             Assert.That(result.ObservedInvariant.Conditions.Select(condition => condition.Text), Is.EquivalentTo(result.ObservedFacts));
+            Assert.That(result.ProgramPointSummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+            Assert.That(
+                result.ProgramPointSummary.TotalPathConditionCount,
+                Is.EqualTo(result.Lines.SelectMany(line => line.ProgramPoints).Sum(point => point.PathConditionCount)));
+            Assert.That(
+                result.ProgramPointSummary.MaxPathConditionCount,
+                Is.EqualTo(result.Lines.SelectMany(line => line.ProgramPoints).Max(point => point.PathConditionCount)));
             Assert.That(result.Reachability.ReachableCount, Is.EqualTo(result.ProgramPointCount));
+            Assert.That(result.ProgramPointSummary.Reachability.ReachableCount, Is.EqualTo(result.Reachability.ReachableCount));
             var proofSummary = result.ConditionProofs.Single(summary => summary.Condition == "value > 0");
             Assert.That(proofSummary.ProvenTrueCount, Is.GreaterThan(0));
             Assert.That(
                 proofSummary.ProvenTrueCount + proofSummary.ProvenFalseCount + proofSummary.UnreachableCount + proofSummary.UnknownCount,
                 Is.EqualTo(result.ProgramPointCount));
+            Assert.That(result.ProgramPointSummary.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointCount));
+            Assert.That(result.ProgramPointSummary.ProofOutcomes.ProvenTrueCount, Is.EqualTo(proofSummary.ProvenTrueCount));
         }
 
         [Test]
@@ -208,6 +238,11 @@ public class TestClass
             Assert.That(filtered.ObservedFacts, Is.EquivalentTo(filtered.Lines.SelectMany(line => line.ProgramPoints).SelectMany(point => point.Facts).Distinct()));
             Assert.That(filtered.ObservedInvariant.ConditionCount, Is.EqualTo(filtered.ObservedFactCount));
             Assert.That(filtered.ObservedInvariant.Conditions.Select(condition => condition.Text), Is.EquivalentTo(filtered.ObservedFacts));
+            Assert.That(filtered.ProgramPointSummary.ProgramPointCount, Is.EqualTo(filtered.ProgramPointCount));
+            Assert.That(
+                filtered.ProgramPointSummary.TotalPathConditionCount,
+                Is.EqualTo(filtered.Lines.SelectMany(line => line.ProgramPoints).Sum(point => point.PathConditionCount)));
+            Assert.That(filtered.ProgramPointSummary.Reachability.ReachableCount, Is.EqualTo(filtered.ProgramPointCount));
             Assert.That(filtered.ConditionProofs.Single(summary => summary.Condition == "value > 0").ProvenTrueCount, Is.GreaterThan(0));
         }
 

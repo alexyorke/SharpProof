@@ -287,7 +287,9 @@ namespace PurelySharp.Symbolic.Smt
                 }
             }
 
-            return builder.ToImmutable();
+            return builder
+                .OrderBy(static condition => condition.ToString(), StringComparer.Ordinal)
+                .ToImmutableArray();
         }
 
         private static bool TryClassifySyntactically(

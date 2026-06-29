@@ -107,6 +107,38 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void Classify_EquivalentPathConditionOrder_UsesSameCacheEntry()
+        {
+            var x = new SmtVariable("ordered_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var xAtLeastZero = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                x,
+                new SmtIntegerConstant(0));
+            var xLessThanTen = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThan,
+                x,
+                new SmtIntegerConstant(10));
+            var fact = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThan,
+                x,
+                new SmtIntegerConstant(11));
+            var service = new SmtAnalysisService(new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.FromMilliseconds(250),
+                TimeSpan.FromMilliseconds(1000),
+                maxPathConditions: 4,
+                maxExpressionNodes: 64));
+
+            var first = service.ClassifyImplication(new[] { xAtLeastZero, xLessThanTen }, fact);
+            var second = service.ClassifyImplication(new[] { xLessThanTen, xAtLeastZero }, fact);
+
+            Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(second.Outcome, Is.EqualTo(first.Outcome));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(1));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public void Classify_SyntacticPathContradiction_BypassesBudgetsAndSolver()
         {
             var x = new SmtVariable("x", SmtValueKind.Int);

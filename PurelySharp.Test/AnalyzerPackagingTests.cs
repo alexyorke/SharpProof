@@ -443,6 +443,9 @@ namespace TestNamespace {
             Assert.That(source, Does.Contain("Line merged invariant"));
             Assert.That(source, Does.Contain("Invariant merge"));
             Assert.That(source, Does.Contain("Path conditions"));
+            Assert.That(source, Does.Contain("Program point summary"));
+            Assert.That(source, Does.Contain("Proof outcomes"));
+            Assert.That(source, Does.Contain("MaxPerPoint"));
             Assert.That(source, Does.Contain("Observed invariant merge"));
             Assert.That(source, Does.Contain("Observed distinct facts"));
             Assert.That(source, Does.Contain("Reachability summary"));

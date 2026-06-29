@@ -1297,6 +1297,7 @@ namespace PurelySharp.Symbolic
                 Facts,
                 MergedInvariantText,
                 SymbolicInvariantMergeKind.DistinctFactUnion);
+            ProgramPointSummary = SymbolicProgramPointSummary.FromProgramPoints(ProgramPoints);
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         }
 
@@ -1311,6 +1312,8 @@ namespace PurelySharp.Symbolic
         public string MergedInvariantText { get; }
 
         public SymbolicInvariantResult MergedInvariant { get; }
+
+        public SymbolicProgramPointSummary ProgramPointSummary { get; }
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
@@ -1355,7 +1358,8 @@ namespace PurelySharp.Symbolic
                 ObservedFacts,
                 factSummary.MergedInvariantText,
                 SymbolicInvariantMergeKind.DistinctFactUnion);
-            Reachability = SymbolicReachabilitySummary.FromProgramPoints(programPoints);
+            ProgramPointSummary = SymbolicProgramPointSummary.FromProgramPoints(programPoints);
+            Reachability = ProgramPointSummary.Reachability;
             ConditionProofs = SymbolicConditionProofSummary.FromProgramPoints(programPoints);
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         }
@@ -1369,6 +1373,8 @@ namespace PurelySharp.Symbolic
         public int ProgramPointCount { get; }
 
         public IReadOnlyList<SymbolicLineQueryResult> Lines { get; }
+
+        public SymbolicProgramPointSummary ProgramPointSummary { get; }
 
         public IReadOnlyList<string> ObservedFacts { get; }
 
@@ -1520,6 +1526,130 @@ namespace PurelySharp.Symbolic
         }
     }
 
+    public sealed class SymbolicProofOutcomeSummary
+    {
+        public SymbolicProofOutcomeSummary(
+            int totalCount,
+            int unknownCount,
+            int provenTrueCount,
+            int provenFalseCount,
+            int unreachableCount)
+        {
+            TotalCount = totalCount;
+            UnknownCount = unknownCount;
+            ProvenTrueCount = provenTrueCount;
+            ProvenFalseCount = provenFalseCount;
+            UnreachableCount = unreachableCount;
+        }
+
+        public int TotalCount { get; }
+
+        public int UnknownCount { get; }
+
+        public int ProvenTrueCount { get; }
+
+        public int ProvenFalseCount { get; }
+
+        public int UnreachableCount { get; }
+
+        public static SymbolicProofOutcomeSummary FromProofs(
+            IEnumerable<SymbolicConditionProofResult> proofs)
+        {
+            if (proofs == null)
+            {
+                throw new ArgumentNullException(nameof(proofs));
+            }
+
+            var totalCount = 0;
+            var unknownCount = 0;
+            var provenTrueCount = 0;
+            var provenFalseCount = 0;
+            var unreachableCount = 0;
+            foreach (var proof in proofs)
+            {
+                totalCount++;
+                switch (proof.TruthValue)
+                {
+                    case SymbolicTruthValue.Unknown:
+                        unknownCount++;
+                        break;
+                    case SymbolicTruthValue.ProvenTrue:
+                        provenTrueCount++;
+                        break;
+                    case SymbolicTruthValue.ProvenFalse:
+                        provenFalseCount++;
+                        break;
+                    case SymbolicTruthValue.Unreachable:
+                        unreachableCount++;
+                        break;
+                }
+            }
+
+            return new SymbolicProofOutcomeSummary(
+                totalCount,
+                unknownCount,
+                provenTrueCount,
+                provenFalseCount,
+                unreachableCount);
+        }
+    }
+
+    public sealed class SymbolicProgramPointSummary
+    {
+        public SymbolicProgramPointSummary(
+            int programPointCount,
+            int totalPathConditionCount,
+            int maxPathConditionCount,
+            SymbolicReachabilitySummary reachability,
+            SymbolicProofOutcomeSummary proofOutcomes)
+        {
+            ProgramPointCount = programPointCount;
+            TotalPathConditionCount = totalPathConditionCount;
+            MaxPathConditionCount = maxPathConditionCount;
+            Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
+            ProofOutcomes = proofOutcomes ?? throw new ArgumentNullException(nameof(proofOutcomes));
+        }
+
+        public int ProgramPointCount { get; }
+
+        public int TotalPathConditionCount { get; }
+
+        public int MaxPathConditionCount { get; }
+
+        public SymbolicReachabilitySummary Reachability { get; }
+
+        public SymbolicProofOutcomeSummary ProofOutcomes { get; }
+
+        public static SymbolicProgramPointSummary FromProgramPoints(
+            IEnumerable<SymbolicSourceQueryResult> programPoints)
+        {
+            if (programPoints == null)
+            {
+                throw new ArgumentNullException(nameof(programPoints));
+            }
+
+            var points = programPoints.ToArray();
+            var totalPathConditionCount = 0;
+            var maxPathConditionCount = 0;
+            foreach (var point in points)
+            {
+                var pathConditionCount = point.PathConditionCount;
+                totalPathConditionCount += pathConditionCount;
+                if (pathConditionCount > maxPathConditionCount)
+                {
+                    maxPathConditionCount = pathConditionCount;
+                }
+            }
+
+            return new SymbolicProgramPointSummary(
+                points.Length,
+                totalPathConditionCount,
+                maxPathConditionCount,
+                SymbolicReachabilitySummary.FromProgramPoints(points),
+                SymbolicProofOutcomeSummary.FromProofs(points.SelectMany(static point => point.ConditionProofs)));
+        }
+    }
+
     public sealed class SymbolicConditionProofSummary
     {
         public SymbolicConditionProofSummary(
@@ -1632,6 +1762,7 @@ namespace PurelySharp.Symbolic
             Reachability = reachability;
             ReachabilityReason = reachabilityReason;
             ConditionProofs = conditionProofs ?? Array.Empty<SymbolicConditionProofResult>();
+            ProofOutcomes = SymbolicProofOutcomeSummary.FromProofs(ConditionProofs);
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         }
 
@@ -1655,11 +1786,15 @@ namespace PurelySharp.Symbolic
 
         public IReadOnlyList<SymbolicInvariantCondition> PathConditions => Invariant.Conditions;
 
+        public int PathConditionCount => PathConditions.Count;
+
         public SymbolicReachability Reachability { get; }
 
         public string ReachabilityReason { get; }
 
         public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; }
+
+        public SymbolicProofOutcomeSummary ProofOutcomes { get; }
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 

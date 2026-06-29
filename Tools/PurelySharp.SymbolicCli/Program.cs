@@ -98,6 +98,7 @@ static void PrintFileResult(
     Console.WriteLine($"Total lines: {result.LineCount}");
     Console.WriteLine($"Lines with program points: {result.LinesWithProgramPoints}");
     Console.WriteLine($"Program points: {result.ProgramPointCount}");
+    PrintProgramPointSummary(result.ProgramPointSummary, options);
     Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
     Console.WriteLine($"Observed invariant merge: {result.ObservedInvariant.MergeKind}");
     Console.WriteLine($"Observed invariant conditions: {result.ObservedInvariant.ConditionCount}");
@@ -137,6 +138,7 @@ static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions o
 {
     Console.WriteLine($"{result.FilePath}:{result.Line}");
     Console.WriteLine($"Program points: {result.ProgramPoints.Count}");
+    PrintProgramPointSummary(result.ProgramPointSummary, options);
     Console.WriteLine($"Line merged invariant: {result.MergedInvariantText}");
     Console.WriteLine($"Line invariant merge: {result.MergedInvariant.MergeKind}");
     Console.WriteLine($"Line invariant conditions: {result.MergedInvariant.ConditionCount}");
@@ -165,7 +167,7 @@ static void PrintPointResult(
     Console.WriteLine($"Node: {result.NodeKind}");
     Console.WriteLine($"Merged invariant: {result.MergedInvariantText}");
     Console.WriteLine($"Invariant merge: {result.Invariant.MergeKind}");
-    Console.WriteLine($"Path conditions: {result.PathConditions.Count}");
+    Console.WriteLine($"Path conditions: {result.PathConditionCount}");
     if (options.CheckReachability)
     {
         Console.WriteLine($"Reachability: {result.Reachability}");
@@ -177,6 +179,8 @@ static void PrintPointResult(
         Console.WriteLine($"Implies '{proof.Condition}': {proof.TruthValue}");
         Console.WriteLine($"Implication reason: {proof.Reason}");
     }
+
+    PrintProofOutcomeSummary(result.ProofOutcomes, indent: "");
 
     if (result.SmtDiagnostics.IsConfigured)
     {
@@ -194,6 +198,43 @@ static void PrintPointResult(
     {
         Console.WriteLine("  " + fact);
     }
+}
+
+static void PrintProgramPointSummary(
+    SymbolicProgramPointSummary summary,
+    SymbolicCliOptions options)
+{
+    Console.WriteLine("Program point summary:");
+    Console.WriteLine($"  Points: {summary.ProgramPointCount}");
+    Console.WriteLine(
+        "  Path conditions: " +
+        $"Total={summary.TotalPathConditionCount}, " +
+        $"MaxPerPoint={summary.MaxPathConditionCount}");
+    if (options.CheckReachability)
+    {
+        Console.WriteLine(
+            "  Reachability: " +
+            $"Reachable={summary.Reachability.ReachableCount}, " +
+            $"Unreachable={summary.Reachability.UnreachableCount}, " +
+            $"Unknown={summary.Reachability.UnknownCount}, " +
+            $"NotChecked={summary.Reachability.NotCheckedCount}");
+    }
+
+    PrintProofOutcomeSummary(summary.ProofOutcomes, indent: "  ");
+}
+
+static void PrintProofOutcomeSummary(
+    SymbolicProofOutcomeSummary summary,
+    string indent)
+{
+    Console.WriteLine(
+        indent +
+        "Proof outcomes: " +
+        $"Total={summary.TotalCount}, " +
+        $"ProvenTrue={summary.ProvenTrueCount}, " +
+        $"ProvenFalse={summary.ProvenFalseCount}, " +
+        $"Unreachable={summary.UnreachableCount}, " +
+        $"Unknown={summary.UnknownCount}");
 }
 
 static void PrintSmtDiagnostics(SymbolicSmtDiagnostics diagnostics)
