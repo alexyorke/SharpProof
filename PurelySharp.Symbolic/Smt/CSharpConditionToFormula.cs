@@ -2353,8 +2353,24 @@ namespace PurelySharp.Symbolic.Smt
                     cancellationToken,
                     out var lengthFormula,
                     getSymbolVersion,
-                    inlineDepth) ||
-                !TryCreateEffectiveBuiltInIndexFormula(
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            if (TryCreateBuiltInRangeAccessInRangeFormula(
+                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    lengthFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
+            if (!TryCreateEffectiveBuiltInIndexFormula(
                     elementAccess.ArgumentList.Arguments[0].Expression,
                     lengthFormula,
                     semanticModel,
@@ -4147,6 +4163,85 @@ namespace PurelySharp.Symbolic.Smt
 
             indexFormula = ordinaryIndex;
             return true;
+        }
+
+        private static bool TryCreateBuiltInRangeAccessInRangeFormula(
+            ExpressionSyntax argumentExpression,
+            SmtFormula lengthFormula,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null!;
+            argumentExpression = UnwrapElementAccessIndexExpression(argumentExpression);
+            if (argumentExpression is not RangeExpressionSyntax rangeExpression ||
+                !TryCreateEffectiveRangeEndpointFormula(
+                    rangeExpression.LeftOperand,
+                    lengthFormula,
+                    defaultWhenOmitted: new SmtIntegerConstant(0),
+                    semanticModel,
+                    cancellationToken,
+                    out var startFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                !TryCreateEffectiveRangeEndpointFormula(
+                    rangeExpression.RightOperand,
+                    lengthFormula,
+                    defaultWhenOmitted: lengthFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out var endFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            var nonNegativeStart = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                startFormula,
+                new SmtIntegerConstant(0));
+            var orderedEndpoints = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThanOrEqual,
+                startFormula,
+                endFormula);
+            var endWithinLength = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThanOrEqual,
+                endFormula,
+                lengthFormula);
+            formula = new SmtBinaryFormula(
+                SmtBinaryOperator.And,
+                nonNegativeStart,
+                new SmtBinaryFormula(SmtBinaryOperator.And, orderedEndpoints, endWithinLength));
+            return true;
+        }
+
+        private static bool TryCreateEffectiveRangeEndpointFormula(
+            ExpressionSyntax? endpointExpression,
+            SmtFormula lengthFormula,
+            SmtFormula defaultWhenOmitted,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula endpointFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            if (endpointExpression == null)
+            {
+                endpointFormula = defaultWhenOmitted;
+                return true;
+            }
+
+            return TryCreateEffectiveBuiltInIndexFormula(
+                endpointExpression,
+                lengthFormula,
+                semanticModel,
+                cancellationToken,
+                out endpointFormula,
+                getSymbolVersion,
+                inlineDepth);
         }
 
         private static ExpressionSyntax UnwrapElementAccessIndexExpression(ExpressionSyntax expression)

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
 
@@ -17,7 +18,9 @@ try
         : null;
 
     var queryService = new SymbolicSourceQueryService();
-    object result = options.LineInvariants
+    object result = options.AllLines
+        ? QueryFileAllLines(queryService, options, smtAnalysis)
+        : options.LineInvariants
         ? queryService.QueryFileLine(
             options.FilePath,
             options.Line,
@@ -44,11 +47,16 @@ try
     {
         var json = result switch
         {
+            IReadOnlyList<SymbolicLineQueryResult> fileResult => JsonSerializer.Serialize(fileResult, new JsonSerializerOptions { WriteIndented = true }),
             SymbolicLineQueryResult lineResult => JsonSerializer.Serialize(lineResult, new JsonSerializerOptions { WriteIndented = true }),
             SymbolicSourceQueryResult pointResult => JsonSerializer.Serialize(pointResult, new JsonSerializerOptions { WriteIndented = true }),
             _ => throw new InvalidOperationException("Unexpected query result type."),
         };
         Console.WriteLine(json);
+    }
+    else if (result is IReadOnlyList<SymbolicLineQueryResult> fileResult)
+    {
+        PrintFileResult(fileResult, options, smtAnalysis);
     }
     else if (result is SymbolicLineQueryResult lineResult)
     {
@@ -68,10 +76,67 @@ catch (ArgumentException ex)
     return 64;
 }
 
+static IReadOnlyList<SymbolicLineQueryResult> QueryFileAllLines(
+    SymbolicSourceQueryService queryService,
+    SymbolicCliOptions options,
+    SmtAnalysisService? smtAnalysis)
+{
+    var filePath = Path.GetFullPath(options.FilePath!);
+    var sourceText = File.ReadAllText(filePath);
+    var syntaxTree = CSharpSyntaxTree.ParseText(
+        sourceText,
+        new CSharpParseOptions(LanguageVersion.Preview),
+        filePath);
+    var references = options.CreateReferences()?.ToArray() ??
+        SymbolicSourceQueryService.GetTrustedPlatformReferences().ToArray();
+    var compilation = CSharpCompilation.Create(
+        "PurelySharp.SymbolicCli.Query",
+        new[] { syntaxTree },
+        references,
+        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    var lineCount = syntaxTree.GetText().Lines.Count;
+    var results = new List<SymbolicLineQueryResult>();
+    for (var line = 1; line <= lineCount; line++)
+    {
+        var lineResult = queryService.QuerySyntaxTreeLine(
+            syntaxTree,
+            compilation,
+            line,
+            smtAnalysis: smtAnalysis,
+            impliedConditions: options.ImpliedConditions);
+        if (lineResult.ProgramPoints.Count != 0)
+        {
+            results.Add(lineResult);
+        }
+    }
+
+    return results;
+}
+
+static void PrintFileResult(
+    IReadOnlyList<SymbolicLineQueryResult> results,
+    SymbolicCliOptions options,
+    SmtAnalysisService? smtAnalysis)
+{
+    Console.WriteLine($"{options.FilePath}");
+    Console.WriteLine($"Lines with program points: {results.Count}");
+    foreach (var lineResult in results)
+    {
+        Console.WriteLine();
+        PrintLineResult(lineResult, options);
+    }
+
+    if (results.Count == 0 && smtAnalysis != null)
+    {
+        PrintSmtDiagnostics(SymbolicSmtDiagnostics.FromService(smtAnalysis));
+    }
+}
+
 static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions options)
 {
     Console.WriteLine($"{result.FilePath}:{result.Line}");
     Console.WriteLine($"Program points: {result.ProgramPoints.Count}");
+    Console.WriteLine($"Line merged invariant: {result.MergedInvariantText}");
     foreach (var point in result.ProgramPoints)
     {
         Console.WriteLine();
@@ -149,6 +214,7 @@ Options:
   --line <n>          1-based source line to query.
   --column <n>        1-based source column to query. Default: 1.
   --line-invariants   Query every statement/expression program point on the line.
+  --all-lines         Query every line that contains statement/expression program points.
   --position <n>      0-based absolute source position to query.
   --reference <path>  Metadata reference path. Can be repeated.
   --check-reachability
@@ -175,6 +241,8 @@ Options:
     public int? Position { get; private set; }
 
     public bool LineInvariants { get; private set; }
+
+    public bool AllLines { get; private set; }
 
     public List<string> ReferencePaths { get; } = new();
 
@@ -226,6 +294,10 @@ Options:
                 case "--all-line-points":
                     options.LineInvariants = true;
                     break;
+                case "--all-lines":
+                case "--file-invariants":
+                    options.AllLines = true;
+                    break;
                 case "--reference":
                 case "-r":
                     options.ReferencePaths.Add(ReadString(args, ref index, arg));
@@ -276,6 +348,12 @@ Options:
                 throw new ArgumentException("--position cannot be combined with --line.");
             }
 
+            if (options.AllLines &&
+                (options.Position.HasValue || options.Line != 0 || options.Column != 1 || options.LineInvariants))
+            {
+                throw new ArgumentException("--all-lines cannot be combined with --line, --column, --position, or --line-invariants.");
+            }
+
             if (options.Position.HasValue && options.LineInvariants)
             {
                 throw new ArgumentException("--line-invariants cannot be combined with --position.");
@@ -286,9 +364,9 @@ Options:
                 throw new ArgumentException("--line-invariants cannot be combined with --column.");
             }
 
-            if (!options.Position.HasValue && options.Line == 0)
+            if (!options.AllLines && !options.Position.HasValue && options.Line == 0)
             {
-                throw new ArgumentException("--line or --position is required.");
+                throw new ArgumentException("--line, --position, or --all-lines is required.");
             }
 
             foreach (var referencePath in options.ReferencePaths)

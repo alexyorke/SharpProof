@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -85,6 +86,54 @@ namespace PurelySharp.Symbolic
                 : ConjoinPathConditions(pathConditions).ToString() ?? "true";
         }
 
+        public static SymbolicInvariantFactSummary MergeInvariantFacts(IEnumerable<IEnumerable<string>> factSets)
+        {
+            if (factSets == null)
+            {
+                throw new ArgumentNullException(nameof(factSets));
+            }
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var facts = new List<string>();
+            foreach (var factSet in factSets)
+            {
+                if (factSet == null)
+                {
+                    continue;
+                }
+
+                foreach (var fact in factSet)
+                {
+                    if (!string.IsNullOrWhiteSpace(fact) && seen.Add(fact))
+                    {
+                        facts.Add(fact);
+                    }
+                }
+            }
+
+            return new SymbolicInvariantFactSummary(facts);
+        }
+
+        public static string FormatMergedInvariantFacts(IReadOnlyList<string> facts)
+        {
+            if (facts == null)
+            {
+                throw new ArgumentNullException(nameof(facts));
+            }
+
+            if (facts.Count == 0)
+            {
+                return "true";
+            }
+
+            if (facts.Count == 1)
+            {
+                return facts[0];
+            }
+
+            return string.Join(" && ", facts.Select(static fact => "(" + fact + ")"));
+        }
+
         private static SmtFormula[] CollectInvariantsAt(
             SyntaxNode site,
             SemanticModel semanticModel,
@@ -148,6 +197,19 @@ namespace PurelySharp.Symbolic
         public IReadOnlyList<string> Facts { get; }
 
         public SmtFormula MergedInvariant { get; }
+
+        public string MergedInvariantText { get; }
+    }
+
+    public sealed class SymbolicInvariantFactSummary
+    {
+        public SymbolicInvariantFactSummary(IReadOnlyList<string> facts)
+        {
+            Facts = facts ?? throw new ArgumentNullException(nameof(facts));
+            MergedInvariantText = SymbolicInvariantService.FormatMergedInvariantFacts(facts);
+        }
+
+        public IReadOnlyList<string> Facts { get; }
 
         public string MergedInvariantText { get; }
     }

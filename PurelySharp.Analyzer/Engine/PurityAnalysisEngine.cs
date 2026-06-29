@@ -2492,6 +2492,94 @@ namespace PurelySharp.Analyzer.Engine
             return true;
         }
 
+        internal static bool TryCreateBranchAssumptionState(
+            PurityAnalysisState currentState,
+            IOperation? condition,
+            SemanticModel semanticModel,
+            bool branchWhenTrue,
+            SmtAnalysisService smtAnalysis,
+            out PurityAnalysisState branchState)
+        {
+            return TryCreateSuccessorState(
+                currentState,
+                condition,
+                semanticModel,
+                branchWhenTrue,
+                smtAnalysis,
+                out branchState);
+        }
+
+        internal static bool TryGetKnownConditionValueFromPathFacts(
+            PurityAnalysisState currentState,
+            IOperation? condition,
+            SemanticModel semanticModel,
+            SmtAnalysisService smtAnalysis,
+            out bool value)
+        {
+            value = false;
+
+            if (condition?.ConstantValue.HasValue == true &&
+                condition.ConstantValue.Value is bool constantBool)
+            {
+                value = constantBool;
+                return true;
+            }
+
+            condition = SkipImplicitConversions(condition);
+            if (condition?.Syntax is not ExpressionSyntax expressionSyntax)
+            {
+                return false;
+            }
+
+            if (IsBranchAssumptionUnsatisfiable(currentState, expressionSyntax, branchWhenTrue: true, semanticModel, smtAnalysis))
+            {
+                value = false;
+                return true;
+            }
+
+            if (IsBranchAssumptionUnsatisfiable(currentState, expressionSyntax, branchWhenTrue: false, semanticModel, smtAnalysis))
+            {
+                value = true;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsBranchAssumptionUnsatisfiable(
+            PurityAnalysisState currentState,
+            ExpressionSyntax expressionSyntax,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            SmtAnalysisService smtAnalysis)
+        {
+            var pathConditionsBuilder = currentState.PathConditions.ToBuilder();
+            var addedBranchAssumptions = CSharpConditionToFormula.TryCollectBranchAssumptions(
+                expressionSyntax,
+                branchWhenTrue,
+                semanticModel,
+                CancellationToken.None,
+                pathConditionsBuilder,
+                currentState.GetSmtSymbolVersion);
+
+            if (CSharpConditionToFormula.TryTranslate(
+                    expressionSyntax,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var formula,
+                    currentState.GetSmtSymbolVersion) &&
+                formula != null)
+            {
+                pathConditionsBuilder.Add(branchWhenTrue
+                    ? formula
+                    : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
+                addedBranchAssumptions = true;
+            }
+
+            return addedBranchAssumptions &&
+                ArePathConditionsUnsatisfiable(currentState, pathConditionsBuilder.ToImmutable(), smtAnalysis);
+        }
+
         private static bool ArePathConditionsUnsatisfiable(
             PurityAnalysisState currentState,
             ImmutableArray<SmtFormula> pathConditions,

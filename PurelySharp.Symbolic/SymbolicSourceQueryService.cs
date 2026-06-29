@@ -897,7 +897,7 @@ namespace PurelySharp.Symbolic
                 falseProof.Reason);
         }
 
-        private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
+        public static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
         {
             var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
             if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))
@@ -1183,6 +1183,9 @@ namespace PurelySharp.Symbolic
             FilePath = filePath;
             Line = line;
             ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
+            var factSummary = SymbolicInvariantService.MergeInvariantFacts(ProgramPoints.Select(static point => point.Facts));
+            Facts = factSummary.Facts;
+            MergedInvariantText = factSummary.MergedInvariantText;
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         }
 
@@ -1191,6 +1194,10 @@ namespace PurelySharp.Symbolic
         public int Line { get; }
 
         public IReadOnlyList<SymbolicSourceQueryResult> ProgramPoints { get; }
+
+        public IReadOnlyList<string> Facts { get; }
+
+        public string MergedInvariantText { get; }
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
     }

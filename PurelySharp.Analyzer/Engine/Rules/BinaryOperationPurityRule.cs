@@ -32,25 +32,63 @@ namespace PurelySharp.Analyzer.Engine.Rules
             PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Left Operand is Pure.");
 
             if (binaryOperation.OperatorKind == BinaryOperatorKind.ConditionalAnd &&
-                binaryOperation.LeftOperand.ConstantValue.HasValue &&
-                binaryOperation.LeftOperand.ConstantValue.Value is bool leftAnd &&
+                PurityAnalysisEngine.TryGetKnownConditionValueFromPathFacts(
+                    currentState,
+                    binaryOperation.LeftOperand,
+                    context.SemanticModel,
+                    context.SmtAnalysis,
+                    out var leftAnd) &&
                 !leftAnd)
             {
-                PurityAnalysisEngine.LogDebug("    [BinaryOpRule] Constant false && skips right operand. Binary operation is Pure.");
+                PurityAnalysisEngine.LogDebug("    [BinaryOpRule] Proven false && skips right operand. Binary operation is Pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
             if (binaryOperation.OperatorKind == BinaryOperatorKind.ConditionalOr &&
-                binaryOperation.LeftOperand.ConstantValue.HasValue &&
-                binaryOperation.LeftOperand.ConstantValue.Value is bool leftOr &&
+                PurityAnalysisEngine.TryGetKnownConditionValueFromPathFacts(
+                    currentState,
+                    binaryOperation.LeftOperand,
+                    context.SemanticModel,
+                    context.SmtAnalysis,
+                    out var leftOr) &&
                 leftOr)
             {
-                PurityAnalysisEngine.LogDebug("    [BinaryOpRule] Constant true || skips right operand. Binary operation is Pure.");
+                PurityAnalysisEngine.LogDebug("    [BinaryOpRule] Proven true || skips right operand. Binary operation is Pure.");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
 
-            var rightResult = PurityAnalysisEngine.CheckSingleOperation(binaryOperation.RightOperand, context, currentState);
+            var rightState = currentState;
+            if (binaryOperation.OperatorKind == BinaryOperatorKind.ConditionalAnd)
+            {
+                if (!PurityAnalysisEngine.TryCreateBranchAssumptionState(
+                    currentState,
+                    binaryOperation.LeftOperand,
+                    context.SemanticModel,
+                    branchWhenTrue: true,
+                    context.SmtAnalysis,
+                    out rightState))
+                {
+                    PurityAnalysisEngine.LogDebug("    [BinaryOpRule] Proven unreachable && right operand. Binary operation is Pure.");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                }
+            }
+            else if (binaryOperation.OperatorKind == BinaryOperatorKind.ConditionalOr)
+            {
+                if (!PurityAnalysisEngine.TryCreateBranchAssumptionState(
+                    currentState,
+                    binaryOperation.LeftOperand,
+                    context.SemanticModel,
+                    branchWhenTrue: false,
+                    context.SmtAnalysis,
+                    out rightState))
+                {
+                    PurityAnalysisEngine.LogDebug("    [BinaryOpRule] Proven unreachable || right operand. Binary operation is Pure.");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                }
+            }
+
+            var rightResult = PurityAnalysisEngine.CheckSingleOperation(binaryOperation.RightOperand, context, rightState);
             if (!rightResult.IsPure)
             {
                 PurityAnalysisEngine.LogDebug($"    [BinaryOpRule] Right Operand is Impure: {binaryOperation.RightOperand.Syntax}");

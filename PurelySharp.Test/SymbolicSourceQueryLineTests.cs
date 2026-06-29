@@ -43,6 +43,11 @@ public class TestClass
             var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
             Assert.That(returnPoint.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
             Assert.That(returnPoint.MergedInvariantText, Does.Contain("value"));
+            var summary = SymbolicInvariantService.MergeInvariantFacts(result.ProgramPoints.Select(point => point.Facts));
+            Assert.That(summary.Facts, Is.EquivalentTo(result.ProgramPoints.SelectMany(point => point.Facts).Distinct()));
+            Assert.That(summary.MergedInvariantText, Does.Contain("value"));
+            Assert.That(result.Facts, Is.EquivalentTo(summary.Facts));
+            Assert.That(result.MergedInvariantText, Is.EqualTo(summary.MergedInvariantText));
         }
 
         [Test]
@@ -62,6 +67,11 @@ public class TestClass
                 AnalyzerTestHost.GetTrustedPlatformReferences());
 
             Assert.That(result.ProgramPoints, Is.Empty);
+            var summary = SymbolicInvariantService.MergeInvariantFacts(result.ProgramPoints.Select(point => point.Facts));
+            Assert.That(summary.Facts, Is.Empty);
+            Assert.That(summary.MergedInvariantText, Is.EqualTo("true"));
+            Assert.That(result.Facts, Is.Empty);
+            Assert.That(result.MergedInvariantText, Is.EqualTo("true"));
         }
 
         private static int FindLine(string source, string text)

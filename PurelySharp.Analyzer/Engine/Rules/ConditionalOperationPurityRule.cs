@@ -32,15 +32,27 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
             PurityAnalysisEngine.LogDebug($"    [CondRule] Condition is Pure.");
 
-            if (conditionalOperation.Condition.ConstantValue.HasValue &&
-                conditionalOperation.Condition.ConstantValue.Value is bool constantCondition)
+            if (PurityAnalysisEngine.TryGetKnownConditionValueFromPathFacts(
+                    currentState,
+                    conditionalOperation.Condition,
+                    context.SemanticModel,
+                    context.SmtAnalysis,
+                    out var constantCondition))
             {
                 var reachableBranch = constantCondition ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse;
                 var reachableBranchName = constantCondition ? "WhenTrue" : "WhenFalse";
 
                 if (reachableBranch != null)
                 {
-                    var reachableBranchResult = PurityAnalysisEngine.CheckSingleOperation(reachableBranch, context, currentState);
+                    var reachableBranchState = currentState;
+                    PurityAnalysisEngine.TryCreateBranchAssumptionState(
+                        currentState,
+                        conditionalOperation.Condition,
+                        context.SemanticModel,
+                        constantCondition,
+                        context.SmtAnalysis,
+                        out reachableBranchState);
+                    var reachableBranchResult = PurityAnalysisEngine.CheckSingleOperation(reachableBranch, context, reachableBranchState);
                     if (!reachableBranchResult.IsPure)
                     {
                         PurityAnalysisEngine.LogDebug($"    [CondRule] Reachable {reachableBranchName} is Impure: {reachableBranch.Syntax}");
@@ -54,11 +66,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (conditionalOperation.WhenTrue != null)
             {
-                var whenTrueResult = PurityAnalysisEngine.CheckSingleOperation(conditionalOperation.WhenTrue, context, currentState);
-                if (!whenTrueResult.IsPure)
+                if (PurityAnalysisEngine.TryCreateBranchAssumptionState(
+                        currentState,
+                        conditionalOperation.Condition,
+                        context.SemanticModel,
+                        branchWhenTrue: true,
+                        context.SmtAnalysis,
+                        out var whenTrueState))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [CondRule] WhenTrue is Impure: {conditionalOperation.WhenTrue.Syntax}");
-                    return whenTrueResult;
+                    var whenTrueResult = PurityAnalysisEngine.CheckSingleOperation(conditionalOperation.WhenTrue, context, whenTrueState);
+                    if (!whenTrueResult.IsPure)
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [CondRule] WhenTrue is Impure: {conditionalOperation.WhenTrue.Syntax}");
+                        return whenTrueResult;
+                    }
+                }
+                else
+                {
+                    PurityAnalysisEngine.LogDebug($"    [CondRule] WhenTrue branch is SMT-unreachable. Skipping.");
                 }
             }
             else
@@ -72,11 +97,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (conditionalOperation.WhenFalse != null)
             {
-                var whenFalseResult = PurityAnalysisEngine.CheckSingleOperation(conditionalOperation.WhenFalse, context, currentState);
-                if (!whenFalseResult.IsPure)
+                if (PurityAnalysisEngine.TryCreateBranchAssumptionState(
+                        currentState,
+                        conditionalOperation.Condition,
+                        context.SemanticModel,
+                        branchWhenTrue: false,
+                        context.SmtAnalysis,
+                        out var whenFalseState))
                 {
-                    PurityAnalysisEngine.LogDebug($"    [CondRule] WhenFalse is Impure: {conditionalOperation.WhenFalse.Syntax}");
-                    return whenFalseResult;
+                    var whenFalseResult = PurityAnalysisEngine.CheckSingleOperation(conditionalOperation.WhenFalse, context, whenFalseState);
+                    if (!whenFalseResult.IsPure)
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [CondRule] WhenFalse is Impure: {conditionalOperation.WhenFalse.Syntax}");
+                        return whenFalseResult;
+                    }
+                }
+                else
+                {
+                    PurityAnalysisEngine.LogDebug($"    [CondRule] WhenFalse branch is SMT-unreachable. Skipping.");
                 }
             }
             else

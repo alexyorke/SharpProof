@@ -399,6 +399,91 @@ public class TestClass
         }
 
         [Test]
+        public void CSharpConditionToFormula_ElementAccessInRange_TranslatesRangeEndpoints()
+        {
+            var source = @"
+public class TestClass
+{
+    public int[] TestMethod(int[] values)
+    {
+        if (values.Length >= 2)
+        {
+            return values[1..^1];
+        }
+
+        return values;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ElementAccessRangeInRangeHost",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var root = syntaxTree.GetRoot();
+            var guard = root.DescendantNodes().OfType<IfStatementSyntax>().Single().Condition;
+            var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
+
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+                    elementAccess,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var inRangeFormula),
+                Is.True);
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslate(
+                    guard,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var guardFormula),
+                Is.True);
+            Assert.That(guardFormula, Is.Not.Null);
+
+            var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
+                .ClassifyImplication(new[] { guardFormula! }, inRangeFormula);
+
+            Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        }
+
+        [Test]
+        public void CSharpConditionToFormula_ElementAccessInRange_ProvesInvalidConstantRangeOutOfRange()
+        {
+            var source = @"
+public class TestClass
+{
+    public int[] TestMethod(int[] values)
+    {
+        return values[2..1];
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                "ElementAccessInvalidRangeHost",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var root = syntaxTree.GetRoot();
+            var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
+
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+                    elementAccess,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var inRangeFormula),
+                Is.True);
+
+            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+            var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
+                .ClassifyImplication(Array.Empty<SmtFormula>(), outOfRangeFormula);
+
+            Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        }
+
+        [Test]
         public void ExecutionVisibility_TautologicalCondition_IsAlwaysTrue()
         {
             Assert.That(
