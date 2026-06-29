@@ -2380,8 +2380,7 @@ namespace PurelySharp.Symbolic.Smt
 
             var receiverType = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).ConvertedType ??
                 semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).Type;
-            if (receiverType is not IArrayTypeSymbol { Rank: 1 } &&
-                receiverType?.SpecialType != SpecialType.System_String)
+            if (!IsSupportedBuiltInElementAccessReceiver(receiverType))
             {
                 return false;
             }
@@ -4060,9 +4059,9 @@ namespace PurelySharp.Symbolic.Smt
 
             var receiverType = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).ConvertedType ??
                 semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).Type;
-            if (receiverType is not IArrayTypeSymbol { Rank: 1 } arrayType ||
-                !TryGetValueKind(arrayType.ElementType, out var elementKind) ||
-                !TryTranslateValue(
+            if (!TryGetBuiltInElementAccessElementType(receiverType, out var elementType) ||
+                !TryGetValueKind(elementType, out var elementKind) ||
+                !TryCreateBuiltInElementAccessReceiverFormula(
                     elementAccess.Expression,
                     semanticModel,
                     cancellationToken,
@@ -4093,6 +4092,16 @@ namespace PurelySharp.Symbolic.Smt
             Func<ISymbol, int>? getSymbolVersion,
             int inlineDepth)
         {
+            if (!TryResolveBuiltInIndexAccessIndexExpression(
+                    indexExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out indexExpression))
+            {
+                indexText = string.Empty;
+                return false;
+            }
+
             indexExpression = UnwrapElementAccessIndexExpression(indexExpression);
             if (indexExpression is PrefixUnaryExpressionSyntax fromEndIndex &&
                 fromEndIndex.OperatorToken.IsKind(SyntaxKind.CaretToken))
@@ -4252,6 +4261,24 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (IsBuiltInSpanType(receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type) &&
+                TryCreateBuiltInElementAccessReceiverFormula(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var spanReceiverFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+                if (TryCreateMemberFormula(spanReceiverFormula, "Length", intType, out var spanLength) &&
+                    spanLength is { Kind: SmtValueKind.Int })
+                {
+                    lengthFormula = spanLength;
+                    return true;
+                }
+            }
+
             if (!TryTranslateValue(
                     receiverExpression,
                     semanticModel,
@@ -4265,8 +4292,8 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
-            if (!TryCreateMemberFormula(receiverFormula, "Length", intType, out var candidate) ||
+            var fallbackIntType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+            if (!TryCreateMemberFormula(receiverFormula, "Length", fallbackIntType, out var candidate) ||
                 candidate is not { Kind: SmtValueKind.Int })
             {
                 lengthFormula = null!;
@@ -4573,8 +4600,7 @@ namespace PurelySharp.Symbolic.Smt
 
             var sourceType = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).ConvertedType ??
                 semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).Type;
-            if (sourceType is not IArrayTypeSymbol { Rank: 1 } &&
-                sourceType?.SpecialType != SpecialType.System_String)
+            if (!IsSupportedBuiltInElementAccessReceiver(sourceType))
             {
                 return false;
             }
@@ -4678,43 +4704,41 @@ namespace PurelySharp.Symbolic.Smt
             out RangeExpressionSyntax rangeExpression)
         {
             rangeExpression = null!;
-            if (!TryGetEnclosingStatementInBlock(useExpression, out var block, out var useStatement))
-            {
-                return false;
-            }
-
             var foundAssignment = false;
-            foreach (var statement in block.Statements)
+            foreach (var containingBlock in EnumerateContainingBlocks(useExpression).Reverse())
             {
-                if (statement == useStatement)
+                foreach (var statement in containingBlock.Block.Statements)
                 {
-                    break;
-                }
+                    if (statement == containingBlock.ContainingStatement)
+                    {
+                        break;
+                    }
 
-                TryGetRangeAssignmentFromPrecedingStatement(
-                    statement,
-                    rangeSymbol,
-                    semanticModel,
-                    cancellationToken,
-                    out var writesRangeSymbol,
-                    out var assignedRangeExpression);
-                if (!writesRangeSymbol)
-                {
-                    continue;
-                }
+                    TryGetRangeAssignmentFromPrecedingStatement(
+                        statement,
+                        rangeSymbol,
+                        semanticModel,
+                        cancellationToken,
+                        out var writesRangeSymbol,
+                        out var assignedRangeExpression);
+                    if (!writesRangeSymbol)
+                    {
+                        continue;
+                    }
 
-                if (foundAssignment || assignedRangeExpression == null)
-                {
-                    rangeExpression = null!;
-                    return false;
-                }
+                    if (foundAssignment ||
+                        assignedRangeExpression == null)
+                    {
+                        rangeExpression = null!;
+                        return false;
+                    }
 
-                rangeExpression = assignedRangeExpression;
-                foundAssignment = true;
+                    rangeExpression = assignedRangeExpression;
+                    foundAssignment = true;
+                }
             }
 
-            if (!foundAssignment ||
-                ContainsRangeSymbolWrite(useStatement, rangeSymbol, semanticModel, cancellationToken))
+            if (!foundAssignment)
             {
                 rangeExpression = null!;
                 return false;
@@ -4723,21 +4747,16 @@ namespace PurelySharp.Symbolic.Smt
             return true;
         }
 
-        private static bool TryGetEnclosingStatementInBlock(
-            SyntaxNode node,
-            out BlockSyntax block,
-            out StatementSyntax statement)
+        private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(SyntaxNode site)
         {
-            statement = node.Ancestors().OfType<StatementSyntax>().FirstOrDefault(static candidate => candidate.Parent is BlockSyntax)!;
-            if (statement?.Parent is BlockSyntax parentBlock)
+            for (SyntaxNode? current = site; current != null; current = current.Parent)
             {
-                block = parentBlock;
-                return true;
+                if (current is StatementSyntax statement &&
+                    statement.Parent is BlockSyntax block)
+                {
+                    yield return (block, statement);
+                }
             }
-
-            block = null!;
-            statement = null!;
-            return false;
         }
 
         private static void TryGetRangeAssignmentFromPrecedingStatement(
@@ -4929,6 +4948,374 @@ namespace PurelySharp.Symbolic.Smt
                 SymbolEqualityComparer.Default.Equals(typeSymbol, rangeType);
         }
 
+        private static bool IsSupportedBuiltInElementAccessReceiver(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is IArrayTypeSymbol { Rank: 1 } ||
+                typeSymbol?.SpecialType == SpecialType.System_String ||
+                IsBuiltInSpanType(typeSymbol);
+        }
+
+        private static bool IsSupportedBuiltInLengthReceiver(ITypeSymbol? typeSymbol)
+        {
+            return IsSupportedBuiltInElementAccessReceiver(typeSymbol);
+        }
+
+        private static bool TryGetBuiltInElementAccessElementType(ITypeSymbol? receiverType, out ITypeSymbol elementType)
+        {
+            if (receiverType is IArrayTypeSymbol { Rank: 1 } arrayType)
+            {
+                elementType = arrayType.ElementType;
+                return true;
+            }
+
+            if (receiverType is INamedTypeSymbol namedType &&
+                IsBuiltInSpanType(namedType) &&
+                namedType.TypeArguments.Length == 1)
+            {
+                elementType = namedType.TypeArguments[0];
+                return true;
+            }
+
+            elementType = null!;
+            return false;
+        }
+
+        private static bool TryCreateBuiltInElementAccessReceiverFormula(
+            ExpressionSyntax receiverExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula receiverFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            if (TryTranslateValue(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedReceiver,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                translatedReceiver is { Kind: SmtValueKind.Reference })
+            {
+                receiverFormula = translatedReceiver;
+                return true;
+            }
+
+            receiverExpression = UnwrapExpression(receiverExpression);
+            var receiverType = semanticModel.GetTypeInfo(receiverExpression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(receiverExpression, cancellationToken).Type;
+            if (!IsBuiltInSpanType(receiverType))
+            {
+                receiverFormula = null!;
+                return false;
+            }
+
+            var receiverSymbol = semanticModel.GetSymbolInfo(receiverExpression, cancellationToken).Symbol;
+            if (receiverSymbol is not ILocalSymbol and not IParameterSymbol)
+            {
+                receiverFormula = null!;
+                return false;
+            }
+
+            receiverFormula = new SmtVariable(GetVariableName(receiverSymbol, getSymbolVersion), SmtValueKind.Reference);
+            return true;
+        }
+
+        private static bool IsBuiltInSpanType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>";
+        }
+
+        private static bool TryResolveBuiltInIndexAccessIndexExpression(
+            ExpressionSyntax argumentExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax indexExpression)
+        {
+            argumentExpression = UnwrapElementAccessIndexExpression(argumentExpression);
+            if (!IsSystemIndexExpression(argumentExpression, semanticModel, cancellationToken) ||
+                !TryGetLocalOrParameterIndexSymbol(argumentExpression, semanticModel, cancellationToken, out var indexSymbol))
+            {
+                indexExpression = argumentExpression;
+                return true;
+            }
+
+            return TryResolveAssignedIndexExpression(
+                argumentExpression,
+                indexSymbol,
+                semanticModel,
+                cancellationToken,
+                out indexExpression);
+        }
+
+        private static bool TryGetLocalOrParameterIndexSymbol(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ISymbol indexSymbol)
+        {
+            var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
+            if (symbol is ILocalSymbol localSymbol &&
+                IsSystemIndexType(localSymbol.Type, semanticModel.Compilation))
+            {
+                indexSymbol = localSymbol;
+                return true;
+            }
+
+            if (symbol is IParameterSymbol { RefKind: RefKind.None } parameterSymbol &&
+                IsSystemIndexType(parameterSymbol.Type, semanticModel.Compilation))
+            {
+                indexSymbol = parameterSymbol;
+                return true;
+            }
+
+            indexSymbol = null!;
+            return false;
+        }
+
+        private static bool TryResolveAssignedIndexExpression(
+            ExpressionSyntax useExpression,
+            ISymbol indexSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax indexExpression)
+        {
+            indexExpression = null!;
+            var foundAssignment = false;
+            foreach (var containingBlock in EnumerateContainingBlocks(useExpression).Reverse())
+            {
+                foreach (var statement in containingBlock.Block.Statements)
+                {
+                    if (statement == containingBlock.ContainingStatement)
+                    {
+                        break;
+                    }
+
+                    TryGetIndexAssignmentFromPrecedingStatement(
+                        statement,
+                        indexSymbol,
+                        semanticModel,
+                        cancellationToken,
+                        out var writesIndexSymbol,
+                        out var assignedIndexExpression);
+                    if (!writesIndexSymbol)
+                    {
+                        continue;
+                    }
+
+                    if (foundAssignment ||
+                        assignedIndexExpression == null)
+                    {
+                        indexExpression = null!;
+                        return false;
+                    }
+
+                    indexExpression = assignedIndexExpression;
+                    foundAssignment = true;
+                }
+            }
+
+            if (!foundAssignment)
+            {
+                indexExpression = null!;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static void TryGetIndexAssignmentFromPrecedingStatement(
+            StatementSyntax statement,
+            ISymbol indexSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out bool writesIndexSymbol,
+            out ExpressionSyntax? indexExpression)
+        {
+            indexExpression = null;
+            writesIndexSymbol = false;
+
+            if (TryGetIndexAssignmentFromLocalDeclaration(
+                    statement,
+                    indexSymbol,
+                    semanticModel,
+                    cancellationToken,
+                    out writesIndexSymbol,
+                    out indexExpression))
+            {
+                return;
+            }
+
+            if (TryGetIndexAssignmentFromExpressionStatement(
+                    statement,
+                    indexSymbol,
+                    semanticModel,
+                    cancellationToken,
+                    out writesIndexSymbol,
+                    out indexExpression))
+            {
+                return;
+            }
+
+            writesIndexSymbol = ContainsIndexSymbolWrite(statement, indexSymbol, semanticModel, cancellationToken);
+        }
+
+        private static bool TryGetIndexAssignmentFromLocalDeclaration(
+            StatementSyntax statement,
+            ISymbol indexSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out bool writesIndexSymbol,
+            out ExpressionSyntax? indexExpression)
+        {
+            indexExpression = null;
+            writesIndexSymbol = false;
+            if (statement is not LocalDeclarationStatementSyntax localDeclaration)
+            {
+                return false;
+            }
+
+            foreach (var variable in localDeclaration.Declaration.Variables)
+            {
+                var declaredSymbol = semanticModel.GetDeclaredSymbol(variable, cancellationToken);
+                if (!IsSameSymbol(declaredSymbol, indexSymbol))
+                {
+                    continue;
+                }
+
+                if (variable.Initializer == null)
+                {
+                    return true;
+                }
+
+                writesIndexSymbol = true;
+                if (localDeclaration.Declaration.Variables.Count != 1 ||
+                    !TryGetSupportedAssignedIndexExpression(
+                        variable.Initializer.Value,
+                        semanticModel,
+                        cancellationToken,
+                        out indexExpression))
+                {
+                    return true;
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetIndexAssignmentFromExpressionStatement(
+            StatementSyntax statement,
+            ISymbol indexSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out bool writesIndexSymbol,
+            out ExpressionSyntax? indexExpression)
+        {
+            indexExpression = null;
+            writesIndexSymbol = false;
+            if (statement is not ExpressionStatementSyntax
+                {
+                    Expression: AssignmentExpressionSyntax assignment
+                } ||
+                !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                !IsIndexSymbolReference(assignment.Left, indexSymbol, semanticModel, cancellationToken))
+            {
+                return false;
+            }
+
+            writesIndexSymbol = true;
+            TryGetSupportedAssignedIndexExpression(
+                assignment.Right,
+                semanticModel,
+                cancellationToken,
+                out indexExpression);
+            return true;
+        }
+
+        private static bool TryGetSupportedAssignedIndexExpression(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax indexExpression)
+        {
+            expression = UnwrapElementAccessIndexExpression(expression);
+            if (expression is PrefixUnaryExpressionSyntax fromEndIndex &&
+                fromEndIndex.OperatorToken.IsKind(SyntaxKind.CaretToken))
+            {
+                indexExpression = expression;
+                return true;
+            }
+
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            if (typeInfo.Type != null &&
+                IsIntegralOrEnumType(typeInfo.Type))
+            {
+                indexExpression = expression;
+                return true;
+            }
+
+            indexExpression = null!;
+            return false;
+        }
+
+        private static bool ContainsIndexSymbolWrite(
+            SyntaxNode node,
+            ISymbol indexSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var assignment in node.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (IsIndexSymbolReference(assignment.Left, indexSymbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var argument in node.DescendantNodes().OfType<ArgumentSyntax>())
+            {
+                if ((argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) ||
+                     argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword)) &&
+                    IsIndexSymbolReference(argument.Expression, indexSymbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsIndexSymbolReference(
+            ExpressionSyntax expression,
+            ISymbol indexSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return IsSameSymbol(
+                semanticModel.GetSymbolInfo(UnwrapElementAccessIndexExpression(expression), cancellationToken).Symbol,
+                indexSymbol);
+        }
+
+        private static bool IsSystemIndexExpression(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            return IsSystemIndexType(typeInfo.ConvertedType ?? typeInfo.Type, semanticModel.Compilation);
+        }
+
+        private static bool IsSystemIndexType(ITypeSymbol? typeSymbol, Compilation compilation)
+        {
+            var indexType = compilation.GetTypeByMetadataName("System.Index");
+            return typeSymbol != null &&
+                indexType != null &&
+                SymbolEqualityComparer.Default.Equals(typeSymbol, indexType);
+        }
+
         private static bool TryCreateArrayLengthFormula(
             ExpressionSyntax receiverExpression,
             SemanticModel semanticModel,
@@ -5021,6 +5408,16 @@ namespace PurelySharp.Symbolic.Smt
             Func<ISymbol, int>? getSymbolVersion,
             int inlineDepth)
         {
+            if (!TryResolveBuiltInIndexAccessIndexExpression(
+                    indexExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out indexExpression))
+            {
+                indexFormula = null!;
+                return false;
+            }
+
             indexExpression = UnwrapElementAccessIndexExpression(indexExpression);
             if (indexExpression is PrefixUnaryExpressionSyntax fromEndIndex &&
                 fromEndIndex.OperatorToken.IsKind(SyntaxKind.CaretToken))
@@ -5172,8 +5569,7 @@ namespace PurelySharp.Symbolic.Smt
 
             var receiverType = semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).ConvertedType ??
                 semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).Type;
-            return receiverType is IArrayTypeSymbol ||
-                receiverType?.SpecialType == SpecialType.System_String;
+            return IsSupportedBuiltInLengthReceiver(receiverType);
         }
 
         private static bool TryTranslateComparison(

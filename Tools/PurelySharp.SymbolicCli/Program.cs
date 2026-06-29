@@ -69,20 +69,15 @@ try
         };
         Console.WriteLine(JsonSerializer.Serialize(
             compactResult,
-            new JsonSerializerOptions
-            {
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                Converters = { new JsonStringEnumConverter() },
-            }));
+            CreateCompactJsonOptions()));
     }
     else if (options.Json)
     {
         var json = result switch
         {
-            SymbolicFileQueryResult fileResult => JsonSerializer.Serialize(fileResult, new JsonSerializerOptions { WriteIndented = true }),
-            SymbolicLineQueryResult lineResult => JsonSerializer.Serialize(lineResult, new JsonSerializerOptions { WriteIndented = true }),
-            SymbolicSourceQueryResult pointResult => JsonSerializer.Serialize(pointResult, new JsonSerializerOptions { WriteIndented = true }),
+            SymbolicFileQueryResult fileResult => JsonSerializer.Serialize(fileResult, CreateFullJsonOptions()),
+            SymbolicLineQueryResult lineResult => JsonSerializer.Serialize(lineResult, CreateFullJsonOptions()),
+            SymbolicSourceQueryResult pointResult => JsonSerializer.Serialize(pointResult, CreateFullJsonOptions()),
             _ => throw new InvalidOperationException("Unexpected query result type."),
         };
         Console.WriteLine(json);
@@ -290,6 +285,27 @@ static void PrintSmtDiagnostics(SymbolicSmtDiagnostics diagnostics)
     Console.WriteLine($"  Max expression nodes: {diagnostics.MaxExpressionNodes}");
     Console.WriteLine($"  Executed queries: {diagnostics.ExecutedQueryCount}");
     Console.WriteLine($"  Cache entries: {diagnostics.CacheEntryCount}");
+}
+
+static JsonSerializerOptions CreateCompactJsonOptions()
+{
+    var options = new JsonSerializerOptions
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+    options.Converters.Add(new JsonStringEnumConverter());
+    return options;
+}
+
+static JsonSerializerOptions CreateFullJsonOptions()
+{
+    var options = new JsonSerializerOptions
+    {
+        WriteIndented = true,
+    };
+    options.Converters.Add(new JsonStringEnumConverter());
+    return options;
 }
 
 internal sealed class SymbolicCliOptions

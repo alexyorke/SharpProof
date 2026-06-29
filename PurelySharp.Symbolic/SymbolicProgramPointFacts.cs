@@ -417,6 +417,9 @@ namespace PurelySharp.Symbolic
                     symbolFormula.Kind != SmtValueKind.Int ||
                     initializer.UpperBound.Kind != SmtValueKind.Int ||
                     StatementMutatesSymbol(forStatement.Statement, initializer.Symbol, semanticModel, cancellationToken) ||
+                    initializer.BoundSymbols.Any(symbol =>
+                        StatementMutatesSymbol(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
+                        ForLoopIncrementorsMutateSymbol(forStatement, symbol, semanticModel, cancellationToken)) ||
                     !ForLoopIncrementorsPreserveUpperBound(forStatement, initializer.Symbol, semanticModel, cancellationToken))
                 {
                     continue;
@@ -429,7 +432,24 @@ namespace PurelySharp.Symbolic
             }
         }
 
-        private static IEnumerable<(ISymbol Symbol, SmtFormula UpperBound)> EnumerateForLoopStrictUpperBoundInitializers(
+        private static bool ForLoopIncrementorsMutateSymbol(
+            ForStatementSyntax forStatement,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var incrementor in forStatement.Incrementors)
+            {
+                if (NodeMutatesSymbol(incrementor, symbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static IEnumerable<(ISymbol Symbol, SmtFormula UpperBound, IReadOnlyList<ISymbol> BoundSymbols)> EnumerateForLoopStrictUpperBoundInitializers(
             ForStatementSyntax forStatement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -440,12 +460,18 @@ namespace PurelySharp.Symbolic
                 {
                     if (declarator.Initializer == null ||
                         semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol localSymbol ||
-                        !TryGetStrictUpperBoundInitializer(declarator.Initializer.Value, localSymbol.OriginalDefinition, semanticModel, cancellationToken, out var upperBound))
+                        !TryGetStrictUpperBoundInitializer(
+                            declarator.Initializer.Value,
+                            localSymbol.OriginalDefinition,
+                            semanticModel,
+                            cancellationToken,
+                            out var upperBound,
+                            out var boundSymbols))
                     {
                         continue;
                     }
 
-                    yield return (localSymbol.OriginalDefinition, upperBound);
+                    yield return (localSymbol.OriginalDefinition, upperBound, boundSymbols);
                 }
             }
 
@@ -455,12 +481,18 @@ namespace PurelySharp.Symbolic
                     !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
                     semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } symbol ||
                     symbol is not ILocalSymbol and not IParameterSymbol ||
-                    !TryGetStrictUpperBoundInitializer(assignment.Right, symbol.OriginalDefinition, semanticModel, cancellationToken, out var upperBound))
+                    !TryGetStrictUpperBoundInitializer(
+                        assignment.Right,
+                        symbol.OriginalDefinition,
+                        semanticModel,
+                        cancellationToken,
+                        out var upperBound,
+                        out var boundSymbols))
                 {
                     continue;
                 }
 
-                yield return (symbol.OriginalDefinition, upperBound);
+                yield return (symbol.OriginalDefinition, upperBound, boundSymbols);
             }
         }
 
@@ -469,19 +501,27 @@ namespace PurelySharp.Symbolic
             ISymbol initializedSymbol,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula upperBound)
+            out SmtFormula upperBound,
+            out IReadOnlyList<ISymbol> upperBoundSymbols)
         {
             expression = UnwrapExpression(expression);
             if (expression is not BinaryExpressionSyntax binaryExpression)
             {
                 upperBound = null!;
+                upperBoundSymbols = Array.Empty<ISymbol>();
                 return false;
             }
 
             if (binaryExpression.IsKind(SyntaxKind.SubtractExpression) &&
                 TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken, out var subtractedValue) &&
                 subtractedValue > 0 &&
-                TryTranslateInitializerBound(binaryExpression.Left, initializedSymbol, semanticModel, cancellationToken, out upperBound))
+                TryTranslateInitializerBound(
+                    binaryExpression.Left,
+                    initializedSymbol,
+                    semanticModel,
+                    cancellationToken,
+                    out upperBound,
+                    out upperBoundSymbols))
             {
                 return true;
             }
@@ -490,20 +530,33 @@ namespace PurelySharp.Symbolic
             {
                 if (TryGetIntegralConstant(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue) &&
                     rightValue < 0 &&
-                    TryTranslateInitializerBound(binaryExpression.Left, initializedSymbol, semanticModel, cancellationToken, out upperBound))
+                    TryTranslateInitializerBound(
+                        binaryExpression.Left,
+                        initializedSymbol,
+                        semanticModel,
+                        cancellationToken,
+                        out upperBound,
+                        out upperBoundSymbols))
                 {
                     return true;
                 }
 
                 if (TryGetIntegralConstant(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue) &&
                     leftValue < 0 &&
-                    TryTranslateInitializerBound(binaryExpression.Right, initializedSymbol, semanticModel, cancellationToken, out upperBound))
+                    TryTranslateInitializerBound(
+                        binaryExpression.Right,
+                        initializedSymbol,
+                        semanticModel,
+                        cancellationToken,
+                        out upperBound,
+                        out upperBoundSymbols))
                 {
                     return true;
                 }
             }
 
             upperBound = null!;
+            upperBoundSymbols = Array.Empty<ISymbol>();
             return false;
         }
 
@@ -512,9 +565,11 @@ namespace PurelySharp.Symbolic
             ISymbol initializedSymbol,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula upperBound)
+            out SmtFormula upperBound,
+            out IReadOnlyList<ISymbol> upperBoundSymbols)
         {
-            if (ExpressionReferencesSymbol(expression, initializedSymbol, semanticModel, cancellationToken) ||
+            var referencedSymbols = GetReferencedLocalAndParameterSymbols(expression, semanticModel, cancellationToken);
+            if (referencedSymbols.Any(symbol => SymbolEqualityComparer.Default.Equals(symbol, initializedSymbol)) ||
                 !CSharpConditionToFormula.TryTranslateValue(
                     expression,
                     semanticModel,
@@ -525,10 +580,12 @@ namespace PurelySharp.Symbolic
                 candidate is not { Kind: SmtValueKind.Int })
             {
                 upperBound = null!;
+                upperBoundSymbols = Array.Empty<ISymbol>();
                 return false;
             }
 
             upperBound = candidate;
+            upperBoundSymbols = referencedSymbols;
             return true;
         }
 
@@ -1813,6 +1870,8 @@ namespace PurelySharp.Symbolic
                         semanticModel,
                         cancellationToken,
                         facts);
+                    AddForLoopMonotonicLowerBoundFacts(facts, forStatement, semanticModel, cancellationToken);
+                    AddForLoopMonotonicUpperBoundFacts(facts, forStatement, semanticModel, cancellationToken);
                     break;
                 case DoStatementSyntax doStatement
                     when CanAssumeLoopConditionFalseAfterNormalExit(doStatement, doStatement.Statement):
@@ -1830,18 +1889,22 @@ namespace PurelySharp.Symbolic
             StatementSyntax loopStatement,
             StatementSyntax loopBody)
         {
-            if (loopBody.DescendantNodesAndSelf(
-                    descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
-                .OfType<GotoStatementSyntax>()
-                .Any())
+            foreach (var node in loopBody.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
             {
-                return false;
+                switch (node)
+                {
+                    case GotoStatementSyntax:
+                    case ReturnStatementSyntax:
+                    case ThrowStatementSyntax:
+                    case ThrowExpressionSyntax:
+                        return false;
+                    case BreakStatementSyntax breakStatement when BreakTargetsLoop(breakStatement, loopStatement):
+                        return false;
+                }
             }
 
-            return !loopBody.DescendantNodesAndSelf(
-                    descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
-                .OfType<BreakStatementSyntax>()
-                .Any(breakStatement => BreakTargetsLoop(breakStatement, loopStatement));
+            return true;
         }
 
         private static bool BreakTargetsLoop(

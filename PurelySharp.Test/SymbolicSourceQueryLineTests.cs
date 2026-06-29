@@ -449,6 +449,17 @@ public class TestClass
             Assert.That(compact.Column, Is.EqualTo(result.Column));
             Assert.That(compact.Position, Is.EqualTo(position));
             Assert.That(compact.NodeKind, Is.EqualTo("ReturnStatement"));
+            Assert.That(compact.NodeSpanStart, Is.EqualTo(result.NodeSpanStart));
+            Assert.That(compact.NodeSpanEnd, Is.EqualTo(result.NodeSpanEnd));
+            Assert.That(compact.NodeSpanLength, Is.EqualTo(result.NodeSpanLength));
+            Assert.That(compact.NodeStartLine, Is.EqualTo(result.NodeStartLine));
+            Assert.That(compact.NodeStartColumn, Is.EqualTo(result.NodeStartColumn));
+            Assert.That(compact.NodeEndLine, Is.EqualTo(result.NodeEndLine));
+            Assert.That(compact.NodeEndColumn, Is.EqualTo(result.NodeEndColumn));
+            Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(compact.PointReachability, Is.EqualTo(result.Reachability.ToString()));
+            Assert.That(compact.ReachabilityReason, Is.EqualTo(result.ReachabilityReason));
+            Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProofOutcomes.TotalCount));
             Assert.That(compact.ProgramPointCount, Is.EqualTo(1));
             Assert.That(compact.ProgramPoints, Is.Empty);
             Assert.That(compact.Truncation.ProgramPoints, Is.True);
@@ -474,6 +485,11 @@ public class TestClass
             Assert.That(kind.GetString(), Is.EqualTo("point"));
             Assert.That(root.TryGetProperty("Kind", out _), Is.False);
             Assert.That(root.TryGetProperty("lineCount", out _), Is.False);
+            Assert.That(root.GetProperty("nodeSpanStart").GetInt32(), Is.EqualTo(result.NodeSpanStart));
+            Assert.That(root.GetProperty("nodeSpanEnd").GetInt32(), Is.EqualTo(result.NodeSpanEnd));
+            Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo(result.MergedInvariantText));
+            Assert.That(root.GetProperty("pointReachability").GetString(), Is.EqualTo(result.Reachability.ToString()));
+            Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(result.ProofOutcomes.TotalCount));
             Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.Zero);
             Assert.That(root.GetProperty("truncation").GetProperty("isTruncated").GetBoolean(), Is.True);
         }
@@ -516,6 +532,8 @@ public class TestClass
             Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
             Assert.That(compact.ProgramPoints, Has.Count.EqualTo(1));
             Assert.That(compact.Truncation.ProgramPoints, Is.EqualTo(result.ProgramPoints.Count > 1));
+            Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
             Assert.That(compact.ObservedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion.ToString()));
             Assert.That(compact.ObservedInvariant.RawFactCount, Is.EqualTo(result.Facts.Count));
             Assert.That(compact.ObservedInvariant.RawFacts, Is.EqualTo(result.Facts.Take(1)));
@@ -527,6 +545,24 @@ public class TestClass
             Assert.That(compact.Reachability.ReachableCount, Is.EqualTo(result.ProgramPointSummary.Reachability.ReachableCount));
             Assert.That(compact.SmtDiagnostics.IsConfigured, Is.True);
             Assert.That(compact.SmtDiagnostics.Mode, Is.EqualTo(SmtAnalysisMode.Bounded.ToString()));
+
+            var compactPoint = compact.ProgramPoints.Single();
+            var sourcePoint = result.ProgramPoints.First();
+            Assert.That(compactPoint.FilePath, Is.EqualTo(sourcePoint.FilePath));
+            Assert.That(compactPoint.Line, Is.EqualTo(sourcePoint.Line));
+            Assert.That(compactPoint.Column, Is.EqualTo(sourcePoint.Column));
+            Assert.That(compactPoint.Position, Is.EqualTo(sourcePoint.Position));
+            Assert.That(compactPoint.NodeSpanStart, Is.EqualTo(sourcePoint.NodeSpanStart));
+            Assert.That(compactPoint.NodeSpanEnd, Is.EqualTo(sourcePoint.NodeSpanEnd));
+            Assert.That(compactPoint.NodeSpanLength, Is.EqualTo(sourcePoint.NodeSpanLength));
+            Assert.That(compactPoint.NodeStartLine, Is.EqualTo(sourcePoint.NodeStartLine));
+            Assert.That(compactPoint.NodeStartColumn, Is.EqualTo(sourcePoint.NodeStartColumn));
+            Assert.That(compactPoint.NodeEndLine, Is.EqualTo(sourcePoint.NodeEndLine));
+            Assert.That(compactPoint.NodeEndColumn, Is.EqualTo(sourcePoint.NodeEndColumn));
+            Assert.That(compactPoint.MergedInvariantText, Is.EqualTo(sourcePoint.MergedInvariantText));
+            Assert.That(compactPoint.Reachability, Is.EqualTo(sourcePoint.Reachability.ToString()));
+            Assert.That(compactPoint.ReachabilityReason, Is.EqualTo(sourcePoint.ReachabilityReason));
+            Assert.That(compactPoint.ProofOutcomes.TotalCount, Is.EqualTo(sourcePoint.ProofOutcomes.TotalCount));
         }
 
         [Test]
@@ -574,6 +610,8 @@ public class TestClass
             Assert.That(compact.Truncation.Facts, Is.EqualTo(result.ObservedFactCount > 0));
             Assert.That(compact.Truncation.Conditions, Is.EqualTo(result.MergedInvariant.ConditionCount > 0));
             Assert.That(compact.Truncation.Proofs, Is.EqualTo(result.ConditionProofs.Count > 0));
+            Assert.That(compact.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(compact.ProofOutcomes.TotalCount, Is.EqualTo(result.ProgramPointSummary.ProofOutcomes.TotalCount));
             Assert.That(compact.ObservedInvariant.RawFactCount, Is.EqualTo(result.ObservedFactCount));
             Assert.That(compact.ObservedInvariant.RawFacts, Is.Empty);
             Assert.That(compact.ConservativeInvariant.Text, Is.EqualTo(result.MergedInvariantText));
@@ -581,6 +619,113 @@ public class TestClass
             Assert.That(compact.ConservativeInvariant.MergedPathFacts!.MaybeFactCount, Is.EqualTo(result.MergedPathFacts.MaybeFacts.Count));
             Assert.That(compact.ConservativeInvariant.MergedPathFacts.MaybeFacts, Is.Empty);
             Assert.That(compact.SmtDiagnostics.IsConfigured, Is.True);
+        }
+
+        [Test]
+        public async Task SymbolicCli_CompactJson_EmitsPerPointMetadataWhenDetailsAreBounded()
+        {
+            var source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliCompactMetadata-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--line",
+                    FindLine(source, "return value;").ToString(),
+                    "--line-invariants",
+                    "--check-reachability",
+                    "--implies",
+                    "value > 0",
+                    "--compact-json",
+                    "--max-points",
+                    "1",
+                    "--max-facts",
+                    "0",
+                    "--max-conditions",
+                    "0",
+                    "--max-proofs",
+                    "0");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("line"));
+                Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
+                Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+
+                var point = root.GetProperty("programPoints")[0];
+                Assert.That(point.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
+                Assert.That(point.GetProperty("line").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
+                Assert.That(point.GetProperty("column").GetInt32(), Is.EqualTo(FindColumn(source, "return value;")));
+                Assert.That(point.GetProperty("position").GetInt32(), Is.EqualTo(FindPosition(source, "return value;")));
+                Assert.That(point.GetProperty("nodeSpanStart").GetInt32(), Is.EqualTo(FindPosition(source, "return value;")));
+                Assert.That(point.GetProperty("nodeSpanEnd").GetInt32(), Is.GreaterThan(point.GetProperty("nodeSpanStart").GetInt32()));
+                Assert.That(point.GetProperty("nodeSpanLength").GetInt32(), Is.GreaterThan(0));
+                Assert.That(point.GetProperty("nodeStartLine").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
+                Assert.That(point.GetProperty("nodeEndLine").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
+                Assert.That(point.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
+                Assert.That(point.GetProperty("reachability").GetString(), Is.EqualTo(SymbolicReachability.Reachable.ToString()));
+                Assert.That(point.GetProperty("reachabilityReason").GetString(), Is.Not.Empty);
+                Assert.That(point.GetProperty("conditionProofs").GetArrayLength(), Is.Zero);
+                Assert.That(point.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(point.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(point.GetProperty("conservativeInvariant").GetProperty("text").GetString(), Is.EqualTo("value > 0"));
+                Assert.That(point.GetProperty("conservativeInvariant").GetProperty("conditions").GetArrayLength(), Is.Zero);
+                Assert.That(point.GetProperty("truncation").GetProperty("conditions").GetBoolean(), Is.True);
+                Assert.That(point.GetProperty("truncation").GetProperty("proofs").GetBoolean(), Is.True);
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public async Task SymbolicCli_Json_EmitsEnumNames()
+        {
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliFullJson-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
+            try
+            {
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--position",
+                    "0",
+                    "--json");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("Reachability").ValueKind, Is.EqualTo(JsonValueKind.String));
+                Assert.That(
+                    Enum.TryParse<SymbolicReachability>(root.GetProperty("Reachability").GetString(), out _),
+                    Is.True);
+                Assert.That(root.GetProperty("Invariant").GetProperty("MergeKind").ValueKind, Is.EqualTo(JsonValueKind.String));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
         }
 
         [Test]
@@ -611,6 +756,17 @@ public class TestClass
                     "1");
                 Assert.That(maxLinesWithoutCompact.ExitCode, Is.EqualTo(64));
                 Assert.That(maxLinesWithoutCompact.StandardError, Does.Contain("require --compact-json"));
+
+                var negativeMaxPoints = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--position",
+                    "0",
+                    "--compact-json",
+                    "--max-points",
+                    "-1");
+                Assert.That(negativeMaxPoints.ExitCode, Is.EqualTo(64));
+                Assert.That(negativeMaxPoints.StandardError, Does.Contain("non-negative integer"));
             }
             finally
             {

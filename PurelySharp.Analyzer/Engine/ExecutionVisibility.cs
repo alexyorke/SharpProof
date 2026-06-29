@@ -84,10 +84,13 @@ namespace PurelySharp.Analyzer.Engine
                 }
                 else if (ancestor is ConditionalAccessExpressionSyntax conditionalAccessExpression)
                 {
-                    var receiverValue = semanticModel.GetConstantValue(conditionalAccessExpression.Expression, cancellationToken);
-                    if (receiverValue.HasValue &&
-                        receiverValue.Value == null &&
-                        conditionalAccessExpression.WhenNotNull.Span.Contains(syntaxNode.SpanStart))
+                    if (conditionalAccessExpression.WhenNotNull.Span.Contains(syntaxNode.SpanStart) &&
+                        IsReferenceKnownNullAt(
+                            conditionalAccessExpression.Expression,
+                            conditionalAccessExpression,
+                            semanticModel,
+                            cancellationToken,
+                            smtAnalysis))
                     {
                         return true;
                     }
@@ -111,8 +114,12 @@ namespace PurelySharp.Analyzer.Engine
                     if (binaryExpression.IsKind(SyntaxKind.CoalesceExpression) &&
                         binaryExpression.Right.Span.Contains(syntaxNode.SpanStart))
                     {
-                        var leftValue = semanticModel.GetConstantValue(binaryExpression.Left, cancellationToken);
-                        if (leftValue.HasValue && leftValue.Value != null)
+                        if (IsReferenceKnownNonNullAt(
+                            binaryExpression.Left,
+                            binaryExpression,
+                            semanticModel,
+                            cancellationToken,
+                            smtAnalysis))
                         {
                             return true;
                         }
@@ -400,6 +407,107 @@ namespace PurelySharp.Analyzer.Engine
         private static bool IsFormulaAlwaysFalseUsingSmt(SmtFormula formula, SmtAnalysisService? smtAnalysis)
         {
             return IsFormulaAlwaysFalseUsingSmt(formula, Array.Empty<SmtFormula>(), smtAnalysis);
+        }
+
+        private static bool IsReferenceKnownNullAt(
+            ExpressionSyntax expression,
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            if (TryGetConstantReferenceNullState(expression, semanticModel, cancellationToken, out var isNull))
+            {
+                return isNull;
+            }
+
+            if (!TryCreateReferenceNullComparison(expression, semanticModel, cancellationToken, equalToNull: true, out var nullFormula))
+            {
+                return false;
+            }
+
+            return IsFormulaAlwaysTrueUsingSmt(
+                nullFormula,
+                CollectPathConditionsAt(site, semanticModel, cancellationToken),
+                smtAnalysis);
+        }
+
+        private static bool IsReferenceKnownNonNullAt(
+            ExpressionSyntax expression,
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            SmtAnalysisService? smtAnalysis)
+        {
+            if (TryGetConstantReferenceNullState(expression, semanticModel, cancellationToken, out var isNull))
+            {
+                return !isNull;
+            }
+
+            if (!TryCreateReferenceNullComparison(expression, semanticModel, cancellationToken, equalToNull: false, out var nonNullFormula))
+            {
+                return false;
+            }
+
+            return IsFormulaAlwaysTrueUsingSmt(
+                nonNullFormula,
+                CollectPathConditionsAt(site, semanticModel, cancellationToken),
+                smtAnalysis);
+        }
+
+        private static bool TryGetConstantReferenceNullState(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out bool isNull)
+        {
+            var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
+            if (constantValue.HasValue)
+            {
+                isNull = constantValue.Value == null;
+                return true;
+            }
+
+            isNull = false;
+            return false;
+        }
+
+        private static bool TryCreateReferenceNullComparison(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            bool equalToNull,
+            out SmtFormula formula)
+        {
+            formula = null!;
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) ||
+                valueFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            formula = new SmtBinaryFormula(
+                equalToNull ? SmtBinaryOperator.Equal : SmtBinaryOperator.NotEqual,
+                valueFormula,
+                new SmtNullConstant());
+            return true;
+        }
+
+        private static bool IsFormulaAlwaysTrueUsingSmt(
+            SmtFormula formula,
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            SmtAnalysisService? smtAnalysis)
+        {
+            return IsFormulaAlwaysFalseUsingSmt(
+                new SmtUnaryFormula(SmtUnaryOperator.Not, formula),
+                pathConditions,
+                smtAnalysis);
         }
 
         private static bool IsFormulaAlwaysFalseUsingSmt(

@@ -492,6 +492,7 @@ namespace PurelySharp.Symbolic
                 column,
                 smtAnalysis,
                 cancellationToken);
+            var nodeSourceSpan = GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
             var conditionProofs = ProveConditions(
                 query.SemanticModel,
                 query.Position,
@@ -513,7 +514,12 @@ namespace PurelySharp.Symbolic
                 conditionProofs,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis),
                 SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions),
-                query.Analysis.PathConditions);
+                query.Analysis.PathConditions,
+                query.Node.Span.End,
+                nodeSourceSpan.StartLine,
+                nodeSourceSpan.StartColumn,
+                nodeSourceSpan.EndLine,
+                nodeSourceSpan.EndColumn);
         }
 
         public SymbolicLineQueryResult QuerySyntaxTreeLine(
@@ -547,6 +553,7 @@ namespace PurelySharp.Symbolic
                         smtAnalysis,
                         cancellationToken);
                     var lineColumn = GetLineAndColumn(syntaxTree, query.Position, cancellationToken);
+                    var nodeSourceSpan = GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
                     var conditionProofs = ProveConditions(
                         query.SemanticModel,
                         query.Position,
@@ -568,7 +575,12 @@ namespace PurelySharp.Symbolic
                         conditionProofs,
                         SymbolicSmtDiagnostics.FromService(smtAnalysis),
                         SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions),
-                        query.Analysis.PathConditions);
+                        query.Analysis.PathConditions,
+                        query.Node.Span.End,
+                        nodeSourceSpan.StartLine,
+                        nodeSourceSpan.StartColumn,
+                        nodeSourceSpan.EndLine,
+                        nodeSourceSpan.EndColumn);
                 })
                 .ToArray();
 
@@ -645,6 +657,7 @@ namespace PurelySharp.Symbolic
                 smtAnalysis,
                 cancellationToken);
             var lineColumn = GetLineAndColumn(syntaxTree, position, cancellationToken);
+            var nodeSourceSpan = GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
             var conditionProofs = ProveConditions(
                 query.SemanticModel,
                 query.Position,
@@ -666,7 +679,12 @@ namespace PurelySharp.Symbolic
                 conditionProofs,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis),
                 SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions),
-                query.Analysis.PathConditions);
+                query.Analysis.PathConditions,
+                query.Node.Span.End,
+                nodeSourceSpan.StartLine,
+                nodeSourceSpan.StartColumn,
+                nodeSourceSpan.EndLine,
+                nodeSourceSpan.EndColumn);
         }
 
         public SymbolicProgramPointQueryResult AnalyzeSyntaxTree(
@@ -1199,6 +1217,21 @@ namespace PurelySharp.Symbolic
             return new LineColumn(line.LineNumber + 1, position - line.Start + 1);
         }
 
+        private static NodeSourceSpan GetNodeSourceSpan(
+            SyntaxTree syntaxTree,
+            TextSpan span,
+            CancellationToken cancellationToken)
+        {
+            var text = syntaxTree.GetText(cancellationToken);
+            var startLine = text.Lines.GetLineFromPosition(span.Start);
+            var endLine = text.Lines.GetLineFromPosition(span.End);
+            return new NodeSourceSpan(
+                startLine.LineNumber + 1,
+                span.Start - startLine.Start + 1,
+                endLine.LineNumber + 1,
+                span.End - endLine.Start + 1);
+        }
+
         private readonly struct LineColumn
         {
             public LineColumn(int line, int column)
@@ -1210,6 +1243,29 @@ namespace PurelySharp.Symbolic
             public int Line { get; }
 
             public int Column { get; }
+        }
+
+        private readonly struct NodeSourceSpan
+        {
+            public NodeSourceSpan(
+                int startLine,
+                int startColumn,
+                int endLine,
+                int endColumn)
+            {
+                StartLine = startLine;
+                StartColumn = startColumn;
+                EndLine = endLine;
+                EndColumn = endColumn;
+            }
+
+            public int StartLine { get; }
+
+            public int StartColumn { get; }
+
+            public int EndLine { get; }
+
+            public int EndColumn { get; }
         }
 
         private sealed class ProgramPointQueryContext
@@ -1490,6 +1546,15 @@ namespace PurelySharp.Symbolic
             int? column,
             int? position,
             string? nodeKind,
+            int? nodeSpanStart,
+            int? nodeSpanEnd,
+            int? nodeSpanLength,
+            int? nodeStartLine,
+            int? nodeStartColumn,
+            int? nodeEndLine,
+            int? nodeEndColumn,
+            string? pointReachability,
+            string? reachabilityReason,
             int? lineCount,
             int linesWithProgramPoints,
             int programPointCount,
@@ -1509,13 +1574,24 @@ namespace PurelySharp.Symbolic
             Column = column;
             Position = position;
             NodeKind = nodeKind;
+            NodeSpanStart = nodeSpanStart;
+            NodeSpanEnd = nodeSpanEnd;
+            NodeSpanLength = nodeSpanLength;
+            NodeStartLine = nodeStartLine;
+            NodeStartColumn = nodeStartColumn;
+            NodeEndLine = nodeEndLine;
+            NodeEndColumn = nodeEndColumn;
+            PointReachability = pointReachability;
+            ReachabilityReason = reachabilityReason;
             LineCount = lineCount;
             LinesWithProgramPoints = linesWithProgramPoints;
             ProgramPointCount = programPointCount;
             ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
             ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
+            MergedInvariantText = ConservativeInvariant.Text;
             Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
             ProgramPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
+            ProofOutcomes = ProgramPointSummary.ProofOutcomes;
             ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
             Lines = lines ?? throw new ArgumentNullException(nameof(lines));
             ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
@@ -1535,6 +1611,24 @@ namespace PurelySharp.Symbolic
 
         public string? NodeKind { get; }
 
+        public int? NodeSpanStart { get; }
+
+        public int? NodeSpanEnd { get; }
+
+        public int? NodeSpanLength { get; }
+
+        public int? NodeStartLine { get; }
+
+        public int? NodeStartColumn { get; }
+
+        public int? NodeEndLine { get; }
+
+        public int? NodeEndColumn { get; }
+
+        public string? PointReachability { get; }
+
+        public string? ReachabilityReason { get; }
+
         public int? LineCount { get; }
 
         public int LinesWithProgramPoints { get; }
@@ -1545,9 +1639,13 @@ namespace PurelySharp.Symbolic
 
         public SymbolicCompactInvariantSummary ConservativeInvariant { get; }
 
+        public string MergedInvariantText { get; }
+
         public SymbolicReachabilitySummary Reachability { get; }
 
         public SymbolicProgramPointSummary ProgramPointSummary { get; }
+
+        public SymbolicProofOutcomeSummary ProofOutcomes { get; }
 
         public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
 
@@ -1593,6 +1691,15 @@ namespace PurelySharp.Symbolic
                 result.Column,
                 result.Position,
                 result.NodeKind,
+                result.NodeSpanStart,
+                result.NodeSpanEnd,
+                result.NodeSpanLength,
+                result.NodeStartLine,
+                result.NodeStartColumn,
+                result.NodeEndLine,
+                result.NodeEndColumn,
+                result.Reachability.ToString(),
+                result.ReachabilityReason,
                 null,
                 1,
                 1,
@@ -1639,6 +1746,15 @@ namespace PurelySharp.Symbolic
                 "line",
                 result.FilePath,
                 result.Line,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 null,
                 null,
                 null,
@@ -1710,6 +1826,15 @@ namespace PurelySharp.Symbolic
                 null,
                 null,
                 null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 result.LineCount,
                 result.LinesWithProgramPoints,
                 result.ProgramPointCount,
@@ -1745,8 +1870,10 @@ namespace PurelySharp.Symbolic
             ProgramPointCount = programPointCount;
             ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
             ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
+            MergedInvariantText = ConservativeInvariant.Text;
             Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
             ProgramPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
+            ProofOutcomes = ProgramPointSummary.ProofOutcomes;
             ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
             ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
             SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
@@ -1763,9 +1890,13 @@ namespace PurelySharp.Symbolic
 
         public SymbolicCompactInvariantSummary ConservativeInvariant { get; }
 
+        public string MergedInvariantText { get; }
+
         public SymbolicReachabilitySummary Reachability { get; }
 
         public SymbolicProgramPointSummary ProgramPointSummary { get; }
+
+        public SymbolicProofOutcomeSummary ProofOutcomes { get; }
 
         public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
 
@@ -1830,6 +1961,12 @@ namespace PurelySharp.Symbolic
             int column,
             int position,
             int nodeSpanStart,
+            int nodeSpanEnd,
+            int nodeSpanLength,
+            int nodeStartLine,
+            int nodeStartColumn,
+            int nodeEndLine,
+            int nodeEndColumn,
             string nodeKind,
             int factCount,
             IReadOnlyList<string> facts,
@@ -1849,11 +1986,18 @@ namespace PurelySharp.Symbolic
             Column = column;
             Position = position;
             NodeSpanStart = nodeSpanStart;
+            NodeSpanEnd = nodeSpanEnd;
+            NodeSpanLength = nodeSpanLength;
+            NodeStartLine = nodeStartLine;
+            NodeStartColumn = nodeStartColumn;
+            NodeEndLine = nodeEndLine;
+            NodeEndColumn = nodeEndColumn;
             NodeKind = nodeKind ?? string.Empty;
             FactCount = factCount;
             Facts = facts ?? throw new ArgumentNullException(nameof(facts));
             ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
             ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
+            MergedInvariantText = ConservativeInvariant.Text;
             PathConditionCount = pathConditionCount;
             PathConditions = pathConditions ?? throw new ArgumentNullException(nameof(pathConditions));
             Reachability = reachability ?? string.Empty;
@@ -1874,6 +2018,18 @@ namespace PurelySharp.Symbolic
 
         public int NodeSpanStart { get; }
 
+        public int NodeSpanEnd { get; }
+
+        public int NodeSpanLength { get; }
+
+        public int NodeStartLine { get; }
+
+        public int NodeStartColumn { get; }
+
+        public int NodeEndLine { get; }
+
+        public int NodeEndColumn { get; }
+
         public string NodeKind { get; }
 
         public int FactCount { get; }
@@ -1883,6 +2039,8 @@ namespace PurelySharp.Symbolic
         public SymbolicCompactInvariantSummary ObservedInvariant { get; }
 
         public SymbolicCompactInvariantSummary ConservativeInvariant { get; }
+
+        public string MergedInvariantText { get; }
 
         public int PathConditionCount { get; }
 
@@ -1931,6 +2089,12 @@ namespace PurelySharp.Symbolic
                 result.Column,
                 result.Position,
                 result.NodeSpanStart,
+                result.NodeSpanEnd,
+                result.NodeSpanLength,
+                result.NodeStartLine,
+                result.NodeStartColumn,
+                result.NodeEndLine,
+                result.NodeEndColumn,
                 result.NodeKind,
                 result.Facts.Count,
                 facts,
@@ -3016,13 +3180,24 @@ namespace PurelySharp.Symbolic
             IReadOnlyList<SymbolicConditionProofResult>? conditionProofs = null,
             SymbolicSmtDiagnostics? smtDiagnostics = null,
             string? mergedInvariantText = null,
-            IReadOnlyList<SmtFormula>? pathConditions = null)
+            IReadOnlyList<SmtFormula>? pathConditions = null,
+            int? nodeSpanEnd = null,
+            int? nodeStartLine = null,
+            int? nodeStartColumn = null,
+            int? nodeEndLine = null,
+            int? nodeEndColumn = null)
         {
             FilePath = filePath;
             Line = line;
             Column = column;
             Position = position;
             NodeSpanStart = nodeSpanStart;
+            NodeSpanEnd = nodeSpanEnd ?? nodeSpanStart;
+            NodeSpanLength = Math.Max(0, NodeSpanEnd - NodeSpanStart);
+            NodeStartLine = nodeStartLine ?? line;
+            NodeStartColumn = nodeStartColumn ?? column;
+            NodeEndLine = nodeEndLine ?? NodeStartLine;
+            NodeEndColumn = nodeEndColumn ?? NodeStartColumn + NodeSpanLength;
             NodeKind = nodeKind;
             Facts = facts ?? Array.Empty<string>();
             MergedInvariantText = mergedInvariantText ??
@@ -3051,6 +3226,18 @@ namespace PurelySharp.Symbolic
         public int Position { get; }
 
         public int NodeSpanStart { get; }
+
+        public int NodeSpanEnd { get; }
+
+        public int NodeSpanLength { get; }
+
+        public int NodeStartLine { get; }
+
+        public int NodeStartColumn { get; }
+
+        public int NodeEndLine { get; }
+
+        public int NodeEndColumn { get; }
 
         public string NodeKind { get; }
 
