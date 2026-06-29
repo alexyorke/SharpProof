@@ -458,9 +458,12 @@ namespace SearchLib.Smt
 
                 var literal = escaped switch
                 {
+                    'a' => "\a",
+                    'f' => "\f",
                     'n' => "\n",
                     'r' => "\r",
                     't' => "\t",
+                    'v' => "\v",
                     '\\' => "\\",
                     '.' => ".",
                     '^' => "^",
@@ -478,6 +481,12 @@ namespace SearchLib.Smt
                     '-' => "-",
                     _ => null
                 };
+
+                if (escaped is 'b' or 'B')
+                {
+                    regex = CreateLiteralRegex(string.Empty);
+                    return true;
+                }
 
                 if (literal == null)
                 {
@@ -617,9 +626,13 @@ namespace SearchLib.Smt
 
                 var value = escaped switch
                 {
+                    'a' => '\a',
+                    'b' => '\b',
+                    'f' => '\f',
                     'n' => '\n',
                     'r' => '\r',
                     't' => '\t',
+                    'v' => '\v',
                     '\\' => '\\',
                     '-' => '-',
                     ']' => ']',
@@ -647,6 +660,17 @@ namespace SearchLib.Smt
             private bool TryCreateEscapedCharacterClassRegex(char escaped, out ReExpr regex)
             {
                 regex = null!;
+                if (escaped is 'p' or 'P')
+                {
+                    if (!TryReadRegexCategoryName())
+                    {
+                        return false;
+                    }
+
+                    regex = CreateAnyCharRegex();
+                    return true;
+                }
+
                 if (escaped is not ('d' or 'D' or 's' or 'S' or 'w' or 'W'))
                 {
                     return false;
@@ -655,6 +679,35 @@ namespace SearchLib.Smt
                 // .NET's shorthand classes are Unicode-aware by default. One-char over-approximation
                 // preserves soundness for reachability proofs while still exposing length facts to Z3.
                 regex = CreateAnyCharRegex();
+                return true;
+            }
+
+            private bool TryReadRegexCategoryName()
+            {
+                if (!Peek('{'))
+                {
+                    return false;
+                }
+
+                _position++;
+                var start = _position;
+                while (_position < _pattern.Length && !Peek('}'))
+                {
+                    var current = _pattern[_position];
+                    if (!char.IsLetterOrDigit(current) && current != '_')
+                    {
+                        return false;
+                    }
+
+                    _position++;
+                }
+
+                if (_position == start || !Peek('}'))
+                {
+                    return false;
+                }
+
+                _position++;
                 return true;
             }
 

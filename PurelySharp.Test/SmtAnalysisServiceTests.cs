@@ -348,6 +348,63 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ClassifyImplication_ProvesCategoryRegexLengthFact()
+        {
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtRegexMatchFormula(text, @"\A\p{Lu}\P{Ll}\z"),
+            };
+            var fact = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtStringLengthTerm(text),
+                new SmtIntegerConstant(2));
+
+            var result = service.ClassifyImplication(pathConditions, fact);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void ClassifyImplication_ProvesWordBoundaryRegexLengthFact()
+        {
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtRegexMatchFormula(text, @"\A\bAB\B?\z"),
+            };
+            var fact = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtStringLengthTerm(text),
+                new SmtIntegerConstant(2));
+
+            var result = service.ClassifyImplication(pathConditions, fact);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_NegatedCategoryRegexClassRemainsConservative()
+        {
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtRegexMatchFormula(text, @"\A[^\p{Lu}]\z"),
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("A")),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
         public void ClassifyPathFeasibility_CombinesStringContainsAndEquality()
         {
             var text = new SmtVariable("text", SmtValueKind.String);

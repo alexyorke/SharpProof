@@ -5357,6 +5357,39 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_CategoryRegexImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\A\p{Lu}\P{Ll}\z"") && text.Length != 2",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_WordBoundaryRegexImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\A\bAB\B?\z"") && text.Length != 2",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NegatedCategoryRegexClassRemainsConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\A[^\p{Lu}]\z"") && text == ""A""",
+                    "using System.Text.RegularExpressions;"),
+                Is.False);
+        }
+
+        [Test]
         public void ExecutionVisibility_UnsupportedRegexOptionsRemainConservative()
         {
             Assert.That(
