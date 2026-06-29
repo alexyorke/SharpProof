@@ -838,6 +838,22 @@ namespace PurelySharp.Analyzer.Engine
                     case SmtIntegerBinaryTerm binary:
                         return ReferencesSmtVariable(binary.Left, variablePrefix) ||
                             ReferencesSmtVariable(binary.Right, variablePrefix);
+                    case SmtStringLengthTerm stringLength:
+                        return ReferencesSmtVariable(stringLength.Value, variablePrefix);
+                    case SmtStringConcatTerm stringConcat:
+                        return ReferencesSmtVariable(stringConcat.Left, variablePrefix) ||
+                            ReferencesSmtVariable(stringConcat.Right, variablePrefix);
+                    case SmtStringContainsFormula stringContains:
+                        return ReferencesSmtVariable(stringContains.Value, variablePrefix) ||
+                            ReferencesSmtVariable(stringContains.Search, variablePrefix);
+                    case SmtStringStartsWithFormula stringStartsWith:
+                        return ReferencesSmtVariable(stringStartsWith.Value, variablePrefix) ||
+                            ReferencesSmtVariable(stringStartsWith.Prefix, variablePrefix);
+                    case SmtStringEndsWithFormula stringEndsWith:
+                        return ReferencesSmtVariable(stringEndsWith.Value, variablePrefix) ||
+                            ReferencesSmtVariable(stringEndsWith.Suffix, variablePrefix);
+                    case SmtRegexMatchFormula regexMatch:
+                        return ReferencesSmtVariable(regexMatch.Value, variablePrefix);
                     case SmtConditionalFormula conditional:
                         return ReferencesSmtVariable(conditional.Condition, variablePrefix) ||
                             ReferencesSmtVariable(conditional.WhenTrue, variablePrefix) ||
@@ -4157,7 +4173,36 @@ namespace PurelySharp.Analyzer.Engine
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, targetStringFormula, valueStringFormula)));
             }
 
+            if (TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReferenceFormula) &&
+                targetReferenceFormula is { Kind: SmtValueKind.Reference } &&
+                GetTrackedSymbolType(targetSymbol)?.SpecialType == SpecialType.System_String &&
+                CSharpConditionToFormula.TryCreateStringNonNullFormula(
+                    valueExpression,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var valueNonNullFormula,
+                    valueState.GetSmtSymbolVersion) &&
+                valueNonNullFormula != null)
+            {
+                var targetNonNullFormula = new SmtBinaryFormula(
+                    SmtBinaryOperator.NotEqual,
+                    targetReferenceFormula,
+                    new SmtNullConstant());
+                nextState = nextState.WithPathConditions(nextState.PathConditions.Add(
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, targetNonNullFormula, valueNonNullFormula)));
+            }
+
             return nextState;
+        }
+
+        private static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol)
+        {
+            return symbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                _ => null
+            };
         }
 
         private static SmtFormula CreateAssignedValueFact(SmtFormula targetFormula, SmtFormula valueFormula)

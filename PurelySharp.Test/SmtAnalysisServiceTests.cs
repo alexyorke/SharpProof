@@ -260,6 +260,57 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ClassifyPathFeasibility_CombinesNonCapturingRegexGroupAndStringEquality()
+        {
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtRegexMatchFormula(text, @"\A(?:AB|CD)\z"),
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("EF")),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_CombinesNegatedRegexClassAndStringEquality()
+        {
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtRegexMatchFormula(text, @"\A[^A]\z"),
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("A")),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_CombinesRegexHexEscapesAndStringEquality()
+        {
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtRegexMatchFormula(text, "\\A\\u0041\\x42\\z"),
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, text, new SmtStringConstant("AB")),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void ClassifyPathFeasibility_CombinesStringContainsAndEquality()
         {
             var text = new SmtVariable("text", SmtValueKind.String);
@@ -268,6 +319,24 @@ namespace PurelySharp.Test
             {
                 new SmtStringContainsFormula(text, new SmtStringConstant("Z")),
                 new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("ABC")),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_CombinesStringConcatAndEquality()
+        {
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.NotEqual,
+                    new SmtStringConcatTerm(new SmtStringConstant("A"), new SmtStringConstant("B")),
+                    new SmtStringConstant("AB")),
             };
 
             var result = service.ClassifyPathFeasibility(pathConditions);

@@ -1010,6 +1010,26 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicInvariantService_CollectsStringConcatAssignmentFacts()
+        {
+            var facts = CollectProgramPointFacts(
+                @"
+public class TestClass
+{
+    public int TestMethod(string prefix)
+    {
+        var code = prefix + ""-01"";
+        return code.Length;
+    }
+}",
+                "return code.Length;");
+
+            Assert.That(facts, Is.Not.Empty);
+            Assert.That(facts.Any(fact => fact.Contains("SmtStringConcatTerm", StringComparison.Ordinal) &&
+                                           fact.Contains("-01", StringComparison.Ordinal)), Is.True);
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsPriorEarlyExitGuardFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -5304,6 +5324,17 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_RegexIsMatchImpliesInputNonNull()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "Regex.IsMatch(text, \"A\") && text == null",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_UnsupportedRegexOptionsRemainConservative()
         {
             Assert.That(
@@ -5319,6 +5350,34 @@ public class TestClass
         {
             Assert.That(
                 IsConditionAlwaysFalse("string text", "text.Contains(\"Z\") && text == \"ABC\""),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringLiteralEqualityImpliesNonNull()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "text == \"A\" && text == null"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringConcatContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string left, string right",
+                    "left == \"A\" && right == \"B\" && (left + right) != \"AB\""),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NullStringConcatUsesEmptyString()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "text == null && (text + \"X\") != \"X\""),
                 Is.True);
         }
 
@@ -7322,6 +7381,34 @@ public class TestClass
 }");
 
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_StringConcatContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(string left, string right)
+    {
+        var value = left + right;
+        if (left == ""A"" && right == ""B"" && value != ""AB"")
+        {
+            Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
         }
 
         [Test]

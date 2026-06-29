@@ -58,6 +58,9 @@ namespace SearchLib.Smt
                 SmtIntegerUnaryTerm integerUnaryTerm => EncodeIntegerUnary(integerUnaryTerm),
                 SmtIntegerBinaryTerm integerBinaryTerm => EncodeIntegerBinary(integerBinaryTerm),
                 SmtStringLengthTerm stringLengthTerm => _context.MkLength(EncodeString(stringLengthTerm.Value)),
+                SmtStringConcatTerm stringConcatTerm => _context.MkConcat(
+                    EncodeString(stringConcatTerm.Left),
+                    EncodeString(stringConcatTerm.Right)),
                 SmtStringContainsFormula stringContainsFormula => _context.MkContains(
                     EncodeString(stringContainsFormula.Value),
                     EncodeString(stringContainsFormula.Search)),
@@ -378,6 +381,17 @@ namespace SearchLib.Smt
                 switch (current)
                 {
                     case '(':
+                        if (Peek('?'))
+                        {
+                            _position++;
+                            if (!Peek(':'))
+                            {
+                                return false;
+                            }
+
+                            _position++;
+                        }
+
                         if (!TryParseExpression(out regex) || !Peek(')'))
                         {
                             return false;
@@ -415,6 +429,28 @@ namespace SearchLib.Smt
                 }
 
                 var escaped = _pattern[_position++];
+                if (escaped == 'x')
+                {
+                    if (!TryReadFixedHexChar(2, out var hexChar))
+                    {
+                        return false;
+                    }
+
+                    regex = CreateLiteralRegex(hexChar.ToString());
+                    return true;
+                }
+
+                if (escaped == 'u')
+                {
+                    if (!TryReadFixedHexChar(4, out var unicodeChar))
+                    {
+                        return false;
+                    }
+
+                    regex = CreateLiteralRegex(unicodeChar.ToString());
+                    return true;
+                }
+
                 var literal = escaped switch
                 {
                     'n' => "\n",
@@ -450,9 +486,11 @@ namespace SearchLib.Smt
             private bool TryParseCharClass(out ReExpr regex)
             {
                 regex = null!;
+                var negate = false;
                 if (Peek('^'))
                 {
-                    return false;
+                    negate = true;
+                    _position++;
                 }
 
                 var parts = new List<ReExpr>();
@@ -490,6 +528,11 @@ namespace SearchLib.Smt
 
                 _position++;
                 regex = parts.Count == 1 ? parts[0] : _context.MkUnion(parts.ToArray());
+                if (negate)
+                {
+                    regex = _context.MkDiff(CreateAnyCharRegex(), regex);
+                }
+
                 return true;
             }
 
@@ -514,6 +557,16 @@ namespace SearchLib.Smt
                 }
 
                 var escaped = _pattern[_position++];
+                if (escaped == 'x')
+                {
+                    return TryReadFixedHexChar(2, out value);
+                }
+
+                if (escaped == 'u')
+                {
+                    return TryReadFixedHexChar(4, out value);
+                }
+
                 value = escaped switch
                 {
                     'n' => '\n',
@@ -527,6 +580,51 @@ namespace SearchLib.Smt
                 };
 
                 return value != '\0';
+            }
+
+            private bool TryReadFixedHexChar(int digitCount, out char value)
+            {
+                value = default;
+                if (_position + digitCount > _pattern.Length)
+                {
+                    return false;
+                }
+
+                var parsed = 0;
+                for (var index = 0; index < digitCount; index++)
+                {
+                    var digit = HexValue(_pattern[_position + index]);
+                    if (digit < 0)
+                    {
+                        return false;
+                    }
+
+                    parsed = (parsed * 16) + digit;
+                }
+
+                _position += digitCount;
+                value = (char)parsed;
+                return true;
+            }
+
+            private static int HexValue(char value)
+            {
+                if (value >= '0' && value <= '9')
+                {
+                    return value - '0';
+                }
+
+                if (value >= 'a' && value <= 'f')
+                {
+                    return value - 'a' + 10;
+                }
+
+                if (value >= 'A' && value <= 'F')
+                {
+                    return value - 'A' + 10;
+                }
+
+                return -1;
             }
 
             private bool TryReadNumber(out uint value)

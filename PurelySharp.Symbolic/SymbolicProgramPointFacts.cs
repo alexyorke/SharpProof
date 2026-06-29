@@ -2356,6 +2356,26 @@ namespace PurelySharp.Symbolic
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
+                TryCreateSymbolSmtValue(assignedSymbol, out var targetReferenceFormula) &&
+                targetReferenceFormula is { Kind: SmtValueKind.Reference } &&
+                GetSymbolType(assignedSymbol)?.SpecialType == SpecialType.System_String &&
+                CSharpConditionToFormula.TryCreateStringNonNullFormula(
+                    effectiveValueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueNonNullFormula) &&
+                valueNonNullFormula != null)
+            {
+                facts.Add(new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.NotEqual,
+                        targetReferenceFormula,
+                        new SmtNullConstant()),
+                    valueNonNullFormula));
+            }
+
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
                 TryCreateBuiltInLengthFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var lengthFact))
             {
                 facts.Add(lengthFact);
@@ -4041,6 +4061,9 @@ namespace PurelySharp.Symbolic
                         ReferencesSmtVariable(integerBinary.Right, variablePrefix);
                 case SmtStringLengthTerm stringLength:
                     return ReferencesSmtVariable(stringLength.Value, variablePrefix);
+                case SmtStringConcatTerm stringConcat:
+                    return ReferencesSmtVariable(stringConcat.Left, variablePrefix) ||
+                        ReferencesSmtVariable(stringConcat.Right, variablePrefix);
                 case SmtStringContainsFormula stringContains:
                     return ReferencesSmtVariable(stringContains.Value, variablePrefix) ||
                         ReferencesSmtVariable(stringContains.Search, variablePrefix);

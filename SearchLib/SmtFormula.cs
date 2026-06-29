@@ -59,6 +59,8 @@ namespace SearchLib.Smt
 
     public sealed record SmtStringLengthTerm(SmtFormula Value) : SmtFormula(SmtValueKind.Int);
 
+    public sealed record SmtStringConcatTerm(SmtFormula Left, SmtFormula Right) : SmtFormula(SmtValueKind.String);
+
     public sealed record SmtStringContainsFormula(SmtFormula Value, SmtFormula Search) : SmtFormula(SmtValueKind.Bool);
 
     public sealed record SmtStringStartsWithFormula(SmtFormula Value, SmtFormula Prefix) : SmtFormula(SmtValueKind.Bool);

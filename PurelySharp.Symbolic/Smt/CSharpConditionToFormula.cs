@@ -1508,6 +1508,10 @@ namespace PurelySharp.Symbolic.Smt
                         SubstituteVariables(binary.Right, substitutions));
                 case SmtStringLengthTerm stringLength:
                     return new SmtStringLengthTerm(SubstituteVariables(stringLength.Value, substitutions));
+                case SmtStringConcatTerm stringConcat:
+                    return new SmtStringConcatTerm(
+                        SubstituteVariables(stringConcat.Left, substitutions),
+                        SubstituteVariables(stringConcat.Right, substitutions));
                 case SmtStringContainsFormula stringContains:
                     return new SmtStringContainsFormula(
                         SubstituteVariables(stringContains.Value, substitutions),
@@ -1612,6 +1616,9 @@ namespace PurelySharp.Symbolic.Smt
                         FormulaReferencesAnyVariableName(binary.Right, variableNames);
                 case SmtStringLengthTerm stringLength:
                     return FormulaReferencesAnyVariableName(stringLength.Value, variableNames);
+                case SmtStringConcatTerm stringConcat:
+                    return FormulaReferencesAnyVariableName(stringConcat.Left, variableNames) ||
+                        FormulaReferencesAnyVariableName(stringConcat.Right, variableNames);
                 case SmtStringContainsFormula stringContains:
                     return FormulaReferencesAnyVariableName(stringContains.Value, variableNames) ||
                         FormulaReferencesAnyVariableName(stringContains.Search, variableNames);
@@ -1752,6 +1759,18 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (expression is BinaryExpressionSyntax addExpression &&
+                addExpression.IsKind(SyntaxKind.AddExpression) &&
+                IsStringExpression(expression, semanticModel, cancellationToken) &&
+                TryTranslateStringConcatOperand(addExpression.Left, semanticModel, cancellationToken, out var concatLeft, getSymbolVersion, inlineDepth) &&
+                concatLeft != null &&
+                TryTranslateStringConcatOperand(addExpression.Right, semanticModel, cancellationToken, out var concatRight, getSymbolVersion, inlineDepth) &&
+                concatRight != null)
+            {
+                formula = new SmtStringConcatTerm(concatLeft, concatRight);
+                return true;
+            }
+
             var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
             var type = typeInfo.ConvertedType ?? typeInfo.Type;
             if (type?.SpecialType != SpecialType.System_String)
@@ -1776,6 +1795,36 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
+        }
+
+        private static bool TryTranslateStringConcatOperand(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!TryTranslateStringValue(expression, semanticModel, cancellationToken, out var stringFormula, getSymbolVersion, inlineDepth) ||
+                stringFormula == null)
+            {
+                return false;
+            }
+
+            if (TryTranslateValue(expression, semanticModel, cancellationToken, out var referenceFormula, getSymbolVersion, inlineDepth) &&
+                referenceFormula is { Kind: SmtValueKind.Reference })
+            {
+                formula = new SmtConditionalFormula(
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, referenceFormula, new SmtNullConstant()),
+                    stringFormula,
+                    new SmtStringConstant(string.Empty),
+                    SmtValueKind.String);
+                return true;
+            }
+
+            formula = stringFormula;
+            return true;
         }
 
         private static bool TryTranslateImplicitThisStringMemberValue(
@@ -1823,13 +1872,103 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            formula = new SmtBinaryFormula(
-                binaryExpression.IsKind(SyntaxKind.EqualsExpression)
-                    ? SmtBinaryOperator.Equal
-                    : SmtBinaryOperator.NotEqual,
-                left,
-                right);
+            var valuesEqual = new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right);
+            var equality = valuesEqual;
+            if (TryCreateStringNonNullFormula(binaryExpression.Left, semanticModel, cancellationToken, out var leftNonNull, getSymbolVersion, inlineDepth) &&
+                leftNonNull != null &&
+                TryCreateStringNonNullFormula(binaryExpression.Right, semanticModel, cancellationToken, out var rightNonNull, getSymbolVersion, inlineDepth) &&
+                rightNonNull != null)
+            {
+                var bothNull = new SmtBinaryFormula(
+                    SmtBinaryOperator.And,
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, leftNonNull),
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, rightNonNull));
+                var bothNonNull = new SmtBinaryFormula(SmtBinaryOperator.And, leftNonNull, rightNonNull);
+                equality = new SmtBinaryFormula(
+                    SmtBinaryOperator.Or,
+                    bothNull,
+                    new SmtBinaryFormula(SmtBinaryOperator.And, bothNonNull, valuesEqual));
+            }
+
+            formula = binaryExpression.IsKind(SyntaxKind.EqualsExpression)
+                ? equality
+                : new SmtUnaryFormula(SmtUnaryOperator.Not, equality);
             return true;
+        }
+
+        public static bool TryCreateStringNonNullFormula(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            expression = UnwrapExpression(expression);
+            formula = null;
+
+            var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
+            if (constantValue.HasValue)
+            {
+                if (constantValue.Value is string)
+                {
+                    formula = new SmtBooleanConstant(true);
+                    return true;
+                }
+
+                if (constantValue.Value == null)
+                {
+                    formula = new SmtBooleanConstant(false);
+                    return true;
+                }
+            }
+
+            if (IsStringEmptyMemberAccess(expression, semanticModel, cancellationToken))
+            {
+                formula = new SmtBooleanConstant(true);
+                return true;
+            }
+
+            if (expression is BinaryExpressionSyntax addExpression &&
+                addExpression.IsKind(SyntaxKind.AddExpression) &&
+                IsStringExpression(expression, semanticModel, cancellationToken))
+            {
+                formula = new SmtBooleanConstant(true);
+                return true;
+            }
+
+            if (expression is BinaryExpressionSyntax coalesceExpression &&
+                coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                IsStringExpression(expression, semanticModel, cancellationToken) &&
+                TryCreateStringNonNullFormula(coalesceExpression.Left, semanticModel, cancellationToken, out var coalesceLeftNonNull, getSymbolVersion, inlineDepth) &&
+                coalesceLeftNonNull != null &&
+                TryCreateStringNonNullFormula(coalesceExpression.Right, semanticModel, cancellationToken, out var coalesceRightNonNull, getSymbolVersion, inlineDepth) &&
+                coalesceRightNonNull != null)
+            {
+                formula = new SmtBinaryFormula(SmtBinaryOperator.Or, coalesceLeftNonNull, coalesceRightNonNull);
+                return true;
+            }
+
+            if (expression is ConditionalExpressionSyntax conditionalExpression &&
+                TryTranslate(conditionalExpression.Condition, semanticModel, cancellationToken, out var conditionFormula, getSymbolVersion, inlineDepth) &&
+                conditionFormula != null &&
+                TryCreateStringNonNullFormula(conditionalExpression.WhenTrue, semanticModel, cancellationToken, out var whenTrueNonNull, getSymbolVersion, inlineDepth) &&
+                whenTrueNonNull != null &&
+                TryCreateStringNonNullFormula(conditionalExpression.WhenFalse, semanticModel, cancellationToken, out var whenFalseNonNull, getSymbolVersion, inlineDepth) &&
+                whenFalseNonNull != null)
+            {
+                formula = new SmtConditionalFormula(conditionFormula, whenTrueNonNull, whenFalseNonNull, SmtValueKind.Bool);
+                return true;
+            }
+
+            if (TryTranslateValue(expression, semanticModel, cancellationToken, out var referenceFormula, getSymbolVersion, inlineDepth) &&
+                referenceFormula is { Kind: SmtValueKind.Reference })
+            {
+                formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, referenceFormula, new SmtNullConstant());
+                return true;
+            }
+
+            return false;
         }
 
         public static bool TryCollectBranchAssumptions(
@@ -1972,7 +2111,105 @@ namespace PurelySharp.Symbolic.Smt
                     new SmtIntegerConstant(0)));
             }
 
+            foreach (var invocation in expression.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>())
+            {
+                if (semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation invocationOperation)
+                {
+                    AddKnownStringInvocationDomainFacts(invocationOperation, semanticModel, cancellationToken, formulas, getSymbolVersion);
+                }
+            }
+
             return formulas.Count > originalCount;
+        }
+
+        private static void AddKnownStringInvocationDomainFacts(
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            var method = invocationOperation.TargetMethod;
+            if (method.Name == "IsMatch" &&
+                IsRegexType(method.ContainingType) &&
+                TryGetRegexInputExpression(invocationOperation, out var regexInputExpression))
+            {
+                AddStringNonNullDomainFact(regexInputExpression, semanticModel, cancellationToken, formulas, getSymbolVersion);
+                return;
+            }
+
+            if (method.ReturnType.SpecialType != SpecialType.System_Boolean ||
+                method.ContainingType?.SpecialType != SpecialType.System_String ||
+                method.IsStatic ||
+                method.Name is not "Contains" and not "StartsWith" and not "EndsWith")
+            {
+                return;
+            }
+
+            if (invocationOperation.Instance?.Syntax is ExpressionSyntax receiverExpression)
+            {
+                AddStringNonNullDomainFact(receiverExpression, semanticModel, cancellationToken, formulas, getSymbolVersion);
+            }
+
+            if (method.Parameters.Length >= 1 &&
+                method.Parameters[0].Type.SpecialType == SpecialType.System_String &&
+                invocationOperation.Arguments.Length >= 1 &&
+                invocationOperation.Arguments[0].Value.Syntax is ExpressionSyntax searchExpression)
+            {
+                AddStringNonNullDomainFact(searchExpression, semanticModel, cancellationToken, formulas, getSymbolVersion);
+            }
+        }
+
+        private static bool TryGetRegexInputExpression(
+            IInvocationOperation invocationOperation,
+            out ExpressionSyntax inputExpression)
+        {
+            inputExpression = null!;
+            var method = invocationOperation.TargetMethod;
+            if (method.Name != "IsMatch" ||
+                !IsRegexType(method.ContainingType))
+            {
+                return false;
+            }
+
+            if (method.IsStatic)
+            {
+                if (method.Parameters.Length < 1 ||
+                    method.Parameters[0].Type.SpecialType != SpecialType.System_String ||
+                    invocationOperation.Arguments.Length < 1 ||
+                    invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax staticInputExpression)
+                {
+                    return false;
+                }
+
+                inputExpression = staticInputExpression;
+                return true;
+            }
+
+            if (method.Parameters.Length < 1 ||
+                method.Parameters[0].Type.SpecialType != SpecialType.System_String ||
+                invocationOperation.Arguments.Length < 1 ||
+                invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax instanceInputExpression)
+            {
+                return false;
+            }
+
+            inputExpression = instanceInputExpression;
+            return true;
+        }
+
+        private static void AddStringNonNullDomainFact(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (TryCreateStringNonNullFormula(expression, semanticModel, cancellationToken, out var nonNullFormula, getSymbolVersion) &&
+                nonNullFormula != null)
+            {
+                formulas.Add(nonNullFormula);
+            }
         }
 
         private static void AddBranchAssumptions(

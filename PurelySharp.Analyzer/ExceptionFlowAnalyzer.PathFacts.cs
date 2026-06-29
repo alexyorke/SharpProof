@@ -714,6 +714,26 @@ namespace PurelySharp.Analyzer
                 facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetStringFormula, valueStringFormula));
             }
 
+            if (TryCreateSymbolSmtValue(targetSymbol, out var targetReferenceFormula) &&
+                targetReferenceFormula is { Kind: SmtValueKind.Reference } &&
+                GetTrackedSymbolType(targetSymbol)?.SpecialType == SpecialType.System_String &&
+                !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
+                CSharpConditionToFormula.TryCreateStringNonNullFormula(
+                    effectiveValueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueNonNullFormula) &&
+                valueNonNullFormula != null)
+            {
+                facts.Add(new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.NotEqual,
+                        targetReferenceFormula,
+                        new SmtNullConstant()),
+                    valueNonNullFormula));
+            }
+
             if (hasThrowGuard &&
                 guardExpression != null &&
                 !ExpressionReferencesSymbol(guardExpression, targetSymbol, semanticModel, cancellationToken))
@@ -817,6 +837,16 @@ namespace PurelySharp.Analyzer
                     RemoveFactsReferencingSymbol(facts, mutatedSymbol);
                 }
             }
+        }
+
+        private static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol)
+        {
+            return symbol switch
+            {
+                ILocalSymbol localSymbol => localSymbol.Type,
+                IParameterSymbol parameterSymbol => parameterSymbol.Type,
+                _ => null
+            };
         }
 
         private static bool TryCreateSymbolSmtValue(ISymbol symbol, out SmtFormula formula)
@@ -1207,6 +1237,9 @@ namespace PurelySharp.Analyzer
                         ReferencesSmtVariable(integerBinary.Right, variablePrefix);
                 case SmtStringLengthTerm stringLength:
                     return ReferencesSmtVariable(stringLength.Value, variablePrefix);
+                case SmtStringConcatTerm stringConcat:
+                    return ReferencesSmtVariable(stringConcat.Left, variablePrefix) ||
+                        ReferencesSmtVariable(stringConcat.Right, variablePrefix);
                 case SmtStringContainsFormula stringContains:
                     return ReferencesSmtVariable(stringContains.Value, variablePrefix) ||
                         ReferencesSmtVariable(stringContains.Search, variablePrefix);
