@@ -511,7 +511,8 @@ namespace PurelySharp.Symbolic
                 query.Analysis.ReachabilityReason,
                 conditionProofs,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis),
-                query.Analysis.MergedInvariantText);
+                query.Analysis.MergedInvariantText,
+                query.Analysis.PathConditions);
         }
 
         public SymbolicLineQueryResult QuerySyntaxTreeLine(
@@ -565,7 +566,8 @@ namespace PurelySharp.Symbolic
                         query.Analysis.ReachabilityReason,
                         conditionProofs,
                         SymbolicSmtDiagnostics.FromService(smtAnalysis),
-                        query.Analysis.MergedInvariantText);
+                        query.Analysis.MergedInvariantText,
+                        query.Analysis.PathConditions);
                 })
                 .ToArray();
 
@@ -662,7 +664,8 @@ namespace PurelySharp.Symbolic
                 query.Analysis.ReachabilityReason,
                 conditionProofs,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis),
-                query.Analysis.MergedInvariantText);
+                query.Analysis.MergedInvariantText,
+                query.Analysis.PathConditions);
         }
 
         public SymbolicProgramPointQueryResult AnalyzeSyntaxTree(
@@ -1290,6 +1293,10 @@ namespace PurelySharp.Symbolic
             var factSummary = SymbolicInvariantService.MergeInvariantFacts(ProgramPoints.Select(static point => point.Facts));
             Facts = factSummary.Facts;
             MergedInvariantText = factSummary.MergedInvariantText;
+            MergedInvariant = SymbolicInvariantResult.FromFacts(
+                Facts,
+                MergedInvariantText,
+                SymbolicInvariantMergeKind.DistinctFactUnion);
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         }
 
@@ -1302,6 +1309,8 @@ namespace PurelySharp.Symbolic
         public IReadOnlyList<string> Facts { get; }
 
         public string MergedInvariantText { get; }
+
+        public SymbolicInvariantResult MergedInvariant { get; }
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
@@ -1342,6 +1351,10 @@ namespace PurelySharp.Symbolic
             var factSummary = SymbolicInvariantService.MergeInvariantFacts(programPoints.Select(static point => point.Facts));
             ObservedFacts = factSummary.Facts;
             ObservedFactCount = ObservedFacts.Count;
+            ObservedInvariant = SymbolicInvariantResult.FromFacts(
+                ObservedFacts,
+                factSummary.MergedInvariantText,
+                SymbolicInvariantMergeKind.DistinctFactUnion);
             Reachability = SymbolicReachabilitySummary.FromProgramPoints(programPoints);
             ConditionProofs = SymbolicConditionProofSummary.FromProgramPoints(programPoints);
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
@@ -1360,6 +1373,8 @@ namespace PurelySharp.Symbolic
         public IReadOnlyList<string> ObservedFacts { get; }
 
         public int ObservedFactCount { get; }
+
+        public SymbolicInvariantResult ObservedInvariant { get; }
 
         public SymbolicReachabilitySummary Reachability { get; }
 
@@ -1597,7 +1612,8 @@ namespace PurelySharp.Symbolic
             string reachabilityReason = "reachability_not_checked",
             IReadOnlyList<SymbolicConditionProofResult>? conditionProofs = null,
             SymbolicSmtDiagnostics? smtDiagnostics = null,
-            string? mergedInvariantText = null)
+            string? mergedInvariantText = null,
+            IReadOnlyList<SmtFormula>? pathConditions = null)
         {
             FilePath = filePath;
             Line = line;
@@ -1607,6 +1623,12 @@ namespace PurelySharp.Symbolic
             NodeKind = nodeKind;
             Facts = facts;
             MergedInvariantText = mergedInvariantText ?? FormatMergedInvariantText(facts);
+            Invariant = pathConditions == null
+                ? SymbolicInvariantResult.FromFacts(
+                    Facts,
+                    MergedInvariantText,
+                    SymbolicInvariantMergeKind.Conjunction)
+                : SymbolicInvariantResult.FromPathConditions(pathConditions, MergedInvariantText);
             Reachability = reachability;
             ReachabilityReason = reachabilityReason;
             ConditionProofs = conditionProofs ?? Array.Empty<SymbolicConditionProofResult>();
@@ -1628,6 +1650,10 @@ namespace PurelySharp.Symbolic
         public IReadOnlyList<string> Facts { get; }
 
         public string MergedInvariantText { get; }
+
+        public SymbolicInvariantResult Invariant { get; }
+
+        public IReadOnlyList<SymbolicInvariantCondition> PathConditions => Invariant.Conditions;
 
         public SymbolicReachability Reachability { get; }
 
@@ -1651,6 +1677,130 @@ namespace PurelySharp.Symbolic
 
             return string.Join(" && ", facts.Select(static fact => "(" + fact + ")"));
         }
+    }
+
+    public sealed class SymbolicInvariantResult
+    {
+        private SymbolicInvariantResult(
+            IReadOnlyList<SymbolicInvariantCondition> conditions,
+            string mergedInvariantText,
+            SymbolicInvariantMergeKind mergeKind)
+        {
+            Conditions = conditions ?? throw new ArgumentNullException(nameof(conditions));
+            MergedInvariantText = mergedInvariantText ?? throw new ArgumentNullException(nameof(mergedInvariantText));
+            MergeKind = mergeKind;
+        }
+
+        public IReadOnlyList<SymbolicInvariantCondition> Conditions { get; }
+
+        public int ConditionCount => Conditions.Count;
+
+        public string MergedInvariantText { get; }
+
+        public SymbolicInvariantMergeKind MergeKind { get; }
+
+        public bool IsTrivial => Conditions.Count == 0 && string.Equals(MergedInvariantText, "true", StringComparison.Ordinal);
+
+        public static SymbolicInvariantResult FromPathConditions(
+            IReadOnlyList<SmtFormula> pathConditions,
+            string? mergedInvariantText = null)
+        {
+            if (pathConditions == null)
+            {
+                throw new ArgumentNullException(nameof(pathConditions));
+            }
+
+            return new SymbolicInvariantResult(
+                pathConditions
+                    .Select(static (condition, index) => SymbolicInvariantCondition.FromFormula(index, condition))
+                    .ToArray(),
+                mergedInvariantText ?? SymbolicInvariantService.FormatMergedInvariant(pathConditions),
+                SymbolicInvariantMergeKind.Conjunction);
+        }
+
+        public static SymbolicInvariantResult FromFacts(
+            IReadOnlyList<string> facts,
+            string? mergedInvariantText = null,
+            SymbolicInvariantMergeKind mergeKind = SymbolicInvariantMergeKind.DistinctFactUnion)
+        {
+            if (facts == null)
+            {
+                throw new ArgumentNullException(nameof(facts));
+            }
+
+            return new SymbolicInvariantResult(
+                facts
+                    .Select(static (fact, index) => SymbolicInvariantCondition.FromText(index, fact))
+                    .ToArray(),
+                mergedInvariantText ?? SymbolicInvariantService.FormatMergedInvariantFacts(facts),
+                mergeKind);
+        }
+    }
+
+    public sealed class SymbolicInvariantCondition
+    {
+        private SymbolicInvariantCondition(
+            int index,
+            string text,
+            string formulaKind,
+            string valueKind,
+            bool hasSmtFormula)
+        {
+            Index = index;
+            Text = text ?? throw new ArgumentNullException(nameof(text));
+            FormulaKind = formulaKind ?? throw new ArgumentNullException(nameof(formulaKind));
+            ValueKind = valueKind ?? throw new ArgumentNullException(nameof(valueKind));
+            HasSmtFormula = hasSmtFormula;
+        }
+
+        public int Index { get; }
+
+        public string Text { get; }
+
+        public string FormulaKind { get; }
+
+        public string ValueKind { get; }
+
+        public bool HasSmtFormula { get; }
+
+        public static SymbolicInvariantCondition FromFormula(int index, SmtFormula formula)
+        {
+            if (formula == null)
+            {
+                throw new ArgumentNullException(nameof(formula));
+            }
+
+            return new SymbolicInvariantCondition(
+                index,
+                formula.ToString() ?? string.Empty,
+                GetFormulaKind(formula),
+                formula.Kind.ToString(),
+                hasSmtFormula: true);
+        }
+
+        public static SymbolicInvariantCondition FromText(int index, string text)
+        {
+            return new SymbolicInvariantCondition(
+                index,
+                text ?? string.Empty,
+                "Text",
+                "Unknown",
+                hasSmtFormula: false);
+        }
+
+        private static string GetFormulaKind(SmtFormula formula)
+        {
+            var name = formula.GetType().Name;
+            return name.EndsWith("Formula", StringComparison.Ordinal)
+                ? name.Substring(0, name.Length - "Formula".Length)
+                : name;
+        }
+    }
+
+    public enum SymbolicInvariantMergeKind
+    {
+        Conjunction,
+        DistinctFactUnion,
     }
 
     public sealed class SymbolicProgramPointQueryResult

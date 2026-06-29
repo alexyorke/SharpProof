@@ -4100,6 +4100,36 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesValueTuplePositionalPatternElementFact()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(ValueTuple<int, int> pair)
+    {
+        if (pair is (> 0, _))
+        {
+            return pair.Item1;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ValueTuplePositionalPatternElementFact.cs",
+                FindLine(source, "return pair.Item1;"),
+                20,
+                "pair.Item1 > 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNamedTupleElementAssignedNonZeroValue()
         {
             const string source = @"
@@ -5419,6 +5449,17 @@ public class TestClass
                     "ExtendedPatternBox box",
                     "box is { Child.Value: > 0 } && box.Child.Value <= 0",
                     ExtendedPropertyPatternSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_ValueTuplePositionalPatternContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "ValueTuple<int, int> pair",
+                    "pair is (_, < 10) && pair.Item2 >= 10",
+                    "using System;"),
                 Is.True);
         }
 

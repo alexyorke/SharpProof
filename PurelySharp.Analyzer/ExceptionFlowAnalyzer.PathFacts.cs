@@ -1786,9 +1786,18 @@ namespace PurelySharp.Analyzer
             {
                 case ReturnStatementSyntax:
                 case ThrowStatementSyntax:
+                case ContinueStatementSyntax:
+                case BreakStatementSyntax:
                     return true;
+                case YieldStatementSyntax yieldStatement:
+                    return yieldStatement.IsKind(SyntaxKind.YieldBreakStatement);
                 case BlockSyntax block:
-                    return block.Statements.LastOrDefault() is ReturnStatementSyntax or ThrowStatementSyntax;
+                    return block.Statements.LastOrDefault() is { } lastStatement &&
+                        StatementDefinitelyExits(lastStatement);
+                case IfStatementSyntax ifStatement:
+                    return StatementDefinitelyExits(ifStatement.Statement) &&
+                        ifStatement.Else?.Statement is { } elseStatement &&
+                        StatementDefinitelyExits(elseStatement);
                 default:
                     return false;
             }

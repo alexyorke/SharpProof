@@ -99,6 +99,8 @@ static void PrintFileResult(
     Console.WriteLine($"Lines with program points: {result.LinesWithProgramPoints}");
     Console.WriteLine($"Program points: {result.ProgramPointCount}");
     Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
+    Console.WriteLine($"Observed invariant merge: {result.ObservedInvariant.MergeKind}");
+    Console.WriteLine($"Observed invariant conditions: {result.ObservedInvariant.ConditionCount}");
     if (options.CheckReachability)
     {
         Console.WriteLine(
@@ -136,6 +138,8 @@ static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions o
     Console.WriteLine($"{result.FilePath}:{result.Line}");
     Console.WriteLine($"Program points: {result.ProgramPoints.Count}");
     Console.WriteLine($"Line merged invariant: {result.MergedInvariantText}");
+    Console.WriteLine($"Line invariant merge: {result.MergedInvariant.MergeKind}");
+    Console.WriteLine($"Line invariant conditions: {result.MergedInvariant.ConditionCount}");
     foreach (var point in result.ProgramPoints)
     {
         Console.WriteLine();
@@ -160,6 +164,8 @@ static void PrintPointResult(
 
     Console.WriteLine($"Node: {result.NodeKind}");
     Console.WriteLine($"Merged invariant: {result.MergedInvariantText}");
+    Console.WriteLine($"Invariant merge: {result.Invariant.MergeKind}");
+    Console.WriteLine($"Path conditions: {result.PathConditions.Count}");
     if (options.CheckReachability)
     {
         Console.WriteLine($"Reachability: {result.Reachability}");

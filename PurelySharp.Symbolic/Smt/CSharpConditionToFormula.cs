@@ -2762,6 +2762,14 @@ namespace PurelySharp.Symbolic.Smt
                         cancellationToken,
                         formulas,
                         getSymbolVersion);
+                    AddRecursiveTuplePositionalPatternBindingFacts(
+                        matchedValue,
+                        matchedValueType,
+                        recursivePattern,
+                        semanticModel,
+                        cancellationToken,
+                        formulas,
+                        getSymbolVersion);
                     if (designationValue != null &&
                         !Equals(designationValue, matchedValue))
                     {
@@ -2776,6 +2784,14 @@ namespace PurelySharp.Symbolic.Smt
                             getSymbolVersion);
                         AddRecursivePropertyPatternBindingFacts(
                             designationValue,
+                            recursivePattern,
+                            semanticModel,
+                            cancellationToken,
+                            formulas,
+                            getSymbolVersion);
+                        AddRecursiveTuplePositionalPatternBindingFacts(
+                            designationValue,
+                            matchedValueType,
                             recursivePattern,
                             semanticModel,
                             cancellationToken,
@@ -2930,6 +2946,46 @@ namespace PurelySharp.Symbolic.Smt
                     memberValue,
                     memberType,
                     subpattern.Pattern,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion);
+            }
+        }
+
+        private static void AddRecursiveTuplePositionalPatternBindingFacts(
+            SmtFormula matchedValue,
+            ITypeSymbol? matchedValueType,
+            RecursivePatternSyntax recursivePattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            var subpatterns = recursivePattern.PositionalPatternClause?.Subpatterns;
+            if (subpatterns == null)
+            {
+                return;
+            }
+
+            for (var position = 0; position < subpatterns.Value.Count; position++)
+            {
+                if (!TryResolveTuplePositionalSubpatternValue(
+                        matchedValue,
+                        matchedValueType,
+                        position,
+                        out var memberValue,
+                        out var memberType) ||
+                    memberValue == null ||
+                    memberType == null)
+                {
+                    continue;
+                }
+
+                AddPatternBindingFacts(
+                    memberValue,
+                    memberType,
+                    subpatterns.Value[position].Pattern,
                     semanticModel,
                     cancellationToken,
                     formulas,
@@ -3150,6 +3206,7 @@ namespace PurelySharp.Symbolic.Smt
 
                 if (TryTranslateRecursivePattern(
                         valueFormula,
+                        underlyingType,
                         recursivePattern,
                         semanticModel,
                         cancellationToken,
@@ -3370,7 +3427,7 @@ namespace PurelySharp.Symbolic.Smt
 
             if (pattern is RecursivePatternSyntax recursivePattern)
             {
-                return TryTranslateRecursivePattern(value, recursivePattern, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth);
+                return TryTranslateRecursivePattern(value, valueType, recursivePattern, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth);
             }
 
             if (pattern is ListPatternSyntax listPattern)
@@ -3402,6 +3459,7 @@ namespace PurelySharp.Symbolic.Smt
 
         private static bool TryTranslateRecursivePattern(
             SmtFormula value,
+            ITypeSymbol? valueType,
             RecursivePatternSyntax recursivePattern,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -3410,32 +3468,158 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth)
         {
             formula = null;
-            SmtFormula? current = value.Kind == SmtValueKind.Reference
+            SmtFormula? current = ShouldRequireRecursivePatternNonNull(value, valueType)
                 ? new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtNullConstant())
                 : null;
 
-            var subpatterns = recursivePattern.PropertyPatternClause?.Subpatterns;
-            if (subpatterns == null || subpatterns.Value.Count == 0)
+            var positionalSubpatterns = recursivePattern.PositionalPatternClause?.Subpatterns;
+            if (positionalSubpatterns != null)
             {
-                formula = current;
-                return formula != null;
+                for (var position = 0; position < positionalSubpatterns.Value.Count; position++)
+                {
+                    if (!TryTranslateTuplePositionalSubpattern(
+                            value,
+                            valueType,
+                            positionalSubpatterns.Value[position],
+                            position,
+                            semanticModel,
+                            cancellationToken,
+                            out var positionalFormula,
+                            getSymbolVersion,
+                            inlineDepth) ||
+                        positionalFormula == null)
+                    {
+                        return false;
+                    }
+
+                    current = Conjoin(current, positionalFormula);
+                }
             }
 
-            foreach (var subpattern in subpatterns.Value)
+            var propertySubpatterns = recursivePattern.PropertyPatternClause?.Subpatterns;
+            if (propertySubpatterns != null)
             {
-                if (!TryTranslatePropertySubpattern(value, subpattern, semanticModel, cancellationToken, out var subpatternFormula, getSymbolVersion, inlineDepth) ||
-                    subpatternFormula == null)
+                foreach (var subpattern in propertySubpatterns.Value)
                 {
-                    return false;
-                }
+                    if (!TryTranslatePropertySubpattern(value, subpattern, semanticModel, cancellationToken, out var subpatternFormula, getSymbolVersion, inlineDepth) ||
+                        subpatternFormula == null)
+                    {
+                        return false;
+                    }
 
-                current = current == null
-                    ? subpatternFormula
-                    : new SmtBinaryFormula(SmtBinaryOperator.And, current, subpatternFormula);
+                    current = Conjoin(current, subpatternFormula);
+                }
             }
 
             formula = current;
             return formula != null;
+        }
+
+        private static bool ShouldRequireRecursivePatternNonNull(SmtFormula value, ITypeSymbol? valueType)
+        {
+            return value.Kind == SmtValueKind.Reference &&
+                (valueType == null || valueType.IsReferenceType);
+        }
+
+        private static SmtFormula Conjoin(SmtFormula? left, SmtFormula right)
+        {
+            return left == null
+                ? right
+                : new SmtBinaryFormula(SmtBinaryOperator.And, left, right);
+        }
+
+        private static bool TryTranslateTuplePositionalSubpattern(
+            SmtFormula receiver,
+            ITypeSymbol? receiverType,
+            SubpatternSyntax subpattern,
+            int position,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!TryResolveTuplePositionalSubpatternValue(
+                    receiver,
+                    receiverType,
+                    position,
+                    out var memberValue,
+                    out var memberType) ||
+                memberValue == null ||
+                memberType == null)
+            {
+                return false;
+            }
+
+            return TryTranslatePattern(
+                memberValue,
+                subpattern.Pattern,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                memberType,
+                inlineDepth) &&
+                formula != null;
+        }
+
+        private static bool TryResolveTuplePositionalSubpatternValue(
+            SmtFormula receiver,
+            ITypeSymbol? receiverType,
+            int position,
+            out SmtFormula? memberValue,
+            out ITypeSymbol? memberType)
+        {
+            memberValue = null;
+            memberType = null;
+            if (!TryGetTuplePositionalField(receiverType, position, out var fieldSymbol) ||
+                !TryGetTupleElementStorageName(fieldSymbol, out var storageName) ||
+                !TryGetValueKind(fieldSymbol.Type, out var kind))
+            {
+                return false;
+            }
+
+            memberType = fieldSymbol.Type;
+            memberValue = new SmtVariable(GetFormulaVariableName(receiver) + "." + storageName, kind);
+            return true;
+        }
+
+        private static string GetFormulaVariableName(SmtFormula formula)
+        {
+            return formula is SmtVariable variable
+                ? variable.Name
+                : formula.ToString() ?? string.Empty;
+        }
+
+        private static bool TryGetTuplePositionalField(
+            ITypeSymbol? receiverType,
+            int position,
+            out IFieldSymbol fieldSymbol)
+        {
+            fieldSymbol = null!;
+            if (receiverType is not INamedTypeSymbol namedType)
+            {
+                return false;
+            }
+
+            if (namedType.IsTupleType)
+            {
+                if (position < 0 || position >= namedType.TupleElements.Length)
+                {
+                    return false;
+                }
+
+                fieldSymbol = namedType.TupleElements[position];
+                return true;
+            }
+
+            var storageName = "Item" + (position + 1).ToString(CultureInfo.InvariantCulture);
+            fieldSymbol = namedType
+                .GetMembers(storageName)
+                .OfType<IFieldSymbol>()
+                .FirstOrDefault(static field => !field.IsStatic)!;
+            return fieldSymbol != null;
         }
 
         private static bool TryTranslatePropertySubpattern(
@@ -4572,6 +4756,12 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (IsSupportedTupleCarrierType(type))
+            {
+                formula = new SmtVariable(GetVariableName(symbol, getSymbolVersion), SmtValueKind.Reference);
+                return true;
+            }
+
             return false;
         }
 
@@ -5485,9 +5675,7 @@ namespace PurelySharp.Symbolic.Smt
         private static bool TryGetTupleElementStorageName(IFieldSymbol fieldSymbol, out string storageName)
         {
             var tupleField = fieldSymbol.CorrespondingTupleField ?? fieldSymbol;
-            if (tupleField.Name.Length > 4 &&
-                tupleField.Name.StartsWith("Item", StringComparison.Ordinal) &&
-                tupleField.Name.Skip(4).All(char.IsDigit))
+            if (IsTupleElementStorageName(tupleField.Name))
             {
                 storageName = tupleField.Name;
                 return true;
@@ -5495,6 +5683,13 @@ namespace PurelySharp.Symbolic.Smt
 
             storageName = string.Empty;
             return false;
+        }
+
+        private static bool IsTupleElementStorageName(string name)
+        {
+            return name.Length > 4 &&
+                name.StartsWith("Item", StringComparison.Ordinal) &&
+                name.Skip(4).All(char.IsDigit);
         }
 
         private static bool TryCreateMemberFormula(
@@ -5539,7 +5734,8 @@ namespace PurelySharp.Symbolic.Smt
             };
 
             if (type == null ||
-                !TryGetValueKind(type, out var kind))
+                (!TryGetValueKind(type, out var kind) &&
+                 !TryGetTupleCarrierKind(type, out kind)))
             {
                 formula = null!;
                 return false;
@@ -5571,6 +5767,36 @@ namespace PurelySharp.Symbolic.Smt
 
             kind = default;
             return false;
+        }
+
+        private static bool TryGetTupleCarrierKind(ITypeSymbol type, out SmtValueKind kind)
+        {
+            if (IsSupportedTupleCarrierType(type))
+            {
+                kind = SmtValueKind.Reference;
+                return true;
+            }
+
+            kind = default;
+            return false;
+        }
+
+        private static bool IsSupportedTupleCarrierType(ITypeSymbol type)
+        {
+            if (type is not INamedTypeSymbol namedType)
+            {
+                return false;
+            }
+
+            if (namedType.IsTupleType && namedType.TupleElements.Length > 0)
+            {
+                return true;
+            }
+
+            return namedType
+                .GetMembers()
+                .OfType<IFieldSymbol>()
+                .Any(static field => !field.IsStatic && IsTupleElementStorageName(field.Name));
         }
 
         private static bool TryGetNullableUnderlyingType(ITypeSymbol? type, out ITypeSymbol underlyingType)

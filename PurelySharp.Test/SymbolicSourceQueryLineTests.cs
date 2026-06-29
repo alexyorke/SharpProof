@@ -48,6 +48,13 @@ public class TestClass
             Assert.That(summary.MergedInvariantText, Does.Contain("value"));
             Assert.That(result.Facts, Is.EquivalentTo(summary.Facts));
             Assert.That(result.MergedInvariantText, Is.EqualTo(summary.MergedInvariantText));
+            Assert.That(result.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion));
+            Assert.That(result.MergedInvariant.ConditionCount, Is.EqualTo(result.Facts.Count));
+            Assert.That(returnPoint.Invariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.Conjunction));
+            Assert.That(returnPoint.Invariant.MergedInvariantText, Is.EqualTo(returnPoint.MergedInvariantText));
+            Assert.That(returnPoint.PathConditions.Select(condition => condition.Text), Is.EquivalentTo(returnPoint.Facts));
+            Assert.That(returnPoint.PathConditions.All(condition => condition.HasSmtFormula), Is.True);
+            Assert.That(returnPoint.PathConditions.All(condition => !string.IsNullOrWhiteSpace(condition.FormulaKind)), Is.True);
         }
 
         [Test]
@@ -82,6 +89,8 @@ public class TestClass
             Assert.That(filtered.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
             Assert.That(filtered.Facts, Is.EquivalentTo(filtered.ProgramPoints.Single().Facts));
             Assert.That(filtered.MergedInvariantText, Is.EqualTo(filtered.ProgramPoints.Single().MergedInvariantText));
+            Assert.That(filtered.MergedInvariant.Conditions.Select(condition => condition.Text), Is.EquivalentTo(filtered.Facts));
+            Assert.That(filtered.MergedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion));
         }
 
         [Test]
@@ -106,6 +115,8 @@ public class TestClass
             Assert.That(summary.MergedInvariantText, Is.EqualTo("true"));
             Assert.That(result.Facts, Is.Empty);
             Assert.That(result.MergedInvariantText, Is.EqualTo("true"));
+            Assert.That(result.MergedInvariant.IsTrivial, Is.True);
+            Assert.That(result.MergedInvariant.ConditionCount, Is.Zero);
         }
 
         [Test]
@@ -145,6 +156,9 @@ public class TestClass
             Assert.That(result.ObservedFacts, Is.EquivalentTo(result.Lines.SelectMany(line => line.ProgramPoints).SelectMany(point => point.Facts).Distinct()));
             Assert.That(result.ObservedFactCount, Is.EqualTo(result.ObservedFacts.Count));
             Assert.That(result.ObservedFacts.Any(fact => fact.Contains("value", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.ObservedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion));
+            Assert.That(result.ObservedInvariant.ConditionCount, Is.EqualTo(result.ObservedFactCount));
+            Assert.That(result.ObservedInvariant.Conditions.Select(condition => condition.Text), Is.EquivalentTo(result.ObservedFacts));
             Assert.That(result.Reachability.ReachableCount, Is.EqualTo(result.ProgramPointCount));
             var proofSummary = result.ConditionProofs.Single(summary => summary.Condition == "value > 0");
             Assert.That(proofSummary.ProvenTrueCount, Is.GreaterThan(0));
@@ -192,6 +206,8 @@ public class TestClass
             Assert.That(filtered.Lines.SelectMany(line => line.ProgramPoints).All(point => point.Facts.Count != 0), Is.True);
             Assert.That(filtered.Reachability.ReachableCount, Is.EqualTo(filtered.ProgramPointCount));
             Assert.That(filtered.ObservedFacts, Is.EquivalentTo(filtered.Lines.SelectMany(line => line.ProgramPoints).SelectMany(point => point.Facts).Distinct()));
+            Assert.That(filtered.ObservedInvariant.ConditionCount, Is.EqualTo(filtered.ObservedFactCount));
+            Assert.That(filtered.ObservedInvariant.Conditions.Select(condition => condition.Text), Is.EquivalentTo(filtered.ObservedFacts));
             Assert.That(filtered.ConditionProofs.Single(summary => summary.Condition == "value > 0").ProvenTrueCount, Is.GreaterThan(0));
         }
 

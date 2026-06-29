@@ -7,7 +7,10 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Analyzer.Engine;
+using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
+using SearchLib.Purity;
+using SearchLib.Smt;
 
 namespace PurelySharp.Analyzer
 {
@@ -577,7 +580,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                if (tryStatement.Catches.Any(catchClause => CatchesException(catchClause, exceptionType, semanticModel, cancellationToken, smtAnalysis)))
+                if (tryStatement.Catches.Any(catchClause => CatchesException(catchClause, exceptionType, throwNode, semanticModel, cancellationToken, smtAnalysis)))
                 {
                     return true;
                 }
@@ -603,23 +606,25 @@ namespace PurelySharp.Analyzer
         private static bool CatchesException(
             CatchClauseSyntax catchClause,
             ITypeSymbol? exceptionType,
+            SyntaxNode exceptionSite,
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            if (catchClause.Filter != null)
+            if (!CatchDeclarationMatches(catchClause, exceptionType, semanticModel, cancellationToken))
             {
-                if (ExecutionVisibility.IsConditionAlwaysFalseUsingSmt(catchClause.Filter.FilterExpression, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    return false;
-                }
-
-                if (!ExecutionVisibility.IsConditionAlwaysTrueUsingSmt(catchClause.Filter.FilterExpression, semanticModel, cancellationToken, smtAnalysis))
-                {
-                    return false;
-                }
+                return false;
             }
 
+            return IsCatchFilterProvenTrueAtSite(catchClause, exceptionSite, semanticModel, cancellationToken, smtAnalysis);
+        }
+
+        private static bool CatchDeclarationMatches(
+            CatchClauseSyntax catchClause,
+            ITypeSymbol? exceptionType,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
             if (catchClause.Declaration == null)
             {
                 return true;
@@ -632,6 +637,65 @@ namespace PurelySharp.Analyzer
 
             var catchType = semanticModel.GetTypeInfo(catchClause.Declaration.Type, cancellationToken).Type;
             return catchType != null && IsSameOrDerivedFrom(exceptionType, catchType);
+        }
+
+        private static bool IsCatchFilterProvenTrueAtSite(
+            CatchClauseSyntax catchClause,
+            SyntaxNode exceptionSite,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (catchClause.Filter?.FilterExpression is not { } filterExpression)
+            {
+                return true;
+            }
+
+            var constantValue = semanticModel.GetConstantValue(filterExpression, cancellationToken);
+            if (constantValue.HasValue && constantValue.Value is bool booleanValue)
+            {
+                return booleanValue;
+            }
+
+            var pathConditions = CollectExceptionSitePathConditions(exceptionSite, semanticModel, cancellationToken);
+            CSharpConditionToFormula.TryCollectDomainFacts(filterExpression, semanticModel, cancellationToken, pathConditions);
+            if (!PathConditionsAreSatisfiable(pathConditions, smtAnalysis))
+            {
+                return false;
+            }
+
+            if (CSharpConditionToFormula.TryTranslate(filterExpression, semanticModel, cancellationToken, out var filterFormula) &&
+                filterFormula != null &&
+                smtAnalysis.PathConditionsImply(pathConditions, filterFormula))
+            {
+                return true;
+            }
+
+            var falseBranchConditions = pathConditions.ToList();
+            return CSharpConditionToFormula.TryCollectBranchAssumptions(
+                    filterExpression,
+                    branchWhenTrue: false,
+                    semanticModel,
+                    cancellationToken,
+                    falseBranchConditions) &&
+                !PathConditionsAreSatisfiable(falseBranchConditions, smtAnalysis);
+        }
+
+        private static List<SmtFormula> CollectExceptionSitePathConditions(
+            SyntaxNode exceptionSite,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var pathConditions = SymbolicProgramPointFacts.CollectPriorAssignmentFacts(exceptionSite, semanticModel, cancellationToken);
+            pathConditions.AddRange(SymbolicProgramPointFacts.CollectAncestorReachabilityConditions(exceptionSite, semanticModel, cancellationToken));
+            return pathConditions;
+        }
+
+        private static bool PathConditionsAreSatisfiable(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtAnalysisService smtAnalysis)
+        {
+            return smtAnalysis.ClassifyPathFeasibility(pathConditions).PathFeasibility != Feasibility.Unsatisfiable;
         }
 
         private static bool IsSameOrDerivedFrom(ITypeSymbol exceptionType, ITypeSymbol catchType)

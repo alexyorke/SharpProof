@@ -1663,13 +1663,209 @@ public class TestClass
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
 
+        [Test]
+        public async Task Ps0010_ContinueGuardZeroDivisor_ReportsDivideByZeroException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        for (var i = 0; i < 1; i++)
+        {
+            if (divisor != 0)
+            {
+                continue;
+            }
+
+            return 10 / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_ContinueGuardUpperBoundIndex_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        for (var i = 0; i < 1; i++)
+        {
+            if (index < values.Length)
+            {
+                continue;
+            }
+
+            return values[index];
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
+        public async Task Ps0010_BreakGuardNullReceiver_ReportsNullReferenceException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        while (true)
+        {
+            if (value != null)
+            {
+                break;
+            }
+
+            return value.Length;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_null_dereference"));
+        }
+
+        [Test]
+        public async Task Ps0010_CatchFilterTrueFromThrowSiteBranch_SuppressesException()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        try
+        {
+            if (divisor == 0)
+            {
+                throw new InvalidOperationException();
+            }
+
+            return 1;
+        }
+        catch (InvalidOperationException) when (divisor == 0)
+        {
+            return 0;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_CatchFilterUnknownAtThrowSite_DoesNotSuppressException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(bool enabled)
+    {
+        try
+        {
+            throw new InvalidOperationException();
+        }
+        catch (InvalidOperationException) when (enabled)
+        {
+            return 0;
+        }
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
+        public async Task Ps0011_CatchFilterTrueFromThrowSiteBranch_SuppressesExceptionSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        try
+        {
+            if (divisor == 0)
+            {
+                throw new InvalidOperationException();
+            }
+
+            return 1;
+        }
+        catch (InvalidOperationException) when (divisor == 0)
+        {
+            return 0;
+        }
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0011_CatchFilterUnknownAtThrowSite_ReportsExceptionSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(bool enabled)
+    {
+        try
+        {
+            throw new InvalidOperationException();
+        }
+        catch (InvalidOperationException) when (enabled)
+        {
+            return 0;
+        }
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
         private static async Task<Diagnostic> SingleExceptionDiagnosticAsync(string source)
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(source);
             return diagnostics.Single(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId);
         }
 
-        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(string source)
+        private static async Task<ImmutableArray<Diagnostic>> GetAnalyzerDiagnosticsAsync(
+            string source,
+            bool reportExceptions = true,
+            bool checkedExceptions = false)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var references = GetTrustedPlatformReferences()
@@ -1683,9 +1879,9 @@ public class TestClass
 
             var analyzerOptions = new AnalyzerOptions(
                 ImmutableArray<AdditionalText>.Empty,
-                new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty.Add(
-                    "purelysharp_report_exceptions",
-                    "true")));
+                new TestAnalyzerConfigOptionsProvider(ImmutableDictionary<string, string>.Empty
+                    .Add("purelysharp_report_exceptions", reportExceptions ? "true" : "false")
+                    .Add("purelysharp_checked_exceptions", checkedExceptions ? "true" : "false")));
 
             var compilationWithAnalyzers = compilation.WithAnalyzers(
                 ImmutableArray.Create<DiagnosticAnalyzer>(new PurelySharpAnalyzer()),

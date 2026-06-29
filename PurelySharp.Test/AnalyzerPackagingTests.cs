@@ -441,6 +441,9 @@ namespace TestNamespace {
             Assert.That(source, Does.Contain("options.CreateSmtOptions()"));
             Assert.That(source, Does.Contain("Merged invariant"));
             Assert.That(source, Does.Contain("Line merged invariant"));
+            Assert.That(source, Does.Contain("Invariant merge"));
+            Assert.That(source, Does.Contain("Path conditions"));
+            Assert.That(source, Does.Contain("Observed invariant merge"));
             Assert.That(source, Does.Contain("Observed distinct facts"));
             Assert.That(source, Does.Contain("Reachability summary"));
             Assert.That(source, Does.Contain("Lines with program points"));
