@@ -202,7 +202,8 @@ namespace SearchLib.Purity
             string unknownReason)
         {
             var normalizedPathConditions = pathConditions.ToArray();
-            var pathFeasibility = _solver.IsSatisfiable(normalizedPathConditions, timeout);
+            var (pathFeasibility, impurityFeasibility) =
+                _solver.CheckPathAndImpurity(normalizedPathConditions, impurityCondition, timeout);
             if (pathFeasibility == Feasibility.Unsatisfiable)
             {
                 return new PurityProofResult(
@@ -221,8 +222,6 @@ namespace SearchLib.Purity
                     "path_feasibility_unknown");
             }
 
-            var combinedConditions = normalizedPathConditions.Concat(new[] { impurityCondition });
-            var impurityFeasibility = _solver.IsSatisfiable(combinedConditions, timeout);
             return impurityFeasibility switch
             {
                 Feasibility.Unsatisfiable => new PurityProofResult(

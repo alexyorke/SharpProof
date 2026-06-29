@@ -9,7 +9,7 @@ namespace PurelySharp.Test
     public class UriTests
     {
         [Test]
-        public async Task UriIsWellFormedUriString_Diagnostic()
+        public async Task UriIsWellFormedUriString_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -18,7 +18,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(string value)
+    public bool TestMethod(string value)
     {
         return Uri.IsWellFormedUriString(value, UriKind.Absolute);
     }
@@ -28,7 +28,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task UriEscapeAndUnescapeDataString_Diagnostic()
+        public async Task UriEscapeAndUnescapeDataString_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -37,7 +37,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string {|PS0002:TestMethod|}(string value)
+    public string TestMethod(string value)
     {
         return Uri.UnescapeDataString(Uri.EscapeDataString(value));
     }

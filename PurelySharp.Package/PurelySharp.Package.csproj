@@ -46,6 +46,7 @@
       <TfmSpecificPackageFile Include="..\PurelySharp.Analyzer\bin\$(Configuration)\netstandard2.0\Microsoft.Z3.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="..\PurelySharp.Analyzer\bin\$(Configuration)\netstandard2.0\libz3.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="..\PurelySharp.CodeFixes\bin\$(Configuration)\netstandard2.0\PurelySharp.CodeFixes.dll" PackagePath="analyzers/dotnet/cs" />
+      <TfmSpecificPackageFile Include="..\PurelySharp.Attributes\bin\$(Configuration)\netstandard2.0\PurelySharp.Attributes.dll" PackagePath="analyzers/dotnet/cs" />
       <TfmSpecificPackageFile Include="..\PurelySharp.Attributes\bin\$(Configuration)\netstandard2.0\PurelySharp.Attributes.dll" PackagePath="lib/netstandard2.0" />
     </ItemGroup>
   </Target>

@@ -68,6 +68,16 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return formattableStringResult;
             }
 
+            if (TryCheckCompilerGeneratedInterpolatedStringHandlerPurity(invocationOperation, context, currentState, out var interpolatedStringHandlerResult))
+            {
+                return interpolatedStringHandlerResult;
+            }
+
+            if (TryCheckUnsafeReadUnalignedPurity(invocationOperation, context, currentState, out var unsafeReadUnalignedResult))
+            {
+                return unsafeReadUnalignedResult;
+            }
+
             if (IsCompilerGeneratedArrayForeachInvocation(invocationOperation, context))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] Compiler-generated array foreach member is treated as pure.");
@@ -190,25 +200,31 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     invokedMethodSymbol);
             }
 
-            if (invokedMethodSymbol.IsExtensionMethod &&
-                SymbolEqualityComparer.Default.Equals(invokedMethodSymbol.ContainingType?.OriginalDefinition, context.SemanticModel.Compilation.GetTypeByMetadataName("System.Linq.Enumerable")))
+            if (IsLinqEnumerableInvocation(invokedMethodSymbol, context.SemanticModel.Compilation))
             {
                 PurityAnalysisEngine.LogDebug($"  [MIR] Detected LINQ Enumerable extension method: {invokedMethodSymbol.Name}. Checking source and delegate arguments.");
 
 
 
 
-                if (invocationOperation.Arguments.Length > 0)
+                var sourceOperation = invocationOperation.Instance;
+                var firstRemainingArgumentIndex = 0;
+                if (sourceOperation == null && invocationOperation.Arguments.Length > 0)
                 {
-                    var sourceArgument = invocationOperation.Arguments[0];
-                    if (IsImmediateFreshArrayLinqSource(sourceArgument.Value, context.SemanticModel.Compilation))
+                    sourceOperation = invocationOperation.Arguments[0].Value;
+                    firstRemainingArgumentIndex = 1;
+                }
+
+                if (sourceOperation != null)
+                {
+                    if (IsImmediateFreshArrayLinqSource(sourceOperation, context.SemanticModel.Compilation))
                     {
                         PurityAnalysisEngine.LogDebug("  [MIR]   LINQ source is an immediate reviewed fresh array producer; skipping conservative source re-analysis.");
                     }
                     else
                     {
-                    PurityAnalysisEngine.LogDebug($"  [MIR]   Checking LINQ source argument purity: {sourceArgument.Value.Kind}");
-                    var sourceResult = PurityAnalysisEngine.CheckSingleOperation(sourceArgument.Value, context, currentState);
+                    PurityAnalysisEngine.LogDebug($"  [MIR]   Checking LINQ source argument purity: {sourceOperation.Kind}");
+                    var sourceResult = PurityAnalysisEngine.CheckSingleOperation(sourceOperation, context, currentState);
 
                     if (!sourceResult.IsPure)
                     {
@@ -217,7 +233,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         return sourceResult;
                     }
 
-                    var sourceEnumeratorResult = CheckLinqSourceEnumeratorPurity(sourceArgument.Value, context, currentState);
+                    var sourceEnumeratorResult = CheckLinqSourceEnumeratorPurity(sourceOperation, context, currentState);
                     if (!sourceEnumeratorResult.IsPure)
                     {
                         PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (LINQ source GetEnumerator was impure)");
@@ -227,19 +243,26 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 }
                 else
                 {
-                    PurityAnalysisEngine.LogDebug($"  [MIR]   WARNING: LINQ method {invokedMethodSymbol.Name} called with no arguments? Assuming impure.");
-                    return PurityAnalysisEngine.PurityAnalysisResult.Impure(
-                        invocationOperation.Syntax,
-                        PurityAnalysisEngine.PurityEvidence.Create(
-                            "unsupported_operation",
-                            nameof(MethodInvocationPurityRule),
-                            invocationOperation,
-                            symbol: invokedMethodSymbol));
+                    if (IsLinqSourceLessFactory(invokedMethodSymbol))
+                    {
+                        PurityAnalysisEngine.LogDebug($"  [MIR]   LINQ source-less factory method {invokedMethodSymbol.Name}; checking factory arguments only.");
+                    }
+                    else
+                    {
+                        PurityAnalysisEngine.LogDebug($"  [MIR]   WARNING: LINQ method {invokedMethodSymbol.Name} called with no enumerable source. Assuming impure.");
+                        return PurityAnalysisEngine.PurityAnalysisResult.Impure(
+                            invocationOperation.Syntax,
+                            PurityAnalysisEngine.PurityEvidence.Create(
+                                "unsupported_operation",
+                                nameof(MethodInvocationPurityRule),
+                                invocationOperation,
+                                symbol: invokedMethodSymbol));
+                    }
                 }
 
 
                 PurityAnalysisEngine.LogDebug("  [MIR]   LINQ source was pure. Checking remaining arguments...");
-                for (int argumentIndex = 1; argumentIndex < invocationOperation.Arguments.Length; argumentIndex++)
+                for (int argumentIndex = firstRemainingArgumentIndex; argumentIndex < invocationOperation.Arguments.Length; argumentIndex++)
                 {
                     var argument = invocationOperation.Arguments[argumentIndex];
                     var parameter = argument.Parameter;
@@ -730,6 +753,65 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 calleePurity.Evidence.CatalogSource.StartsWith("fresh_mutable_object_", StringComparison.Ordinal);
         }
 
+        private static bool TryCheckCompilerGeneratedInterpolatedStringHandlerPurity(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            if (!IsDefaultInterpolatedStringHandlerInvocation(invocationOperation))
+            {
+                return false;
+            }
+
+            if (ContainsFormattedOrAlignedInterpolation(invocationOperation.Syntax))
+            {
+                return false;
+            }
+
+            result = CheckPureViewInvocationInputs(invocationOperation, context, currentState);
+            if (result.IsPure)
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] Compiler-generated interpolated-string handler invocation is treated as pure.");
+            }
+
+            return true;
+        }
+
+        private static bool IsDefaultInterpolatedStringHandlerInvocation(IInvocationOperation invocationOperation)
+        {
+            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
+            if (targetMethod == null)
+            {
+                return false;
+            }
+
+            var containingType = targetMethod.ContainingType?.OriginalDefinition.ToDisplayString();
+            if (!string.Equals(containingType, "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            return targetMethod.Name is "AppendLiteral" or "AppendFormatted" or "ToStringAndClear";
+        }
+
+        private static bool ContainsFormattedOrAlignedInterpolation(SyntaxNode syntax)
+        {
+            var interpolatedString = syntax.AncestorsAndSelf()
+                .OfType<InterpolatedStringExpressionSyntax>()
+                .FirstOrDefault();
+            if (interpolatedString == null)
+            {
+                return false;
+            }
+
+            return interpolatedString.Contents
+                .OfType<InterpolationSyntax>()
+                .Any(interpolation => interpolation.AlignmentClause != null || interpolation.FormatClause != null);
+        }
+
         private static bool IsUntrustedMetadataOnlyMethod(IMethodSymbol methodSymbol)
         {
             if (methodSymbol.DeclaringSyntaxReferences.Length > 0 || methodSymbol.IsAbstract)
@@ -910,13 +992,84 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return !methodSymbol.IsSealed;
         }
 
+        private static bool IsLinqEnumerableInvocation(IMethodSymbol methodSymbol, Compilation compilation)
+        {
+            var enumerableType = compilation.GetTypeByMetadataName("System.Linq.Enumerable");
+            var definition = GetExtensionDefinition(methodSymbol);
+            return enumerableType != null &&
+                SymbolEqualityComparer.Default.Equals(definition.ContainingType?.OriginalDefinition, enumerableType);
+        }
+
+        private static bool IsLinqSourceLessFactory(IMethodSymbol methodSymbol)
+        {
+            var definition = GetExtensionDefinition(methodSymbol);
+            return definition.ContainingType?.OriginalDefinition.ToDisplayString() == "System.Linq.Enumerable" &&
+                definition.Name is "Empty" or "Range" or "Repeat";
+        }
+
+        private static IMethodSymbol GetExtensionDefinition(IMethodSymbol methodSymbol)
+        {
+            return methodSymbol.ReducedFrom ?? methodSymbol;
+        }
+
         internal static bool ShouldDeferToSpecializedDispatchPurity(IMethodSymbol methodSymbol)
         {
             return TryGetDefaultComparisonCollectionKeyType(methodSymbol, out _) ||
                 TryGetDefaultEqualityCollectionElementType(methodSymbol, out _, out _) ||
+                IsLinqDefaultEqualityDispatchMethod(methodSymbol) ||
+                IsLinqDefaultComparisonDispatchMethod(methodSymbol) ||
+                IsNullableDefaultDispatchMethod(methodSymbol) ||
+                IsMemoryExtensionsDefaultEqualityDispatchMethod(methodSymbol) ||
                 IsHashCodeCombineMethod(methodSymbol) ||
                 TryGetEqualityComparerElementType(methodSymbol, out _) ||
                 TryGetComparerElementType(methodSymbol, out _);
+        }
+
+        private static bool IsLinqDefaultEqualityDispatchMethod(IMethodSymbol methodSymbol)
+        {
+            var definition = GetExtensionDefinition(methodSymbol);
+            return definition.ContainingType?.OriginalDefinition.ToDisplayString() == "System.Linq.Enumerable" &&
+                definition.Name is "Contains" or "SequenceEqual" or "Distinct" or "Except" or "Intersect" or "Union" or
+                    "GroupBy" or "ToLookup" or "Join" or "GroupJoin";
+        }
+
+        private static bool IsLinqDefaultComparisonDispatchMethod(IMethodSymbol methodSymbol)
+        {
+            var definition = GetExtensionDefinition(methodSymbol);
+            return definition.ContainingType?.OriginalDefinition.ToDisplayString() == "System.Linq.Enumerable" &&
+                definition.Name is "OrderBy" or "OrderByDescending" or "ThenBy" or "ThenByDescending" or "Min" or "Max";
+        }
+
+        private static bool IsNullableDefaultDispatchMethod(IMethodSymbol methodSymbol)
+        {
+            var definition = methodSymbol.OriginalDefinition;
+            return definition.ContainingType?.ToDisplayString() == "System.Nullable" &&
+                definition.Name is "Compare" or "Equals";
+        }
+
+        private static bool IsMemoryExtensionsDefaultEqualityDispatchMethod(IMethodSymbol methodSymbol)
+        {
+            var definition = GetExtensionDefinition(methodSymbol);
+            return definition.ContainingType?.OriginalDefinition.ToDisplayString() == "System.MemoryExtensions" &&
+                definition.Name is "SequenceEqual" or "Contains" or "IndexOf" or "LastIndexOf" or "StartsWith" or "EndsWith";
+        }
+
+        private static bool TryCheckUnsafeReadUnalignedPurity(
+            IInvocationOperation invocationOperation,
+            PurityAnalysisContext context,
+            PurityAnalysisEngine.PurityAnalysisState currentState,
+            out PurityAnalysisEngine.PurityAnalysisResult result)
+        {
+            result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
+
+            var methodSymbol = invocationOperation.TargetMethod?.OriginalDefinition;
+            if (methodSymbol?.Name != "ReadUnaligned" ||
+                methodSymbol.ContainingType?.ToDisplayString() != "System.Runtime.CompilerServices.Unsafe")
+            {
+                return false;
+            }
+
+            return EnsureInvocationOperandsArePure(invocationOperation, context, currentState, out result);
         }
 
         private static bool IsPureOutArgumentTarget(IOperation? operation)
@@ -1490,22 +1643,22 @@ namespace PurelySharp.Analyzer.Engine.Rules
             result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
             var methodSymbol = invocationOperation.TargetMethod;
-            if (methodSymbol.ContainingType?.ToDisplayString() != "System.Nullable" ||
-                !methodSymbol.IsGenericMethod ||
-                methodSymbol.TypeArguments.Length != 1 ||
-                methodSymbol.Parameters.Length != 2)
+            var definition = methodSymbol.OriginalDefinition;
+            if (definition.ContainingType?.ToDisplayString() != "System.Nullable" ||
+                definition.Name is not ("Compare" or "Equals") ||
+                methodSymbol.TypeArguments.Length != 1)
             {
                 return false;
             }
 
             var valueType = methodSymbol.TypeArguments[0];
-            if (methodSymbol.Name == "Compare")
+            if (definition.Name == "Compare")
             {
                 result = CheckDefaultComparisonDispatchPurity(valueType, invocationOperation, context);
                 return true;
             }
 
-            if (methodSymbol.Name == "Equals")
+            if (definition.Name == "Equals")
             {
                 result = CheckDefaultEqualityDispatchPurity(valueType, invocationOperation, context);
                 return true;
@@ -1908,13 +2061,14 @@ namespace PurelySharp.Analyzer.Engine.Rules
         {
             comparisonType = null!;
 
-            if (methodSymbol.ContainingType?.OriginalDefinition.ToDisplayString() != "System.Linq.Enumerable" ||
-                methodSymbol.Name is not ("OrderBy" or "OrderByDescending" or "ThenBy" or "ThenByDescending" or "Min" or "Max"))
+            var definition = GetExtensionDefinition(methodSymbol);
+            if (definition.ContainingType?.OriginalDefinition.ToDisplayString() != "System.Linq.Enumerable" ||
+                definition.Name is not ("OrderBy" or "OrderByDescending" or "ThenBy" or "ThenByDescending" or "Min" or "Max"))
             {
                 return false;
             }
 
-            if (methodSymbol.Name is "Min" or "Max")
+            if (definition.Name is "Min" or "Max")
             {
                 if (methodSymbol.TypeArguments.Length != 1)
                 {
@@ -1936,11 +2090,9 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static bool IsLinqDefaultComparisonOverload(IInvocationOperation invocationOperation)
         {
-            var methodSymbol = invocationOperation.TargetMethod;
-            if (TryGetComparerArgumentIndex(methodSymbol, out var comparerArgumentIndex))
+            if (TryGetComparerArgument(invocationOperation, out var comparerArgument))
             {
-                return invocationOperation.Arguments.Length > comparerArgumentIndex &&
-                    IsNullOrDefaultComparerArgument(invocationOperation.Arguments[comparerArgumentIndex]);
+                return IsNullOrDefaultComparerArgument(comparerArgument);
             }
 
             return true;
@@ -1952,12 +2104,13 @@ namespace PurelySharp.Analyzer.Engine.Rules
         {
             equalityType = null!;
 
-            if (methodSymbol.ContainingType?.OriginalDefinition.ToDisplayString() != "System.Linq.Enumerable")
+            var definition = GetExtensionDefinition(methodSymbol);
+            if (definition.ContainingType?.OriginalDefinition.ToDisplayString() != "System.Linq.Enumerable")
             {
                 return false;
             }
 
-            if (methodSymbol.Name is "GroupBy" or "ToLookup")
+            if (definition.Name is "GroupBy" or "ToLookup")
             {
                 if (methodSymbol.TypeArguments.Length < 2)
                 {
@@ -1968,7 +2121,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return true;
             }
 
-            if (methodSymbol.Name is "Join" or "GroupJoin")
+            if (definition.Name is "Join" or "GroupJoin")
             {
                 if (methodSymbol.TypeArguments.Length < 3)
                 {
@@ -1979,7 +2132,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return true;
             }
 
-            if (methodSymbol.Name is not ("Contains" or "SequenceEqual" or "Distinct" or "Except" or "Intersect" or "Union") ||
+            if (definition.Name is not ("Contains" or "SequenceEqual" or "Distinct" or "Except" or "Intersect" or "Union") ||
                 methodSymbol.TypeArguments.Length != 1)
             {
                 return false;
@@ -1991,14 +2144,44 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
         private static bool IsLinqDefaultEqualityOverload(IInvocationOperation invocationOperation)
         {
-            var methodSymbol = invocationOperation.TargetMethod;
-            if (TryGetEqualityComparerArgumentIndex(methodSymbol, out var comparerArgumentIndex))
+            if (TryGetEqualityComparerArgument(invocationOperation, out var comparerArgument))
             {
-                return invocationOperation.Arguments.Length > comparerArgumentIndex &&
-                    IsNullOrDefaultComparerArgument(invocationOperation.Arguments[comparerArgumentIndex]);
+                return IsNullOrDefaultComparerArgument(comparerArgument);
             }
 
             return true;
+        }
+
+        private static bool TryGetComparerArgument(
+            IInvocationOperation invocationOperation,
+            out IArgumentOperation comparerArgument)
+        {
+            return TryGetArgumentByParameterType(invocationOperation, IsComparerType, out comparerArgument);
+        }
+
+        private static bool TryGetEqualityComparerArgument(
+            IInvocationOperation invocationOperation,
+            out IArgumentOperation comparerArgument)
+        {
+            return TryGetArgumentByParameterType(invocationOperation, IsEqualityComparerType, out comparerArgument);
+        }
+
+        private static bool TryGetArgumentByParameterType(
+            IInvocationOperation invocationOperation,
+            Func<ITypeSymbol?, bool> matchesParameterType,
+            out IArgumentOperation matchingArgument)
+        {
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (matchesParameterType(argument.Parameter?.Type))
+                {
+                    matchingArgument = argument;
+                    return true;
+                }
+            }
+
+            matchingArgument = null!;
+            return false;
         }
 
         private static bool TryGetComparerArgumentIndex(
@@ -2474,19 +2657,19 @@ namespace PurelySharp.Analyzer.Engine.Rules
             result = PurityAnalysisEngine.PurityAnalysisResult.Pure;
 
             var methodSymbol = invocationOperation.TargetMethod;
-            if (methodSymbol.ContainingType?.OriginalDefinition.ToDisplayString() != "System.MemoryExtensions" ||
-                methodSymbol.Name is not ("SequenceEqual" or "Contains" or "IndexOf" or "LastIndexOf" or "StartsWith" or "EndsWith") ||
-                methodSymbol.Parameters.Length != 2)
+            var definition = GetExtensionDefinition(methodSymbol);
+            if (definition.ContainingType?.OriginalDefinition.ToDisplayString() != "System.MemoryExtensions" ||
+                definition.Name is not ("SequenceEqual" or "Contains" or "IndexOf" or "LastIndexOf" or "StartsWith" or "EndsWith"))
             {
                 return false;
             }
 
-            if (methodSymbol.TypeArguments.Length < 1)
+            var elementType = GetFirstTypeArgument(methodSymbol) ?? GetFirstTypeArgument(definition);
+            if (elementType == null)
             {
                 return false;
             }
 
-            var elementType = methodSymbol.TypeArguments[0];
             if (elementType.TypeKind == TypeKind.TypeParameter)
             {
                 return false;
@@ -2494,6 +2677,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             result = CheckDefaultEqualityDispatchPurity(elementType, invocationOperation, context);
             return true;
+        }
+
+        private static ITypeSymbol? GetFirstTypeArgument(IMethodSymbol methodSymbol)
+        {
+            return methodSymbol.TypeArguments.Length > 0 ? methodSymbol.TypeArguments[0] : null;
         }
 
         private static bool TryCheckHashCodeCombineDispatchPurity(
@@ -3528,7 +3716,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 {
                     if (hasExactReceiverType)
                     {
-                        var exactImplementation = knownReceiverType.FindImplementationForInterfaceMember(interfaceImplementationTarget) as IMethodSymbol;
+                        var exactImplementation = ResolveKnownInterfaceImplementation(knownReceiverType, interfaceImplementationTarget);
                         if (exactImplementation != null)
                         {
                             targets.Add(exactImplementation.OriginalDefinition);
@@ -3543,7 +3731,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
                     if (IsAllocationOnlyInterfaceReceiver(invocationInstance))
                     {
-                        var implementation = knownReceiverType.FindImplementationForInterfaceMember(interfaceImplementationTarget) as IMethodSymbol;
+                        var implementation = ResolveKnownInterfaceImplementation(knownReceiverType, interfaceImplementationTarget);
                         if (implementation != null)
                         {
                             targets.Add(implementation.OriginalDefinition);
@@ -3559,7 +3747,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     if (knownReceiverType.TypeKind == TypeKind.Struct ||
                         (knownReceiverType.TypeKind == TypeKind.Class && knownReceiverType.IsSealed))
                     {
-                        var implementation = knownReceiverType.FindImplementationForInterfaceMember(interfaceImplementationTarget) as IMethodSymbol;
+                        var implementation = ResolveKnownInterfaceImplementation(knownReceiverType, interfaceImplementationTarget);
                         if (implementation != null)
                         {
                             targets.Add(implementation.OriginalDefinition);
@@ -3601,7 +3789,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
                              type.TypeKind == TypeKind.Struct ||
                              type.TypeKind == TypeKind.Class))
                         {
-                            var implementation = type.FindImplementationForInterfaceMember(target) as IMethodSymbol;
+                            var implementation = ResolveKnownInterfaceImplementation(type, target);
                             if (implementation != null)
                             {
                                 targets.Add(implementation.OriginalDefinition);
@@ -3626,7 +3814,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
                     if (type.Kind == SymbolKind.NamedType && (type.TypeKind == TypeKind.Interface || type.TypeKind == TypeKind.Struct || type.TypeKind == TypeKind.Class))
                     {
-                        var implementation = type.FindImplementationForInterfaceMember(target) as IMethodSymbol;
+                        var implementation = ResolveKnownInterfaceImplementation(type, target);
                         if (implementation != null)
                         {
                             targets.Add(implementation.OriginalDefinition);
@@ -3705,6 +3893,56 @@ namespace PurelySharp.Analyzer.Engine.Rules
             return targets;
         }
 
+        private static IMethodSymbol? ResolveKnownInterfaceImplementation(
+            INamedTypeSymbol receiverType,
+            IMethodSymbol interfaceMethod)
+        {
+            var implementation = receiverType.FindImplementationForInterfaceMember(interfaceMethod) as IMethodSymbol;
+            if (implementation != null)
+            {
+                return implementation;
+            }
+
+            if (receiverType.TypeKind != TypeKind.Interface)
+            {
+                return null;
+            }
+
+            foreach (var member in receiverType.GetMembers(interfaceMethod.Name))
+            {
+                if (member is IMethodSymbol candidate &&
+                    HasMethodBody(candidate) &&
+                    HasMatchingSignature(candidate, interfaceMethod))
+                {
+                    return candidate;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool HasMatchingSignature(IMethodSymbol candidate, IMethodSymbol interfaceMethod)
+        {
+            if (candidate.Parameters.Length != interfaceMethod.Parameters.Length ||
+                !SymbolEqualityComparer.Default.Equals(candidate.ReturnType, interfaceMethod.ReturnType))
+            {
+                return false;
+            }
+
+            for (var i = 0; i < candidate.Parameters.Length; i++)
+            {
+                var candidateParameter = candidate.Parameters[i];
+                var interfaceParameter = interfaceMethod.Parameters[i];
+                if (candidateParameter.RefKind != interfaceParameter.RefKind ||
+                    !SymbolEqualityComparer.Default.Equals(candidateParameter.Type, interfaceParameter.Type))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         private static IMethodSymbol? ResolveDispatchTargetForSealedReceiver(IMethodSymbol targetMethod, INamedTypeSymbol sealedReceiverType)
         {
             for (var type = sealedReceiverType; type != null; type = type.BaseType)
@@ -3747,6 +3985,13 @@ namespace PurelySharp.Analyzer.Engine.Rules
             if (interfaceSymbol == null)
             {
                 return false;
+            }
+
+            if (SymbolEqualityComparer.Default.Equals(
+                    type.OriginalDefinition,
+                    interfaceSymbol.OriginalDefinition))
+            {
+                return true;
             }
 
             return type.AllInterfaces.Any(
@@ -3844,7 +4089,7 @@ namespace PurelySharp.Analyzer.Engine.Rules
             out INamedTypeSymbol? targetType)
         {
             if (operation is IConversionOperation conversion &&
-                conversion.Syntax.IsKind(SyntaxKind.AsExpression))
+                IsAsConversionSyntax(conversion.Syntax))
             {
                 operand = conversion.Operand;
                 targetType = conversion.Type as INamedTypeSymbol;
@@ -3854,6 +4099,17 @@ namespace PurelySharp.Analyzer.Engine.Rules
             operand = null;
             targetType = null;
             return false;
+        }
+
+        private static bool IsAsConversionSyntax(SyntaxNode syntax)
+        {
+            if (syntax.IsKind(SyntaxKind.AsExpression))
+            {
+                return true;
+            }
+
+            return syntax.DescendantNodesAndSelf()
+                .Any(node => node.IsKind(SyntaxKind.AsExpression));
         }
 
         private static string GetCatalogHitCategory(ISymbol symbol) =>

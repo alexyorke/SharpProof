@@ -77,6 +77,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     context.SemanticModel.Compilation,
                     out var generatedPurity);
 
+                if (fieldSymbol.IsReadOnly && IsStableStaticBclValueField(fieldSymbol))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Static readonly field '{fieldSymbol.Name}' is a stable BCL value. Assuming Pure.");
+                    return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                }
+
                 var staticCtorResult = PurityAnalysisEngine.CheckStaticConstructorPurity(fieldSymbol.ContainingType, context, currentState);
                 if (!staticCtorResult.IsPure)
                 {
@@ -242,6 +248,31 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             PurityAnalysisEngine.LogDebug($"    [FieldRefRule] Unhandled case for field '{fieldSymbol.Name}'. Assuming Impure.");
             return PurityAnalysisEngine.PurityAnalysisResult.Impure(fieldReferenceOperation.Syntax);
+        }
+
+        private static bool IsStableStaticBclValueField(IFieldSymbol fieldSymbol)
+        {
+            if (!fieldSymbol.IsStatic || !fieldSymbol.IsReadOnly)
+            {
+                return false;
+            }
+
+            var containingType = fieldSymbol.ContainingType?.OriginalDefinition.ToDisplayString();
+            var name = fieldSymbol.Name;
+
+            return containingType switch
+            {
+                "System.Guid" => name is "Empty",
+                "System.TimeSpan" => name is "Zero" or "MinValue" or "MaxValue",
+                "System.DateTime" => name is "MinValue" or "MaxValue" or "UnixEpoch",
+                "System.DateTimeOffset" => name is "MinValue" or "MaxValue" or "UnixEpoch",
+                "System.EventArgs" => name is "Empty",
+                "System.DBNull" => name is "Value",
+                "System.Reflection.Missing" => name is "Value",
+                "System.Net.IPAddress" => name is "Any" or "Broadcast" or "Loopback" or "None" or "IPv6Any" or "IPv6Loopback" or "IPv6None",
+                "System.Net.Http.HttpVersion" => name.StartsWith("Version", StringComparison.Ordinal),
+                _ => false,
+            };
         }
 
         private static PurityAnalysisEngine.PurityAnalysisResult ImpureFieldRead(

@@ -27,7 +27,7 @@ public class SimplePoco
 ";
 
         [Test]
-        public async Task JsonSerializePoco_GetterSuggestionsOnly()
+        public async Task JsonSerializePoco_GetterSuggestionsAndSerializeDiagnostic()
         {
             var test = TestSetup + @"
 
@@ -36,7 +36,7 @@ public class TestClass
     [EnforcePure]
     public string TestMethod(SimplePoco poco)
     {
-        // Current analyzer behavior treats this serialization path as pure and only surfaces the POCO getter suggestions.
+        // Serialization remains conservative; only simple POCO getter access is suggested separately.
         return JsonSerializer.Serialize(poco);
     }
 }";
@@ -51,8 +51,11 @@ public class TestClass
             var expectedGetterName = VerifyCS.Diagnostic(PurelySharpDiagnostics.MissingEnforcePureAttributeId)
                                             .WithSpan(10, 20, 10, 24)
                                             .WithArguments("get_Name");
+            var expectedSerialize = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedId)
+                                            .WithSpan(17, 19, 17, 29)
+                                            .WithArguments("TestMethod");
 
-            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetterId, expectedGetterName);
+            await VerifyCS.VerifyAnalyzerAsync(test, expectedGetterId, expectedGetterName, expectedSerialize);
         }
 
         [Test]

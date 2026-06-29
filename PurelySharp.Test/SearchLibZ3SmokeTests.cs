@@ -71,6 +71,22 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_UnsupportedRegexWithoutConcreteInput_ReturnsUnknown()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, "("),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
         public void SmtSolver_AffineGuardImpliesExactValue_IsUnsatisfiable()
         {
             using var solver = new SmtSolver();

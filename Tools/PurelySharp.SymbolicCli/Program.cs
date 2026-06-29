@@ -17,14 +17,21 @@ try
         : null;
 
     var queryService = new SymbolicSourceQueryService();
-    var result = options.Position.HasValue
-        ? queryService.QueryFileAtPosition(
+    object result = options.LineInvariants
+        ? queryService.QueryFileLine(
+            options.FilePath,
+            options.Line,
+            options.CreateReferences(),
+            smtAnalysis: smtAnalysis,
+            impliedConditions: options.ImpliedConditions)
+        : options.Position.HasValue
+            ? queryService.QueryFileAtPosition(
             options.FilePath,
             options.Position.Value,
             options.CreateReferences(),
             smtAnalysis: smtAnalysis,
             impliedConditions: options.ImpliedConditions)
-        : queryService.QueryFile(
+            : queryService.QueryFile(
             new SymbolicFileQuery(
                 options.FilePath,
                 options.Line,
@@ -35,50 +42,21 @@ try
 
     if (options.Json)
     {
-        Console.WriteLine(JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+        var json = result switch
+        {
+            SymbolicLineQueryResult lineResult => JsonSerializer.Serialize(lineResult, new JsonSerializerOptions { WriteIndented = true }),
+            SymbolicSourceQueryResult pointResult => JsonSerializer.Serialize(pointResult, new JsonSerializerOptions { WriteIndented = true }),
+            _ => throw new InvalidOperationException("Unexpected query result type."),
+        };
+        Console.WriteLine(json);
+    }
+    else if (result is SymbolicLineQueryResult lineResult)
+    {
+        PrintLineResult(lineResult, options);
     }
     else
     {
-        Console.WriteLine($"{result.FilePath}:{result.Line}:{result.Column}");
-        Console.WriteLine($"Node: {result.NodeKind}");
-        Console.WriteLine($"Merged invariant: {result.MergedInvariantText}");
-        if (options.CheckReachability)
-        {
-            Console.WriteLine($"Reachability: {result.Reachability}");
-            Console.WriteLine($"Reachability reason: {result.ReachabilityReason}");
-        }
-
-        foreach (var proof in result.ConditionProofs)
-        {
-            Console.WriteLine($"Implies '{proof.Condition}': {proof.TruthValue}");
-            Console.WriteLine($"Implication reason: {proof.Reason}");
-        }
-
-        if (result.SmtDiagnostics.IsConfigured)
-        {
-            Console.WriteLine("SMT:");
-            Console.WriteLine($"  Mode: {result.SmtDiagnostics.Mode}");
-            Console.WriteLine($"  Enabled: {result.SmtDiagnostics.IsEnabled}");
-            Console.WriteLine($"  Query timeout ms: {result.SmtDiagnostics.QueryTimeoutMs}");
-            Console.WriteLine($"  Method budget ms: {result.SmtDiagnostics.MethodBudgetMs}");
-            Console.WriteLine($"  Max path conditions: {result.SmtDiagnostics.MaxPathConditions}");
-            Console.WriteLine($"  Max expression nodes: {result.SmtDiagnostics.MaxExpressionNodes}");
-            Console.WriteLine($"  Executed queries: {result.SmtDiagnostics.ExecutedQueryCount}");
-            Console.WriteLine($"  Cache entries: {result.SmtDiagnostics.CacheEntryCount}");
-        }
-
-        Console.WriteLine("Facts:");
-        if (result.Facts.Count == 0)
-        {
-            Console.WriteLine("  <none>");
-        }
-        else
-        {
-            foreach (var fact in result.Facts)
-            {
-                Console.WriteLine("  " + fact);
-            }
-        }
+        PrintPointResult((SymbolicSourceQueryResult)result, options, includeLocation: true);
     }
 
     return 0;
@@ -90,15 +68,87 @@ catch (ArgumentException ex)
     return 64;
 }
 
+static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions options)
+{
+    Console.WriteLine($"{result.FilePath}:{result.Line}");
+    Console.WriteLine($"Program points: {result.ProgramPoints.Count}");
+    foreach (var point in result.ProgramPoints)
+    {
+        Console.WriteLine();
+        PrintPointResult(point, options, includeLocation: true);
+    }
+
+    if (result.SmtDiagnostics.IsConfigured && result.ProgramPoints.Count == 0)
+    {
+        PrintSmtDiagnostics(result.SmtDiagnostics);
+    }
+}
+
+static void PrintPointResult(
+    SymbolicSourceQueryResult result,
+    SymbolicCliOptions options,
+    bool includeLocation)
+{
+    if (includeLocation)
+    {
+        Console.WriteLine($"{result.FilePath}:{result.Line}:{result.Column}");
+    }
+
+    Console.WriteLine($"Node: {result.NodeKind}");
+    Console.WriteLine($"Merged invariant: {result.MergedInvariantText}");
+    if (options.CheckReachability)
+    {
+        Console.WriteLine($"Reachability: {result.Reachability}");
+        Console.WriteLine($"Reachability reason: {result.ReachabilityReason}");
+    }
+
+    foreach (var proof in result.ConditionProofs)
+    {
+        Console.WriteLine($"Implies '{proof.Condition}': {proof.TruthValue}");
+        Console.WriteLine($"Implication reason: {proof.Reason}");
+    }
+
+    if (result.SmtDiagnostics.IsConfigured)
+    {
+        PrintSmtDiagnostics(result.SmtDiagnostics);
+    }
+
+    Console.WriteLine("Facts:");
+    if (result.Facts.Count == 0)
+    {
+        Console.WriteLine("  <none>");
+        return;
+    }
+
+    foreach (var fact in result.Facts)
+    {
+        Console.WriteLine("  " + fact);
+    }
+}
+
+static void PrintSmtDiagnostics(SymbolicSmtDiagnostics diagnostics)
+{
+    Console.WriteLine("SMT:");
+    Console.WriteLine($"  Mode: {diagnostics.Mode}");
+    Console.WriteLine($"  Enabled: {diagnostics.IsEnabled}");
+    Console.WriteLine($"  Query timeout ms: {diagnostics.QueryTimeoutMs}");
+    Console.WriteLine($"  Method budget ms: {diagnostics.MethodBudgetMs}");
+    Console.WriteLine($"  Max path conditions: {diagnostics.MaxPathConditions}");
+    Console.WriteLine($"  Max expression nodes: {diagnostics.MaxExpressionNodes}");
+    Console.WriteLine($"  Executed queries: {diagnostics.ExecutedQueryCount}");
+    Console.WriteLine($"  Cache entries: {diagnostics.CacheEntryCount}");
+}
+
 internal sealed class SymbolicCliOptions
 {
     public const string Usage = """
-Usage: PurelySharp.SymbolicCli --file <path> (--line <n> [--column <n>] | --position <n>) [--json]
+Usage: PurelySharp.SymbolicCli --file <path> (--line <n> [--column <n>] [--line-invariants] | --position <n>) [--json]
 
 Options:
   --file <path>       C# source file to query.
   --line <n>          1-based source line to query.
   --column <n>        1-based source column to query. Default: 1.
+  --line-invariants   Query every statement/expression program point on the line.
   --position <n>      0-based absolute source position to query.
   --reference <path>  Metadata reference path. Can be repeated.
   --check-reachability
@@ -123,6 +173,8 @@ Options:
     public int Column { get; private set; } = 1;
 
     public int? Position { get; private set; }
+
+    public bool LineInvariants { get; private set; }
 
     public List<string> ReferencePaths { get; } = new();
 
@@ -169,6 +221,10 @@ Options:
                     break;
                 case "--position":
                     options.Position = ReadNonNegativeInt(args, ref index, arg);
+                    break;
+                case "--line-invariants":
+                case "--all-line-points":
+                    options.LineInvariants = true;
                     break;
                 case "--reference":
                 case "-r":
@@ -218,6 +274,16 @@ Options:
             if (options.Position.HasValue && options.Line != 0)
             {
                 throw new ArgumentException("--position cannot be combined with --line.");
+            }
+
+            if (options.Position.HasValue && options.LineInvariants)
+            {
+                throw new ArgumentException("--line-invariants cannot be combined with --position.");
+            }
+
+            if (options.LineInvariants && options.Column != 1)
+            {
+                throw new ArgumentException("--line-invariants cannot be combined with --column.");
             }
 
             if (!options.Position.HasValue && options.Line == 0)

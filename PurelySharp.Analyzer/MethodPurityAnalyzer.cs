@@ -439,6 +439,17 @@ namespace PurelySharp.Analyzer
 
         private static bool ShouldSuggestMissingEnforcePure(IMethodSymbol methodSymbol)
         {
+            if (methodSymbol.MethodKind == MethodKind.Conversion)
+            {
+                return false;
+            }
+
+            if (methodSymbol.MethodKind == MethodKind.Constructor &&
+                HasAttributeByName(methodSymbol, "SetsRequiredMembersAttribute"))
+            {
+                return false;
+            }
+
             if (!methodSymbol.IsStatic &&
                 (methodSymbol.ContainingType?.TypeKind == TypeKind.Interface ||
                  ImplementsInstanceInterfaceMember(methodSymbol) ||

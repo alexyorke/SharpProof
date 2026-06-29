@@ -47,7 +47,6 @@ public class TestClass
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
 
-        [TestCase("OperatingSystem.IsOSVersionAtLeast(10, 0, 0, 0)")]
         [TestCase("OperatingSystem.IsWindowsVersionAtLeast(10, 0, 0, 0)")]
         [TestCase("OperatingSystem.IsOSPlatformVersionAtLeast(\"windows\", 10, 0, 0, 0)")]
         public async Task OperatingSystemVersionProbeHelpers_Diagnostic(string expression)

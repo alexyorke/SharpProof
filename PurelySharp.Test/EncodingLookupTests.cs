@@ -47,7 +47,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task EncodingUtf8Getter_Diagnostic()
+        public async Task EncodingUtf8Getter_NoDiagnostic()
         {
             var test = @"
 using System.Text;
@@ -56,7 +56,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public Encoding {|PS0002:TestMethod|}()
+    public Encoding TestMethod()
     {
         return Encoding.UTF8;
     }

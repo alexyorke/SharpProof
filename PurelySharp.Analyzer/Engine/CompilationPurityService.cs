@@ -5,7 +5,7 @@ using PurelySharp.Symbolic.Smt;
 
 namespace PurelySharp.Analyzer.Engine
 {
-    internal sealed class CompilationPurityService
+    internal sealed class CompilationPurityService : System.IDisposable
     {
         private readonly ConcurrentDictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult> _purityCache = new(SymbolEqualityComparer.Default);
         private readonly object _fixedPointLock = new();
@@ -22,6 +22,11 @@ namespace PurelySharp.Analyzer.Engine
         }
 
         public SmtAnalysisService SmtAnalysis { get; }
+
+        public void Dispose()
+        {
+            SmtAnalysis.Dispose();
+        }
 
         public PurityAnalysisEngine.PurityAnalysisResult GetPurity(
             IMethodSymbol methodSymbol,

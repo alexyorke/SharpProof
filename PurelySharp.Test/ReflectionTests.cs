@@ -1260,7 +1260,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeHasElementType_Diagnostic()
+        public async Task TypeHasElementType_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -1268,7 +1268,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public bool {|PS0002:TestMethod|}(System.Type type)
+    public bool TestMethod(System.Type type)
     {
         return type.HasElementType;
     }
@@ -1476,7 +1476,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task TypeDefaultBinder_Diagnostic()
+        public async Task TypeDefaultBinder_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -1484,7 +1484,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public System.Reflection.Binder {|PS0002:TestMethod|}()
+    public System.Reflection.Binder TestMethod()
     {
         return System.Type.DefaultBinder;
     }
@@ -1978,7 +1978,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task MemberInfoName_Diagnostic()
+        public async Task MemberInfoName_NoDiagnostic()
         {
             var test = @"
 using PurelySharp.Attributes;
@@ -1987,7 +1987,7 @@ using System.Reflection;
 public class TestClass
 {
     [EnforcePure]
-    public string {|PS0002:TestMethod|}(MemberInfo member)
+    public string TestMethod(MemberInfo member)
     {
         return member.Name;
     }

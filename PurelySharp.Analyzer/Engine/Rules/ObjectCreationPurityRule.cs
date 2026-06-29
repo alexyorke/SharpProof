@@ -342,7 +342,8 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return false;
             }
 
-            if (argument.Value is not IInvocationOperation invocationOperation ||
+            var argumentValue = PurityAnalysisEngine.SkipImplicitConversions(argument.Value) ?? argument.Value;
+            if (argumentValue is not IInvocationOperation invocationOperation ||
                 invocationOperation.TargetMethod == null ||
                 invocationOperation.Type is not IArrayTypeSymbol arrayType ||
                 arrayType.ElementType.SpecialType != SpecialType.System_Char)
@@ -351,21 +352,27 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             var enumerableType = context.SemanticModel.Compilation.GetTypeByMetadataName("System.Linq.Enumerable");
-            var targetMethod = invocationOperation.TargetMethod.OriginalDefinition;
+            var targetMethod = invocationOperation.TargetMethod.ReducedFrom ?? invocationOperation.TargetMethod;
+            var targetDefinition = targetMethod.OriginalDefinition;
             if (enumerableType == null ||
-                !targetMethod.IsExtensionMethod ||
-                targetMethod.Name != "ToArray" ||
-                !SymbolEqualityComparer.Default.Equals(targetMethod.ContainingType?.OriginalDefinition, enumerableType))
+                targetDefinition.Name != "ToArray" ||
+                !SymbolEqualityComparer.Default.Equals(targetDefinition.ContainingType?.OriginalDefinition, enumerableType))
             {
                 return false;
             }
 
-            if (invocationOperation.Arguments.Length == 0 || invocationOperation.Arguments[0].Value == null)
+            var sourceOperation = invocationOperation.Instance;
+            if (sourceOperation == null && invocationOperation.Arguments.Length > 0)
+            {
+                sourceOperation = invocationOperation.Arguments[0].Value;
+            }
+
+            if (sourceOperation == null)
             {
                 return false;
             }
 
-            var sourceResult = PurityAnalysisEngine.CheckSingleOperation(invocationOperation.Arguments[0].Value, context, currentState);
+            var sourceResult = PurityAnalysisEngine.CheckSingleOperation(sourceOperation, context, currentState);
             return sourceResult.IsPure;
         }
 

@@ -607,6 +607,13 @@ namespace PurelySharp.Symbolic.Smt
                     out formula,
                     getSymbolVersion,
                     inlineDepth) ||
+                TryTranslateStringEqualsInvocation(
+                    invocationOperation,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth) ||
                 TryTranslateStringPredicateInvocation(
                     invocationOperation,
                     semanticModel,
@@ -621,6 +628,69 @@ namespace PurelySharp.Symbolic.Smt
                     out formula,
                     getSymbolVersion,
                     inlineDepth);
+        }
+
+        private static bool TryTranslateStringEqualsInvocation(
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            var method = invocationOperation.TargetMethod;
+            if (method.Name != "Equals" ||
+                method.ReturnType.SpecialType != SpecialType.System_Boolean ||
+                method.ContainingType?.SpecialType != SpecialType.System_String ||
+                !HasOrdinalStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken))
+            {
+                return false;
+            }
+
+            if (method.IsStatic)
+            {
+                if (invocationOperation.Arguments.Length < 3 ||
+                    invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax leftExpression ||
+                    invocationOperation.Arguments[1].Value.Syntax is not ExpressionSyntax rightExpression ||
+                    !TryTranslateStringValue(leftExpression, semanticModel, cancellationToken, out var left, getSymbolVersion, inlineDepth) ||
+                    left == null ||
+                    !TryTranslateStringValue(rightExpression, semanticModel, cancellationToken, out var right, getSymbolVersion, inlineDepth) ||
+                    right == null)
+                {
+                    return false;
+                }
+
+                formula = CreateNullSafeStringEqualityFormula(
+                    leftExpression,
+                    rightExpression,
+                    left,
+                    right,
+                    semanticModel,
+                    cancellationToken,
+                    getSymbolVersion,
+                    inlineDepth);
+                return true;
+            }
+
+            if (invocationOperation.Arguments.Length < 2 ||
+                invocationOperation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
+                invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax argumentExpression ||
+                !TryTranslateStringValue(receiverExpression, semanticModel, cancellationToken, out var receiver, getSymbolVersion, inlineDepth) ||
+                receiver == null ||
+                !TryTranslateStringValue(argumentExpression, semanticModel, cancellationToken, out var argument, getSymbolVersion, inlineDepth) ||
+                argument == null ||
+                !TryCreateStringNonNullFormula(receiverExpression, semanticModel, cancellationToken, out var receiverNonNull, getSymbolVersion, inlineDepth) ||
+                receiverNonNull == null)
+            {
+                return false;
+            }
+
+            formula = new SmtBinaryFormula(
+                SmtBinaryOperator.And,
+                receiverNonNull,
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, receiver, argument));
+            return true;
         }
 
         private static bool TryTranslateRegexIsMatchInvocation(
@@ -702,9 +772,12 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
+            var firstParameterType = method.Parameters[0].Type;
+            var isCharPredicateArgument = firstParameterType.SpecialType == SpecialType.System_Char;
             if (method.Name is "StartsWith" or "EndsWith")
             {
-                if (!HasOrdinalStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken))
+                if (!isCharPredicateArgument &&
+                    !HasOrdinalStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken))
                 {
                     return false;
                 }
@@ -715,12 +788,18 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            if (method.Parameters[0].Type.SpecialType != SpecialType.System_String ||
-                invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax searchExpression ||
+            if (invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax searchExpression ||
+                !TryTranslateStringPredicateArgument(
+                    searchExpression,
+                    invocationOperation.Arguments[0].Parameter?.Type,
+                    semanticModel,
+                    cancellationToken,
+                    getSymbolVersion,
+                    inlineDepth,
+                    out var searchFormula) ||
+                searchFormula == null ||
                 !TryTranslateStringValue(receiverExpression, semanticModel, cancellationToken, out var receiverFormula, getSymbolVersion, inlineDepth) ||
-                receiverFormula == null ||
-                !TryTranslateStringValue(searchExpression, semanticModel, cancellationToken, out var searchFormula, getSymbolVersion, inlineDepth) ||
-                searchFormula == null)
+                receiverFormula == null)
             {
                 return false;
             }
@@ -733,6 +812,43 @@ namespace PurelySharp.Symbolic.Smt
                 _ => null
             };
             return formula != null;
+        }
+
+        private static bool TryTranslateStringPredicateArgument(
+            ExpressionSyntax argumentExpression,
+            ITypeSymbol? parameterType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            out SmtFormula? formula)
+        {
+            formula = null;
+            if (parameterType?.SpecialType == SpecialType.System_String)
+            {
+                return TryTranslateStringValue(
+                        argumentExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out formula,
+                        getSymbolVersion,
+                        inlineDepth) &&
+                    formula != null;
+            }
+
+            if (parameterType?.SpecialType != SpecialType.System_Char)
+            {
+                return false;
+            }
+
+            var constantValue = semanticModel.GetConstantValue(argumentExpression, cancellationToken);
+            if (constantValue is not { HasValue: true, Value: char character })
+            {
+                return false;
+            }
+
+            formula = new SmtStringConstant(character.ToString());
+            return true;
         }
 
         private static bool TryTranslateStringIsNullOrEmptyInvocation(
@@ -1967,28 +2083,50 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            var valuesEqual = new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right);
-            var equality = valuesEqual;
-            if (TryCreateStringNonNullFormula(binaryExpression.Left, semanticModel, cancellationToken, out var leftNonNull, getSymbolVersion, inlineDepth) &&
-                leftNonNull != null &&
-                TryCreateStringNonNullFormula(binaryExpression.Right, semanticModel, cancellationToken, out var rightNonNull, getSymbolVersion, inlineDepth) &&
-                rightNonNull != null)
-            {
-                var bothNull = new SmtBinaryFormula(
-                    SmtBinaryOperator.And,
-                    new SmtUnaryFormula(SmtUnaryOperator.Not, leftNonNull),
-                    new SmtUnaryFormula(SmtUnaryOperator.Not, rightNonNull));
-                var bothNonNull = new SmtBinaryFormula(SmtBinaryOperator.And, leftNonNull, rightNonNull);
-                equality = new SmtBinaryFormula(
-                    SmtBinaryOperator.Or,
-                    bothNull,
-                    new SmtBinaryFormula(SmtBinaryOperator.And, bothNonNull, valuesEqual));
-            }
+            var equality = CreateNullSafeStringEqualityFormula(
+                binaryExpression.Left,
+                binaryExpression.Right,
+                left,
+                right,
+                semanticModel,
+                cancellationToken,
+                getSymbolVersion,
+                inlineDepth);
 
             formula = binaryExpression.IsKind(SyntaxKind.EqualsExpression)
                 ? equality
                 : new SmtUnaryFormula(SmtUnaryOperator.Not, equality);
             return true;
+        }
+
+        private static SmtFormula CreateNullSafeStringEqualityFormula(
+            ExpressionSyntax leftExpression,
+            ExpressionSyntax rightExpression,
+            SmtFormula left,
+            SmtFormula right,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            var valuesEqual = new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right);
+            if (!TryCreateStringNonNullFormula(leftExpression, semanticModel, cancellationToken, out var leftNonNull, getSymbolVersion, inlineDepth) ||
+                leftNonNull == null ||
+                !TryCreateStringNonNullFormula(rightExpression, semanticModel, cancellationToken, out var rightNonNull, getSymbolVersion, inlineDepth) ||
+                rightNonNull == null)
+            {
+                return valuesEqual;
+            }
+
+            var bothNull = new SmtBinaryFormula(
+                SmtBinaryOperator.And,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, leftNonNull),
+                new SmtUnaryFormula(SmtUnaryOperator.Not, rightNonNull));
+            var bothNonNull = new SmtBinaryFormula(SmtBinaryOperator.And, leftNonNull, rightNonNull);
+            return new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                bothNull,
+                new SmtBinaryFormula(SmtBinaryOperator.And, bothNonNull, valuesEqual));
         }
 
         public static bool TryCreateStringNonNullFormula(

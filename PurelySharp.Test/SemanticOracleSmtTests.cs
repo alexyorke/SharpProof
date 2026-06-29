@@ -5379,14 +5379,14 @@ public class TestClass
         }
 
         [Test]
-        public void ExecutionVisibility_NegatedCategoryRegexClassRemainsConservative()
+        public void ExecutionVisibility_NegatedCategoryRegexClassConcreteMismatchIsUnreachable()
         {
             Assert.That(
                 IsConditionAlwaysFalse(
                     "string text",
                     @"Regex.IsMatch(text, @""\A[^\p{Lu}]\z"") && text == ""A""",
                     "using System.Text.RegularExpressions;"),
-                Is.False);
+                Is.True);
         }
 
         [Test]
@@ -5405,6 +5405,44 @@ public class TestClass
         {
             Assert.That(
                 IsConditionAlwaysFalse("string text", "text.Contains(\"Z\") && text == \"ABC\""),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringContainsCharContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "text.Contains('Z') && text == \"ABC\""),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringStartsWithCharContradictsEmptyString()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "text.StartsWith('A') && text == string.Empty"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceStringEqualsOrdinalContradictsInequality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "text.Equals(\"A\", StringComparison.Ordinal) && text != \"A\"",
+                    "using System;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StaticStringEqualsOrdinalContradictsInequality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "string.Equals(text, \"A\", StringComparison.Ordinal) && text != \"A\"",
+                    "using System;"),
                 Is.True);
         }
 

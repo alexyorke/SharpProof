@@ -11,13 +11,15 @@ using SearchLib.Smt;
 
 namespace PurelySharp.Symbolic.Smt
 {
-    public sealed class SmtAnalysisService
+    public sealed class SmtAnalysisService : IDisposable
     {
         private readonly ConcurrentDictionary<string, PurityProofResult> _queryCache = new(StringComparer.Ordinal);
         private readonly object _solverLock = new();
+        private PurityProofSearch? _proofSearch;
         private long _consumedQueryTicks;
         private int _executedQueryCount;
         private bool _solverUnavailable;
+        private bool _disposed;
 
         public SmtAnalysisService(SmtAnalysisOptions options)
         {
@@ -64,6 +66,11 @@ namespace PurelySharp.Symbolic.Smt
 
         public PurityProofResult Classify(PurityProofQuery query)
         {
+            if (_disposed)
+            {
+                return Unknown("smt_disposed");
+            }
+
             if (!Options.IsEnabled)
             {
                 return Unknown("smt_disabled");
@@ -75,6 +82,11 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             var pathConditions = NormalizePathConditions(query.PathConditions);
+            if (TryClassifySyntactically(query, pathConditions, out var syntacticResult))
+            {
+                return syntacticResult;
+            }
+
             if (pathConditions.Length > Options.MaxPathConditions)
             {
                 return Unknown("smt_path_condition_budget_exceeded");
@@ -109,8 +121,13 @@ namespace PurelySharp.Symbolic.Smt
             {
                 lock (_solverLock)
                 {
+                    if (_disposed)
+                    {
+                        return Unknown("smt_disposed");
+                    }
+
                     Interlocked.Increment(ref _executedQueryCount);
-                    using var search = new PurityProofSearch();
+                    var search = GetOrCreateProofSearch();
                     return search.Classify(query, Options.QueryTimeout);
                 }
             }
@@ -121,12 +138,39 @@ namespace PurelySharp.Symbolic.Smt
             catch (Exception ex) when (IsZ3OrEncodingFailure(ex))
             {
                 _solverUnavailable = true;
+                DisposeProofSearch();
                 return Unknown("smt_unavailable");
             }
             finally
             {
                 queryClock.Stop();
                 Interlocked.Add(ref _consumedQueryTicks, queryClock.ElapsedTicks);
+            }
+        }
+
+        public void Dispose()
+        {
+            _disposed = true;
+            DisposeProofSearch();
+        }
+
+        private PurityProofSearch GetOrCreateProofSearch()
+        {
+            if (_proofSearch != null)
+            {
+                return _proofSearch;
+            }
+
+            _proofSearch = new PurityProofSearch();
+            return _proofSearch;
+        }
+
+        private void DisposeProofSearch()
+        {
+            lock (_solverLock)
+            {
+                _proofSearch?.Dispose();
+                _proofSearch = null;
             }
         }
 
@@ -182,6 +226,168 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return builder.ToImmutable();
+        }
+
+        private static bool TryClassifySyntactically(
+            PurityProofQuery query,
+            ImmutableArray<SmtFormula> pathConditions,
+            out PurityProofResult result)
+        {
+            if (ContainsSyntacticContradiction(pathConditions))
+            {
+                result = new PurityProofResult(
+                    PurityProofOutcome.ProvablyPure,
+                    Feasibility.Unsatisfiable,
+                    Feasibility.Unsatisfiable,
+                    "path_unsatisfiable");
+                return true;
+            }
+
+            if (IsHazardTriggerSyntacticallyUnreachable(query, pathConditions, out var pureReason))
+            {
+                result = new PurityProofResult(
+                    PurityProofOutcome.ProvablyPure,
+                    Feasibility.Unknown,
+                    Feasibility.Unsatisfiable,
+                    pureReason);
+                return true;
+            }
+
+            result = Unknown("smt_syntactic_no_match");
+            return false;
+        }
+
+        private static bool ContainsSyntacticContradiction(ImmutableArray<SmtFormula> pathConditions)
+        {
+            var seen = new List<SmtFormula>(pathConditions.Length);
+            foreach (var pathCondition in pathConditions)
+            {
+                if (pathCondition is SmtBooleanConstant { Value: false })
+                {
+                    return true;
+                }
+
+                foreach (var existing in seen)
+                {
+                    if (AreSyntacticComplements(pathCondition, existing))
+                    {
+                        return true;
+                    }
+                }
+
+                seen.Add(pathCondition);
+            }
+
+            return false;
+        }
+
+        private static bool IsHazardTriggerSyntacticallyUnreachable(
+            PurityProofQuery query,
+            ImmutableArray<SmtFormula> pathConditions,
+            out string pureReason)
+        {
+            pureReason = string.Empty;
+            if (!TryGetTriggerBasedPureReason(query.Hazard, out pureReason))
+            {
+                return false;
+            }
+
+            if (query.Hazard.TriggerCondition is SmtBooleanConstant { Value: false })
+            {
+                return true;
+            }
+
+            foreach (var pathCondition in pathConditions)
+            {
+                if (AreSyntacticComplements(pathCondition, query.Hazard.TriggerCondition))
+                {
+                    return true;
+                }
+            }
+
+            pureReason = string.Empty;
+            return false;
+        }
+
+        private static bool TryGetTriggerBasedPureReason(PurityHazard hazard, out string reason)
+        {
+            reason = string.Empty;
+            if (hazard.Visibility == PurityEffectVisibility.InternalOnly)
+            {
+                return false;
+            }
+
+            reason = hazard.Kind switch
+            {
+                PurityHazardKind.BranchReachability => "branch_unreachable",
+                PurityHazardKind.ImpureCallReachability => "impure_call_unreachable",
+                PurityHazardKind.CallerVisibleMemoryWrite => "memory_write_unreachable",
+                PurityHazardKind.NullDereference => "null_dereference_unreachable",
+                PurityHazardKind.DivideByZero => "divide_by_zero_unreachable",
+                _ => string.Empty,
+            };
+
+            return reason.Length != 0;
+        }
+
+        private static bool AreSyntacticComplements(SmtFormula left, SmtFormula right)
+        {
+            if (left is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } leftNot &&
+                leftNot.Operand.Equals(right))
+            {
+                return true;
+            }
+
+            if (right is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } rightNot &&
+                rightNot.Operand.Equals(left))
+            {
+                return true;
+            }
+
+            if (left is not SmtBinaryFormula leftBinary ||
+                right is not SmtBinaryFormula rightBinary)
+            {
+                return false;
+            }
+
+            if (!HaveSameOperands(leftBinary, rightBinary))
+            {
+                return false;
+            }
+
+            return AreComplementaryOperators(leftBinary.Operator, rightBinary.Operator);
+        }
+
+        private static bool HaveSameOperands(SmtBinaryFormula left, SmtBinaryFormula right)
+        {
+            if (left.Left.Equals(right.Left) && left.Right.Equals(right.Right))
+            {
+                return true;
+            }
+
+            return IsSymmetricComparison(left.Operator) &&
+                IsSymmetricComparison(right.Operator) &&
+                left.Left.Equals(right.Right) &&
+                left.Right.Equals(right.Left);
+        }
+
+        private static bool IsSymmetricComparison(SmtBinaryOperator op)
+        {
+            return op is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual;
+        }
+
+        private static bool AreComplementaryOperators(SmtBinaryOperator left, SmtBinaryOperator right)
+        {
+            return (left, right) switch
+            {
+                (SmtBinaryOperator.Equal, SmtBinaryOperator.NotEqual) => true,
+                (SmtBinaryOperator.NotEqual, SmtBinaryOperator.Equal) => true,
+                (SmtBinaryOperator.LessThan, SmtBinaryOperator.GreaterThanOrEqual) => true,
+                (SmtBinaryOperator.GreaterThanOrEqual, SmtBinaryOperator.LessThan) => true,
+                (SmtBinaryOperator.LessThanOrEqual, SmtBinaryOperator.GreaterThan) => true,
+                (SmtBinaryOperator.GreaterThan, SmtBinaryOperator.LessThanOrEqual) => true,
+                _ => false,
+            };
         }
 
         private static int CountFormulaNodes(IEnumerable<SmtFormula> formulas)

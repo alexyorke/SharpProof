@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Z3;
 
 namespace SearchLib.Smt
@@ -7,7 +8,7 @@ namespace SearchLib.Smt
         private readonly Context _context = new();
         private readonly Sort _referenceSort;
         private readonly Expr _nullReference;
-        private readonly Dictionary<string, Expr> _variables = new(StringComparer.Ordinal);
+        private readonly Dictionary<(string Name, SmtValueKind Kind), Expr> _variables = new();
 
         public Z3FormulaEncoder()
         {
@@ -161,7 +162,8 @@ namespace SearchLib.Smt
 
         private Expr GetOrCreateVariable(SmtVariable variable)
         {
-            if (_variables.TryGetValue(variable.Name, out var existing))
+            var key = (variable.Name, variable.Kind);
+            if (_variables.TryGetValue(key, out var existing))
             {
                 return existing;
             }
@@ -175,15 +177,17 @@ namespace SearchLib.Smt
                 _ => throw new InvalidOperationException("Unsupported SMT variable kind."),
             };
 
-            _variables.Add(variable.Name, created);
+            _variables.Add(key, created);
             return created;
         }
 
         private sealed class Z3RegexTranslator
         {
             private const int MaxBoundedRepeat = 64;
+            private const int MaxCharacterClassRangeCount = 512;
             private readonly Context _context;
             private readonly string _pattern;
+            private readonly Dictionary<string, RegexClassTranslation> _characterClassCache = new(StringComparer.Ordinal);
             private int _position;
 
             private Z3RegexTranslator(Context context, string pattern)
@@ -429,8 +433,9 @@ namespace SearchLib.Smt
                 }
 
                 var escaped = _pattern[_position++];
-                if (TryCreateEscapedCharacterClassRegex(escaped, out regex))
+                if (TryCreateEscapedCharacterClassRegex(escaped, out var escapedClass))
                 {
+                    regex = escapedClass.Regex;
                     return true;
                 }
 
@@ -596,9 +601,12 @@ namespace SearchLib.Smt
                 }
 
                 var escaped = _pattern[_position++];
-                if (TryCreateEscapedCharacterClassRegex(escaped, out var escapedClassRegex))
+                if (TryCreateEscapedCharacterClassRegex(escaped, out var escapedClass))
                 {
-                    part = new CharacterClassPart(escapedClassRegex, exactCharacter: null, isApproximation: true);
+                    part = new CharacterClassPart(
+                        escapedClass.Regex,
+                        exactCharacter: null,
+                        isApproximation: !escapedClass.IsExact);
                     return true;
                 }
 
@@ -657,9 +665,22 @@ namespace SearchLib.Smt
                     isApproximation: false);
             }
 
-            private bool TryCreateEscapedCharacterClassRegex(char escaped, out ReExpr regex)
+            private readonly struct RegexClassTranslation
             {
-                regex = null!;
+                public RegexClassTranslation(ReExpr regex, bool isExact)
+                {
+                    Regex = regex;
+                    IsExact = isExact;
+                }
+
+                public ReExpr Regex { get; }
+
+                public bool IsExact { get; }
+            }
+
+            private bool TryCreateEscapedCharacterClassRegex(char escaped, out RegexClassTranslation regex)
+            {
+                regex = default;
                 if (escaped is 'p' or 'P')
                 {
                     if (!TryReadRegexCategoryName())
@@ -667,7 +688,7 @@ namespace SearchLib.Smt
                         return false;
                     }
 
-                    regex = CreateAnyCharRegex();
+                    regex = new RegexClassTranslation(CreateAnyCharRegex(), isExact: false);
                     return true;
                 }
 
@@ -678,7 +699,7 @@ namespace SearchLib.Smt
 
                 // .NET's shorthand classes are Unicode-aware by default. One-char over-approximation
                 // preserves soundness for reachability proofs while still exposing length facts to Z3.
-                regex = CreateAnyCharRegex();
+                regex = new RegexClassTranslation(CreateAnyCharRegex(), isExact: false);
                 return true;
             }
 

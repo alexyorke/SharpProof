@@ -91,9 +91,6 @@ public class TestClass
             var expectedCS8618 = DiagnosticResult.CompilerError("CS8618")
                                      .WithSpan(9, 65, 9, 82).WithSpan(9, 120, 9, 132)
                                      .WithArguments("property", "ErrorMessage");
-            var expectedPS0004Ctor = VerifyCS.Diagnostic(PurelySharpDiagnostics.MissingEnforcePureAttributeId)
-                                        .WithSpan(9, 65, 9, 82)
-                                        .WithArguments(".ctor");
             var expectedPS0004GetterErr = VerifyCS.Diagnostic(PurelySharpDiagnostics.MissingEnforcePureAttributeId)
                                            .WithSpan(9, 120, 9, 132)
                                            .WithArguments("get_ErrorMessage");
@@ -107,7 +104,6 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test, new[] {
                 expectedCS8618,
-                expectedPS0004Ctor,
                 expectedPS0004GetterErr,
                 expectedPS0004GetterMin,
                 expectedPS0002
@@ -160,7 +156,6 @@ public class TestRunner
 
             var expectedGetMin = VerifyCS.Diagnostic(PurelySharpDiagnostics.MissingEnforcePureAttributeId).WithSpan(9, 16, 9, 19).WithArguments("get_Min");
             var expectedGetMax = VerifyCS.Diagnostic(PurelySharpDiagnostics.MissingEnforcePureAttributeId).WithSpan(10, 16, 10, 19).WithArguments("get_Max");
-            var expectedAttrCtor = VerifyCS.Diagnostic(PurelySharpDiagnostics.MissingEnforcePureAttributeId).WithSpan(11, 12, 11, 30).WithArguments(".ctor");
             var expectedGetValue = VerifyCS.Diagnostic(PurelySharpDiagnostics.MissingEnforcePureAttributeId).WithSpan(24, 16, 24, 21).WithArguments("get_Value");
             var expectedTestMethod = VerifyCS.Diagnostic(PurelySharpDiagnostics.PurityNotVerifiedId).WithSpan(30, 17, 30, 27).WithArguments("TestMethod");
 
@@ -168,7 +163,6 @@ public class TestRunner
             await VerifyCS.VerifyAnalyzerAsync(test, new[] {
                 expectedGetMin,
                 expectedGetMax,
-                expectedAttrCtor,
                 expectedGetValue,
                 expectedTestMethod
             });

@@ -166,9 +166,28 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
+            if (IsInReachableConstantSwitchGotoSection(syntaxNode, semanticModel))
+            {
+                return false;
+            }
+
             var analysis = new SymbolicInvariantService().AnalyzeAt(syntaxNode, semanticModel, smtAnalysis, cancellationToken);
             return analysis.PathConditions.Count > 0 &&
                 analysis.Reachability == SymbolicReachability.Unreachable;
+        }
+
+        private static bool IsInReachableConstantSwitchGotoSection(SyntaxNode syntaxNode, SemanticModel semanticModel)
+        {
+            foreach (var switchStatement in syntaxNode.Ancestors().OfType<SwitchStatementSyntax>())
+            {
+                var section = switchStatement.Sections.FirstOrDefault(candidate => candidate.Span.Contains(syntaxNode.SpanStart));
+                if (section != null && IsReachableConstantSwitchGotoTarget(section, switchStatement, semanticModel))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsInUnreachableSwitchStatementSection(
@@ -195,7 +214,170 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
+            if (IsReachableConstantSwitchGotoTarget(section, switchStatement, semanticModel))
+            {
+                return false;
+            }
+
             return IsFormulaAlwaysFalseUsingSmt(sectionCondition, smtAnalysis);
+        }
+
+        private static bool IsReachableConstantSwitchGotoTarget(
+            SwitchSectionSyntax section,
+            SwitchStatementSyntax switchStatement,
+            SemanticModel semanticModel)
+        {
+            var governingValue = semanticModel.GetConstantValue(switchStatement.Expression);
+            if (!governingValue.HasValue)
+            {
+                return false;
+            }
+
+            var initialSection = ResolveInitialConstantSwitchSection(switchStatement, semanticModel, governingValue.Value);
+            if (initialSection == null)
+            {
+                return false;
+            }
+
+            var reachableSections = new List<SwitchSectionSyntax> { initialSection };
+            for (var index = 0; index < reachableSections.Count; index++)
+            {
+                foreach (var gotoStatement in reachableSections[index]
+                             .DescendantNodes()
+                             .OfType<GotoStatementSyntax>())
+                {
+                    if (!ReferenceEquals(
+                            gotoStatement.Ancestors().OfType<SwitchStatementSyntax>().FirstOrDefault(),
+                            switchStatement))
+                    {
+                        continue;
+                    }
+
+                    var targetSection = ResolveConstantSwitchGotoTarget(gotoStatement, switchStatement, semanticModel);
+                    if (targetSection == null ||
+                        reachableSections.Any(reachableSection => ReferenceEquals(reachableSection, targetSection)))
+                    {
+                        continue;
+                    }
+
+                    reachableSections.Add(targetSection);
+                }
+            }
+
+            return reachableSections.Any(reachableSection => ReferenceEquals(reachableSection, section));
+        }
+
+        private static SwitchSectionSyntax? ResolveInitialConstantSwitchSection(
+            SwitchStatementSyntax switchStatement,
+            SemanticModel semanticModel,
+            object? governingValue)
+        {
+            SwitchSectionSyntax? defaultSection = null;
+
+            foreach (var section in switchStatement.Sections)
+            {
+                foreach (var label in section.Labels)
+                {
+                    if (label is DefaultSwitchLabelSyntax)
+                    {
+                        defaultSection ??= section;
+                        continue;
+                    }
+
+                    if (label is CaseSwitchLabelSyntax caseLabel)
+                    {
+                        var labelValue = semanticModel.GetConstantValue(caseLabel.Value);
+                        if (labelValue.HasValue && ConstantValuesEqual(labelValue.Value, governingValue))
+                        {
+                            return section;
+                        }
+
+                        continue;
+                    }
+
+                    if (label is CasePatternSwitchLabelSyntax patternLabel &&
+                        PatternMatchesConstant(patternLabel.Pattern, governingValue, semanticModel) &&
+                        WhenClauseCanMatch(patternLabel.WhenClause, semanticModel))
+                    {
+                        return section;
+                    }
+                }
+            }
+
+            return defaultSection;
+        }
+
+        private static SwitchSectionSyntax? ResolveConstantSwitchGotoTarget(
+            GotoStatementSyntax gotoStatement,
+            SwitchStatementSyntax switchStatement,
+            SemanticModel semanticModel)
+        {
+            if (gotoStatement.IsKind(SyntaxKind.GotoDefaultStatement))
+            {
+                return switchStatement.Sections.FirstOrDefault(section =>
+                    section.Labels.Any(label => label is DefaultSwitchLabelSyntax));
+            }
+
+            if (!gotoStatement.IsKind(SyntaxKind.GotoCaseStatement) ||
+                gotoStatement.Expression == null)
+            {
+                return null;
+            }
+
+            var gotoValue = semanticModel.GetConstantValue(gotoStatement.Expression);
+            if (!gotoValue.HasValue)
+            {
+                return null;
+            }
+
+            foreach (var section in switchStatement.Sections)
+            {
+                if (section.Labels.OfType<CaseSwitchLabelSyntax>().Any(label =>
+                    semanticModel.GetConstantValue(label.Value) is { HasValue: true } labelValue &&
+                    ConstantValuesEqual(labelValue.Value, gotoValue.Value)))
+                {
+                    return section;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool PatternMatchesConstant(
+            PatternSyntax pattern,
+            object? governingValue,
+            SemanticModel semanticModel)
+        {
+            switch (pattern)
+            {
+                case DiscardPatternSyntax:
+                    return true;
+                case ParenthesizedPatternSyntax parenthesizedPattern:
+                    return PatternMatchesConstant(parenthesizedPattern.Pattern, governingValue, semanticModel);
+                case ConstantPatternSyntax constantPattern:
+                    var patternValue = semanticModel.GetConstantValue(constantPattern.Expression);
+                    return patternValue.HasValue && ConstantValuesEqual(patternValue.Value, governingValue);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool WhenClauseCanMatch(WhenClauseSyntax? whenClause, SemanticModel semanticModel)
+        {
+            if (whenClause == null)
+            {
+                return true;
+            }
+
+            var constantValue = semanticModel.GetConstantValue(whenClause.Condition);
+            return constantValue.HasValue &&
+                constantValue.Value is bool booleanValue &&
+                booleanValue;
+        }
+
+        private static bool ConstantValuesEqual(object? left, object? right)
+        {
+            return Equals(left, right);
         }
 
         private static bool IsInUnreachableSwitchExpressionArm(
@@ -514,7 +696,8 @@ namespace PurelySharp.Analyzer.Engine
                 pathConditions.ToArray(),
                 new PurityHazard(PurityHazardKind.BranchReachability, formula));
 
-            var proofResult = (smtAnalysis ?? new SmtAnalysisService(SmtAnalysisOptions.Default)).Classify(query);
+            using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
+            var proofResult = (smtAnalysis ?? fallbackSmtAnalysis!).Classify(query);
             return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
         }
 

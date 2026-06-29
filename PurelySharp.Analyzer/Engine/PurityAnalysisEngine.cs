@@ -188,9 +188,10 @@ namespace PurelySharp.Analyzer.Engine
                 SyntaxNode? syntaxNode = null,
                 ISymbol? symbol = null,
                 string? catalogSource = null,
-                string? calleeChain = null)
+                string? calleeChain = null,
+                string? operationKindOverride = null)
             {
-                var operationKind = operation?.Kind.ToString() ?? syntaxNode?.Kind().ToString() ?? string.Empty;
+                var operationKind = operationKindOverride ?? operation?.Kind.ToString() ?? syntaxNode?.Kind().ToString() ?? string.Empty;
                 return new PurityEvidence(
                     category,
                     ruleName ?? string.Empty,
@@ -1057,7 +1058,8 @@ namespace PurelySharp.Analyzer.Engine
             SmtAnalysisService? smtAnalysis = null)
         {
 
-            var activeSmtAnalysis = smtAnalysis ?? new SmtAnalysisService(SmtAnalysisOptions.Default);
+            using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
+            var activeSmtAnalysis = smtAnalysis ?? fallbackSmtAnalysis!;
             var indent = new string(' ', visited.Count * 2);
             LogDebug($"{indent}>> Enter DeterminePurity: {methodSymbol.ToDisplayString()}");
 
@@ -1546,13 +1548,14 @@ namespace PurelySharp.Analyzer.Engine
 
                                     if (!postCfgGeneratedPurity.IsPure)
                                     {
+                                        var invocationRuleResult = CheckSingleOperation(invocationOp, postCfgContext, postCfgReturnState);
+                                        if (invocationRuleResult.IsPure)
+                                        {
+                                            continue;
+                                        }
+
                                         LogDebug($"{indent}    Post-CFG: Found generated-summary impure invocation IMPURE: {invocationOp.Syntax} calling {invocationOp.TargetMethod.ToDisplayString()}");
-                                        result = ImpureResult(
-                                            invocationOp,
-                                            postCfgGeneratedPurity.PrimaryCategory,
-                                            "MethodInvocationPurityRule",
-                                            targetMethod,
-                                            "generated_purity_summary");
+                                        result = invocationRuleResult;
                                         goto PostCfgChecksDone;
                                     }
                                 }
@@ -1929,6 +1932,12 @@ namespace PurelySharp.Analyzer.Engine
 
             if (!currentStateInBlock.HasPotentialImpurity &&
                 block.BranchValue != null &&
+                TryCreateThrowBranchImpurity(block.BranchValue, ruleContext, currentStateInBlock, out var throwBranchResult))
+            {
+                currentStateInBlock = currentStateInBlock.WithImpurity(throwBranchResult, throwBranchResult.ImpureSyntaxNode ?? block.BranchValue.Syntax);
+            }
+            else if (!currentStateInBlock.HasPotentialImpurity &&
+                block.BranchValue != null &&
                 ShouldAnalyzeExplicitConditionBranchValue(block.BranchValue.Syntax))
             {
                 LogDebug($"    [ATF Block {block.Ordinal}] Checking Branch Value Kind: {block.BranchValue.Kind}, Syntax: {block.BranchValue.Syntax.ToString().Replace("\r\n", " ").Replace("\n", " ")}");
@@ -1947,6 +1956,38 @@ namespace PurelySharp.Analyzer.Engine
 
             LogDebug($"ApplyTransferFunction END for Block #{block.Ordinal} - Final State: Impure={currentStateInBlock.HasPotentialImpurity}");
             return currentStateInBlock;
+        }
+
+        private static bool TryCreateThrowBranchImpurity(
+            IOperation branchValue,
+            Rules.PurityAnalysisContext context,
+            PurityAnalysisState currentState,
+            out PurityAnalysisResult result)
+        {
+            result = PurityAnalysisResult.Pure;
+
+            var throwSyntax = branchValue.Syntax.FirstAncestorOrSelf<ThrowStatementSyntax>() ??
+                (SyntaxNode?)branchValue.Syntax.FirstAncestorOrSelf<ThrowExpressionSyntax>();
+            if (throwSyntax == null)
+            {
+                return false;
+            }
+
+            var exceptionResult = CheckSingleOperation(branchValue, context, currentState);
+            if (!exceptionResult.IsPure)
+            {
+                result = exceptionResult;
+                return true;
+            }
+
+            result = PurityAnalysisResult.Impure(
+                throwSyntax,
+                PurityEvidence.Create(
+                    "throw",
+                    ruleName: "ThrowOperationPurityRule",
+                    syntaxNode: throwSyntax,
+                    operationKindOverride: OperationKind.Throw.ToString()));
+            return true;
         }
 
         private static bool IsRecursivePlaceholderImpurity(PurityAnalysisResult result)
@@ -5559,10 +5600,10 @@ namespace PurelySharp.Analyzer.Engine
 
         private static bool IsTransientCharArrayConsumedByStringConstructor(IInvocationOperation invocationOperation, SemanticModel semanticModel)
         {
-            var targetMethod = invocationOperation.TargetMethod?.OriginalDefinition;
-            if (targetMethod == null ||
-                !targetMethod.IsExtensionMethod ||
-                targetMethod.Name != "ToArray" ||
+            var targetMethod = invocationOperation.TargetMethod?.ReducedFrom ?? invocationOperation.TargetMethod;
+            var targetDefinition = targetMethod?.OriginalDefinition;
+            if (targetDefinition == null ||
+                targetDefinition.Name != "ToArray" ||
                 invocationOperation.Type is not IArrayTypeSymbol arrayType ||
                 arrayType.ElementType.SpecialType != SpecialType.System_Char)
             {
@@ -5571,7 +5612,7 @@ namespace PurelySharp.Analyzer.Engine
 
             var enumerableType = semanticModel.Compilation.GetTypeByMetadataName("System.Linq.Enumerable");
             if (enumerableType == null ||
-                !SymbolEqualityComparer.Default.Equals(targetMethod.ContainingType?.OriginalDefinition, enumerableType))
+                !SymbolEqualityComparer.Default.Equals(targetDefinition.ContainingType?.OriginalDefinition, enumerableType))
             {
                 return false;
             }

@@ -50,6 +50,8 @@ namespace PurelySharp.Analyzer
                     ? GeneratedPurityCatalog.FromOptions(startContext.Options, startContext.CancellationToken)
                     : null;
 
+                startContext.RegisterCompilationEndAction(_ => purityService.Dispose());
+
                 startContext.RegisterSyntaxNodeAction(c =>
                 {
                     using (generatedPurityCatalog == null ? null : GeneratedPurityCatalog.UseCurrent(generatedPurityCatalog))

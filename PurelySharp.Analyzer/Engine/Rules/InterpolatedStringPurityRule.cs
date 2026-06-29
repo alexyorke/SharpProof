@@ -8,10 +8,37 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
     internal class InterpolatedStringPurityRule : IPurityRule
     {
-        public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(OperationKind.InterpolatedString);
+        public IEnumerable<OperationKind> ApplicableOperationKinds => ImmutableArray.Create(
+            OperationKind.InterpolatedString,
+            OperationKind.InterpolatedStringHandlerCreation,
+            OperationKind.InterpolatedStringHandlerArgumentPlaceholder);
 
         public PurityAnalysisEngine.PurityAnalysisResult CheckPurity(IOperation operation, PurityAnalysisContext context, PurityAnalysisEngine.PurityAnalysisState currentState)
         {
+            if (operation is IInterpolatedStringHandlerArgumentPlaceholderOperation)
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            if (operation is IInterpolatedStringHandlerCreationOperation handlerCreation)
+            {
+                PurityAnalysisEngine.LogDebug($"InterpolatedStringPurityRule: Analyzing handler creation for {handlerCreation.Syntax}");
+
+                var handlerCreationResult = PurityAnalysisEngine.CheckSingleOperation(
+                    handlerCreation.HandlerCreation,
+                    context,
+                    currentState);
+                if (!handlerCreationResult.IsPure)
+                {
+                    return handlerCreationResult;
+                }
+
+                return PurityAnalysisEngine.CheckSingleOperation(
+                    handlerCreation.Content,
+                    context,
+                    currentState);
+            }
+
             if (!(operation is IInterpolatedStringOperation interpolatedString))
             {
                 PurityAnalysisEngine.LogDebug($"WARNING: InterpolatedStringPurityRule called with unexpected operation type: {operation.Kind}. Assuming Pure.");
@@ -175,6 +202,11 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            if (IsPrimitiveOrEnumInterpolationValue(expressionType))
+            {
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
             var trustedMetadataPurity = PurityAnalysisEngine.GetTrustedMethodPurityMetadata(
                 originalDefinition,
                 context.SemanticModel.Compilation);
@@ -295,6 +327,29 @@ namespace PurelySharp.Analyzer.Engine.Rules
             var namespaceName = type.ContainingNamespace?.ToDisplayString();
             return namespaceName == "System" ||
                 namespaceName?.StartsWith("System.", System.StringComparison.Ordinal) == true;
+        }
+
+        private static bool IsPrimitiveOrEnumInterpolationValue(ITypeSymbol type)
+        {
+            if (type.TypeKind == TypeKind.Enum)
+            {
+                return true;
+            }
+
+            return type.SpecialType is
+                SpecialType.System_Boolean or
+                SpecialType.System_Char or
+                SpecialType.System_SByte or
+                SpecialType.System_Byte or
+                SpecialType.System_Int16 or
+                SpecialType.System_UInt16 or
+                SpecialType.System_Int32 or
+                SpecialType.System_UInt32 or
+                SpecialType.System_Int64 or
+                SpecialType.System_UInt64 or
+                SpecialType.System_Decimal or
+                SpecialType.System_Single or
+                SpecialType.System_Double;
         }
 
         private static bool IsFormattableStringInvariantArgument(IInterpolatedStringOperation interpolatedString)

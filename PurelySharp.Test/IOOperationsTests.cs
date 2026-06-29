@@ -354,7 +354,7 @@ public class TestClass
             File.WriteAllText(""log.txt"", input);
         }
         
-        return input.ToUpper();
+        return input.ToUpperInvariant();
     }
 }";
 

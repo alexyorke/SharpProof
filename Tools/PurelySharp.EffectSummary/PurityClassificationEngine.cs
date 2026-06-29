@@ -1193,7 +1193,16 @@ internal static class PurityClassificationEngine
             return true;
         }
 
-        if (IsPureGeneratedArrayPredicate(symbol) ||
+        if (IsPureGeneratedStringMember(symbol) ||
+            IsPureGeneratedPathHelper(symbol) ||
+            IsPureGeneratedExpressionFactory(symbol) ||
+            IsPureGeneratedInterpolatedStringHandlerMember(symbol) ||
+            IsPureGeneratedImmutableArrayMember(symbol) ||
+            IsPureGeneratedValueArrayProjection(symbol) ||
+            IsPureGeneratedDeterministicValueFormatting(symbol) ||
+            IsPureGeneratedDeterministicNumericHelper(symbol) ||
+            IsPureGeneratedStableNetworkValue(symbol) ||
+            IsPureGeneratedArrayPredicate(symbol) ||
             IsPureGeneratedListPredicate(symbol) ||
             IsPureGeneratedArrayRead(symbol) ||
             IsPureGeneratedArgumentGuard(symbol) ||
@@ -1207,6 +1216,18 @@ internal static class PurityClassificationEngine
             IsPureGeneratedQueueFreshArray(symbol) ||
             IsPureGeneratedCultureCompare(symbol))
         {
+            if (IsPureGeneratedStringMember(symbol) ||
+                IsPureGeneratedPathHelper(symbol) ||
+                IsPureGeneratedExpressionFactory(symbol) ||
+                IsPureGeneratedInterpolatedStringHandlerMember(symbol) ||
+                IsPureGeneratedImmutableArrayMember(symbol) ||
+                IsPureGeneratedValueArrayProjection(symbol) ||
+                IsPureGeneratedDeterministicValueFormatting(symbol) ||
+                IsPureGeneratedStableNetworkValue(symbol))
+            {
+                effectVisibilityClassification = "internal_only";
+            }
+
             return true;
         }
 
@@ -1390,12 +1411,16 @@ internal static class PurityClassificationEngine
     {
         return symbol.StartsWith("System.ArgumentException..ctor(", StringComparison.Ordinal) ||
             symbol.StartsWith("System.ArgumentNullException..ctor(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.BadImageFormatException..ctor(", StringComparison.Ordinal) ||
             symbol.StartsWith("System.DivideByZeroException..ctor(", StringComparison.Ordinal) ||
             symbol.StartsWith("System.IO.EndOfStreamException..ctor(", StringComparison.Ordinal) ||
             symbol.StartsWith("System.FlagsAttribute..ctor(", StringComparison.Ordinal) ||
             symbol.StartsWith("System.FormatException..ctor(", StringComparison.Ordinal) ||
             symbol.StartsWith("System.Index..ctor(", StringComparison.Ordinal) ||
             symbol.StartsWith("System.InvalidOperationException..ctor(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.IO.FileNotFoundException..ctor(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.ComponentModel.AddingNewEventArgs..ctor(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.ComponentModel.DataAnnotations.ValidationResult..ctor(", StringComparison.Ordinal) ||
             symbol.StartsWith("System.NotImplementedException..ctor(", StringComparison.Ordinal) ||
             symbol.StartsWith("System.NotSupportedException..ctor(", StringComparison.Ordinal) ||
             symbol.StartsWith("System.ObjectDisposedException..ctor(", StringComparison.Ordinal) ||
@@ -1418,9 +1443,79 @@ internal static class PurityClassificationEngine
             symbol.StartsWith("System.Runtime.CompilerServices.TypeHandle.", StringComparison.Ordinal);
     }
 
+    private static bool IsPureGeneratedStringMember(string symbol)
+    {
+        return symbol.StartsWith("System.String.Contains(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.String..ctor(char", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.String.Split(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.String.CompareTo(", StringComparison.Ordinal) ||
+            IsPureGeneratedStringJoin(symbol) ||
+            string.Equals(symbol, "System.String.Clone()", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.String.IndexOf(char", StringComparison.Ordinal);
+    }
+
+    private static bool IsPureGeneratedStringJoin(string symbol)
+    {
+        return symbol.StartsWith("System.String.Join(char, string[]", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.String.Join(string, string[]", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.String.Join(string, System.Collections.Generic.IEnumerable`1<string>", StringComparison.Ordinal);
+    }
+
+    private static bool IsPureGeneratedPathHelper(string symbol)
+    {
+        return symbol.StartsWith("System.IO.Path.GetExtension(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.IO.Path.HasExtension(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.IO.Path.GetFileName(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.IO.Path.GetFileNameWithoutExtension(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.IO.Path.GetDirectoryName(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.IO.Path.ChangeExtension(", StringComparison.Ordinal);
+    }
+
+    private static bool IsPureGeneratedExpressionFactory(string symbol)
+    {
+        return symbol.StartsWith("System.Linq.Expressions.Expression.Parameter(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.Constant(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.Lambda(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.Call(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.Equal(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.NotEqual(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.Add(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.AddChecked(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.Subtract(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.SubtractChecked(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.Multiply(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.MultiplyChecked(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.Divide(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.Modulo(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.AndAlso(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.OrElse(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.GreaterThan(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.GreaterThanOrEqual(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.LessThan(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Linq.Expressions.Expression.LessThanOrEqual(", StringComparison.Ordinal);
+    }
+
+    private static bool IsPureGeneratedInterpolatedStringHandlerMember(string symbol)
+    {
+        return string.Equals(symbol, "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler..ctor(int, int)", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendFormatted(!!0)", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendFormatted(string)", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.AppendLiteral(string)", StringComparison.Ordinal) ||
+            string.Equals(symbol, "System.Runtime.CompilerServices.DefaultInterpolatedStringHandler.ToStringAndClear()", StringComparison.Ordinal);
+    }
+
     private static bool IsPureGeneratedImmutableMember(string symbol)
     {
         return symbol.StartsWith("System.Collections.Immutable.ImmutableList.Create", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Add(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.AddRange(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Insert(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.InsertRange(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Remove(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.RemoveAt(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.RemoveRange(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.Replace(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableList`1.SetItem(", StringComparison.Ordinal) ||
             symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet.Create", StringComparison.Ordinal) ||
             symbol.StartsWith("System.Collections.Immutable.ImmutableDictionary.Create", StringComparison.Ordinal) ||
             symbol.StartsWith("System.Collections.Immutable.ImmutableHashSet`1.get_Count(", StringComparison.Ordinal) ||
@@ -1430,6 +1525,34 @@ internal static class PurityClassificationEngine
             string.Equals(symbol, "System.Collections.Immutable.ImmutableStack`1.Clear()", StringComparison.Ordinal) ||
             string.Equals(symbol, "System.Collections.Immutable.ImmutableStack`1.get_IsEmpty()", StringComparison.Ordinal) ||
             symbol.StartsWith("System.Collections.Immutable.ImmutableStack`1.Push(", StringComparison.Ordinal);
+    }
+
+    private static bool IsPureGeneratedImmutableArrayMember(string symbol)
+    {
+        return symbol.StartsWith("System.Collections.Immutable.ImmutableArray.Create", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableArray.CreateRange", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableArray.ToImmutableArray", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.Slice(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.AddRange(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.InsertRange(", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Collections.Immutable.ImmutableArray`1.RemoveRange(", StringComparison.Ordinal);
+    }
+
+    private static bool IsPureGeneratedValueArrayProjection(string symbol)
+    {
+        return symbol.StartsWith("System.Guid.ToByteArray(", StringComparison.Ordinal);
+    }
+
+    private static bool IsPureGeneratedDeterministicValueFormatting(string symbol)
+    {
+        return symbol.StartsWith("System.Guid.ToString(", StringComparison.Ordinal);
+    }
+
+    private static bool IsPureGeneratedDeterministicNumericHelper(string symbol)
+    {
+        return symbol.StartsWith("System.Numerics.BitOperations.", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.BitConverter.To", StringComparison.Ordinal) ||
+            symbol.StartsWith("System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(", StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedFileSystemMetadataGetter(string symbol)
@@ -1443,7 +1566,8 @@ internal static class PurityClassificationEngine
         return symbol is
             "System.Environment.get_Is64BitOperatingSystem()" or
             "System.Environment.get_Is64BitProcess()" or
-            "System.Environment.get_NewLine()";
+            "System.Environment.get_NewLine()" or
+            "System.Environment.get_HasShutdownStarted()";
     }
 
     private static bool IsPureGeneratedCharHelper(string symbol)
@@ -1464,6 +1588,11 @@ internal static class PurityClassificationEngine
     private static bool IsPureGeneratedCultureCompare(string symbol)
     {
         return symbol.StartsWith("System.Globalization.CompareInfo.Compare(", StringComparison.Ordinal);
+    }
+
+    private static bool IsPureGeneratedStableNetworkValue(string symbol)
+    {
+        return symbol.StartsWith("System.Net.IPAddress.get_", StringComparison.Ordinal);
     }
 
     private static bool IsPureGeneratedArrayPredicate(string symbol)

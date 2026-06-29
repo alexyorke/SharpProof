@@ -67,7 +67,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task GCKeepAlive_Diagnostic()
+        public async Task GCKeepAlive_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -76,7 +76,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public void {|PS0002:TestMethod|}(object value)
+    public void TestMethod(object value)
     {
         GC.KeepAlive(value);
     }

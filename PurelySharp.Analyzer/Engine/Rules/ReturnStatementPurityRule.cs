@@ -1,6 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Collections.Immutable;
@@ -46,6 +47,15 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     PurityAnalysisEngine.LogDebug("    [ReturnRule] Returned value is a fresh awaiter produced by GetAwaiter(). Defer await-protocol purity to AwaitPurityRule.");
                     return valueResult;
                 }
+                else if (IsSpanToArrayReturn(sourceReturnedValue, out var spanToArrayMethod))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes a mutable array produced from span method '{spanToArrayMethod.ToDisplayString()}'. Return statement is Impure.");
+                    return CreateMutableStateEscapeResult(
+                        returnOperation,
+                        returnOperation.ReturnedValue.Syntax,
+                        spanToArrayMethod,
+                        "returned_span_to_array");
+                }
                 else if (IsAllowedTrustedArrayReturn(
                              sourceReturnedValue,
                              context.SemanticModel,
@@ -89,6 +99,15 @@ namespace PurelySharp.Analyzer.Engine.Rules
                         returnOperation.ReturnedValue.Syntax,
                         readOnlyCollectionMethod,
                         "returned_array_read_only_view");
+                }
+                else if (IsListAsReadOnlyReturn(sourceReturnedValue, out var listAsReadOnlyMethod))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ReturnRule] Returned value escapes a read-only view over mutable list storage through '{listAsReadOnlyMethod.ToDisplayString()}'. Return statement is Impure.");
+                    return CreateMutableStateEscapeResult(
+                        returnOperation,
+                        returnOperation.ReturnedValue.Syntax,
+                        listAsReadOnlyMethod,
+                        "returned_list_read_only_view");
                 }
                 else if (IsCallerOwnedArraySpanReturn(sourceReturnedValue, currentState, context.SemanticModel, out var spanMethod))
                 {
@@ -289,6 +308,45 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             factoryMethod = null!;
+            return false;
+        }
+
+        private static bool IsSpanToArrayReturn(
+            IOperation? returnedValue,
+            out IMethodSymbol methodSymbol)
+        {
+            var unwrappedReturnedValue = PurityAnalysisEngine.UnwrapArrayOwnershipPreservingConversions(returnedValue);
+            if (unwrappedReturnedValue is IInvocationOperation invocationOperation &&
+                invocationOperation.Type is IArrayTypeSymbol &&
+                invocationOperation.TargetMethod?.OriginalDefinition is { } targetMethod &&
+                targetMethod.Name == "ToArray" &&
+                !targetMethod.IsStatic &&
+                targetMethod.ContainingType?.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>")
+            {
+                methodSymbol = targetMethod;
+                return true;
+            }
+
+            if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
+            {
+                if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                {
+                    return IsSpanToArrayReturn(
+                        conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
+                        out methodSymbol);
+                }
+
+                return IsSpanToArrayReturn(conditionalOperation.WhenTrue, out methodSymbol) ||
+                    IsSpanToArrayReturn(conditionalOperation.WhenFalse, out methodSymbol);
+            }
+
+            if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
+            {
+                return IsSpanToArrayReturn(coalesceOperation.Value, out methodSymbol) ||
+                    IsSpanToArrayReturn(coalesceOperation.WhenNull, out methodSymbol);
+            }
+
+            methodSymbol = null!;
             return false;
         }
 
@@ -697,6 +755,47 @@ namespace PurelySharp.Analyzer.Engine.Rules
             }
 
             sourceOperation = null!;
+            methodSymbol = null!;
+            return false;
+        }
+
+        private static bool IsListAsReadOnlyReturn(
+            IOperation? returnedValue,
+            out IMethodSymbol methodSymbol)
+        {
+            var unwrappedReturnedValue = PurityAnalysisEngine.SkipImplicitConversions(returnedValue);
+            if (unwrappedReturnedValue is IInvocationOperation invocationOperation &&
+                invocationOperation.TargetMethod?.OriginalDefinition is { } targetMethod &&
+                targetMethod.Name == "AsReadOnly" &&
+                !targetMethod.IsStatic &&
+                string.Equals(
+                    targetMethod.ContainingType?.OriginalDefinition.ToDisplayString(),
+                    "System.Collections.Generic.List<T>",
+                    StringComparison.Ordinal))
+            {
+                methodSymbol = targetMethod;
+                return true;
+            }
+
+            if (unwrappedReturnedValue is IConditionalOperation conditionalOperation)
+            {
+                if (RuleAnalysisHelper.TryGetConstantCondition(conditionalOperation, out var conditionValue))
+                {
+                    return IsListAsReadOnlyReturn(
+                        conditionValue ? conditionalOperation.WhenTrue : conditionalOperation.WhenFalse,
+                        out methodSymbol);
+                }
+
+                return IsListAsReadOnlyReturn(conditionalOperation.WhenTrue, out methodSymbol) ||
+                    IsListAsReadOnlyReturn(conditionalOperation.WhenFalse, out methodSymbol);
+            }
+
+            if (unwrappedReturnedValue is ICoalesceOperation coalesceOperation)
+            {
+                return IsListAsReadOnlyReturn(coalesceOperation.Value, out methodSymbol) ||
+                    IsListAsReadOnlyReturn(coalesceOperation.WhenNull, out methodSymbol);
+            }
+
             methodSymbol = null!;
             return false;
         }

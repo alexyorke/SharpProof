@@ -154,6 +154,7 @@
       "OutputPath": "TypeDescriptor.ComponentModel.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.ComponentModel.TypeConverter.dll",
       "SymbolPrefixes": [
+        "System.ComponentModel.AddingNewEventArgs",
         "System.ComponentModel.TypeDescriptor.GetConverter",
         "System.ComponentModel.TypeDescriptor.GetProperties"
       ]
@@ -297,6 +298,8 @@
         "System.Attribute.GetCustomAttribute",
         "System.Attribute.GetCustomAttributes",
         "System.Attribute.IsDefined",
+        "System.BitConverter.ToDouble",
+        "System.BitConverter.ToInt32",
         "System.Boolean",
         "System.Buffer",
         "System.Buffers.Binary.BinaryPrimitives",
@@ -344,6 +347,7 @@
         "System.Environment.GetEnvironmentVariable",
         "System.Environment.GetEnvironmentVariables",
         "System.Environment.GetFolderPath",
+        "System.Environment.get_HasShutdownStarted",
         "System.Environment.get_Is64BitOperatingSystem",
         "System.Environment.get_Is64BitProcess",
         "System.Environment.get_NewLine",
@@ -359,6 +363,7 @@
         "System.Environment.get_Version",
         "System.ArgumentException",
         "System.ArgumentNullException",
+        "System.BadImageFormatException",
         "System.CallerArgumentExpressionAttribute",
         "System.DivideByZeroException",
         "System.FlagsAttribute",
@@ -389,11 +394,18 @@
         "System.IO.FileInfo.get_Name",
         "System.IO.FileSystemInfo.get_Extension",
         "System.IO.Path.Combine",
+        "System.IO.Path.ChangeExtension",
+        "System.IO.Path.GetDirectoryName",
+        "System.IO.Path.GetExtension",
         "System.IO.Path.GetFileName",
+        "System.IO.Path.GetFileNameWithoutExtension",
         "System.IO.Path.GetFullPath",
+        "System.IO.Path.HasExtension",
         "System.IO.Path.GetTempPath",
+        "System.IO.FileNotFoundException",
         "System.IO.EndOfStreamException",
         "System.MemoryExtensions",
+        "System.Numerics.BitOperations",
         "System.Nullable",
         "System.Object.Equals(object, object)",
         "System.Object.GetType()",
@@ -474,6 +486,13 @@
       "RuntimeAssemblyName": "System.Security.Claims.dll",
       "SymbolPrefixes": [
         "System.Security.Claims.ClaimsPrincipal.IsInRole"
+      ]
+    },
+    {
+      "OutputPath": "cryptography-runtime.PurelySharp.EffectSummary.json",
+      "RuntimeAssemblyName": "System.Security.Cryptography.dll",
+      "SymbolPrefixes": [
+        "System.Security.Cryptography.CryptographicOperations.FixedTimeEquals"
       ]
     },
     {
@@ -587,6 +606,7 @@
       "OutputPath": "componentmodel-primitives-runtime.PurelySharp.EffectSummary.json",
       "RuntimeAssemblyName": "System.ComponentModel.Primitives.dll",
       "SymbolPrefixes": [
+        "System.ComponentModel.AddingNewEventArgs",
         "System.ComponentModel.BrowsableAttribute",
         "System.ComponentModel.DescriptionAttribute"
       ]
@@ -599,7 +619,8 @@
         "System.ComponentModel.DataAnnotations.RangeAttribute",
         "System.ComponentModel.DataAnnotations.RegularExpressionAttribute",
         "System.ComponentModel.DataAnnotations.RequiredAttribute",
-        "System.ComponentModel.DataAnnotations.StringLengthAttribute"
+        "System.ComponentModel.DataAnnotations.StringLengthAttribute",
+        "System.ComponentModel.DataAnnotations.ValidationResult"
       ]
     },
     {

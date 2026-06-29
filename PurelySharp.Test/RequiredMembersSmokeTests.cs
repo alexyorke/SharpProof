@@ -442,7 +442,7 @@ public struct Point
     public required double {|PS0004:Y|} { get; init; }
 
     [EnforcePure]
-    public double {|PS0002:CalculateDistance|}()
+    public double CalculateDistance()
     {
         return Math.Sqrt(X * X + Y * Y);
     }

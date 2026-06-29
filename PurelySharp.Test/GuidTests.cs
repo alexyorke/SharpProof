@@ -48,7 +48,7 @@ public class TestClass
         }
 
         [Test]
-        public async Task GuidToString_Diagnostic()
+        public async Task GuidToString_NoDiagnostic()
         {
             var test = @"
 using System;
@@ -57,7 +57,7 @@ using PurelySharp.Attributes;
 public class TestClass
 {
     [EnforcePure]
-    public string {|PS0002:TestMethod|}(Guid value)
+    public string TestMethod(Guid value)
     {
         return value.ToString();
     }
