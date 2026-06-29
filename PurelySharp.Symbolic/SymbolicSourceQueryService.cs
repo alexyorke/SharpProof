@@ -1327,6 +1327,11 @@ namespace PurelySharp.Symbolic
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
+        public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
+        {
+            return SymbolicCompactQueryResult.FromLine(this, options);
+        }
+
         public SymbolicLineQueryResult Filter(SymbolicSourceQueryFilter filter)
         {
             if (filter == null)
@@ -1407,6 +1412,11 @@ namespace PurelySharp.Symbolic
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
+        public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
+        {
+            return SymbolicCompactQueryResult.FromFile(this, options);
+        }
+
         public SymbolicFileQueryResult Filter(SymbolicSourceQueryFilter filter)
         {
             if (filter == null)
@@ -1423,6 +1433,842 @@ namespace PurelySharp.Symbolic
                 LineCount,
                 lines,
                 SmtDiagnostics);
+        }
+    }
+
+    public sealed class SymbolicCompactQueryOptions
+    {
+        public const int DefaultMaxLines = 100;
+        public const int DefaultMaxProgramPoints = 250;
+        public const int DefaultMaxFacts = 50;
+        public const int DefaultMaxConditions = 50;
+        public const int DefaultMaxProofs = 50;
+
+        public static readonly SymbolicCompactQueryOptions Default = new SymbolicCompactQueryOptions();
+
+        public SymbolicCompactQueryOptions(
+            int maxLines = DefaultMaxLines,
+            int maxProgramPoints = DefaultMaxProgramPoints,
+            int maxFacts = DefaultMaxFacts,
+            int maxConditions = DefaultMaxConditions,
+            int maxProofs = DefaultMaxProofs)
+        {
+            MaxLines = ValidateNonNegative(maxLines, nameof(maxLines));
+            MaxProgramPoints = ValidateNonNegative(maxProgramPoints, nameof(maxProgramPoints));
+            MaxFacts = ValidateNonNegative(maxFacts, nameof(maxFacts));
+            MaxConditions = ValidateNonNegative(maxConditions, nameof(maxConditions));
+            MaxProofs = ValidateNonNegative(maxProofs, nameof(maxProofs));
+        }
+
+        public int MaxLines { get; }
+
+        public int MaxProgramPoints { get; }
+
+        public int MaxFacts { get; }
+
+        public int MaxConditions { get; }
+
+        public int MaxProofs { get; }
+
+        private static int ValidateNonNegative(int value, string paramName)
+        {
+            if (value < 0)
+            {
+                throw new ArgumentOutOfRangeException(paramName, "Compact output limits cannot be negative.");
+            }
+
+            return value;
+        }
+    }
+
+    public sealed class SymbolicCompactQueryResult
+    {
+        private SymbolicCompactQueryResult(
+            string kind,
+            string filePath,
+            int? line,
+            int? column,
+            int? position,
+            string? nodeKind,
+            int? lineCount,
+            int linesWithProgramPoints,
+            int programPointCount,
+            SymbolicCompactInvariantSummary observedInvariant,
+            SymbolicCompactInvariantSummary conservativeInvariant,
+            SymbolicReachabilitySummary reachability,
+            SymbolicProgramPointSummary programPointSummary,
+            IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
+            IReadOnlyList<SymbolicCompactLineResult> lines,
+            IReadOnlyList<SymbolicCompactProgramPointResult> programPoints,
+            SymbolicCompactSmtDiagnostics smtDiagnostics,
+            SymbolicCompactOutputTruncation truncation)
+        {
+            Kind = kind ?? throw new ArgumentNullException(nameof(kind));
+            FilePath = filePath ?? string.Empty;
+            Line = line;
+            Column = column;
+            Position = position;
+            NodeKind = nodeKind;
+            LineCount = lineCount;
+            LinesWithProgramPoints = linesWithProgramPoints;
+            ProgramPointCount = programPointCount;
+            ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
+            ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
+            Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
+            ProgramPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
+            ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
+            Lines = lines ?? throw new ArgumentNullException(nameof(lines));
+            ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
+            SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
+            Truncation = truncation ?? throw new ArgumentNullException(nameof(truncation));
+        }
+
+        public string Kind { get; }
+
+        public string FilePath { get; }
+
+        public int? Line { get; }
+
+        public int? Column { get; }
+
+        public int? Position { get; }
+
+        public string? NodeKind { get; }
+
+        public int? LineCount { get; }
+
+        public int LinesWithProgramPoints { get; }
+
+        public int ProgramPointCount { get; }
+
+        public SymbolicCompactInvariantSummary ObservedInvariant { get; }
+
+        public SymbolicCompactInvariantSummary ConservativeInvariant { get; }
+
+        public SymbolicReachabilitySummary Reachability { get; }
+
+        public SymbolicProgramPointSummary ProgramPointSummary { get; }
+
+        public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
+
+        public IReadOnlyList<SymbolicCompactLineResult> Lines { get; }
+
+        public IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints { get; }
+
+        public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; }
+
+        public SymbolicCompactOutputTruncation Truncation { get; }
+
+        public static SymbolicCompactQueryResult FromPoint(
+            SymbolicSourceQueryResult result,
+            SymbolicCompactQueryOptions? options = null)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+
+            var normalizedOptions = options ?? SymbolicCompactQueryOptions.Default;
+            var sourcePoints = new[] { result };
+            var programPoint = normalizedOptions.MaxProgramPoints == 0
+                ? null
+                : SymbolicCompactProgramPointResult.FromResult(result, normalizedOptions);
+            var programPoints = programPoint == null
+                ? Array.Empty<SymbolicCompactProgramPointResult>()
+                : new[] { programPoint };
+            var conditionProofSummaries = SymbolicConditionProofSummary.FromProgramPoints(sourcePoints);
+            var observedInvariant = SymbolicCompactInvariantSummary.FromObservedFacts(
+                SymbolicInvariantResult.FromFacts(result.Facts),
+                result.Facts,
+                normalizedOptions);
+            var conservativeInvariant = SymbolicCompactInvariantSummary.FromInvariant(
+                result.Invariant,
+                null,
+                normalizedOptions);
+
+            return new SymbolicCompactQueryResult(
+                "point",
+                result.FilePath,
+                result.Line,
+                result.Column,
+                result.Position,
+                result.NodeKind,
+                null,
+                1,
+                1,
+                observedInvariant,
+                conservativeInvariant,
+                SymbolicReachabilitySummary.FromProgramPoints(sourcePoints),
+                SymbolicProgramPointSummary.FromProgramPoints(sourcePoints),
+                SymbolicCompactProjection.Take(
+                    conditionProofSummaries,
+                    normalizedOptions.MaxProofs),
+                Array.Empty<SymbolicCompactLineResult>(),
+                programPoints,
+                SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
+                SymbolicCompactOutputTruncation.Combine(
+                    new SymbolicCompactOutputTruncation(
+                        false,
+                        programPoints.Length == 0,
+                        false,
+                        false,
+                        conditionProofSummaries.Count > normalizedOptions.MaxProofs),
+                    programPoint == null
+                        ? new SymbolicCompactOutputTruncation(false, false, false, false, false)
+                        : programPoint.Truncation,
+                    SymbolicCompactOutputTruncation.FromInvariant(observedInvariant),
+                    SymbolicCompactOutputTruncation.FromInvariant(conservativeInvariant)));
+        }
+
+        public static SymbolicCompactQueryResult FromLine(
+            SymbolicLineQueryResult result,
+            SymbolicCompactQueryOptions? options = null)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+
+            var normalizedOptions = options ?? SymbolicCompactQueryOptions.Default;
+            var lineResult = SymbolicCompactLineResult.FromResult(
+                result,
+                normalizedOptions,
+                normalizedOptions.MaxProgramPoints);
+
+            return new SymbolicCompactQueryResult(
+                "line",
+                result.FilePath,
+                result.Line,
+                null,
+                null,
+                null,
+                null,
+                result.ProgramPoints.Count == 0 ? 0 : 1,
+                result.ProgramPoints.Count,
+                lineResult.ObservedInvariant,
+                lineResult.ConservativeInvariant,
+                lineResult.Reachability,
+                result.ProgramPointSummary,
+                lineResult.ConditionProofs,
+                Array.Empty<SymbolicCompactLineResult>(),
+                lineResult.ProgramPoints,
+                lineResult.SmtDiagnostics,
+                lineResult.Truncation);
+        }
+
+        public static SymbolicCompactQueryResult FromFile(
+            SymbolicFileQueryResult result,
+            SymbolicCompactQueryOptions? options = null)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+
+            var normalizedOptions = options ?? SymbolicCompactQueryOptions.Default;
+            var lineResults = new List<SymbolicCompactLineResult>();
+            var remainingProgramPoints = normalizedOptions.MaxProgramPoints;
+            foreach (var line in result.Lines)
+            {
+                if (lineResults.Count >= normalizedOptions.MaxLines)
+                {
+                    break;
+                }
+
+                var pointLimit = remainingProgramPoints;
+                lineResults.Add(SymbolicCompactLineResult.FromResult(line, normalizedOptions, pointLimit));
+                if (remainingProgramPoints > 0)
+                {
+                    remainingProgramPoints -= Math.Min(line.ProgramPoints.Count, pointLimit);
+                }
+            }
+
+            var observedInvariant = SymbolicCompactInvariantSummary.FromObservedFacts(
+                result.ObservedInvariant,
+                result.ObservedFacts,
+                normalizedOptions);
+            var conservativeInvariant = SymbolicCompactInvariantSummary.FromInvariant(
+                result.MergedInvariant,
+                result.MergedPathFacts,
+                normalizedOptions);
+            var selectedProgramPointCount = lineResults.Sum(static line => line.ProgramPoints.Count);
+            var truncation = SymbolicCompactOutputTruncation.Combine(
+                new SymbolicCompactOutputTruncation(
+                    result.Lines.Count > lineResults.Count,
+                    result.ProgramPointCount > selectedProgramPointCount,
+                    false,
+                    false,
+                    result.ConditionProofs.Count > normalizedOptions.MaxProofs),
+                SymbolicCompactOutputTruncation.FromInvariant(observedInvariant),
+                SymbolicCompactOutputTruncation.FromInvariant(conservativeInvariant),
+                SymbolicCompactOutputTruncation.Combine(lineResults.Select(static line => line.Truncation)));
+
+            return new SymbolicCompactQueryResult(
+                "file",
+                result.FilePath,
+                null,
+                null,
+                null,
+                null,
+                result.LineCount,
+                result.LinesWithProgramPoints,
+                result.ProgramPointCount,
+                observedInvariant,
+                conservativeInvariant,
+                result.Reachability,
+                result.ProgramPointSummary,
+                SymbolicCompactProjection.Take(result.ConditionProofs, normalizedOptions.MaxProofs),
+                lineResults,
+                Array.Empty<SymbolicCompactProgramPointResult>(),
+                SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
+                truncation);
+        }
+    }
+
+    public sealed class SymbolicCompactLineResult
+    {
+        private SymbolicCompactLineResult(
+            string filePath,
+            int line,
+            int programPointCount,
+            SymbolicCompactInvariantSummary observedInvariant,
+            SymbolicCompactInvariantSummary conservativeInvariant,
+            SymbolicReachabilitySummary reachability,
+            SymbolicProgramPointSummary programPointSummary,
+            IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
+            IReadOnlyList<SymbolicCompactProgramPointResult> programPoints,
+            SymbolicCompactSmtDiagnostics smtDiagnostics,
+            SymbolicCompactOutputTruncation truncation)
+        {
+            FilePath = filePath ?? string.Empty;
+            Line = line;
+            ProgramPointCount = programPointCount;
+            ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
+            ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
+            Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
+            ProgramPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
+            ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
+            ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
+            SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
+            Truncation = truncation ?? throw new ArgumentNullException(nameof(truncation));
+        }
+
+        public string FilePath { get; }
+
+        public int Line { get; }
+
+        public int ProgramPointCount { get; }
+
+        public SymbolicCompactInvariantSummary ObservedInvariant { get; }
+
+        public SymbolicCompactInvariantSummary ConservativeInvariant { get; }
+
+        public SymbolicReachabilitySummary Reachability { get; }
+
+        public SymbolicProgramPointSummary ProgramPointSummary { get; }
+
+        public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
+
+        public IReadOnlyList<SymbolicCompactProgramPointResult> ProgramPoints { get; }
+
+        public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; }
+
+        public SymbolicCompactOutputTruncation Truncation { get; }
+
+        internal static SymbolicCompactLineResult FromResult(
+            SymbolicLineQueryResult result,
+            SymbolicCompactQueryOptions options,
+            int maxProgramPoints)
+        {
+            var observedInvariant = SymbolicCompactInvariantSummary.FromObservedFacts(
+                result.ObservedInvariant,
+                result.Facts,
+                options);
+            var conservativeInvariant = SymbolicCompactInvariantSummary.FromInvariant(
+                result.MergedInvariant,
+                result.MergedPathFacts,
+                options);
+            var programPoints = SymbolicCompactProjection
+                .Take(result.ProgramPoints, maxProgramPoints)
+                .Select(point => SymbolicCompactProgramPointResult.FromResult(point, options))
+                .ToArray();
+            var proofSummaries = SymbolicConditionProofSummary.FromProgramPoints(result.ProgramPoints);
+            var conditionProofs = SymbolicCompactProjection.Take(
+                proofSummaries,
+                options.MaxProofs);
+            var truncation = SymbolicCompactOutputTruncation.Combine(
+                new SymbolicCompactOutputTruncation(
+                    false,
+                    result.ProgramPoints.Count > programPoints.Length,
+                    false,
+                    false,
+                    proofSummaries.Count > options.MaxProofs),
+                SymbolicCompactOutputTruncation.FromInvariant(observedInvariant),
+                SymbolicCompactOutputTruncation.FromInvariant(conservativeInvariant),
+                SymbolicCompactOutputTruncation.Combine(programPoints.Select(static point => point.Truncation)));
+
+            return new SymbolicCompactLineResult(
+                result.FilePath,
+                result.Line,
+                result.ProgramPoints.Count,
+                observedInvariant,
+                conservativeInvariant,
+                result.ProgramPointSummary.Reachability,
+                result.ProgramPointSummary,
+                conditionProofs,
+                programPoints,
+                SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
+                truncation);
+        }
+    }
+
+    public sealed class SymbolicCompactProgramPointResult
+    {
+        private SymbolicCompactProgramPointResult(
+            string filePath,
+            int line,
+            int column,
+            int position,
+            int nodeSpanStart,
+            string nodeKind,
+            int factCount,
+            IReadOnlyList<string> facts,
+            SymbolicCompactInvariantSummary observedInvariant,
+            SymbolicCompactInvariantSummary conservativeInvariant,
+            int pathConditionCount,
+            IReadOnlyList<SymbolicInvariantCondition> pathConditions,
+            string reachability,
+            string reachabilityReason,
+            IReadOnlyList<SymbolicConditionProofResult> conditionProofs,
+            SymbolicProofOutcomeSummary proofOutcomes,
+            SymbolicCompactSmtDiagnostics smtDiagnostics,
+            SymbolicCompactOutputTruncation truncation)
+        {
+            FilePath = filePath ?? string.Empty;
+            Line = line;
+            Column = column;
+            Position = position;
+            NodeSpanStart = nodeSpanStart;
+            NodeKind = nodeKind ?? string.Empty;
+            FactCount = factCount;
+            Facts = facts ?? throw new ArgumentNullException(nameof(facts));
+            ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
+            ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
+            PathConditionCount = pathConditionCount;
+            PathConditions = pathConditions ?? throw new ArgumentNullException(nameof(pathConditions));
+            Reachability = reachability ?? string.Empty;
+            ReachabilityReason = reachabilityReason ?? string.Empty;
+            ConditionProofs = conditionProofs ?? throw new ArgumentNullException(nameof(conditionProofs));
+            ProofOutcomes = proofOutcomes ?? throw new ArgumentNullException(nameof(proofOutcomes));
+            SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
+            Truncation = truncation ?? throw new ArgumentNullException(nameof(truncation));
+        }
+
+        public string FilePath { get; }
+
+        public int Line { get; }
+
+        public int Column { get; }
+
+        public int Position { get; }
+
+        public int NodeSpanStart { get; }
+
+        public string NodeKind { get; }
+
+        public int FactCount { get; }
+
+        public IReadOnlyList<string> Facts { get; }
+
+        public SymbolicCompactInvariantSummary ObservedInvariant { get; }
+
+        public SymbolicCompactInvariantSummary ConservativeInvariant { get; }
+
+        public int PathConditionCount { get; }
+
+        public IReadOnlyList<SymbolicInvariantCondition> PathConditions { get; }
+
+        public string Reachability { get; }
+
+        public string ReachabilityReason { get; }
+
+        public IReadOnlyList<SymbolicConditionProofResult> ConditionProofs { get; }
+
+        public SymbolicProofOutcomeSummary ProofOutcomes { get; }
+
+        public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; }
+
+        public SymbolicCompactOutputTruncation Truncation { get; }
+
+        internal static SymbolicCompactProgramPointResult FromResult(
+            SymbolicSourceQueryResult result,
+            SymbolicCompactQueryOptions options)
+        {
+            var observedInvariant = SymbolicCompactInvariantSummary.FromObservedFacts(
+                SymbolicInvariantResult.FromFacts(result.Facts),
+                result.Facts,
+                options);
+            var conservativeInvariant = SymbolicCompactInvariantSummary.FromInvariant(
+                result.Invariant,
+                null,
+                options);
+            var facts = SymbolicCompactProjection.Take(result.Facts, options.MaxFacts);
+            var pathConditions = SymbolicCompactProjection.Take(result.PathConditions, options.MaxConditions);
+            var conditionProofs = SymbolicCompactProjection.Take(result.ConditionProofs, options.MaxProofs);
+            var truncation = SymbolicCompactOutputTruncation.Combine(
+                new SymbolicCompactOutputTruncation(
+                    false,
+                    false,
+                    result.Facts.Count > facts.Count,
+                    result.PathConditions.Count > pathConditions.Count,
+                    result.ConditionProofs.Count > conditionProofs.Count),
+                SymbolicCompactOutputTruncation.FromInvariant(observedInvariant),
+                SymbolicCompactOutputTruncation.FromInvariant(conservativeInvariant));
+
+            return new SymbolicCompactProgramPointResult(
+                result.FilePath,
+                result.Line,
+                result.Column,
+                result.Position,
+                result.NodeSpanStart,
+                result.NodeKind,
+                result.Facts.Count,
+                facts,
+                observedInvariant,
+                conservativeInvariant,
+                result.PathConditionCount,
+                pathConditions,
+                result.Reachability.ToString(),
+                result.ReachabilityReason,
+                conditionProofs,
+                result.ProofOutcomes,
+                SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
+                truncation);
+        }
+    }
+
+    public sealed class SymbolicCompactInvariantSummary
+    {
+        private SymbolicCompactInvariantSummary(
+            string mergeKind,
+            string text,
+            int conditionCount,
+            IReadOnlyList<string> conditions,
+            int rawFactCount,
+            IReadOnlyList<string> rawFacts,
+            SymbolicCompactMergedPathFacts? mergedPathFacts,
+            bool conditionsTruncated,
+            bool rawFactsTruncated)
+        {
+            MergeKind = mergeKind ?? string.Empty;
+            Text = text ?? string.Empty;
+            ConditionCount = conditionCount;
+            Conditions = conditions ?? throw new ArgumentNullException(nameof(conditions));
+            RawFactCount = rawFactCount;
+            RawFacts = rawFacts ?? throw new ArgumentNullException(nameof(rawFacts));
+            MergedPathFacts = mergedPathFacts;
+            ConditionsTruncated = conditionsTruncated;
+            RawFactsTruncated = rawFactsTruncated;
+        }
+
+        public string MergeKind { get; }
+
+        public string Text { get; }
+
+        public int ConditionCount { get; }
+
+        public IReadOnlyList<string> Conditions { get; }
+
+        public int RawFactCount { get; }
+
+        public IReadOnlyList<string> RawFacts { get; }
+
+        public SymbolicCompactMergedPathFacts? MergedPathFacts { get; }
+
+        public bool ConditionsTruncated { get; }
+
+        public bool RawFactsTruncated { get; }
+
+        internal static SymbolicCompactInvariantSummary FromObservedFacts(
+            SymbolicInvariantResult invariant,
+            IReadOnlyList<string> rawFacts,
+            SymbolicCompactQueryOptions options)
+        {
+            var conditions = invariant.Conditions
+                .Select(static condition => condition.Text)
+                .ToArray();
+            return new SymbolicCompactInvariantSummary(
+                invariant.MergeKind.ToString(),
+                invariant.MergedInvariantText,
+                invariant.ConditionCount,
+                SymbolicCompactProjection.Take(conditions, options.MaxConditions),
+                rawFacts.Count,
+                SymbolicCompactProjection.Take(rawFacts, options.MaxFacts),
+                null,
+                conditions.Length > options.MaxConditions,
+                rawFacts.Count > options.MaxFacts);
+        }
+
+        internal static SymbolicCompactInvariantSummary FromInvariant(
+            SymbolicInvariantResult invariant,
+            SymbolicMergedPathFacts? mergedPathFacts,
+            SymbolicCompactQueryOptions options)
+        {
+            var conditions = invariant.Conditions
+                .Select(static condition => condition.Text)
+                .ToArray();
+            return new SymbolicCompactInvariantSummary(
+                invariant.MergeKind.ToString(),
+                invariant.MergedInvariantText,
+                invariant.ConditionCount,
+                SymbolicCompactProjection.Take(conditions, options.MaxConditions),
+                0,
+                Array.Empty<string>(),
+                mergedPathFacts == null
+                    ? null
+                    : SymbolicCompactMergedPathFacts.FromMergedPathFacts(mergedPathFacts, options),
+                conditions.Length > options.MaxConditions,
+                false);
+        }
+    }
+
+    public sealed class SymbolicCompactMergedPathFacts
+    {
+        private SymbolicCompactMergedPathFacts(
+            int alwaysFactCount,
+            IReadOnlyList<string> alwaysFacts,
+            int maybeFactCount,
+            IReadOnlyList<string> maybeFacts,
+            int conservativeUnknownCount,
+            IReadOnlyList<string> conservativeUnknowns,
+            int candidateProgramPointCount,
+            int unreachableProgramPointCount,
+            bool isUnreachable,
+            bool alwaysFactsTruncated,
+            bool maybeFactsTruncated,
+            bool conservativeUnknownsTruncated)
+        {
+            AlwaysFactCount = alwaysFactCount;
+            AlwaysFacts = alwaysFacts ?? throw new ArgumentNullException(nameof(alwaysFacts));
+            MaybeFactCount = maybeFactCount;
+            MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
+            ConservativeUnknownCount = conservativeUnknownCount;
+            ConservativeUnknowns = conservativeUnknowns ?? throw new ArgumentNullException(nameof(conservativeUnknowns));
+            CandidateProgramPointCount = candidateProgramPointCount;
+            UnreachableProgramPointCount = unreachableProgramPointCount;
+            IsUnreachable = isUnreachable;
+            AlwaysFactsTruncated = alwaysFactsTruncated;
+            MaybeFactsTruncated = maybeFactsTruncated;
+            ConservativeUnknownsTruncated = conservativeUnknownsTruncated;
+        }
+
+        public int AlwaysFactCount { get; }
+
+        public IReadOnlyList<string> AlwaysFacts { get; }
+
+        public int MaybeFactCount { get; }
+
+        public IReadOnlyList<string> MaybeFacts { get; }
+
+        public int ConservativeUnknownCount { get; }
+
+        public IReadOnlyList<string> ConservativeUnknowns { get; }
+
+        public int CandidateProgramPointCount { get; }
+
+        public int UnreachableProgramPointCount { get; }
+
+        public bool IsUnreachable { get; }
+
+        public bool AlwaysFactsTruncated { get; }
+
+        public bool MaybeFactsTruncated { get; }
+
+        public bool ConservativeUnknownsTruncated { get; }
+
+        internal bool IsTruncated =>
+            AlwaysFactsTruncated ||
+            MaybeFactsTruncated ||
+            ConservativeUnknownsTruncated;
+
+        internal static SymbolicCompactMergedPathFacts FromMergedPathFacts(
+            SymbolicMergedPathFacts facts,
+            SymbolicCompactQueryOptions options)
+        {
+            return new SymbolicCompactMergedPathFacts(
+                facts.AlwaysFacts.Count,
+                SymbolicCompactProjection.Take(facts.AlwaysFacts, options.MaxConditions),
+                facts.MaybeFacts.Count,
+                SymbolicCompactProjection.Take(facts.MaybeFacts, options.MaxConditions),
+                facts.ConservativeUnknowns.Count,
+                SymbolicCompactProjection.Take(facts.ConservativeUnknowns, options.MaxConditions),
+                facts.CandidateProgramPointCount,
+                facts.UnreachableProgramPointCount,
+                facts.IsUnreachable,
+                facts.AlwaysFacts.Count > options.MaxConditions,
+                facts.MaybeFacts.Count > options.MaxConditions,
+                facts.ConservativeUnknowns.Count > options.MaxConditions);
+        }
+    }
+
+    public sealed class SymbolicCompactSmtDiagnostics
+    {
+        private SymbolicCompactSmtDiagnostics(
+            bool isConfigured,
+            string mode,
+            bool isEnabled,
+            int queryTimeoutMs,
+            int methodBudgetMs,
+            int maxPathConditions,
+            int maxExpressionNodes,
+            int executedQueryCount,
+            int cacheEntryCount)
+        {
+            IsConfigured = isConfigured;
+            Mode = mode ?? string.Empty;
+            IsEnabled = isEnabled;
+            QueryTimeoutMs = queryTimeoutMs;
+            MethodBudgetMs = methodBudgetMs;
+            MaxPathConditions = maxPathConditions;
+            MaxExpressionNodes = maxExpressionNodes;
+            ExecutedQueryCount = executedQueryCount;
+            CacheEntryCount = cacheEntryCount;
+        }
+
+        public bool IsConfigured { get; }
+
+        public string Mode { get; }
+
+        public bool IsEnabled { get; }
+
+        public int QueryTimeoutMs { get; }
+
+        public int MethodBudgetMs { get; }
+
+        public int MaxPathConditions { get; }
+
+        public int MaxExpressionNodes { get; }
+
+        public int ExecutedQueryCount { get; }
+
+        public int CacheEntryCount { get; }
+
+        internal static SymbolicCompactSmtDiagnostics FromDiagnostics(SymbolicSmtDiagnostics diagnostics)
+        {
+            return new SymbolicCompactSmtDiagnostics(
+                diagnostics.IsConfigured,
+                diagnostics.Mode.ToString(),
+                diagnostics.IsEnabled,
+                diagnostics.QueryTimeoutMs,
+                diagnostics.MethodBudgetMs,
+                diagnostics.MaxPathConditions,
+                diagnostics.MaxExpressionNodes,
+                diagnostics.ExecutedQueryCount,
+                diagnostics.CacheEntryCount);
+        }
+    }
+
+    public sealed class SymbolicCompactOutputTruncation
+    {
+        public SymbolicCompactOutputTruncation(
+            bool lines,
+            bool programPoints,
+            bool facts,
+            bool conditions,
+            bool proofs)
+        {
+            Lines = lines;
+            ProgramPoints = programPoints;
+            Facts = facts;
+            Conditions = conditions;
+            Proofs = proofs;
+        }
+
+        public bool Lines { get; }
+
+        public bool ProgramPoints { get; }
+
+        public bool Facts { get; }
+
+        public bool Conditions { get; }
+
+        public bool Proofs { get; }
+
+        public bool IsTruncated =>
+            Lines ||
+            ProgramPoints ||
+            Facts ||
+            Conditions ||
+            Proofs;
+
+        internal static SymbolicCompactOutputTruncation FromInvariant(SymbolicCompactInvariantSummary invariant)
+        {
+            return new SymbolicCompactOutputTruncation(
+                false,
+                false,
+                invariant.RawFactsTruncated,
+                invariant.ConditionsTruncated ||
+                    (invariant.MergedPathFacts != null && invariant.MergedPathFacts.IsTruncated),
+                false);
+        }
+
+        internal static SymbolicCompactOutputTruncation Combine(
+            IEnumerable<SymbolicCompactOutputTruncation> truncations)
+        {
+            if (truncations == null)
+            {
+                throw new ArgumentNullException(nameof(truncations));
+            }
+
+            var lines = false;
+            var programPoints = false;
+            var facts = false;
+            var conditions = false;
+            var proofs = false;
+            foreach (var truncation in truncations)
+            {
+                if (truncation == null)
+                {
+                    continue;
+                }
+
+                lines |= truncation.Lines;
+                programPoints |= truncation.ProgramPoints;
+                facts |= truncation.Facts;
+                conditions |= truncation.Conditions;
+                proofs |= truncation.Proofs;
+            }
+
+            return new SymbolicCompactOutputTruncation(lines, programPoints, facts, conditions, proofs);
+        }
+
+        internal static SymbolicCompactOutputTruncation Combine(
+            params SymbolicCompactOutputTruncation[] truncations)
+        {
+            return Combine((IEnumerable<SymbolicCompactOutputTruncation>)truncations);
+        }
+    }
+
+    internal static class SymbolicCompactProjection
+    {
+        public static IReadOnlyList<T> Take<T>(IEnumerable<T> values, int maxCount)
+        {
+            if (values == null)
+            {
+                throw new ArgumentNullException(nameof(values));
+            }
+
+            if (maxCount == 0)
+            {
+                return Array.Empty<T>();
+            }
+
+            if (maxCount < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maxCount), "Compact output limits cannot be negative.");
+            }
+
+            return values.Take(maxCount).ToArray();
         }
     }
 
@@ -2227,6 +3073,11 @@ namespace PurelySharp.Symbolic
         public SymbolicProofOutcomeSummary ProofOutcomes { get; }
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+
+        public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
+        {
+            return SymbolicCompactQueryResult.FromPoint(this, options);
+        }
 
         private static string FormatMergedInvariantText(IReadOnlyList<string> facts)
         {

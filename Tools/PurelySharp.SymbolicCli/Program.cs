@@ -1,17 +1,18 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
 
-var options = SymbolicCliOptions.Parse(args);
-if (options.ShowHelp || options.FilePath == null)
-{
-    Console.Error.WriteLine(SymbolicCliOptions.Usage);
-    return options.ShowHelp ? 0 : 64;
-}
-
 try
 {
+    var options = SymbolicCliOptions.Parse(args);
+    if (options.ShowHelp || options.FilePath == null)
+    {
+        Console.Error.WriteLine(SymbolicCliOptions.Usage);
+        return options.ShowHelp ? 0 : 64;
+    }
+
     var smtAnalysis = options.RequiresSmt
         ? new SmtAnalysisService(options.CreateSmtOptions())
         : null;
@@ -57,7 +58,25 @@ try
         };
     }
 
-    if (options.Json)
+    if (options.CompactJson)
+    {
+        var compactResult = result switch
+        {
+            SymbolicFileQueryResult fileResult => fileResult.ToCompactResult(options.CreateCompactOptions()),
+            SymbolicLineQueryResult lineResult => lineResult.ToCompactResult(options.CreateCompactOptions()),
+            SymbolicSourceQueryResult pointResult => pointResult.ToCompactResult(options.CreateCompactOptions()),
+            _ => throw new InvalidOperationException("Unexpected query result type."),
+        };
+        Console.WriteLine(JsonSerializer.Serialize(
+            compactResult,
+            new JsonSerializerOptions
+            {
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                Converters = { new JsonStringEnumConverter() },
+            }));
+    }
+    else if (options.Json)
     {
         var json = result switch
         {
@@ -276,7 +295,7 @@ static void PrintSmtDiagnostics(SymbolicSmtDiagnostics diagnostics)
 internal sealed class SymbolicCliOptions
 {
     public const string Usage = """
-Usage: PurelySharp.SymbolicCli --file <path> (--line <n> [--column <n>] [--line-invariants] | --position <n>) [--json]
+Usage: PurelySharp.SymbolicCli --file <path> (--line <n> [--column <n>] [--line-invariants] | --position <n>) [--json|--compact-json]
 
 Options:
   --file <path>       C# source file to query.
@@ -302,6 +321,13 @@ Options:
   --smt-max-expression-nodes <n>
                       Maximum formula nodes before conservative fallback.
   --json              Emit JSON instead of text.
+  --compact-json      Emit compact bounded JSON with observed and conservative invariant summaries.
+  --max-lines <n>     Maximum lines included in --compact-json output. Default: 100.
+  --max-points <n>    Maximum program points included in --compact-json output. Default: 250.
+  --max-facts <n>     Maximum raw SMT facts included in --compact-json output. Default: 50.
+  --max-conditions <n>
+                      Maximum condition strings included in --compact-json output. Default: 50.
+  --max-proofs <n>    Maximum proof summaries/results included in --compact-json output. Default: 50.
 """;
 
     public string? FilePath { get; private set; }
@@ -326,6 +352,8 @@ Options:
 
     public bool Json { get; private set; }
 
+    public bool CompactJson { get; private set; }
+
     public bool CheckReachability { get; private set; }
 
     public List<string> ImpliedConditions { get; } = new();
@@ -341,6 +369,18 @@ Options:
     public int? SmtMaxPathConditions { get; private set; }
 
     public int? SmtMaxExpressionNodes { get; private set; }
+
+    public int CompactMaxLines { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxLines;
+
+    public int CompactMaxProgramPoints { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxProgramPoints;
+
+    public int CompactMaxFacts { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxFacts;
+
+    public int CompactMaxConditions { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxConditions;
+
+    public int CompactMaxProofs { get; private set; } = SymbolicCompactQueryOptions.DefaultMaxProofs;
+
+    public bool HasCompactOutputLimit { get; private set; }
 
     public bool RequiresSmt => CheckReachability || ImpliedConditions.Count != 0;
 
@@ -397,6 +437,30 @@ Options:
                 case "--json":
                     options.Json = true;
                     break;
+                case "--compact-json":
+                case "--compact":
+                    options.CompactJson = true;
+                    break;
+                case "--max-lines":
+                    options.CompactMaxLines = ReadNonNegativeInt(args, ref index, arg);
+                    options.HasCompactOutputLimit = true;
+                    break;
+                case "--max-points":
+                    options.CompactMaxProgramPoints = ReadNonNegativeInt(args, ref index, arg);
+                    options.HasCompactOutputLimit = true;
+                    break;
+                case "--max-facts":
+                    options.CompactMaxFacts = ReadNonNegativeInt(args, ref index, arg);
+                    options.HasCompactOutputLimit = true;
+                    break;
+                case "--max-conditions":
+                    options.CompactMaxConditions = ReadNonNegativeInt(args, ref index, arg);
+                    options.HasCompactOutputLimit = true;
+                    break;
+                case "--max-proofs":
+                    options.CompactMaxProofs = ReadNonNegativeInt(args, ref index, arg);
+                    options.HasCompactOutputLimit = true;
+                    break;
                 case "--check-reachability":
                     options.CheckReachability = true;
                     break;
@@ -425,6 +489,16 @@ Options:
 
         if (!options.ShowHelp)
         {
+            if (options.Json && options.CompactJson)
+            {
+                throw new ArgumentException("--json cannot be combined with --compact-json.");
+            }
+
+            if (options.HasCompactOutputLimit && !options.CompactJson)
+            {
+                throw new ArgumentException("--max-lines, --max-points, --max-facts, --max-conditions, and --max-proofs require --compact-json.");
+            }
+
             if (options.FilePath == null)
             {
                 throw new ArgumentException("--file is required.");
@@ -490,6 +564,16 @@ Options:
             SmtMethodBudgetMs.HasValue ? TimeSpan.FromMilliseconds(SmtMethodBudgetMs.Value) : null,
             SmtMaxPathConditions,
             SmtMaxExpressionNodes);
+    }
+
+    public SymbolicCompactQueryOptions CreateCompactOptions()
+    {
+        return new SymbolicCompactQueryOptions(
+            CompactMaxLines,
+            CompactMaxProgramPoints,
+            CompactMaxFacts,
+            CompactMaxConditions,
+            CompactMaxProofs);
     }
 
     public IEnumerable<MetadataReference>? CreateReferences()

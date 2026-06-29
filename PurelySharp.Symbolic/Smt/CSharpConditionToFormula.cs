@@ -4219,6 +4219,17 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (TryCreateStringInvocationResultLengthFormula(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out lengthFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             var receiverTypeInfo = semanticModel.GetTypeInfo(receiverExpression, cancellationToken);
             if ((receiverTypeInfo.Type is IArrayTypeSymbol { Rank: 1 } ||
                  receiverTypeInfo.ConvertedType is IArrayTypeSymbol { Rank: 1 }) &&
@@ -4264,6 +4275,285 @@ namespace PurelySharp.Symbolic.Smt
 
             lengthFormula = candidate;
             return true;
+        }
+
+        private static bool TryCreateStringInvocationResultLengthFormula(
+            ExpressionSyntax receiverExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            lengthFormula = null!;
+            if (receiverExpression is not InvocationExpressionSyntax invocationExpression ||
+                semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation)
+            {
+                return false;
+            }
+
+            var method = invocationOperation.TargetMethod;
+            if (method.IsStatic ||
+                method.ContainingType?.SpecialType != SpecialType.System_String ||
+                method.ReturnType.SpecialType != SpecialType.System_String ||
+                invocationOperation.Instance?.Syntax is not ExpressionSyntax sourceExpression)
+            {
+                return false;
+            }
+
+            if (method.Name == "Substring")
+            {
+                if (method.Parameters.Length == 1)
+                {
+                    if (invocationOperation.Arguments.Length != 1 ||
+                        !TryCreateBuiltInElementAccessLengthFormula(
+                            sourceExpression,
+                            semanticModel,
+                            cancellationToken,
+                            out var sourceLength,
+                            getSymbolVersion,
+                            inlineDepth) ||
+                        !TryTranslateIntInvocationArgument(
+                            invocationOperation,
+                            parameterIndex: 0,
+                            semanticModel,
+                            cancellationToken,
+                            out var start,
+                            getSymbolVersion,
+                            inlineDepth))
+                    {
+                        return false;
+                    }
+
+                    lengthFormula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, sourceLength, start);
+                    return true;
+                }
+
+                if (method.Parameters.Length != 2 ||
+                    invocationOperation.Arguments.Length != 2 ||
+                    !TryCreateBuiltInElementAccessLengthFormula(
+                        sourceExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out _,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    !TryTranslateIntInvocationArgument(
+                        invocationOperation,
+                        parameterIndex: 0,
+                        semanticModel,
+                        cancellationToken,
+                        out _,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    !TryTranslateIntInvocationArgument(
+                        invocationOperation,
+                        parameterIndex: 1,
+                        semanticModel,
+                        cancellationToken,
+                        out var candidateLengthFormula,
+                        getSymbolVersion,
+                        inlineDepth))
+                {
+                    lengthFormula = null!;
+                    return false;
+                }
+
+                lengthFormula = candidateLengthFormula;
+                return true;
+            }
+
+            if (method.Name == "Remove")
+            {
+                if (!TryCreateBuiltInElementAccessLengthFormula(
+                        sourceExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var sourceLength,
+                        getSymbolVersion,
+                        inlineDepth))
+                {
+                    return false;
+                }
+
+                if (method.Parameters.Length == 1)
+                {
+                    if (invocationOperation.Arguments.Length != 1 ||
+                        !TryTranslateIntInvocationArgument(
+                            invocationOperation,
+                            parameterIndex: 0,
+                            semanticModel,
+                            cancellationToken,
+                            out var start,
+                            getSymbolVersion,
+                            inlineDepth))
+                    {
+                        return false;
+                    }
+
+                    lengthFormula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, sourceLength, start);
+                    return true;
+                }
+
+                if (method.Parameters.Length != 2 ||
+                    invocationOperation.Arguments.Length != 2 ||
+                    !TryTranslateIntInvocationArgument(
+                        invocationOperation,
+                        parameterIndex: 0,
+                        semanticModel,
+                        cancellationToken,
+                        out _,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    !TryTranslateIntInvocationArgument(
+                        invocationOperation,
+                        parameterIndex: 1,
+                        semanticModel,
+                        cancellationToken,
+                        out var count,
+                        getSymbolVersion,
+                        inlineDepth))
+                {
+                    return false;
+                }
+
+                lengthFormula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, sourceLength, count);
+                return true;
+            }
+
+            if (method.Name == "Insert")
+            {
+                if (method.Parameters.Length != 2 ||
+                    method.Parameters[1].Type.SpecialType != SpecialType.System_String ||
+                    invocationOperation.Arguments.Length != 2 ||
+                    !TryCreateBuiltInElementAccessLengthFormula(
+                        sourceExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var sourceLength,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    !TryTranslateIntInvocationArgument(
+                        invocationOperation,
+                        parameterIndex: 0,
+                        semanticModel,
+                        cancellationToken,
+                        out _,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 1, out var valueExpression) ||
+                    !TryCreateBuiltInElementAccessLengthFormula(
+                        valueExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var valueLength,
+                        getSymbolVersion,
+                        inlineDepth))
+                {
+                    return false;
+                }
+
+                lengthFormula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, sourceLength, valueLength);
+                return true;
+            }
+
+            if (method.Name is "PadLeft" or "PadRight")
+            {
+                if ((method.Parameters.Length != 1 &&
+                        (method.Parameters.Length != 2 ||
+                            method.Parameters[1].Type.SpecialType != SpecialType.System_Char)) ||
+                    invocationOperation.Arguments.Length != method.Parameters.Length ||
+                    !TryCreateBuiltInElementAccessLengthFormula(
+                        sourceExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var sourceLength,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    !TryTranslateIntInvocationArgument(
+                        invocationOperation,
+                        parameterIndex: 0,
+                        semanticModel,
+                        cancellationToken,
+                        out var totalWidth,
+                        getSymbolVersion,
+                        inlineDepth))
+                {
+                    return false;
+                }
+
+                lengthFormula = new SmtConditionalFormula(
+                    new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, totalWidth, sourceLength),
+                    totalWidth,
+                    sourceLength,
+                    SmtValueKind.Int);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryTranslateIntInvocationArgument(
+            IInvocationOperation invocationOperation,
+            int parameterIndex,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula argument,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            argument = null!;
+            if (parameterIndex < 0 ||
+                parameterIndex >= invocationOperation.TargetMethod.Parameters.Length ||
+                invocationOperation.TargetMethod.Parameters[parameterIndex].Type.SpecialType != SpecialType.System_Int32 ||
+                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex, out var argumentExpression) ||
+                !TryTranslateValue(
+                    argumentExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var candidate,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                candidate is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            argument = candidate;
+            return true;
+        }
+
+        private static bool TryGetInvocationArgumentExpression(
+            IInvocationOperation invocationOperation,
+            int parameterIndex,
+            out ExpressionSyntax expression)
+        {
+            expression = null!;
+            if (parameterIndex < 0 ||
+                parameterIndex >= invocationOperation.TargetMethod.Parameters.Length)
+            {
+                return false;
+            }
+
+            var parameter = invocationOperation.TargetMethod.Parameters[parameterIndex];
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (SymbolEqualityComparer.Default.Equals(argument.Parameter, parameter) &&
+                    argument.Value.Syntax is ExpressionSyntax argumentExpression)
+                {
+                    expression = argumentExpression;
+                    return true;
+                }
+            }
+
+            if (parameterIndex < invocationOperation.Arguments.Length &&
+                invocationOperation.Arguments[parameterIndex].Value.Syntax is ExpressionSyntax fallbackExpression)
+            {
+                expression = fallbackExpression;
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryCreateBuiltInRangeAccessResultLengthFormula(

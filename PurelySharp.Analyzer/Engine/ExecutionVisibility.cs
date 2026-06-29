@@ -161,19 +161,13 @@ namespace PurelySharp.Analyzer.Engine
             CancellationToken cancellationToken,
             SmtAnalysisService? smtAnalysis)
         {
-            if (smtAnalysis == null)
-            {
-                return false;
-            }
-
             if (IsInReachableConstantSwitchGotoSection(syntaxNode, semanticModel))
             {
                 return false;
             }
 
-            var analysis = new SymbolicInvariantService().AnalyzeAt(syntaxNode, semanticModel, smtAnalysis, cancellationToken);
-            return analysis.PathConditions.Count > 0 &&
-                analysis.Reachability == SymbolicReachability.Unreachable;
+            var pathConditions = CollectPathConditionsAt(syntaxNode, semanticModel, cancellationToken);
+            return PathConditionsAreUnsatisfiable(pathConditions, smtAnalysis);
         }
 
         private static bool IsInReachableConstantSwitchGotoSection(SyntaxNode syntaxNode, SemanticModel semanticModel)
@@ -197,11 +191,6 @@ namespace PurelySharp.Analyzer.Engine
             CancellationToken cancellationToken,
             SmtAnalysisService? smtAnalysis)
         {
-            if (smtAnalysis == null)
-            {
-                return false;
-            }
-
             var section = switchStatement.Sections.FirstOrDefault(candidate => candidate.Span.Contains(syntaxNode.SpanStart));
             if (section == null ||
                 !SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
@@ -219,7 +208,10 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            return IsFormulaAlwaysFalseUsingSmt(sectionCondition, smtAnalysis);
+            return IsFormulaAlwaysFalseUsingSmt(
+                sectionCondition,
+                CollectPathConditionsAt(switchStatement, semanticModel, cancellationToken),
+                smtAnalysis);
         }
 
         private static bool IsReachableConstantSwitchGotoTarget(
@@ -387,11 +379,6 @@ namespace PurelySharp.Analyzer.Engine
             CancellationToken cancellationToken,
             SmtAnalysisService? smtAnalysis)
         {
-            if (smtAnalysis == null)
-            {
-                return false;
-            }
-
             var arm = switchExpression.Arms.FirstOrDefault(candidate => candidate.Expression.Span.Contains(syntaxNode.SpanStart));
             if (arm == null ||
                 !SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
@@ -404,16 +391,28 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
-            return IsFormulaAlwaysFalseUsingSmt(armCondition, smtAnalysis);
+            return IsFormulaAlwaysFalseUsingSmt(
+                armCondition,
+                CollectPathConditionsAt(switchExpression, semanticModel, cancellationToken),
+                smtAnalysis);
         }
 
-        private static bool IsFormulaAlwaysFalseUsingSmt(SmtFormula formula, SmtAnalysisService smtAnalysis)
+        private static bool IsFormulaAlwaysFalseUsingSmt(SmtFormula formula, SmtAnalysisService? smtAnalysis)
+        {
+            return IsFormulaAlwaysFalseUsingSmt(formula, Array.Empty<SmtFormula>(), smtAnalysis);
+        }
+
+        private static bool IsFormulaAlwaysFalseUsingSmt(
+            SmtFormula formula,
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            SmtAnalysisService? smtAnalysis)
         {
             var query = new PurityProofQuery(
-                Array.Empty<SmtFormula>(),
+                pathConditions.ToArray(),
                 new PurityHazard(PurityHazardKind.BranchReachability, formula));
 
-            var proofResult = smtAnalysis.Classify(query);
+            using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
+            var proofResult = (smtAnalysis ?? fallbackSmtAnalysis!).Classify(query);
             return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
         }
 
@@ -428,13 +427,18 @@ namespace PurelySharp.Analyzer.Engine
                 return false;
             }
 
+            var pathConditions = CollectPathConditionsAt(forStatement, semanticModel, cancellationToken);
             if (!CSharpConditionToFormula.TryTranslate(forStatement.Condition, semanticModel, cancellationToken, out var formula) ||
                 formula == null)
             {
-                return IsConditionAlwaysFalseUsingSmt(forStatement.Condition, semanticModel, cancellationToken, smtAnalysis);
+                return EvaluateKnownBoolean(
+                    forStatement.Condition,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis,
+                    pathConditions) == KnownBooleanValue.False;
             }
 
-            var pathConditions = SymbolicProgramPointFacts.CollectPriorAssignmentFacts(forStatement, semanticModel, cancellationToken);
             foreach (var initializerFact in SymbolicProgramPointFacts.CollectForInitializerFacts(forStatement, semanticModel, cancellationToken))
             {
                 pathConditions.Add(initializerFact);
@@ -456,7 +460,7 @@ namespace PurelySharp.Analyzer.Engine
                 semanticModel,
                 cancellationToken,
                 smtAnalysis,
-                SymbolicProgramPointFacts.CollectPriorAssignmentFacts(site, semanticModel, cancellationToken)) == KnownBooleanValue.False;
+                CollectPathConditionsAt(site, semanticModel, cancellationToken)) == KnownBooleanValue.False;
         }
 
         private static bool IsConditionAlwaysTrueAt(
@@ -471,7 +475,7 @@ namespace PurelySharp.Analyzer.Engine
                 semanticModel,
                 cancellationToken,
                 smtAnalysis,
-                SymbolicProgramPointFacts.CollectPriorAssignmentFacts(site, semanticModel, cancellationToken)) == KnownBooleanValue.True;
+                CollectPathConditionsAt(site, semanticModel, cancellationToken)) == KnownBooleanValue.True;
         }
 
         public static bool IsConditionAlwaysTrue(
@@ -699,6 +703,33 @@ namespace PurelySharp.Analyzer.Engine
             using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
             var proofResult = (smtAnalysis ?? fallbackSmtAnalysis!).Classify(query);
             return proofResult.Outcome == PurityProofOutcome.ProvablyPure;
+        }
+
+        private static List<SmtFormula> CollectPathConditionsAt(
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var pathConditions = SymbolicProgramPointFacts
+                .CollectAncestorReachabilityConditions(site, semanticModel, cancellationToken)
+                .ToList();
+            pathConditions.AddRange(SymbolicProgramPointFacts.CollectPriorAssignmentFacts(site, semanticModel, cancellationToken));
+            return pathConditions;
+        }
+
+        private static bool PathConditionsAreUnsatisfiable(
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            SmtAnalysisService? smtAnalysis)
+        {
+            if (pathConditions.Count == 0)
+            {
+                return false;
+            }
+
+            using var fallbackSmtAnalysis = smtAnalysis == null ? new SmtAnalysisService(SmtAnalysisOptions.Default) : null;
+            return (smtAnalysis ?? fallbackSmtAnalysis!)
+                .ClassifyPathFeasibility(pathConditions)
+                .PathFeasibility == Feasibility.Unsatisfiable;
         }
 
         private enum KnownBooleanValue

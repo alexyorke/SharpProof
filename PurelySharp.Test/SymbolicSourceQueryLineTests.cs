@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NUnit.Framework;
@@ -401,6 +404,220 @@ public class TestClass
             Assert.That(filtered.ConditionProofs.Single(summary => summary.Condition == "value > 0").ProvenTrueCount, Is.GreaterThan(0));
         }
 
+        [Test]
+        public void SymbolicSourceQueryResult_ToCompactResult_AppliesPointBoundsAndJsonShape()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "CompactPointQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "CompactPointQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var position = FindPosition(source, "return value;");
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAtPosition(
+                syntaxTree,
+                compilation,
+                position,
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "value > 0" });
+            var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+                maxProgramPoints: 0,
+                maxFacts: 0,
+                maxConditions: 0,
+                maxProofs: 0));
+
+            Assert.That(compact.Kind, Is.EqualTo("point"));
+            Assert.That(compact.Line, Is.EqualTo(result.Line));
+            Assert.That(compact.Column, Is.EqualTo(result.Column));
+            Assert.That(compact.Position, Is.EqualTo(position));
+            Assert.That(compact.NodeKind, Is.EqualTo("ReturnStatement"));
+            Assert.That(compact.ProgramPointCount, Is.EqualTo(1));
+            Assert.That(compact.ProgramPoints, Is.Empty);
+            Assert.That(compact.Truncation.ProgramPoints, Is.True);
+            Assert.That(compact.Truncation.Facts, Is.EqualTo(result.Facts.Count > 0));
+            Assert.That(compact.Truncation.Conditions, Is.EqualTo(result.PathConditionCount > 0));
+            Assert.That(compact.Truncation.Proofs, Is.EqualTo(result.ConditionProofs.Count > 0));
+            Assert.That(compact.ObservedInvariant.RawFactCount, Is.EqualTo(result.Facts.Count));
+            Assert.That(compact.ObservedInvariant.RawFacts, Is.Empty);
+            Assert.That(compact.ConservativeInvariant.ConditionCount, Is.EqualTo(result.Invariant.ConditionCount));
+            Assert.That(compact.ConservativeInvariant.Conditions, Is.Empty);
+
+            var json = JsonSerializer.Serialize(
+                compact,
+                new JsonSerializerOptions
+                {
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    Converters = { new JsonStringEnumConverter() },
+                });
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            Assert.That(root.TryGetProperty("kind", out var kind), Is.True);
+            Assert.That(kind.GetString(), Is.EqualTo("point"));
+            Assert.That(root.TryGetProperty("Kind", out _), Is.False);
+            Assert.That(root.TryGetProperty("lineCount", out _), Is.False);
+            Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.Zero);
+            Assert.That(root.GetProperty("truncation").GetProperty("isTruncated").GetBoolean(), Is.True);
+        }
+
+        [Test]
+        public void SymbolicLineQueryResult_ToCompactResult_SeparatesObservedRawFactsFromConservativeMerge()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0) { return value; } else { return 0; }
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "CompactLineQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "CompactLineQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "if (value > 0)"),
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "value > 0" });
+            var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+                maxProgramPoints: 1,
+                maxFacts: 1,
+                maxConditions: 1,
+                maxProofs: 1));
+
+            Assert.That(compact.Kind, Is.EqualTo("line"));
+            Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
+            Assert.That(compact.ProgramPoints, Has.Count.EqualTo(1));
+            Assert.That(compact.Truncation.ProgramPoints, Is.EqualTo(result.ProgramPoints.Count > 1));
+            Assert.That(compact.ObservedInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.DistinctFactUnion.ToString()));
+            Assert.That(compact.ObservedInvariant.RawFactCount, Is.EqualTo(result.Facts.Count));
+            Assert.That(compact.ObservedInvariant.RawFacts, Is.EqualTo(result.Facts.Take(1)));
+            Assert.That(compact.ObservedInvariant.Text, Does.Contain("GreaterThan"));
+            Assert.That(compact.ConservativeInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge.ToString()));
+            Assert.That(compact.ConservativeInvariant.Text, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(compact.ConservativeInvariant.MergedPathFacts, Is.Not.Null);
+            Assert.That(compact.ConservativeInvariant.MergedPathFacts!.ConservativeUnknowns, Does.Contain("unknown(value)"));
+            Assert.That(compact.Reachability.ReachableCount, Is.EqualTo(result.ProgramPointSummary.Reachability.ReachableCount));
+            Assert.That(compact.SmtDiagnostics.IsConfigured, Is.True);
+            Assert.That(compact.SmtDiagnostics.Mode, Is.EqualTo(SmtAnalysisMode.Bounded.ToString()));
+        }
+
+        [Test]
+        public void SymbolicFileQueryResult_ToCompactResult_AppliesOutputBounds()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0) { return value; }
+        if (value < 0) { return -value; }
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "CompactFileQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "CompactFileQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+                syntaxTree,
+                compilation,
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "value > 0" });
+            var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+                maxLines: 1,
+                maxProgramPoints: 1,
+                maxFacts: 0,
+                maxConditions: 0,
+                maxProofs: 0));
+
+            Assert.That(compact.Kind, Is.EqualTo("file"));
+            Assert.That(compact.LineCount, Is.EqualTo(result.LineCount));
+            Assert.That(compact.Lines, Has.Count.EqualTo(1));
+            Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+            Assert.That(compact.Truncation.Lines, Is.EqualTo(result.Lines.Count > 1));
+            Assert.That(compact.Truncation.ProgramPoints, Is.EqualTo(result.ProgramPointCount > 1));
+            Assert.That(compact.Truncation.Facts, Is.EqualTo(result.ObservedFactCount > 0));
+            Assert.That(compact.Truncation.Conditions, Is.EqualTo(result.MergedInvariant.ConditionCount > 0));
+            Assert.That(compact.Truncation.Proofs, Is.EqualTo(result.ConditionProofs.Count > 0));
+            Assert.That(compact.ObservedInvariant.RawFactCount, Is.EqualTo(result.ObservedFactCount));
+            Assert.That(compact.ObservedInvariant.RawFacts, Is.Empty);
+            Assert.That(compact.ConservativeInvariant.Text, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(compact.ConservativeInvariant.MergedPathFacts, Is.Not.Null);
+            Assert.That(compact.ConservativeInvariant.MergedPathFacts!.MaybeFactCount, Is.EqualTo(result.MergedPathFacts.MaybeFacts.Count));
+            Assert.That(compact.ConservativeInvariant.MergedPathFacts.MaybeFacts, Is.Empty);
+            Assert.That(compact.SmtDiagnostics.IsConfigured, Is.True);
+        }
+
+        [Test]
+        public async Task SymbolicCli_RejectsInvalidCompactOptionCombinations()
+        {
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliInvalidOptions-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
+            try
+            {
+                var jsonAndCompact = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--position",
+                    "0",
+                    "--json",
+                    "--compact-json");
+                Assert.That(jsonAndCompact.ExitCode, Is.EqualTo(64));
+                Assert.That(jsonAndCompact.StandardError, Does.Contain("--json cannot be combined with --compact-json."));
+
+                var maxLinesWithoutCompact = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--position",
+                    "0",
+                    "--max-lines",
+                    "1");
+                Assert.That(maxLinesWithoutCompact.ExitCode, Is.EqualTo(64));
+                Assert.That(maxLinesWithoutCompact.StandardError, Does.Contain("require --compact-json"));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
         private static int FindLine(string source, string text)
         {
             var lines = source.Split('\n');
@@ -439,6 +656,57 @@ public class TestClass
             }
 
             return position;
+        }
+
+        private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunSymbolicCliAsync(params string[] arguments)
+        {
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                WorkingDirectory = FindRepositoryRoot(),
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            startInfo.ArgumentList.Add("run");
+            startInfo.ArgumentList.Add("--project");
+            startInfo.ArgumentList.Add(Path.Combine("Tools", "PurelySharp.SymbolicCli", "PurelySharp.SymbolicCli.csproj"));
+            startInfo.ArgumentList.Add("--");
+            foreach (var argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start symbolic CLI.");
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            try
+            {
+                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(90));
+            }
+            catch (TimeoutException)
+            {
+                process.Kill(entireProcessTree: true);
+                throw;
+            }
+
+            return (process.ExitCode, await outputTask, await errorTask);
+        }
+
+        private static string FindRepositoryRoot()
+        {
+            var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+            while (directory != null)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "PurelySharp.sln")))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+
+            throw new InvalidOperationException("Could not find repository root.");
         }
 
         private static int FindBlankLine(string source)

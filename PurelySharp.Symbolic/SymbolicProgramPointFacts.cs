@@ -2019,22 +2019,108 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            if (iterationSymbol == null ||
-                !TryGetFiniteElementExpressions(expressionSyntax, foreachStatement, semanticModel, cancellationToken, out var elementExpressions))
+            if (iterationSymbol == null)
             {
                 return;
             }
 
+            if (TryGetFiniteElementExpressions(expressionSyntax, out var elementExpressions))
+            {
+                AddFiniteForeachIterationExpressionFacts(
+                    facts,
+                    iterationSymbol,
+                    elementExpressions,
+                    semanticModel,
+                    cancellationToken);
+                return;
+            }
+
+            if (TryGetPriorAssignedFiniteArrayElementValueFormulas(
+                    expressionSyntax,
+                    foreachStatement,
+                    semanticModel,
+                    cancellationToken,
+                    out var elementValueFormulas))
+            {
+                AddFiniteForeachIterationValueFormulaFacts(facts, iterationSymbol, elementValueFormulas);
+                return;
+            }
+
+            if (TryGetPriorAssignedFiniteElementExpressions(
+                    expressionSyntax,
+                    foreachStatement,
+                    semanticModel,
+                    cancellationToken,
+                    out elementExpressions))
+            {
+                AddFiniteForeachIterationExpressionFacts(
+                    facts,
+                    iterationSymbol,
+                    elementExpressions,
+                    semanticModel,
+                    cancellationToken);
+            }
+        }
+
+        private static void AddFiniteForeachIterationExpressionFacts(
+            ICollection<SmtFormula> facts,
+            ILocalSymbol iterationSymbol,
+            ImmutableArray<ExpressionSyntax> elementExpressions,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
             SmtFormula? finiteDomainFact = null;
+            var allReferenceElementsDefinitelyNonNull = GetSymbolType(iterationSymbol.OriginalDefinition)?.IsReferenceType == true;
             foreach (var elementExpression in elementExpressions)
             {
-                if (ExpressionReferencesSymbol(elementExpression, iterationSymbol.OriginalDefinition, semanticModel, cancellationToken) ||
-                    !TryCreateAssignedValueFact(
+                if (ExpressionReferencesSymbol(elementExpression, iterationSymbol.OriginalDefinition, semanticModel, cancellationToken))
+                {
+                    return;
+                }
+
+                if (TryCreateAssignedValueFact(
                         iterationSymbol.OriginalDefinition,
                         elementExpression,
                         semanticModel,
                         cancellationToken,
                         out var elementValueFact))
+                {
+                    finiteDomainFact = finiteDomainFact == null
+                        ? elementValueFact
+                        : new SmtBinaryFormula(SmtBinaryOperator.Or, finiteDomainFact, elementValueFact);
+                }
+                else if (!allReferenceElementsDefinitelyNonNull)
+                {
+                    return;
+                }
+
+                allReferenceElementsDefinitelyNonNull =
+                    allReferenceElementsDefinitelyNonNull &&
+                    IsDefinitelyNonNullReferenceValue(elementExpression, semanticModel, cancellationToken);
+            }
+
+            if (finiteDomainFact != null)
+            {
+                facts.Add(finiteDomainFact);
+            }
+
+            if (allReferenceElementsDefinitelyNonNull &&
+                TryCreateSymbolSmtValue(iterationSymbol.OriginalDefinition, out var iterationFormula) &&
+                iterationFormula is { Kind: SmtValueKind.Reference })
+            {
+                facts.Add(CreateReferenceNonNullFormula(iterationFormula));
+            }
+        }
+
+        private static void AddFiniteForeachIterationValueFormulaFacts(
+            ICollection<SmtFormula> facts,
+            ILocalSymbol iterationSymbol,
+            ImmutableArray<SmtFormula> elementValueFormulas)
+        {
+            SmtFormula? finiteDomainFact = null;
+            foreach (var elementValueFormula in elementValueFormulas)
+            {
+                if (!TryCreateAssignedValueFact(iterationSymbol.OriginalDefinition, elementValueFormula, out var elementValueFact))
                 {
                     return;
                 }
@@ -2121,13 +2207,199 @@ namespace PurelySharp.Symbolic
 
                 if (TryGetFiniteElementsFromAssignmentStatement(statement, receiverSymbol, semanticModel, cancellationToken, out elementExpressions))
                 {
+                    if (AnyStatementInvalidatesPriorAssignedFiniteElements(
+                            containingBlock,
+                            index + 1,
+                            foreachStatement.SpanStart,
+                            receiverSymbol,
+                            semanticModel,
+                            cancellationToken) ||
+                        AnyReferencedElementSymbolInvalidatedAfterAssignment(
+                            elementExpressions,
+                            containingBlock,
+                            index + 1,
+                            foreachStatement.SpanStart,
+                            receiverSymbol,
+                            semanticModel,
+                            cancellationToken))
+                    {
+                        elementExpressions = ImmutableArray<ExpressionSyntax>.Empty;
+                        return false;
+                    }
+
                     return true;
                 }
 
-                if (StatementMutatesSymbol(statement, receiverSymbol, semanticModel, cancellationToken))
+                if (StatementInvalidatesPriorAssignedFiniteElements(statement, receiverSymbol, semanticModel, cancellationToken))
                 {
                     elementExpressions = ImmutableArray<ExpressionSyntax>.Empty;
                     return false;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryGetPriorAssignedFiniteArrayElementValueFormulas(
+            ExpressionSyntax expressionSyntax,
+            StatementSyntax foreachStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ImmutableArray<SmtFormula> valueFormulas)
+        {
+            valueFormulas = ImmutableArray<SmtFormula>.Empty;
+            if (semanticModel.GetSymbolInfo(UnwrapExpression(expressionSyntax), cancellationToken).Symbol?.OriginalDefinition is not { } receiverSymbol ||
+                receiverSymbol is not ILocalSymbol and not IParameterSymbol ||
+                GetSymbolType(receiverSymbol) is not IArrayTypeSymbol { Rank: 1 } arrayType ||
+                !TryGetPriorAssignedFiniteElementCount(
+                    expressionSyntax,
+                    foreachStatement,
+                    semanticModel,
+                    cancellationToken,
+                    out var elementCount))
+            {
+                return false;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<SmtFormula>(elementCount);
+            for (var index = 0; index < elementCount; index++)
+            {
+                if (!TryCreateArrayElementSmtValue(receiverSymbol, arrayType.ElementType, index, out var elementFormula))
+                {
+                    valueFormulas = ImmutableArray<SmtFormula>.Empty;
+                    return false;
+                }
+
+                builder.Add(elementFormula);
+            }
+
+            valueFormulas = builder.ToImmutable();
+            return true;
+        }
+
+        private static bool TryGetPriorAssignedFiniteElementCount(
+            ExpressionSyntax expressionSyntax,
+            StatementSyntax containingStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out int elementCount)
+        {
+            elementCount = 0;
+            if (containingStatement.Parent is not BlockSyntax containingBlock ||
+                semanticModel.GetSymbolInfo(UnwrapExpression(expressionSyntax), cancellationToken).Symbol?.OriginalDefinition is not { } receiverSymbol ||
+                receiverSymbol is not ILocalSymbol and not IParameterSymbol)
+            {
+                return false;
+            }
+
+            for (var index = containingBlock.Statements.Count - 1; index >= 0; index--)
+            {
+                var statement = containingBlock.Statements[index];
+                if (statement.SpanStart >= containingStatement.SpanStart)
+                {
+                    continue;
+                }
+
+                if (TryGetFiniteElementsFromAssignmentStatement(statement, receiverSymbol, semanticModel, cancellationToken, out var elementExpressions))
+                {
+                    if (AnyStatementInvalidatesPriorAssignedFiniteElements(
+                            containingBlock,
+                            index + 1,
+                            containingStatement.SpanStart,
+                            receiverSymbol,
+                            semanticModel,
+                            cancellationToken))
+                    {
+                        elementCount = 0;
+                        return false;
+                    }
+
+                    elementCount = elementExpressions.Length;
+                    return true;
+                }
+
+                if (StatementInvalidatesPriorAssignedFiniteElements(statement, receiverSymbol, semanticModel, cancellationToken))
+                {
+                    elementCount = 0;
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool AnyStatementInvalidatesPriorAssignedFiniteElements(
+            BlockSyntax containingBlock,
+            int firstStatementIndex,
+            int beforeSpanStart,
+            ISymbol receiverSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            for (var index = firstStatementIndex; index < containingBlock.Statements.Count; index++)
+            {
+                var statement = containingBlock.Statements[index];
+                if (statement.SpanStart >= beforeSpanStart)
+                {
+                    break;
+                }
+
+                if (StatementInvalidatesPriorAssignedFiniteElements(statement, receiverSymbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool StatementInvalidatesPriorAssignedFiniteElements(
+            StatementSyntax statement,
+            ISymbol receiverSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return StatementMutatesSymbol(statement, receiverSymbol, semanticModel, cancellationToken) ||
+                StatementMayMutateSymbolThroughReference(statement, receiverSymbol, semanticModel, cancellationToken);
+        }
+
+        private static bool AnyReferencedElementSymbolInvalidatedAfterAssignment(
+            ImmutableArray<ExpressionSyntax> elementExpressions,
+            BlockSyntax containingBlock,
+            int firstStatementIndex,
+            int beforeSpanStart,
+            ISymbol receiverSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var referencedSymbols = ImmutableArray.CreateBuilder<ISymbol>();
+            foreach (var elementExpression in elementExpressions)
+            {
+                foreach (var referencedSymbol in GetReferencedLocalAndParameterSymbols(elementExpression, semanticModel, cancellationToken))
+                {
+                    if (SymbolEqualityComparer.Default.Equals(referencedSymbol, receiverSymbol))
+                    {
+                        return true;
+                    }
+
+                    if (referencedSymbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, referencedSymbol)))
+                    {
+                        referencedSymbols.Add(referencedSymbol);
+                    }
+                }
+            }
+
+            foreach (var referencedSymbol in referencedSymbols)
+            {
+                if (AnyStatementInvalidatesPriorAssignedFiniteElements(
+                        containingBlock,
+                        firstStatementIndex,
+                        beforeSpanStart,
+                        referencedSymbol,
+                        semanticModel,
+                        cancellationToken))
+                {
+                    return true;
                 }
             }
 
@@ -2284,18 +2556,21 @@ namespace PurelySharp.Symbolic
                     _ => null
                 };
 
-                if (mutatedExpression == null)
+                if (mutatedExpression != null)
                 {
-                    continue;
+                    var mutatedSymbol = semanticModel.GetSymbolInfo(mutatedExpression, cancellationToken).Symbol;
+                    if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
+                    {
+                        RemoveFactsReferencingSymbol(facts, mutatedSymbol.OriginalDefinition);
+                    }
+
+                    foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel, cancellationToken))
+                    {
+                        RemoveFactsReferencingSymbol(facts, receiverSymbol);
+                    }
                 }
 
-                var mutatedSymbol = semanticModel.GetSymbolInfo(mutatedExpression, cancellationToken).Symbol;
-                if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
-                {
-                    RemoveFactsReferencingSymbol(facts, mutatedSymbol.OriginalDefinition);
-                }
-
-                foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel, cancellationToken))
+                foreach (var receiverSymbol in GetPotentiallyMutatedArraySymbols(node, semanticModel, cancellationToken))
                 {
                     RemoveFactsReferencingSymbol(facts, receiverSymbol);
                 }
@@ -2324,6 +2599,113 @@ namespace PurelySharp.Symbolic
             {
                 yield return receiverSymbol;
             }
+        }
+
+        private static IEnumerable<ISymbol> GetPotentiallyMutatedArraySymbols(
+            SyntaxNode node,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            switch (node)
+            {
+                case InvocationExpressionSyntax invocation:
+                    if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
+                    {
+                        foreach (var symbol in GetReferencedArraySymbols(memberAccess.Expression, semanticModel, cancellationToken))
+                        {
+                            yield return symbol;
+                        }
+                    }
+
+                    foreach (var argument in invocation.ArgumentList.Arguments)
+                    {
+                        foreach (var symbol in GetReferencedArraySymbols(argument.Expression, semanticModel, cancellationToken))
+                        {
+                            yield return symbol;
+                        }
+                    }
+
+                    break;
+                case ObjectCreationExpressionSyntax { ArgumentList: { } argumentList }:
+                    foreach (var argument in argumentList.Arguments)
+                    {
+                        foreach (var symbol in GetReferencedArraySymbols(argument.Expression, semanticModel, cancellationToken))
+                        {
+                            yield return symbol;
+                        }
+                    }
+
+                    break;
+            }
+        }
+
+        private static IEnumerable<ISymbol> GetReferencedArraySymbols(
+            SyntaxNode root,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var symbol in GetReferencedLocalAndParameterSymbols(root, semanticModel, cancellationToken))
+            {
+                if (GetSymbolType(symbol) is IArrayTypeSymbol)
+                {
+                    yield return symbol;
+                }
+            }
+        }
+
+        private static bool StatementMayMutateSymbolThroughReference(
+            StatementSyntax statement,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (!IsPotentiallyMutableThroughReference(GetSymbolType(symbol)))
+            {
+                return false;
+            }
+
+            foreach (var node in statement.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+            {
+                if (NodeMayMutateSymbolThroughReference(node, symbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool NodeMayMutateSymbolThroughReference(
+            SyntaxNode node,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            switch (node)
+            {
+                case InvocationExpressionSyntax invocation:
+                    if (invocation.Expression is MemberAccessExpressionSyntax memberAccess &&
+                        ExpressionReferencesSymbol(memberAccess.Expression, symbol, semanticModel, cancellationToken))
+                    {
+                        return true;
+                    }
+
+                    return invocation.ArgumentList.Arguments.Any(argument =>
+                        ExpressionReferencesSymbol(argument.Expression, symbol, semanticModel, cancellationToken));
+                case ObjectCreationExpressionSyntax { ArgumentList: { } argumentList }:
+                    return argumentList.Arguments.Any(argument =>
+                        ExpressionReferencesSymbol(argument.Expression, symbol, semanticModel, cancellationToken));
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsPotentiallyMutableThroughReference(ITypeSymbol? type)
+        {
+            return type is IArrayTypeSymbol ||
+                type?.IsReferenceType == true &&
+                type.SpecialType != SpecialType.System_String;
         }
 
         private static void AddAssignedValueFacts(
@@ -2380,6 +2762,11 @@ namespace PurelySharp.Symbolic
                 TryCreateBuiltInLengthFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var lengthFact))
             {
                 facts.Add(lengthFact);
+            }
+
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
+            {
+                AddFiniteArrayElementAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
@@ -2753,6 +3140,68 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
+        private static void AddFiniteArrayElementAssignedValueFacts(
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (GetSymbolType(assignedSymbol) is not IArrayTypeSymbol { Rank: 1 } arrayType ||
+                !TryGetFiniteElementExpressions(valueExpression, out var elementExpressions))
+            {
+                return;
+            }
+
+            for (var index = 0; index < elementExpressions.Length; index++)
+            {
+                if (!TryCreateArrayElementSmtValue(assignedSymbol, arrayType.ElementType, index, out var targetFormula))
+                {
+                    return;
+                }
+
+                var elementExpression = elementExpressions[index];
+                if (!ExpressionReferencesSymbol(elementExpression, assignedSymbol, semanticModel, cancellationToken) &&
+                    TryTranslateAssignedValueExpression(
+                        elementExpression,
+                        semanticModel,
+                        cancellationToken,
+                        assignedSymbol,
+                        out var valueFormula) &&
+                    valueFormula != null &&
+                    CanCompareSmtValues(targetFormula, valueFormula))
+                {
+                    facts.Add(CreateAssignedValueFact(targetFormula, valueFormula));
+                }
+
+                if (targetFormula.Kind == SmtValueKind.Reference &&
+                    IsDefinitelyNonNullReferenceValue(elementExpression, semanticModel, cancellationToken))
+                {
+                    facts.Add(CreateReferenceNonNullFormula(targetFormula));
+                }
+            }
+        }
+
+        private static bool TryCreateArrayElementSmtValue(
+            ISymbol arraySymbol,
+            ITypeSymbol elementType,
+            int index,
+            out SmtFormula formula)
+        {
+            formula = null!;
+            if (!TryCreateSymbolSmtValue(arraySymbol, out var receiverFormula) ||
+                receiverFormula.Kind != SmtValueKind.Reference ||
+                !TryGetValueKind(elementType, out var elementKind))
+            {
+                return false;
+            }
+
+            formula = new SmtVariable(
+                GetSmtVariableName(arraySymbol) + "[" + index.ToString(System.Globalization.CultureInfo.InvariantCulture) + "]",
+                elementKind);
+            return true;
+        }
+
         private static void AddElementAssignmentFact(
             AssignmentExpressionSyntax assignment,
             SemanticModel semanticModel,
@@ -2805,40 +3254,57 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var containingStatement = valueExpression.AncestorsAndSelf().OfType<StatementSyntax>().FirstOrDefault();
-            var hasFiniteElements = TryGetFiniteElementExpressions(elementAccess.Expression, out var elementExpressions) ||
-                containingStatement != null &&
-                TryGetPriorAssignedFiniteElementExpressions(
-                    elementAccess.Expression,
-                    containingStatement,
-                    semanticModel,
-                    cancellationToken,
-                    out elementExpressions);
-
-            if (!hasFiniteElements ||
-                !TryGetFiniteElementIndex(
+            if (TryGetFiniteElementExpressions(elementAccess.Expression, out var elementExpressions))
+            {
+                if (!TryGetFiniteElementIndex(
                     elementAccess.ArgumentList.Arguments[0].Expression,
                     elementExpressions.Length,
                     semanticModel,
                     cancellationToken,
                     out var index))
+                {
+                    return false;
+                }
+
+                var elementExpression = elementExpressions[index];
+                if (assignedSymbol != null &&
+                    ExpressionReferencesSymbol(elementExpression, assignedSymbol, semanticModel, cancellationToken))
+                {
+                    return false;
+                }
+
+                return TryTranslateAssignedValueExpression(
+                    elementExpression,
+                    semanticModel,
+                    cancellationToken,
+                    assignedSymbol,
+                    out formula);
+            }
+
+            var containingStatement = valueExpression.AncestorsAndSelf().OfType<StatementSyntax>().FirstOrDefault();
+            if (containingStatement == null ||
+                !TryGetPriorAssignedFiniteElementCount(
+                    elementAccess.Expression,
+                    containingStatement,
+                    semanticModel,
+                    cancellationToken,
+                    out var elementCount) ||
+                !TryGetFiniteElementIndex(
+                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    elementCount,
+                    semanticModel,
+                    cancellationToken,
+                    out var priorIndex) ||
+                semanticModel.GetSymbolInfo(UnwrapExpression(elementAccess.Expression), cancellationToken).Symbol?.OriginalDefinition is not { } receiverSymbol ||
+                receiverSymbol is not ILocalSymbol and not IParameterSymbol ||
+                GetSymbolType(receiverSymbol) is not IArrayTypeSymbol { Rank: 1 } arrayType ||
+                !TryCreateArrayElementSmtValue(receiverSymbol, arrayType.ElementType, priorIndex, out formula))
             {
+                formula = null;
                 return false;
             }
 
-            var elementExpression = elementExpressions[index];
-            if (assignedSymbol != null &&
-                ExpressionReferencesSymbol(elementExpression, assignedSymbol, semanticModel, cancellationToken))
-            {
-                return false;
-            }
-
-            return TryTranslateAssignedValueExpression(
-                elementExpression,
-                semanticModel,
-                cancellationToken,
-                assignedSymbol,
-                out formula);
+            return true;
         }
 
         private static bool TryGetFiniteElementIndex(

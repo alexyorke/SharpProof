@@ -1094,6 +1094,63 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_EarlyExitGuardPrunesSwitchSectionWithPathFacts()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value < 0)
+        {
+            return 0;
+        }
+
+        switch (value)
+        {
+            case < 0:
+                return 1;
+        }
+
+        return 2;
+    }
+}",
+                    "return 1;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_EarlyExitGuardMutationBeforeSwitch_RemainsConservative()
+        {
+            Assert.That(
+                IsStatementUnreachable(
+                    @"
+public class TestClass
+{
+    public int TestMethod(int value, int replacement)
+    {
+        if (value < 0)
+        {
+            return 0;
+        }
+
+        value = replacement;
+        switch (value)
+        {
+            case < 0:
+                return 1;
+        }
+
+        return 2;
+    }
+}",
+                    "return 1;"),
+                Is.False);
+        }
+
+        [Test]
         public void SymbolicProgramPointFacts_CollectPriorAssignmentFacts_ReturnsReusableFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -2476,6 +2533,62 @@ public class TestClass
                 FindLine(source, "return text[1..^1].Length;"),
                 20,
                 "text[1..^1].Length == text.Length - 2",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringSubstringOneArgumentResultLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text, int start)
+    {
+        if (text != null && start >= 0 && start <= text.Length)
+        {
+            return text.Substring(start).Length;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "StringSubstringOneArgumentResultLength.cs",
+                FindLine(source, "return text.Substring(start).Length;"),
+                20,
+                "text.Substring(start).Length == text.Length - start",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesStringSubstringTwoArgumentResultLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text, int start, int length)
+    {
+        if (text != null && start >= 0 && length >= 0 && start + length <= text.Length)
+        {
+            return text.Substring(start, length).Length;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "StringSubstringTwoArgumentResultLength.cs",
+                FindLine(source, "return text.Substring(start, length).Length;"),
+                20,
+                "text.Substring(start, length).Length == length",
                 new SmtAnalysisService(SmtAnalysisOptions.Default),
                 AnalyzerTestHost.GetTrustedPlatformReferences());
 
@@ -6127,6 +6240,37 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_StringConcatLengthContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string left, string right",
+                    "left != null && right != null && (left + right).Length != left.Length + right.Length"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringPredicateOnConcatContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string suffix",
+                    "!(\"PRE\" + suffix).StartsWith(\"PRE\", StringComparison.Ordinal)",
+                    "using System;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringSubstringLengthContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text, int start",
+                    "text != null && start >= 0 && start <= text.Length && text.Substring(start).Length != text.Length - start"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_CustomLengthNegative_RemainsUnknown()
         {
             Assert.That(
@@ -7602,6 +7746,65 @@ public class TestClass
 }");
 
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_EarlyExitGuardPrunesSwitchSectionImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int value)
+    {
+        if (value < 0)
+        {
+            return;
+        }
+
+        switch (value)
+        {
+            case < 0:
+                Console.WriteLine(value);
+                break;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_EarlyExitGuardMutationBeforeSwitch_RemainsConservativeReports()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int value, int replacement)
+    {
+        if (value < 0)
+        {
+            return;
+        }
+
+        value = replacement;
+        switch (value)
+        {
+            case < 0:
+                Console.WriteLine(value);
+                break;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.True);
         }
 
         [Test]
@@ -10511,6 +10714,70 @@ public class TestClass
 
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
+        public async Task Ps0010_CompletedLoopExitPrunesSwitchSectionThrow_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(int index)
+    {
+        var limit = 10;
+        while (index < limit)
+        {
+            index++;
+        }
+
+        switch (index)
+        {
+            case < 10:
+                throw new InvalidOperationException();
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_LoopBreakBeforeSwitchThrow_RemainsConservativeReports()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(int index, bool stop)
+    {
+        var limit = 10;
+        while (index < limit)
+        {
+            if (stop)
+            {
+                break;
+            }
+
+            index++;
+        }
+
+        switch (index)
+        {
+            case < 10:
+                throw new InvalidOperationException();
+        }
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
         }
 
         [Test]
