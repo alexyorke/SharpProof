@@ -132,5 +132,61 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task ConditionalAccess_ImpossibleWhenNotNullWithImpureCall_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(Worker worker)
+    {
+        if (worker != null)
+        {
+            return string.Empty;
+        }
+
+        return worker?.Impure() ?? string.Empty;
+    }
+}
+
+public sealed class Worker
+{
+    [Impure]
+    public string Impure() => string.Empty;
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ConditionalAccess_WhenNotNullBranchReceivesNonNullFact_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(Worker worker)
+    {
+        return worker?.Echo(worker == null ? Impure() : string.Empty) ?? string.Empty;
+    }
+
+    [Impure]
+    private static string Impure() => string.Empty;
+}
+
+public sealed class Worker
+{
+    [Pure]
+    public string Echo(string value) => value;
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

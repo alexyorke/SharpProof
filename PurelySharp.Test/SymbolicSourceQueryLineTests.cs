@@ -51,6 +51,40 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicLineQueryResult_Filter_RecomputesLineSummary()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0) { return value; }
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "LineFilterQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "LineFilterQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "if (value > 0)"));
+            var filtered = result.Filter(new SymbolicSourceQueryFilter(nodeKinds: new[] { "ReturnStatement" }));
+
+            Assert.That(filtered.ProgramPoints, Has.Count.EqualTo(1));
+            Assert.That(filtered.ProgramPoints.Single().NodeKind, Is.EqualTo("ReturnStatement"));
+            Assert.That(filtered.Facts, Is.EquivalentTo(filtered.ProgramPoints.Single().Facts));
+            Assert.That(filtered.MergedInvariantText, Is.EqualTo(filtered.ProgramPoints.Single().MergedInvariantText));
+        }
+
+        [Test]
         public void QuerySourceLine_ReturnsEmptyProgramPointsForBlankLine()
         {
             const string source = @"
@@ -117,6 +151,48 @@ public class TestClass
             Assert.That(
                 proofSummary.ProvenTrueCount + proofSummary.ProvenFalseCount + proofSummary.UnreachableCount + proofSummary.UnknownCount,
                 Is.EqualTo(result.ProgramPointCount));
+        }
+
+        [Test]
+        public void SymbolicFileQueryResult_Filter_RecomputesAggregateSummary()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0) { return value; }
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "AllLinesFilterQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "AllLinesFilterQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+                syntaxTree,
+                compilation,
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "value > 0" });
+            var filtered = result.Filter(new SymbolicSourceQueryFilter(
+                nodeKinds: new[] { "ReturnStatement" },
+                requireFacts: true,
+                reachability: new[] { SymbolicReachability.Reachable }));
+
+            Assert.That(filtered.Lines, Is.Not.Empty);
+            Assert.That(filtered.ProgramPointCount, Is.EqualTo(filtered.Lines.Sum(line => line.ProgramPoints.Count)));
+            Assert.That(filtered.Lines.SelectMany(line => line.ProgramPoints).All(point => point.NodeKind == "ReturnStatement"), Is.True);
+            Assert.That(filtered.Lines.SelectMany(line => line.ProgramPoints).All(point => point.Facts.Count != 0), Is.True);
+            Assert.That(filtered.Reachability.ReachableCount, Is.EqualTo(filtered.ProgramPointCount));
+            Assert.That(filtered.ObservedFacts, Is.EquivalentTo(filtered.Lines.SelectMany(line => line.ProgramPoints).SelectMany(point => point.Facts).Distinct()));
+            Assert.That(filtered.ConditionProofs.Single(summary => summary.Condition == "value > 0").ProvenTrueCount, Is.GreaterThan(0));
         }
 
         private static int FindLine(string source, string text)

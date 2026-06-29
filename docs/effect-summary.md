@@ -62,7 +62,7 @@ Some roots cannot be proven from managed IL alone:
 - environment, current culture, time, randomness, process, and filesystem state
 - synchronization, threading, volatile, and interlocked state
 
-These should become explicit root seeds with categories and evidence, not broad guesses hidden in analyzer code. The analyzer has a separate low-confidence BCL fallback diagnostic path for otherwise unknown metadata members, but that path is non-authoritative and does not replace generated summary evidence.
+These should become explicit root seeds with categories and evidence, not broad guesses hidden in analyzer code. The analyzer has a separate low-confidence BCL fallback diagnostic path for otherwise unknown metadata members, but that path is non-authoritative and does not replace generated summary evidence. The same fallback heuristic can be emitted as a local `BclFallbackInventory` report for auditing how much of a runtime would currently fall to `probably_pure`, `probably_impure`, or `unknown` if stronger evidence were absent.
 
 Examples:
 
@@ -91,6 +91,18 @@ Inspect a specific API family such as `System.String.Format`:
 
 ```powershell
 dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix System.String.Format --limit 20
+```
+
+Emit the low-confidence fallback inventory for a focused slice:
+
+```powershell
+dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --symbol-prefix System.GC --bcl-fallback-inventory --output artifacts\effect-summary\gc-fallback-inventory.json
+```
+
+Audit all System runtime assemblies for the installed target framework. This can be large; write it under ignored `artifacts\` and prefer symbol filters while iterating:
+
+```powershell
+dotnet run --project Tools\PurelySharp.EffectSummary -- --framework net8.0 --all-runtime-assemblies --bcl-fallback-inventory --output artifacts\effect-summary\net8-bcl-fallback-inventory.json
 ```
 
 Include same-assembly callees from the matched symbols:
@@ -150,11 +162,17 @@ dotnet run --project Tools\PurelySharp.EffectSummary -- --assembly "C:\Program F
 
 The output schema is versioned and includes the assembly module version ID so generated summaries can be tied to the exact runtime build.
 
-When purity classification is enabled, schema version `2` adds:
+When purity classification is enabled, schema version `3` adds:
 
 - per-method `PurityClassification`
 - top-level `PurityReport`
 - optional manual-catalog comparison rows for emitted methods only
+
+When BCL fallback inventory is enabled, schema version `4` also adds:
+
+- top-level `BclFallbackInventory`
+- per-entry guess, confidence, reason, category, assembly, display symbol, and exact symbol key
+- aggregate counts for `probably_pure`, `probably_impure`, and `unknown`
 
 Summary files are also self-validating enough to cache and share:
 

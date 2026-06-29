@@ -102,7 +102,7 @@ dotnet add package PurelySharp.Attributes --version 0.0.4
 | Dispatch, delegates, and LINQ | [~] | The analyzer narrows many exact concrete receiver flows, delegate targets, default equality/comparison dispatch, immutable collection operations, LINQ materialization, and enumerable hazards. Deeper heterogeneous merges, unknown dynamic dispatch, and unresolved external targets remain conservative. | [ExactConcreteDispatchFlowTests.cs](PurelySharp.Test/ExactConcreteDispatchFlowTests.cs), [DelegateTests.cs](PurelySharp.Test/DelegateTests.cs), [LinqOperationsTests.cs](PurelySharp.Test/LinqOperationsTests.cs), [LinqSoundnessStressTests.cs](PurelySharp.Test/LinqSoundnessStressTests.cs) |
 | Fresh ownership and mutation | [~] | Some fresh arrays, collection expressions, inline arrays, local mutation, fresh returns, and disposal cases are modeled. Full borrow-checker-grade ownership, escape, alias, lifetime, and resource-release analysis is not implemented. | [CollectionExpressionTests.cs](PurelySharp.Test/CollectionExpressionTests.cs), [ArrayMutationTests.cs](PurelySharp.Test/ArrayMutationTests.cs), [UsingStatementTests.cs](PurelySharp.Test/UsingStatementTests.cs), [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
 | BCL/.NET SDK coverage | [~] | Coverage is evidence-backed and member-level, using reviewed catalogs, generated build-time summaries, hand-coded conservative roots, and tests for many runtime families. There is no meaningful "percent of the .NET SDK" claim yet because SDK APIs are not a uniform denominator and many APIs depend on runtime, OS, culture, time, randomness, reflection, native state, or hidden implementation behavior. | [EffectSummaryToolTests.cs](PurelySharp.Test/EffectSummaryToolTests.cs), [ConstantsTests.cs](PurelySharp.Test/ConstantsTests.cs), [CryptographyTests.cs](PurelySharp.Test/CryptographyTests.cs), [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
-| BCL fallback guesses | [~] | When attributes, config, generated summaries, semantic catalogs, and source analysis all miss a metadata BCL member, `PS0002` now carries low-confidence fallback properties such as `probably_pure`, `probably_impure`, or `unknown`. With `purelysharp_emit_explanations = true`, `PS0012` reports the same guess as an info diagnostic. These guesses do not make a method pure. | [DiagnosticEvidenceTests.cs](PurelySharp.Test/DiagnosticEvidenceTests.cs), [BclPurityFallbackClassifier.cs](PurelySharp.Analyzer/Engine/BclPurityFallbackClassifier.cs) |
+| BCL fallback guesses | [~] | When attributes, config, generated summaries, semantic catalogs, and source analysis all miss a metadata BCL member, `PS0002` carries low-confidence fallback properties such as `probably_pure`, `probably_impure`, or `unknown`. With `purelysharp_emit_explanations = true`, `PS0012` reports the same guess as an info diagnostic. The effect-summary tool can also emit a local `BclFallbackInventory` for SDK/runtime auditing. These guesses do not make a method pure. | [DiagnosticEvidenceTests.cs](PurelySharp.Test/DiagnosticEvidenceTests.cs), [EffectSummaryToolTests.cs](PurelySharp.Test/EffectSummaryToolTests.cs), [BclPurityFallbackClassifier.cs](PurelySharp.Analyzer/Engine/BclPurityFallbackClassifier.cs) |
 | Full C# operation coverage | [~] | Every Roslyn operation kind should have an explicit coverage decision. Some shapes are intentionally conservative, including unsafe address capture, function pointer invocation, and custom interpolated-string-handler execution. | [RoslynConstructCoverageTests.cs](PurelySharp.Test/RoslynConstructCoverageTests.cs) |
 | Whole-program execution prediction | [ ] | PurelySharp does not run or fully simulate arbitrary C# programs. It derives bounded facts from syntax, semantics, CFG/path facts, catalogs, summaries, and SMT. | [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
 | Rust-style borrow checker | [ ] | A full borrow/resource ownership system is roadmap work. Current ownership handling is local, bounded, and purity-focused. | [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
@@ -202,6 +202,7 @@ than by hard-coding one method's control flow.
 - `QuerySourceAllLines`
 - line-level merged fact summaries via `SymbolicLineQueryResult`
 - file-level aggregate summaries via `SymbolicFileQueryResult`
+- post-query result filters via `SymbolicSourceQueryFilter`
 
 The CLI mirrors the library:
 
@@ -215,6 +216,10 @@ line/program-point counts, observed distinct fact counts, and aggregate
 reachability/implication counts when SMT checks are requested. File-level
 observed facts are an overview; line and point results remain the source of
 actual merged invariants.
+
+For aggregate queries, pass `--node-kind`, `--with-facts`, or `--reachability`
+to narrow output after analysis. The CLI recomputes line/file summaries from
+the retained program points.
 
 Use `--json` for machine-readable output. Pass `--smt-mode`, `--smt-timeout-ms`,
 `--smt-method-budget-ms`, `--smt-max-path-conditions`, and
@@ -242,7 +247,8 @@ generated outputs.
   supported for external opt-in summaries.
 
 `Tools/PurelySharp.EffectSummary` remains ad hoc tooling for calibration,
-summary generation, and report-only SDK/runtime analysis. See
+summary generation, report-only SDK/runtime analysis, and disposable BCL
+fallback inventories. See
 [docs/effect-summary.md](docs/effect-summary.md).
 
 ## Known Limitations

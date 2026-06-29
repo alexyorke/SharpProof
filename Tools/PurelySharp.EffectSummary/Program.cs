@@ -53,9 +53,7 @@ internal static class EffectSummaryCli
 
     private static EffectSummaryDocument BuildDocument(CliOptions options)
     {
-        var assemblies = options.AssemblyPaths.Count == 0
-            ? new[] { RuntimeAssemblyResolver.Resolve(options.Framework, options.RuntimeAssemblyName) }
-            : options.AssemblyPaths.Select(Path.GetFullPath).ToArray();
+        var assemblies = ResolveInputAssemblies(options);
 
         var reports = assemblies
             .Select(path => AssemblyEffectSummarizer.Summarize(
@@ -88,14 +86,33 @@ internal static class EffectSummaryCli
             generatedPurityCatalog = classificationOutput.GeneratedPurityCatalog;
         }
 
+        var bclFallbackInventory = options.IncludeBclFallbackInventory
+            ? BclFallbackInventoryBuilder.Build(reports)
+            : null;
+
         var document = new EffectSummaryDocument(
-            SchemaVersion: purityClassificationReport == null ? 1 : 3,
+            SchemaVersion: bclFallbackInventory == null
+                ? (purityClassificationReport == null ? 1 : 3)
+                : 4,
             GeneratedAtUtc: DateTimeOffset.UtcNow,
             Assemblies: reports,
             PurityReport: purityClassificationReport,
-            GeneratedPurityCatalog: generatedPurityCatalog);
+            GeneratedPurityCatalog: generatedPurityCatalog,
+            BclFallbackInventory: bclFallbackInventory);
 
         return document;
+    }
+
+    private static string[] ResolveInputAssemblies(CliOptions options)
+    {
+        if (options.AssemblyPaths.Count != 0)
+        {
+            return options.AssemblyPaths.Select(Path.GetFullPath).ToArray();
+        }
+
+        return options.AllRuntimeAssemblies
+            ? RuntimeAssemblyResolver.ResolveSystemRuntimeAssemblies(options.Framework)
+            : new[] { RuntimeAssemblyResolver.Resolve(options.Framework, options.RuntimeAssemblyName) };
     }
     private static void WriteDocument(EffectSummaryDocument document, string? outputPath)
     {
@@ -130,11 +147,13 @@ internal static class EffectSummaryCli
         Console.Error.WriteLine("  --artifact-spec <path>     Generate one or more output files from a JSON artifact spec.");
         Console.Error.WriteLine("  --framework <net8.0>       Runtime framework to inspect when --assembly is omitted.");
         Console.Error.WriteLine("  --runtime-assembly <name>  Runtime assembly name when --assembly is omitted. Default: System.Private.CoreLib.dll");
+        Console.Error.WriteLine("  --all-runtime-assemblies   Inspect all System runtime assemblies for the target framework.");
         Console.Error.WriteLine("  --symbol-prefix <prefix>   Emit only methods whose decoded symbol starts with this prefix. Can be repeated.");
         Console.Error.WriteLine("  --include-callees          Also emit same-assembly callees reachable from matched symbols.");
         Console.Error.WriteLine("  --max-depth <count>        Maximum same-assembly callee depth when --include-callees is used. Use -1 for unbounded depth. Default: 1.");
         Console.Error.WriteLine("  --transitive-roots         Propagate root candidate labels through same-assembly calls.");
         Console.Error.WriteLine("  --classify-purity         Add report-only fixed-point purity classifications to the JSON output.");
+        Console.Error.WriteLine("  --bcl-fallback-inventory  Add report-only low-confidence fallback guesses for unresolved BCL members.");
         Console.Error.WriteLine("  --compare-manual-catalogs Compare emitted methods against the current reviewed manual catalogs.");
         Console.Error.WriteLine("  --output <path>            Write JSON to a file instead of stdout.");
         Console.Error.WriteLine("  --limit <count>            Limit emitted method summaries for smoke testing.");
@@ -174,6 +193,10 @@ internal sealed class CliOptions
 
     public bool CompareManualCatalogs { get; private set; }
 
+    public bool IncludeBclFallbackInventory { get; private set; }
+
+    public bool AllRuntimeAssemblies { get; private set; }
+
     public bool ShowHelp { get; private set; }
 
     public static CliOptions Parse(string[] args)
@@ -196,6 +219,9 @@ internal sealed class CliOptions
                 case "--runtime-assembly":
                     options.RuntimeAssemblyName = ReadRequiredValue(args, ref i, arg);
                     break;
+                case "--all-runtime-assemblies":
+                    options.AllRuntimeAssemblies = true;
+                    break;
                 case "--symbol-prefix":
                     options.SymbolPrefixes.Add(ReadRequiredValue(args, ref i, arg));
                     break;
@@ -210,6 +236,9 @@ internal sealed class CliOptions
                     break;
                 case "--classify-purity":
                     options.IncludePurityClassification = true;
+                    break;
+                case "--bcl-fallback-inventory":
+                    options.IncludeBclFallbackInventory = true;
                     break;
                 case "--compare-manual-catalogs":
                     options.IncludePurityClassification = true;
@@ -250,12 +279,14 @@ internal sealed class CliOptions
             IncludeTransitiveRoots = artifact.IncludeTransitiveRoots ?? defaults?.IncludeTransitiveRoots ?? false,
             IncludePurityClassification = artifact.IncludePurityClassification ?? defaults?.IncludePurityClassification ?? false,
             CompareManualCatalogs = artifact.CompareManualCatalogs ?? defaults?.CompareManualCatalogs ?? false,
+            IncludeBclFallbackInventory = artifact.IncludeBclFallbackInventory ?? defaults?.IncludeBclFallbackInventory ?? false,
+            AllRuntimeAssemblies = artifact.AllRuntimeAssemblies ?? defaults?.AllRuntimeAssemblies ?? false,
         };
 
         var explicitAssemblyPaths = artifact.AssemblyPaths ?? Array.Empty<string>();
         var hasPackageAssembly = HasPackageAssembly(artifact);
         var hasExplicitRuntimeAssembly = !string.IsNullOrWhiteSpace(artifact.RuntimeAssemblyName);
-        if (hasExplicitRuntimeAssembly && (explicitAssemblyPaths.Length > 0 || hasPackageAssembly))
+        if (!options.AllRuntimeAssemblies && hasExplicitRuntimeAssembly && (explicitAssemblyPaths.Length > 0 || hasPackageAssembly))
         {
             options.AssemblyPaths.Add(RuntimeAssemblyResolver.Resolve(options.Framework, options.RuntimeAssemblyName));
         }
@@ -275,7 +306,7 @@ internal sealed class CliOptions
             var pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
             options.AssemblyPaths.Clear();
             options.AssemblyPaths.AddRange(
-                (hasExplicitRuntimeAssembly && (explicitAssemblyPaths.Length > 0 || hasPackageAssembly)
+                (!options.AllRuntimeAssemblies && hasExplicitRuntimeAssembly && (explicitAssemblyPaths.Length > 0 || hasPackageAssembly)
                     ? new[] { RuntimeAssemblyResolver.Resolve(options.Framework, options.RuntimeAssemblyName) }
                     : Array.Empty<string>())
                 .Concat(explicitAssemblyPaths)
@@ -587,6 +618,10 @@ internal sealed class ArtifactSpecDefaults
 
     public bool? CompareManualCatalogs { get; set; }
 
+    public bool? IncludeBclFallbackInventory { get; set; }
+
+    public bool? AllRuntimeAssemblies { get; set; }
+
     public string[]? ExcludedSymbolPrefixes { get; set; }
 }
 
@@ -621,6 +656,10 @@ internal sealed class ArtifactSpecEntry
     public bool? IncludePurityClassification { get; set; }
 
     public bool? CompareManualCatalogs { get; set; }
+
+    public bool? IncludeBclFallbackInventory { get; set; }
+
+    public bool? AllRuntimeAssemblies { get; set; }
 
     public string[]? ExcludedSymbolPrefixes { get; set; }
 }
@@ -933,6 +972,51 @@ internal static class RuntimeAssemblyResolver
         throw new FileNotFoundException(
             $"Runtime assembly '{assemblyName}' was not found for {framework}. Checked the current runtime directory, TRUSTED_PLATFORM_ASSEMBLIES, and shared runtime locations.",
             assemblyName);
+    }
+
+    public static string[] ResolveSystemRuntimeAssemblies(string framework)
+    {
+        var coreLibPath = Resolve(framework, "System.Private.CoreLib.dll");
+        var runtimeDirectory = Path.GetDirectoryName(coreLibPath)
+            ?? throw new DirectoryNotFoundException($"Unable to resolve runtime directory from '{coreLibPath}'.");
+        return Directory
+            .EnumerateFiles(runtimeDirectory, "*.dll", SearchOption.TopDirectoryOnly)
+            .Where(IsSystemRuntimeAssemblyFile)
+            .Where(HasManagedMetadata)
+            .OrderBy(static path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static bool IsSystemRuntimeAssemblyFile(string path)
+    {
+        var fileName = Path.GetFileName(path);
+        return fileName.Equals("mscorlib.dll", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("netstandard.dll", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("System.dll", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("System.Private.CoreLib.dll", StringComparison.OrdinalIgnoreCase) ||
+            fileName.StartsWith("System.", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasManagedMetadata(string path)
+    {
+        try
+        {
+            using var stream = File.OpenRead(path);
+            using var reader = new PEReader(stream);
+            return reader.HasMetadata;
+        }
+        catch (BadImageFormatException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     private static int ParseMajorFrameworkVersion(string framework)
@@ -1611,6 +1695,7 @@ internal static class AssemblyEffectSummarizer
             Calls: calls.ToArray(),
             Fields: fields.ToArray())
         {
+            IsStatic = (definition.Attributes & MethodAttributes.Static) != 0,
             CallSites = callSites
                 .GroupBy(GetCallSiteDeduplicationKey, StringComparer.Ordinal)
                 .Select(group => group.First())
@@ -5033,7 +5118,8 @@ internal sealed record EffectSummaryDocument(
     DateTimeOffset GeneratedAtUtc,
     AssemblyEffectReport[] Assemblies,
     PurityClassificationReport? PurityReport,
-    GeneratedPurityCatalogDocument? GeneratedPurityCatalog);
+    GeneratedPurityCatalogDocument? GeneratedPurityCatalog,
+    BclFallbackInventoryReport? BclFallbackInventory);
 
 internal sealed record AssemblyEffectReport(
     string AssemblyName,
@@ -5073,6 +5159,9 @@ internal sealed record MethodEffectSummary(
 
     [JsonIgnore]
     public ExceptionPropagationSite[] ExceptionPropagationSites { get; init; } = Array.Empty<ExceptionPropagationSite>();
+
+    [JsonIgnore]
+    public bool IsStatic { get; init; }
 }
 
 internal sealed record ExceptionSourcePath(

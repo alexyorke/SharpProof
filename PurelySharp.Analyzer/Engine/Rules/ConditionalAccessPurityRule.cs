@@ -35,7 +35,29 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            var whenNotNullResult = PurityAnalysisEngine.CheckSingleOperation(conditionalAccessOperation.WhenNotNull, context, currentState);
+            if (PurityAnalysisEngine.TryGetKnownReferenceNullValueFromPathFacts(
+                    currentState,
+                    receiver,
+                    context.SmtAnalysis,
+                    out var receiverIsNull) &&
+                receiverIsNull)
+            {
+                PurityAnalysisEngine.LogDebug($"    [ConditionalAccessRule] Path facts prove null receiver skips WhenNotNull. Conditional Access Operation is Pure.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            if (!PurityAnalysisEngine.TryCreateReferenceNullAssumptionState(
+                    currentState,
+                    receiver,
+                    isNull: false,
+                    context.SmtAnalysis,
+                    out var whenNotNullState))
+            {
+                PurityAnalysisEngine.LogDebug($"    [ConditionalAccessRule] SMT proves WhenNotNull branch is unreachable. Conditional Access Operation is Pure.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            var whenNotNullResult = PurityAnalysisEngine.CheckSingleOperation(conditionalAccessOperation.WhenNotNull, context, whenNotNullState);
             if (!whenNotNullResult.IsPure)
             {
                 PurityAnalysisEngine.LogDebug($"    [ConditionalAccessRule] Operation after '?.' (WhenNotNull) is Impure: {conditionalAccessOperation.WhenNotNull.Syntax}");

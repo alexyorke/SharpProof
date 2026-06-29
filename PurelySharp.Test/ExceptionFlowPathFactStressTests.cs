@@ -1563,6 +1563,106 @@ public class TestClass
             Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
 
+        [Test]
+        public async Task Ps0010_CatchFilterZeroDivisor_ReportsDivideByZeroException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        try
+        {
+            return 0;
+        }
+        catch (InvalidOperationException) when (divisor == 0)
+        {
+            return 10 / divisor;
+        }
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_CatchFilterNullReceiver_ReportsNullReferenceException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        try
+        {
+            return 0;
+        }
+        catch (InvalidOperationException) when (value == null)
+        {
+            return value.Length;
+        }
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_null_dereference"));
+        }
+
+        [Test]
+        public async Task Ps0010_CatchFilterUpperBoundIndex_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        try
+        {
+            return 0;
+        }
+        catch (InvalidOperationException) when (index >= values.Length)
+        {
+            return values[index];
+        }
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
+        public async Task Ps0010_CatchFilterFactReassignedBeforeUse_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        try
+        {
+            return 0;
+        }
+        catch (InvalidOperationException) when (divisor == 0)
+        {
+            divisor = 1;
+            return 10 / divisor;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
         private static async Task<Diagnostic> SingleExceptionDiagnosticAsync(string source)
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(source);

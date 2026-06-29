@@ -11,6 +11,7 @@ The primary entrypoint is `SymbolicSourceQueryService`:
 - `QuerySyntaxTreeAllLines` reports every non-empty invariant line from one parse/compilation pass.
 - `SymbolicLineQueryResult` exposes both the per-program-point invariants and a line-level merged fact summary.
 - `SymbolicFileQueryResult` exposes all line results plus observed fact, reachability, and implication summaries.
+- `SymbolicSourceQueryFilter` can post-filter line or file results by exact node kind, presence of facts, or reachability; aggregate summaries are recomputed from the retained points.
 - `QueryFileLine` and `QuerySourceLine` are convenience wrappers for standalone tools.
 - `QueryFileAllLines` and `QuerySourceAllLines` provide the same all-lines summary for file or raw source input.
 
@@ -27,6 +28,12 @@ Use `--all-lines` to enumerate every source line with statement/expression progr
 
 ```powershell
 dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --check-reachability --json
+```
+
+Use `--node-kind`, `--with-facts`, or `--reachability` with `--line-invariants` or `--all-lines` to narrow aggregate output without changing symbolic inference:
+
+```powershell
+dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --node-kind ReturnStatement --with-facts --json
 ```
 
 All-lines JSON is a single `SymbolicFileQueryResult` object. Text output includes total line count, lines with program points, total program points, observed distinct fact count, and aggregate reachability or implication counts when requested. File-level observed facts are an overview, not a single invariant that holds at every program point; use each line or point result for actual merged invariants.

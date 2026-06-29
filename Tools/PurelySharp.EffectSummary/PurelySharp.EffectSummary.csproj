@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\Shared\BclPurityFallbackHeuristics.cs" Link="Shared\BclPurityFallbackHeuristics.cs" />
     <Compile Include="..\..\Shared\Constants.cs" Link="Shared\Constants.cs" />
   </ItemGroup>
 </Project>

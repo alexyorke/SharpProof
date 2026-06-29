@@ -55,6 +55,7 @@ namespace PurelySharp.Analyzer
 
             AddSwitchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
             AddLoopPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
+            AddCatchFilterPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
             AddExpressionBranchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
             AddPrecedingGuardConditions(invalidatedSymbols, useNode, semanticModel, cancellationToken, pathConditions);
             return pathConditions.Count > 0 &&
@@ -188,6 +189,7 @@ namespace PurelySharp.Analyzer
 
             AddSwitchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
             AddLoopPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
+            AddCatchFilterPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
             AddExpressionBranchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
             AddPrecedingGuardConditions(invalidatedSymbols, useNode, semanticModel, cancellationToken, pathConditions);
             return pathConditions;
@@ -355,6 +357,28 @@ namespace PurelySharp.Analyzer
                 {
                     pathConditions.Add(armCondition);
                 }
+            }
+        }
+
+        private static void AddCatchFilterPathConditions(
+            SyntaxNode useNode,
+            IReadOnlyCollection<ISymbol> invalidatedSymbols,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
+        {
+            foreach (var catchClause in useNode.Ancestors().OfType<CatchClauseSyntax>())
+            {
+                if (catchClause.Filter?.FilterExpression is not { } filterExpression ||
+                    !catchClause.Block.Span.Contains(useNode.SpanStart) ||
+                    AnySymbolMutatedInSyntax(filterExpression, invalidatedSymbols, semanticModel, cancellationToken) ||
+                    AnySymbolAssignedBeforeUse(catchClause.Block, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken) ||
+                    AnyReferencedSymbolAssignedBeforeUse(filterExpression, catchClause.Block, useNode.SpanStart, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                TryAddPathCondition(filterExpression, branchWhenTrue: true, semanticModel, cancellationToken, pathConditions);
             }
         }
 

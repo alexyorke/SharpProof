@@ -46,6 +46,17 @@ try
                 options.ImpliedConditions),
             smtAnalysis: smtAnalysis);
 
+    if (options.HasResultFilter)
+    {
+        var filter = options.CreateResultFilter();
+        result = result switch
+        {
+            SymbolicFileQueryResult fileResult => fileResult.Filter(filter),
+            SymbolicLineQueryResult lineResult => lineResult.Filter(filter),
+            _ => result,
+        };
+    }
+
     if (options.Json)
     {
         var json = result switch
@@ -205,6 +216,9 @@ Options:
   --all-lines         Query every line that contains statement/expression program points.
   --position <n>      0-based absolute source position to query.
   --reference <path>  Metadata reference path. Can be repeated.
+  --node-kind <kind>  Keep only matching Roslyn node kinds in --line-invariants or --all-lines output. Can be repeated.
+  --with-facts        Keep only program points that have at least one reported fact.
+  --reachability <r>  Keep only program points with reachability NotChecked, Unknown, Reachable, or Unreachable. Can be repeated.
   --check-reachability
                       Use bounded SMT to classify whether the queried program point is reachable.
   --implies <expr>    Use bounded SMT to prove whether invariants at the queried point imply expr. Can be repeated.
@@ -234,6 +248,12 @@ Options:
 
     public List<string> ReferencePaths { get; } = new();
 
+    public List<string> NodeKinds { get; } = new();
+
+    public bool WithFacts { get; private set; }
+
+    public List<SymbolicReachability> ReachabilityFilters { get; } = new();
+
     public bool Json { get; private set; }
 
     public bool CheckReachability { get; private set; }
@@ -253,6 +273,11 @@ Options:
     public int? SmtMaxExpressionNodes { get; private set; }
 
     public bool RequiresSmt => CheckReachability || ImpliedConditions.Count != 0;
+
+    public bool HasResultFilter =>
+        NodeKinds.Count != 0 ||
+        WithFacts ||
+        ReachabilityFilters.Count != 0;
 
     public static SymbolicCliOptions Parse(string[] args)
     {
@@ -289,6 +314,15 @@ Options:
                 case "--reference":
                 case "-r":
                     options.ReferencePaths.Add(ReadString(args, ref index, arg));
+                    break;
+                case "--node-kind":
+                    options.NodeKinds.Add(ReadString(args, ref index, arg));
+                    break;
+                case "--with-facts":
+                    options.WithFacts = true;
+                    break;
+                case "--reachability":
+                    options.ReachabilityFilters.Add(ReadReachability(args, ref index, arg));
                     break;
                 case "--json":
                     options.Json = true;
@@ -357,6 +391,11 @@ Options:
                 throw new ArgumentException("--line, --position, or --all-lines is required.");
             }
 
+            if (options.HasResultFilter && !options.AllLines && !options.LineInvariants)
+            {
+                throw new ArgumentException("--node-kind, --with-facts, and --reachability require --line-invariants or --all-lines.");
+            }
+
             foreach (var referencePath in options.ReferencePaths)
             {
                 if (!File.Exists(referencePath))
@@ -367,6 +406,11 @@ Options:
         }
 
         return options;
+    }
+
+    public SymbolicSourceQueryFilter CreateResultFilter()
+    {
+        return new SymbolicSourceQueryFilter(NodeKinds, WithFacts, ReachabilityFilters);
     }
 
     public SmtAnalysisOptions CreateSmtOptions()
@@ -450,5 +494,16 @@ Options:
             default:
                 throw new ArgumentException(optionName + " must be off, bounded, or deep.");
         }
+    }
+
+    private static SymbolicReachability ReadReachability(string[] args, ref int index, string optionName)
+    {
+        var value = ReadString(args, ref index, optionName);
+        if (Enum.TryParse<SymbolicReachability>(value, ignoreCase: true, out var reachability))
+        {
+            return reachability;
+        }
+
+        throw new ArgumentException(optionName + " must be NotChecked, Unknown, Reachable, or Unreachable.");
     }
 }

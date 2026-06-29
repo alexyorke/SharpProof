@@ -39,6 +39,7 @@
     <ProjectReference Include="..\PurelySharp.Attributes\PurelySharp.Attributes.csproj" />
     <ProjectReference Include="..\PurelySharp.Symbolic\PurelySharp.Symbolic.csproj" />
     <ProjectReference Include="..\SearchLib\SearchLib.csproj" />
+    <Compile Include="..\Shared\BclPurityFallbackHeuristics.cs" Link="Engine\BclPurityFallbackHeuristics.cs" />
     <Compile Include="..\Shared\Constants.cs" Link="Engine\Constants.cs" />
     <None Include="$(MicrosoftZ3ManagedDllPath)" CopyToOutputDirectory="PreserveNewest" Link="Microsoft.Z3.dll" />
   </ItemGroup>

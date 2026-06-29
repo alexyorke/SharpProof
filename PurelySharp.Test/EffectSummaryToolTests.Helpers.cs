@@ -244,6 +244,25 @@ public sealed class StableCacheDerived : StaticFieldBase
                 Is.EqualTo(expectedEffectVisibilityClassification));
         }
 
+        private static void AssertInventoryEntry(
+            JsonElement inventory,
+            string symbol,
+            string guess,
+            string reason)
+        {
+            var entry = inventory.GetProperty("Entries")
+                .EnumerateArray()
+                .Single(candidate => string.Equals(
+                    candidate.GetProperty("Symbol").GetString(),
+                    symbol,
+                    StringComparison.Ordinal));
+
+            Assert.That(entry.GetProperty("Guess").GetString(), Is.EqualTo(guess));
+            Assert.That(entry.GetProperty("Confidence").GetString(), Is.EqualTo("low"));
+            Assert.That(entry.GetProperty("Reason").GetString(), Is.EqualTo(reason));
+            Assert.That(entry.GetProperty("Category").GetString(), Does.StartWith("bcl_fallback_"));
+        }
+
         private static JsonElement FindMethod(JsonDocument summary, string methodSymbol)
         {
             var methods = summary.RootElement

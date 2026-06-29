@@ -5063,7 +5063,9 @@ namespace PurelySharp.Symbolic.Smt
                     conditionalAccessUnderlyingType,
                     semanticModel,
                     cancellationToken,
-                    out valueFormula))
+                    out valueFormula,
+                    getSymbolVersion,
+                    inlineDepth))
             {
                 hasValueFormula = new SmtBinaryFormula(
                     SmtBinaryOperator.NotEqual,
@@ -5083,32 +5085,55 @@ namespace PurelySharp.Symbolic.Smt
             ITypeSymbol expectedType,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out SmtFormula? formula)
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
         {
             formula = null;
-            if (conditionalAccess.WhenNotNull is not MemberBindingExpressionSyntax memberBinding ||
-                semanticModel.GetSymbolInfo(memberBinding.Name, cancellationToken).Symbol is not { } memberSymbol ||
-                !TryGetMemberType(memberSymbol, out var memberType) ||
-                !SymbolEqualityComparer.Default.Equals(memberType, expectedType))
+            if (conditionalAccess.WhenNotNull is MemberBindingExpressionSyntax memberBinding)
             {
-                return false;
+                if (semanticModel.GetSymbolInfo(memberBinding.Name, cancellationToken).Symbol is not { } memberSymbol ||
+                    !TryGetMemberType(memberSymbol, out var memberType) ||
+                    !SymbolEqualityComparer.Default.Equals(memberType, expectedType))
+                {
+                    return false;
+                }
+
+                if (memberSymbol.Name == "Length" &&
+                    IsStringExpression(conditionalAccess.Expression, semanticModel, cancellationToken) &&
+                    TryTranslateStringValue(
+                        conditionalAccess.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        out var stringFormula) &&
+                    stringFormula != null)
+                {
+                    formula = new SmtStringLengthTerm(stringFormula);
+                    return true;
+                }
+
+                return TryCreateMemberFormula(receiverFormula, memberSymbol.Name, memberType, out formula) &&
+                    formula != null;
             }
 
-            if (memberSymbol.Name == "Length" &&
-                IsStringExpression(conditionalAccess.Expression, semanticModel, cancellationToken) &&
-                TryTranslateStringValue(
-                    conditionalAccess.Expression,
+            if (conditionalAccess.WhenNotNull is ElementBindingExpressionSyntax elementBinding &&
+                elementBinding.ArgumentList.Arguments.Count == 1 &&
+                semanticModel.GetTypeInfo(conditionalAccess.Expression, cancellationToken).Type is IArrayTypeSymbol { Rank: 1 } arrayType &&
+                SymbolEqualityComparer.Default.Equals(arrayType.ElementType, expectedType) &&
+                TryGetValueKind(arrayType.ElementType, out var elementKind) &&
+                TryCreateElementAccessIndexText(
+                    elementBinding.ArgumentList.Arguments[0].Expression,
                     semanticModel,
                     cancellationToken,
-                    out var stringFormula) &&
-                stringFormula != null)
+                    out var indexText,
+                    getSymbolVersion,
+                    inlineDepth))
             {
-                formula = new SmtStringLengthTerm(stringFormula);
+                formula = new SmtVariable(receiverFormula + "[" + indexText + "]", elementKind);
                 return true;
             }
 
-            return TryCreateMemberFormula(receiverFormula, memberSymbol.Name, memberType, out formula) &&
-                formula != null;
+            return false;
         }
 
         private static bool IsRepresentationPreservingIntegralCast(

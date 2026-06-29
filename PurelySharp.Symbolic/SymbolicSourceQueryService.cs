@@ -1304,6 +1304,20 @@ namespace PurelySharp.Symbolic
         public string MergedInvariantText { get; }
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+
+        public SymbolicLineQueryResult Filter(SymbolicSourceQueryFilter filter)
+        {
+            if (filter == null)
+            {
+                throw new ArgumentNullException(nameof(filter));
+            }
+
+            return new SymbolicLineQueryResult(
+                FilePath,
+                Line,
+                ProgramPoints.Where(filter.Matches).ToArray(),
+                SmtDiagnostics);
+        }
     }
 
     public sealed class SymbolicFileQueryResult
@@ -1352,6 +1366,82 @@ namespace PurelySharp.Symbolic
         public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+
+        public SymbolicFileQueryResult Filter(SymbolicSourceQueryFilter filter)
+        {
+            if (filter == null)
+            {
+                throw new ArgumentNullException(nameof(filter));
+            }
+
+            var lines = Lines
+                .Select(line => line.Filter(filter))
+                .Where(static line => line.ProgramPoints.Count != 0)
+                .ToArray();
+            return new SymbolicFileQueryResult(
+                FilePath,
+                LineCount,
+                lines,
+                SmtDiagnostics);
+        }
+    }
+
+    public sealed class SymbolicSourceQueryFilter
+    {
+        public static readonly SymbolicSourceQueryFilter Empty = new();
+
+        public SymbolicSourceQueryFilter(
+            IEnumerable<string>? nodeKinds = null,
+            bool requireFacts = false,
+            IEnumerable<SymbolicReachability>? reachability = null)
+        {
+            NodeKinds = nodeKinds?
+                .Where(static kind => !string.IsNullOrWhiteSpace(kind))
+                .Select(static kind => kind.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray() ?? Array.Empty<string>();
+            RequireFacts = requireFacts;
+            Reachability = reachability?
+                .Distinct()
+                .ToArray() ?? Array.Empty<SymbolicReachability>();
+        }
+
+        public IReadOnlyList<string> NodeKinds { get; }
+
+        public bool RequireFacts { get; }
+
+        public IReadOnlyList<SymbolicReachability> Reachability { get; }
+
+        public bool IsEmpty =>
+            NodeKinds.Count == 0 &&
+            !RequireFacts &&
+            Reachability.Count == 0;
+
+        public bool Matches(SymbolicSourceQueryResult result)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+
+            if (RequireFacts && result.Facts.Count == 0)
+            {
+                return false;
+            }
+
+            if (NodeKinds.Count != 0 &&
+                !NodeKinds.Any(kind => string.Equals(kind, result.NodeKind, StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+
+            if (Reachability.Count != 0 && !Reachability.Contains(result.Reachability))
+            {
+                return false;
+            }
+
+            return true;
+        }
     }
 
     public sealed class SymbolicReachabilitySummary

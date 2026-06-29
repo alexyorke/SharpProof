@@ -10361,6 +10361,50 @@ public readonly struct ConversionFixture
         }
 
         [Test]
+        public async Task EffectSummaryTool_BclFallbackInventory_EmitsReportOnlyGuesses()
+        {
+            var outputPath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "bcl-fallback-inventory-" + Guid.NewGuid().ToString("N") + ".json");
+
+            await RunEffectSummaryToolAsync(
+                "--framework",
+                "net8.0",
+                "--symbol-prefix",
+                "System.GC.CollectionCount",
+                "--symbol-prefix",
+                "System.GC.Collect",
+                "--symbol-prefix",
+                "System.Version..ctor",
+                "--bcl-fallback-inventory",
+                "--output",
+                outputPath);
+
+            using var summary = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
+            var inventory = summary.RootElement.GetProperty("BclFallbackInventory");
+            Assert.That(inventory.GetProperty("CandidateCount").GetInt32(), Is.GreaterThanOrEqualTo(3));
+            Assert.That(inventory.GetProperty("ProbablyPureCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
+            Assert.That(inventory.GetProperty("ProbablyImpureCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
+            Assert.That(inventory.GetProperty("UnknownCount").GetInt32(), Is.GreaterThanOrEqualTo(1));
+
+            AssertInventoryEntry(
+                inventory,
+                "System.GC.CollectionCount(int)",
+                "probably_pure",
+                "value_return_no_ref_or_out");
+            AssertInventoryEntry(
+                inventory,
+                "System.GC.Collect()",
+                "probably_impure",
+                "void_returning_metadata_method");
+            AssertInventoryEntry(
+                inventory,
+                "System.Version..ctor(int, int)",
+                "unknown",
+                "metadata_constructor_without_body");
+        }
+
+        [Test]
         public async Task EffectSummaryTool_ClassifiesFreshObjectConstructionAsInternalOnly()
         {
             var source = """

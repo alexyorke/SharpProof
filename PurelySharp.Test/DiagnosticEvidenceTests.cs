@@ -50,6 +50,14 @@ namespace System.Experimental
             return this;
         }
     }
+
+    public sealed class NumericBox
+    {
+        public int Value
+        {
+            get { return 42; }
+        }
+    }
 }
 ";
 
@@ -11399,6 +11407,38 @@ public class TestClass
 
             var fallbackDiagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.BclFallbackGuessId);
             Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("unknown"));
+        }
+
+        [Test]
+        public async Task Ps0002_MetadataBclFallback_PropertyGetter_IncludesGuessEvidence()
+        {
+            using var fixture = CreateMetadataOnlyAssemblyFixture(
+                "System.FallbackSdk",
+                BclFallbackFixtureSource);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(System.Experimental.NumericBox box)
+    {
+        return box.Value;
+    }
+}",
+                globalOptions: ImmutableDictionary<string, string>.Empty.Add("purelysharp_emit_explanations", "true"),
+                additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("bcl_fallback_probably_pure"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("bcl_heuristic_fallback"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.BclFallbackGuessProperty], Is.EqualTo("probably_pure"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.BclFallbackReasonProperty], Is.EqualTo("metadata_getter_value_like_return"));
+
+            var fallbackDiagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.BclFallbackGuessId);
+            Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("probably_pure"));
         }
 
         [Test]
