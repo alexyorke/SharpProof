@@ -70,6 +70,28 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_GenericClassConstrainedNullReceiver_ReportsNullReferenceException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod<T>(T value)
+        where T : class
+    {
+        if (value == null)
+        {
+            return value.GetHashCode();
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_null_dereference"));
+        }
+
+        [Test]
         public async Task Ps0010_OrFalseBranchZeroDivisor_ReportsDivideByZeroException()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"

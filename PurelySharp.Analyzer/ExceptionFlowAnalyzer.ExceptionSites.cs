@@ -295,9 +295,39 @@ namespace PurelySharp.Analyzer
 
         private static bool IsReferenceType(ITypeSymbol? typeSymbol)
         {
-            return typeSymbol != null &&
-                typeSymbol.TypeKind != TypeKind.TypeParameter &&
-                typeSymbol.IsReferenceType;
+            if (typeSymbol == null)
+            {
+                return false;
+            }
+
+            if (typeSymbol is ITypeParameterSymbol typeParameter)
+            {
+                return IsKnownReferenceTypeParameter(
+                    typeParameter,
+                    new HashSet<ITypeParameterSymbol>(SymbolEqualityComparer.Default));
+            }
+
+            return typeSymbol.IsReferenceType;
+        }
+
+        private static bool IsKnownReferenceTypeParameter(
+            ITypeParameterSymbol typeParameter,
+            HashSet<ITypeParameterSymbol> visited)
+        {
+            if (!visited.Add(typeParameter))
+            {
+                return false;
+            }
+
+            if (typeParameter.HasReferenceTypeConstraint)
+            {
+                return true;
+            }
+
+            return typeParameter.ConstraintTypes.Any(constraint =>
+                constraint.IsReferenceType ||
+                constraint is ITypeParameterSymbol nestedTypeParameter &&
+                IsKnownReferenceTypeParameter(nestedTypeParameter, visited));
         }
 
         private static ITypeSymbol? GetRethrownExceptionType(
