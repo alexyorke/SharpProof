@@ -7,7 +7,6 @@ using System.Linq;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -725,22 +724,16 @@ namespace PurelySharp.Analyzer
 
             var metadataReader = peReader.GetMetadataReader();
             var builder = ImmutableDictionary.CreateBuilder<string, ActualMethodIdentity>(StringComparer.Ordinal);
+            var methodBodyHashProvider = new MethodBodyHashProvider(path);
             foreach (var handle in metadataReader.MethodDefinitions)
             {
                 var definition = metadataReader.GetMethodDefinition(handle);
-                string? methodBodySha256 = null;
-                if (definition.RelativeVirtualAddress != 0)
-                {
-                    var body = peReader.GetMethodBody(definition.RelativeVirtualAddress);
-                    var il = body.GetILBytes();
-                    if (il != null)
-                    {
-                        methodBodySha256 = ComputeSha256(il);
-                    }
-                }
-
                 var token = "0x" + MetadataTokens.GetToken(handle).ToString("X8");
-                var identity = new ActualMethodIdentity(token, methodBodySha256, definition.Attributes);
+                var identity = new ActualMethodIdentity(
+                    token,
+                    methodBodyHashProvider,
+                    definition.RelativeVirtualAddress,
+                    definition.Attributes);
                 foreach (var key in GetMethodKeys(metadataReader, handle))
                 {
                     builder[key] = identity;
@@ -794,12 +787,6 @@ namespace PurelySharp.Analyzer
             {
                 yield return roslynDisplay;
             }
-        }
-
-        private static string ComputeSha256(byte[] bytes)
-        {
-            using var sha256 = SHA256.Create();
-            return CompatibilityHelpers.ToLowerHex(sha256.ComputeHash(bytes));
         }
 
         private static string GetMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
@@ -1340,13 +1327,23 @@ namespace PurelySharp.Analyzer
                 ActualAssemblyIdentity? actualAssemblyIdentity,
                 ActualMethodIdentity? actualMethodIdentity)
             {
-                return AssemblyIdentity != null &&
-                    AssemblyIdentity.IsComplete &&
-                    MethodIdentity != null &&
-                    MethodIdentity.IsCompleteEnoughFor(actualMethodIdentity) &&
-                    actualAssemblyIdentity != null &&
-                    actualMethodIdentity != null &&
-                    AssemblyIdentity.Matches(actualAssemblyIdentity) &&
+                if (AssemblyIdentity == null ||
+                    !AssemblyIdentity.IsComplete ||
+                    MethodIdentity == null ||
+                    actualAssemblyIdentity == null ||
+                    actualMethodIdentity == null ||
+                    !AssemblyIdentity.Matches(actualAssemblyIdentity) ||
+                    !MethodIdentity.MatchesMetadataToken(actualMethodIdentity))
+                {
+                    return false;
+                }
+
+                if (SourcePriority == BuiltInSummarySourcePriority)
+                {
+                    return true;
+                }
+
+                return MethodIdentity.IsCompleteEnoughFor(actualMethodIdentity) &&
                     MethodIdentity.Matches(actualMethodIdentity);
             }
         }

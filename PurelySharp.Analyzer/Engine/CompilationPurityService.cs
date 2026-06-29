@@ -68,7 +68,8 @@ namespace PurelySharp.Analyzer.Engine
                     _callGraph,
                     _compilation,
                     enforcePureAttributeSymbol,
-                    allowSynchronizationAttributeSymbol);
+                    allowSynchronizationAttributeSymbol,
+                    SmtAnalysis);
             }
         }
 

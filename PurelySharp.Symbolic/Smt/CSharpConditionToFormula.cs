@@ -89,19 +89,22 @@ namespace PurelySharp.Symbolic.Smt
             private readonly int _spanStart;
             private readonly int _spanLength;
             private readonly int _inlineDepth;
+            private readonly string _symbolVersionKey;
 
             public ExpressionFormulaCacheKey(
                 string kind,
                 SyntaxTree syntaxTree,
                 int spanStart,
                 int spanLength,
-                int inlineDepth)
+                int inlineDepth,
+                string symbolVersionKey)
             {
                 _kind = kind;
                 _syntaxTree = syntaxTree;
                 _spanStart = spanStart;
                 _spanLength = spanLength;
                 _inlineDepth = inlineDepth;
+                _symbolVersionKey = symbolVersionKey;
             }
 
             public bool Equals(ExpressionFormulaCacheKey other)
@@ -110,7 +113,8 @@ namespace PurelySharp.Symbolic.Smt
                     ReferenceEquals(_syntaxTree, other._syntaxTree) &&
                     _spanStart == other._spanStart &&
                     _spanLength == other._spanLength &&
-                    _inlineDepth == other._inlineDepth;
+                    _inlineDepth == other._inlineDepth &&
+                    string.Equals(_symbolVersionKey, other._symbolVersionKey, StringComparison.Ordinal);
             }
 
             public override bool Equals(object? obj)
@@ -128,6 +132,7 @@ namespace PurelySharp.Symbolic.Smt
                     hash = (hash * 31) + _spanStart;
                     hash = (hash * 31) + _spanLength;
                     hash = (hash * 31) + _inlineDepth;
+                    hash = (hash * 31) + StringComparer.Ordinal.GetHashCode(_symbolVersionKey);
                     return hash;
                 }
             }
@@ -4317,17 +4322,6 @@ namespace PurelySharp.Symbolic.Smt
             FormulaTranslator translator)
         {
             expression = UnwrapExpression(expression);
-            if (getSymbolVersion != null)
-            {
-                return translator(
-                    expression,
-                    semanticModel,
-                    cancellationToken,
-                    out formula,
-                    getSymbolVersion,
-                    inlineDepth);
-            }
-
             var cache = s_expressionFormulaCache.GetValue(
                 semanticModel.Compilation,
                 static _ => new ConcurrentDictionary<ExpressionFormulaCacheKey, SourceBooleanFormulaCacheEntry>());
@@ -4336,7 +4330,10 @@ namespace PurelySharp.Symbolic.Smt
                 expression.SyntaxTree,
                 expression.SpanStart,
                 expression.Span.Length,
-                inlineDepth);
+                inlineDepth,
+                getSymbolVersion == null
+                    ? string.Empty
+                    : CreateSymbolVersionCacheKey(expression, semanticModel, cancellationToken, getSymbolVersion));
             var entry = cache.GetOrAdd(
                 cacheKey,
                 _ =>
@@ -4353,6 +4350,53 @@ namespace PurelySharp.Symbolic.Smt
 
             formula = entry.Formula;
             return entry.Success;
+        }
+
+        private static string CreateSymbolVersionCacheKey(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int> getSymbolVersion)
+        {
+            var symbols = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var node in expression.DescendantNodesAndSelf())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (node is not IdentifierNameSyntax &&
+                    node is not MemberAccessExpressionSyntax &&
+                    node is not MemberBindingExpressionSyntax)
+                {
+                    continue;
+                }
+
+                var symbol = semanticModel.GetSymbolInfo(node, cancellationToken).Symbol?.OriginalDefinition;
+                if (symbol is not ILocalSymbol &&
+                    symbol is not IParameterSymbol &&
+                    symbol is not IFieldSymbol &&
+                    symbol is not IPropertySymbol)
+                {
+                    continue;
+                }
+
+                symbols.Add(GetVersionedSymbolCachePart(symbol, getSymbolVersion));
+            }
+
+            return symbols.Count == 0
+                ? string.Empty
+                : string.Join(";", symbols.OrderBy(static symbol => symbol, StringComparer.Ordinal));
+        }
+
+        private static string GetVersionedSymbolCachePart(ISymbol symbol, Func<ISymbol, int> getSymbolVersion)
+        {
+            var start = symbol.Locations.FirstOrDefault()?.SourceSpan.Start ?? 0;
+            var version = getSymbolVersion(symbol.OriginalDefinition);
+            return symbol.Kind.ToString() +
+                ":" +
+                symbol.Name +
+                "#" +
+                start.ToString(CultureInfo.InvariantCulture) +
+                "@v" +
+                version.ToString(CultureInfo.InvariantCulture);
         }
 
         private static bool TryTranslateDefaultValue(

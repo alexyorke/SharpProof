@@ -13,6 +13,10 @@ namespace PurelySharp.Symbolic.Smt
 {
     public sealed class SmtAnalysisService : IDisposable
     {
+        private const int SharedQueryCacheEntryLimit = 4096;
+        private static readonly ConcurrentDictionary<string, PurityProofResult> s_sharedQueryCache = new(StringComparer.Ordinal);
+        private static readonly ConcurrentQueue<string> s_sharedQueryCacheOrder = new();
+
         private readonly ConcurrentDictionary<string, PurityProofResult> _queryCache = new(StringComparer.Ordinal);
         private readonly object _solverLock = new();
         private PurityProofSearch? _proofSearch;
@@ -109,8 +113,15 @@ namespace PurelySharp.Symbolic.Smt
                 return cached;
             }
 
+            if (TryGetSharedResult(key, out var sharedResult))
+            {
+                _queryCache.TryAdd(key, sharedResult);
+                return sharedResult;
+            }
+
             var result = ClassifyCore(normalizedQuery);
             _queryCache.TryAdd(key, result);
+            AddSharedResult(key, result);
             return result;
         }
 
@@ -180,6 +191,44 @@ namespace PurelySharp.Symbolic.Smt
             return Interlocked.Read(ref _consumedQueryTicks) > budgetTicks;
         }
 
+        private bool TryGetSharedResult(string queryKey, out PurityProofResult result)
+        {
+            if (Options.UseSharedResultCache)
+            {
+                return s_sharedQueryCache.TryGetValue(CreateSharedQueryKey(Options, queryKey), out result);
+            }
+
+            result = default!;
+            return false;
+        }
+
+        private void AddSharedResult(string queryKey, PurityProofResult result)
+        {
+            if (!Options.UseSharedResultCache ||
+                !IsShareableResult(result))
+            {
+                return;
+            }
+
+            var sharedKey = CreateSharedQueryKey(Options, queryKey);
+            if (!s_sharedQueryCache.TryAdd(sharedKey, result))
+            {
+                return;
+            }
+
+            s_sharedQueryCacheOrder.Enqueue(sharedKey);
+            while (s_sharedQueryCache.Count > SharedQueryCacheEntryLimit &&
+                s_sharedQueryCacheOrder.TryDequeue(out var oldestKey))
+            {
+                s_sharedQueryCache.TryRemove(oldestKey, out _);
+            }
+        }
+
+        private static bool IsShareableResult(PurityProofResult result)
+        {
+            return result.Outcome is PurityProofOutcome.ProvablyPure or PurityProofOutcome.ProvablyImpure;
+        }
+
         private static PurityProofResult Unknown(string reason)
         {
             return new PurityProofResult(
@@ -206,6 +255,19 @@ namespace PurelySharp.Symbolic.Smt
                 query.Hazard.Visibility +
                 "|" +
                 query.Hazard.TriggerCondition;
+        }
+
+        private static string CreateSharedQueryKey(SmtAnalysisOptions options, string queryKey)
+        {
+            return options.Mode +
+                "|timeout_ms=" +
+                (long)options.QueryTimeout.TotalMilliseconds +
+                "|max_path=" +
+                options.MaxPathConditions +
+                "|max_expr=" +
+                options.MaxExpressionNodes +
+                "|" +
+                queryKey;
         }
 
         private static ImmutableArray<SmtFormula> NormalizePathConditions(IEnumerable<SmtFormula> pathConditions)

@@ -348,7 +348,8 @@ namespace PurelySharp.Analyzer.Configuration
                 TimeSpan.FromMilliseconds(timeoutMs),
                 TimeSpan.FromMilliseconds(methodBudgetMs),
                 maxPathConditions,
-                maxExpressionNodes);
+                maxExpressionNodes,
+                useSharedResultCache: true);
         }
 
         private static SmtAnalysisMode GetSmtMode(AnalyzerOptions options, SmtAnalysisMode fallback)

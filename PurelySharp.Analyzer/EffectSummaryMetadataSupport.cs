@@ -68,14 +68,21 @@ namespace PurelySharp.Analyzer
 
         public string? MethodBodySha256 { get; }
 
+        public bool MatchesMetadataToken(ActualMethodIdentity? actualMethodIdentity)
+        {
+            return actualMethodIdentity != null &&
+                !string.IsNullOrWhiteSpace(MetadataToken) &&
+                string.Equals(MetadataToken, actualMethodIdentity.MetadataToken, StringComparison.OrdinalIgnoreCase);
+        }
+
         public bool IsCompleteEnoughFor(ActualMethodIdentity? actualMethodIdentity)
         {
-            if (actualMethodIdentity == null || string.IsNullOrWhiteSpace(MetadataToken))
+            if (!MatchesMetadataToken(actualMethodIdentity))
             {
                 return false;
             }
 
-            if (actualMethodIdentity.MethodBodySha256 == null)
+            if (!actualMethodIdentity!.HasMethodBody)
             {
                 return true;
             }
@@ -113,16 +120,56 @@ namespace PurelySharp.Analyzer
 
     internal sealed class ActualMethodIdentity
     {
+        private readonly object _methodBodySha256Lock = new object();
+        private readonly MethodBodyHashProvider? _methodBodyHashProvider;
+        private readonly int _relativeVirtualAddress;
+        private string? _methodBodySha256;
+        private bool _methodBodySha256Computed;
+
         public ActualMethodIdentity(string metadataToken, string? methodBodySha256, MethodAttributes attributes = 0)
         {
             MetadataToken = metadataToken;
-            MethodBodySha256 = methodBodySha256;
+            _methodBodySha256 = methodBodySha256;
+            _methodBodySha256Computed = true;
+            HasMethodBody = methodBodySha256 != null;
+            Attributes = attributes;
+        }
+
+        public ActualMethodIdentity(string metadataToken, MethodBodyHashProvider methodBodyHashProvider, int relativeVirtualAddress, MethodAttributes attributes = 0)
+        {
+            MetadataToken = metadataToken;
+            _methodBodyHashProvider = methodBodyHashProvider;
+            _relativeVirtualAddress = relativeVirtualAddress;
+            _methodBodySha256Computed = relativeVirtualAddress == 0;
+            HasMethodBody = relativeVirtualAddress != 0;
             Attributes = attributes;
         }
 
         public string MetadataToken { get; }
 
-        public string? MethodBodySha256 { get; }
+        public bool HasMethodBody { get; }
+
+        public string? MethodBodySha256
+        {
+            get
+            {
+                if (_methodBodySha256Computed)
+                {
+                    return _methodBodySha256;
+                }
+
+                lock (_methodBodySha256Lock)
+                {
+                    if (!_methodBodySha256Computed)
+                    {
+                        _methodBodySha256 = _methodBodyHashProvider?.ComputeMethodBodySha256(_relativeVirtualAddress);
+                        _methodBodySha256Computed = true;
+                    }
+                }
+
+                return _methodBodySha256;
+            }
+        }
 
         public MethodAttributes Attributes { get; }
 
@@ -130,6 +177,79 @@ namespace PurelySharp.Analyzer
             Attributes.HasFlag(MethodAttributes.Virtual) &&
             !Attributes.HasFlag(MethodAttributes.Final) &&
             !Attributes.HasFlag(MethodAttributes.Static);
+    }
+
+    internal sealed class MethodBodyHashProvider
+    {
+        private readonly string _assemblyPath;
+        private readonly object _lock = new object();
+        private readonly Dictionary<int, string?> _cache = new Dictionary<int, string?>();
+        private byte[]? _assemblyBytes;
+
+        public MethodBodyHashProvider(string assemblyPath)
+        {
+            _assemblyPath = assemblyPath;
+        }
+
+        public string? ComputeMethodBodySha256(int relativeVirtualAddress)
+        {
+            if (relativeVirtualAddress == 0)
+            {
+                return null;
+            }
+
+            lock (_lock)
+            {
+                if (_cache.TryGetValue(relativeVirtualAddress, out var cached))
+                {
+                    return cached;
+                }
+
+                var hash = ComputeMethodBodySha256Core(relativeVirtualAddress);
+                _cache[relativeVirtualAddress] = hash;
+                return hash;
+            }
+        }
+
+        private string? ComputeMethodBodySha256Core(int relativeVirtualAddress)
+        {
+            if (string.IsNullOrWhiteSpace(_assemblyPath) ||
+                !File.Exists(_assemblyPath))
+            {
+                return null;
+            }
+
+            try
+            {
+                _assemblyBytes ??= File.ReadAllBytes(_assemblyPath);
+                using (var stream = new MemoryStream(_assemblyBytes, writable: false))
+                using (var peReader = new PEReader(stream))
+                {
+                    if (!peReader.HasMetadata)
+                    {
+                        return null;
+                    }
+
+                    var body = peReader.GetMethodBody(relativeVirtualAddress);
+                    var il = body.GetILBytes();
+                    if (il == null)
+                    {
+                        return null;
+                    }
+
+                    using var sha256 = SHA256.Create();
+                    return CompatibilityHelpers.ToLowerHex(sha256.ComputeHash(il));
+                }
+            }
+            catch (IOException)
+            {
+                return null;
+            }
+            catch (BadImageFormatException)
+            {
+                return null;
+            }
+        }
     }
 
     internal sealed class ActualAssemblyIdentity

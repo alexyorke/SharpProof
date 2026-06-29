@@ -36,6 +36,11 @@ namespace PurelySharp.Analyzer.Engine
             _smtAnalysis = purityService?.SmtAnalysis ?? new SmtAnalysisService(SmtAnalysisOptions.Default);
         }
 
+        internal PurityAnalysisEngine(SmtAnalysisService smtAnalysis)
+        {
+            _smtAnalysis = smtAnalysis ?? throw new ArgumentNullException(nameof(smtAnalysis));
+        }
+
 
         private static readonly SymbolDisplayFormat _signatureFormat = new SymbolDisplayFormat(
             globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
@@ -1322,7 +1327,8 @@ namespace PurelySharp.Analyzer.Engine
                             allowSynchronizationAttributeSymbol,
                             visited,
                             methodSymbol,
-                            purityCache);
+                            purityCache,
+                            activeSmtAnalysis);
                     }
                     else
                     {
@@ -1363,7 +1369,8 @@ namespace PurelySharp.Analyzer.Engine
                             methodSymbol,
                             _purityRules,
                             CancellationToken.None,
-                            null);
+                            null,
+                            activeSmtAnalysis);
 
 
                         LogDebug($"{indent}  Post-CFG: Checking ReturnOperations (with merged delegate map from CFG)...");
@@ -1464,7 +1471,7 @@ namespace PurelySharp.Analyzer.Engine
                         {
                             foreach (var catchClause in tryOp.Catches)
                             {
-                                var catchResult = AnalyzeOperationSubtreePurity(catchClause, semanticModel, enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, visited, methodSymbol, purityCache);
+                                var catchResult = AnalyzeOperationSubtreePurity(catchClause, semanticModel, enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, visited, methodSymbol, purityCache, activeSmtAnalysis);
                                 if (!catchResult.IsPure)
                                 {
                                     result = catchResult;
@@ -1473,7 +1480,7 @@ namespace PurelySharp.Analyzer.Engine
                             }
                             if (tryOp.Finally != null)
                             {
-                                var finallyResult = AnalyzeOperationSubtreePurity(tryOp.Finally, semanticModel, enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, visited, methodSymbol, purityCache);
+                                var finallyResult = AnalyzeOperationSubtreePurity(tryOp.Finally, semanticModel, enforcePureAttributeSymbol, allowSynchronizationAttributeSymbol, visited, methodSymbol, purityCache, activeSmtAnalysis);
                                 if (!finallyResult.IsPure)
                                 {
                                     result = finallyResult;
@@ -1626,7 +1633,8 @@ namespace PurelySharp.Analyzer.Engine
                                     methodSymbol,
                                     _purityRules,
                                     CancellationToken.None,
-                                    null);
+                                    null,
+                                    activeSmtAnalysis);
                                 var operatorPurity = GetCalleePurity(operatorMethod, contextForOp);
 
                                 if (!operatorPurity.IsPure)
@@ -2005,7 +2013,8 @@ namespace PurelySharp.Analyzer.Engine
             INamedTypeSymbol? allowSynchronizationAttributeSymbol,
             HashSet<IMethodSymbol> visited,
             IMethodSymbol containingMethodSymbol,
-            Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache)
+            Dictionary<IMethodSymbol, PurityAnalysisResult> purityCache,
+            SmtAnalysisService smtAnalysis)
         {
             var pureAttributeSymbol = semanticModel.Compilation.GetTypeByMetadataName("PurelySharp.Attributes.PureAttribute");
             var context = new Rules.PurityAnalysisContext(
@@ -2018,7 +2027,8 @@ namespace PurelySharp.Analyzer.Engine
                 containingMethodSymbol,
                 _purityRules,
                 CancellationToken.None,
-                null);
+                null,
+                smtAnalysis);
 
             var currentState = PurityAnalysisState.Pure;
             foreach (var operation in ExecutionVisibility.VisibleDescendants(rootOperation))
@@ -3565,7 +3575,8 @@ namespace PurelySharp.Analyzer.Engine
                 context.EnforcePureAttributeSymbol,
                 context.AllowSynchronizationAttributeSymbol,
                 context.VisitedMethods,
-                context.PurityCache);
+                context.PurityCache,
+                context.SmtAnalysis);
         }
 
 

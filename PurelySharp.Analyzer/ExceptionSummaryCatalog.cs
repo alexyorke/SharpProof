@@ -7,7 +7,6 @@ using System.Linq;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -17,6 +16,8 @@ namespace PurelySharp.Analyzer
 {
     internal sealed class ExceptionSummaryCatalog
     {
+        private const int BuiltInSummarySourcePriority = 0;
+        private const int AdditionalSummarySourcePriority = 1;
         private static readonly Lazy<ExceptionSummaryCatalog> BuiltInCatalog =
             new Lazy<ExceptionSummaryCatalog>(CreateBuiltInCatalog, LazyThreadSafetyMode.ExecutionAndPublication);
         private static readonly SymbolDisplayFormat EffectSummaryContainingTypeFormat = new SymbolDisplayFormat(
@@ -57,7 +58,7 @@ namespace PurelySharp.Analyzer
             BuiltInEffectSummaryLoader.LoadAdditionalSummaryJsonDocuments(
                 options,
                 cancellationToken,
-                json => AddParsedEntries(entriesBySymbol, json));
+                json => AddParsedEntries(entriesBySymbol, json, AdditionalSummarySourcePriority));
             return CreateCatalog(entriesBySymbol);
         }
 
@@ -148,7 +149,7 @@ namespace PurelySharp.Analyzer
         {
             var entriesBySymbol = new Dictionary<string, ImmutableArray<SummaryEntry>.Builder>(StringComparer.Ordinal);
             BuiltInEffectSummaryLoader.LoadBuiltInSummaryJsonDocuments(
-                json => AddParsedEntries(entriesBySymbol, json));
+                json => AddParsedEntries(entriesBySymbol, json, BuiltInSummarySourcePriority));
             return CreateCatalog(entriesBySymbol);
         }
 
@@ -182,9 +183,10 @@ namespace PurelySharp.Analyzer
 
         private static void AddParsedEntries(
             Dictionary<string, ImmutableArray<SummaryEntry>.Builder> entriesBySymbol,
-            string json)
+            string json,
+            int sourcePriority)
         {
-            foreach (var entry in ParseEntries(json))
+            foreach (var entry in ParseEntries(json, sourcePriority))
             {
                 if (!entriesBySymbol.TryGetValue(entry.Symbol, out var builder))
                 {
@@ -196,7 +198,7 @@ namespace PurelySharp.Analyzer
             }
         }
 
-        private static IEnumerable<SummaryEntry> ParseEntries(string json)
+        private static IEnumerable<SummaryEntry> ParseEntries(string json, int sourcePriority)
         {
             using var document = JsonDocument.Parse(json);
             if (!document.RootElement.TryGetProperty("Assemblies", out var assembliesElement) ||
@@ -256,7 +258,8 @@ namespace PurelySharp.Analyzer
                         exceptionInfos,
                         exceptionFacts,
                         assemblyIdentity,
-                        SummaryMethodIdentity.FromJson(methodElement));
+                        SummaryMethodIdentity.FromJson(methodElement),
+                        sourcePriority);
                 }
             }
         }
@@ -723,22 +726,15 @@ namespace PurelySharp.Analyzer
 
             var metadataReader = peReader.GetMetadataReader();
             var builder = ImmutableDictionary.CreateBuilder<string, ActualMethodIdentity>(StringComparer.Ordinal);
+            var methodBodyHashProvider = new MethodBodyHashProvider(path);
             foreach (var handle in metadataReader.MethodDefinitions)
             {
                 var definition = metadataReader.GetMethodDefinition(handle);
-                string? methodBodySha256 = null;
-                if (definition.RelativeVirtualAddress != 0)
-                {
-                    var body = peReader.GetMethodBody(definition.RelativeVirtualAddress);
-                    var il = body.GetILBytes();
-                    if (il != null)
-                    {
-                        methodBodySha256 = ComputeSha256(il);
-                    }
-                }
-
                 var token = "0x" + MetadataTokens.GetToken(handle).ToString("X8");
-                var identity = new ActualMethodIdentity(token, methodBodySha256);
+                var identity = new ActualMethodIdentity(
+                    token,
+                    methodBodyHashProvider,
+                    definition.RelativeVirtualAddress);
                 foreach (var key in GetMethodKeys(metadataReader, handle))
                 {
                     builder[key] = identity;
@@ -792,12 +788,6 @@ namespace PurelySharp.Analyzer
             {
                 yield return roslynDisplay;
             }
-        }
-
-        private static string ComputeSha256(byte[] bytes)
-        {
-            using var sha256 = SHA256.Create();
-            return CompatibilityHelpers.ToLowerHex(sha256.ComputeHash(bytes));
         }
 
         private static string GetMethodSymbol(MetadataReader reader, MethodDefinitionHandle handle)
@@ -1207,13 +1197,15 @@ namespace PurelySharp.Analyzer
                 ImmutableArray<SummaryExceptionInfo> exceptionInfos,
                 ImmutableArray<SummaryExceptionFact> exceptionFacts,
                 SummaryAssemblyIdentity? assemblyIdentity,
-                SummaryMethodIdentity? methodIdentity)
+                SummaryMethodIdentity? methodIdentity,
+                int sourcePriority)
             {
                 Symbol = symbol;
                 ExceptionInfos = exceptionInfos;
                 ExceptionFacts = exceptionFacts;
                 AssemblyIdentity = assemblyIdentity;
                 MethodIdentity = methodIdentity;
+                SourcePriority = sourcePriority;
             }
 
             public string Symbol { get; }
@@ -1226,6 +1218,8 @@ namespace PurelySharp.Analyzer
 
             public SummaryMethodIdentity? MethodIdentity { get; }
 
+            public int SourcePriority { get; }
+
             public bool IsTrustedFor(
                 IMethodSymbol methodSymbol,
                 ActualAssemblyIdentity? actualAssemblyIdentity,
@@ -1236,13 +1230,23 @@ namespace PurelySharp.Analyzer
                     return false;
                 }
 
-                return AssemblyIdentity != null &&
-                    AssemblyIdentity.IsComplete &&
-                    MethodIdentity != null &&
-                    MethodIdentity.IsCompleteEnoughFor(actualMethodIdentity) &&
-                    actualAssemblyIdentity != null &&
-                    actualMethodIdentity != null &&
-                    AssemblyIdentity.Matches(actualAssemblyIdentity) &&
+                if (AssemblyIdentity == null ||
+                    !AssemblyIdentity.IsComplete ||
+                    MethodIdentity == null ||
+                    actualAssemblyIdentity == null ||
+                    actualMethodIdentity == null ||
+                    !AssemblyIdentity.Matches(actualAssemblyIdentity) ||
+                    !MethodIdentity.MatchesMetadataToken(actualMethodIdentity))
+                {
+                    return false;
+                }
+
+                if (SourcePriority == BuiltInSummarySourcePriority)
+                {
+                    return true;
+                }
+
+                return MethodIdentity.IsCompleteEnoughFor(actualMethodIdentity) &&
                     MethodIdentity.Matches(actualMethodIdentity);
             }
         }

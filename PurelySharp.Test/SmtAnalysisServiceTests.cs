@@ -285,6 +285,33 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void Classify_SharedResultCacheEnabled_ReusesResultAcrossServices()
+        {
+            var variableName = "shared_" + Guid.NewGuid().ToString("N");
+            var x = new SmtVariable(variableName, SmtValueKind.Int);
+            var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
+            var options = new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.FromMilliseconds(250),
+                TimeSpan.FromMilliseconds(1000),
+                maxPathConditions: 4,
+                maxExpressionNodes: 32,
+                useSharedResultCache: true);
+            var query = CreateQuery(new[] { xIsZero }, xIsZero);
+            using var firstService = new SmtAnalysisService(options);
+            using var secondService = new SmtAnalysisService(options);
+
+            var first = firstService.Classify(query);
+            var second = secondService.Classify(query);
+
+            Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+            Assert.That(second.Outcome, Is.EqualTo(first.Outcome));
+            Assert.That(firstService.ExecutedQueryCount, Is.EqualTo(1));
+            Assert.That(secondService.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(secondService.CacheEntryCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public void ClassifyImplication_ProvesFactFromPathConditions()
         {
             var x = new SmtVariable("x", SmtValueKind.Int);

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
+using PurelySharp.Symbolic.Smt;
 
 namespace PurelySharp.Analyzer.Engine.Analysis
 {
@@ -10,10 +11,11 @@ namespace PurelySharp.Analyzer.Engine.Analysis
 			CallGraph graph,
 			Compilation compilation,
 			INamedTypeSymbol enforcePureAttributeSymbol,
-			INamedTypeSymbol? allowSynchronizationAttributeSymbol)
+			INamedTypeSymbol? allowSynchronizationAttributeSymbol,
+			SmtAnalysisService smtAnalysis)
 		{
 			var results = new Dictionary<IMethodSymbol, PurityAnalysisEngine.PurityAnalysisResult>(SymbolEqualityComparer.Default);
-			var engine = new PurityAnalysisEngine();
+			var engine = new PurityAnalysisEngine(smtAnalysis);
 			var worklist = new Queue<IMethodSymbol>();
 			var reverse = new Dictionary<IMethodSymbol, HashSet<IMethodSymbol>>(SymbolEqualityComparer.Default);
 
@@ -62,4 +64,3 @@ namespace PurelySharp.Analyzer.Engine.Analysis
 		}
 	}
 }
-

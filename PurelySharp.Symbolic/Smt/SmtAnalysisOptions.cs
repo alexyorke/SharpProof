@@ -46,13 +46,15 @@ namespace PurelySharp.Symbolic.Smt
             TimeSpan queryTimeout,
             TimeSpan methodBudget,
             int maxPathConditions,
-            int maxExpressionNodes)
+            int maxExpressionNodes,
+            bool useSharedResultCache = false)
         {
             Mode = mode;
             QueryTimeout = queryTimeout;
             MethodBudget = methodBudget;
             MaxPathConditions = maxPathConditions;
             MaxExpressionNodes = maxExpressionNodes;
+            UseSharedResultCache = useSharedResultCache;
         }
 
         public SmtAnalysisMode Mode { get; }
@@ -60,6 +62,7 @@ namespace PurelySharp.Symbolic.Smt
         public TimeSpan MethodBudget { get; }
         public int MaxPathConditions { get; }
         public int MaxExpressionNodes { get; }
+        public bool UseSharedResultCache { get; }
         public bool IsEnabled => Mode != SmtAnalysisMode.Off;
 
         public SmtAnalysisOptions WithOverrides(
@@ -73,7 +76,19 @@ namespace PurelySharp.Symbolic.Smt
                 queryTimeout ?? QueryTimeout,
                 methodBudget ?? MethodBudget,
                 maxPathConditions ?? MaxPathConditions,
-                maxExpressionNodes ?? MaxExpressionNodes);
+                maxExpressionNodes ?? MaxExpressionNodes,
+                UseSharedResultCache);
+        }
+
+        public SmtAnalysisOptions WithSharedResultCache(bool enabled = true)
+        {
+            return new SmtAnalysisOptions(
+                Mode,
+                QueryTimeout,
+                MethodBudget,
+                MaxPathConditions,
+                MaxExpressionNodes,
+                enabled);
         }
     }
 }
