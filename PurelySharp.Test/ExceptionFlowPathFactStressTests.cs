@@ -490,6 +490,54 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_SystemIndexVariableFromEndZeroGuard_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values, int offset)
+    {
+        Index index = 0;
+        index = ^offset;
+        if (offset == 0)
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
+        public async Task Ps0010_SystemIndexVariableFromEndGuardedInRange_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values, int offset)
+    {
+        Index index = ^offset;
+        if (offset > 0 && offset <= values.Length)
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_InRangeArrayIndexGuard_DoesNotReport()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
@@ -1876,6 +1924,60 @@ public class TestClass
             var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId);
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
+        public async Task Ps0011_SystemIndexVariableFromEndZeroGuard_ReportsExceptionSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values, int offset)
+    {
+        Index index = ^offset;
+        if (offset == 0)
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
+        public async Task Ps0011_SystemIndexVariableFromEndGuardedInRange_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values, int offset)
+    {
+        Index index = ^offset;
+        if (offset > 0 && offset <= values.Length)
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
         }
 
         private static async Task<Diagnostic> SingleExceptionDiagnosticAsync(string source)

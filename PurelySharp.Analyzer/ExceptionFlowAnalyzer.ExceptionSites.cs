@@ -4,6 +4,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using PurelySharp.Analyzer.Engine;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
 
@@ -272,7 +273,7 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            if (!CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+            if (!TryTranslateBuiltInElementAccessInRangeForExceptionFlow(
                     elementAccess,
                     semanticModel,
                     cancellationToken,
@@ -291,6 +292,230 @@ namespace PurelySharp.Analyzer
 
             return PathConditionsAreSatisfiable(pathConditions, smtAnalysis) &&
                 PathConditionsImplyFact(pathConditions, outOfRangeFormula, smtAnalysis);
+        }
+
+        private static bool TryTranslateBuiltInElementAccessInRangeForExceptionFlow(
+            ElementAccessExpressionSyntax elementAccess,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula inRangeFormula)
+        {
+            if (CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+                    elementAccess,
+                    semanticModel,
+                    cancellationToken,
+                    out inRangeFormula))
+            {
+                return true;
+            }
+
+            if (!CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+                    elementAccess.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var lengthFormula) ||
+                lengthFormula is not { Kind: SmtValueKind.Int } ||
+                !TryCreateEffectiveSystemIndexVariableFormula(
+                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    elementAccess,
+                    lengthFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out var indexFormula))
+            {
+                inRangeFormula = null!;
+                return false;
+            }
+
+            var lowerBound = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                indexFormula,
+                new SmtIntegerConstant(0));
+            var upperBound = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThan,
+                indexFormula,
+                lengthFormula);
+            inRangeFormula = new SmtBinaryFormula(SmtBinaryOperator.And, lowerBound, upperBound);
+            return true;
+        }
+
+        private static bool TryCreateEffectiveSystemIndexVariableFormula(
+            ExpressionSyntax indexExpression,
+            SyntaxNode useNode,
+            SmtFormula lengthFormula,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula indexFormula)
+        {
+            indexExpression = UnwrapFactExpression(indexExpression);
+            if (!TryResolveCurrentSystemIndexValueExpression(
+                    indexExpression,
+                    useNode,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueExpression))
+            {
+                indexFormula = null!;
+                return false;
+            }
+
+            return TryCreateEffectiveIndexExpressionFormula(
+                valueExpression,
+                lengthFormula,
+                semanticModel,
+                cancellationToken,
+                out indexFormula);
+        }
+
+        private static bool TryResolveCurrentSystemIndexValueExpression(
+            ExpressionSyntax indexExpression,
+            SyntaxNode useNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out ExpressionSyntax valueExpression)
+        {
+            valueExpression = null!;
+            var symbol = GetLocalOrParameterSymbol(indexExpression, semanticModel, cancellationToken);
+            if (symbol == null ||
+                !IsSystemIndexType(GetTrackedSymbolType(symbol)))
+            {
+                return false;
+            }
+
+            ExpressionSyntax? currentValue = null;
+            foreach (var (block, containingStatement) in EnumerateContainingBlocks(useNode).Reverse())
+            {
+                foreach (var statement in block.Statements)
+                {
+                    if (ReferenceEquals(statement, containingStatement))
+                    {
+                        break;
+                    }
+
+                    if (statement is LocalDeclarationStatementSyntax localDeclaration)
+                    {
+                        foreach (var declarator in localDeclaration.Declaration.Variables)
+                        {
+                            if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol &&
+                                SymbolEqualityComparer.Default.Equals(localSymbol.OriginalDefinition, symbol))
+                            {
+                                currentValue = declarator.Initializer?.Value;
+                            }
+                        }
+
+                        if (StatementMutatesSymbolExceptLinearAssignment(statement, symbol, semanticModel, cancellationToken))
+                        {
+                            currentValue = null;
+                        }
+
+                        continue;
+                    }
+
+                    if (statement is ExpressionStatementSyntax
+                        {
+                            Expression: AssignmentExpressionSyntax assignment
+                        } &&
+                        ExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken))
+                    {
+                        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                            ExpressionReferencesSymbol(assignment.Right, symbol, semanticModel, cancellationToken))
+                        {
+                            currentValue = null;
+                            continue;
+                        }
+
+                        currentValue = assignment.Right;
+                        continue;
+                    }
+
+                    if (StatementMutatesSymbolExceptLinearAssignment(statement, symbol, semanticModel, cancellationToken))
+                    {
+                        currentValue = null;
+                    }
+                }
+            }
+
+            if (currentValue == null)
+            {
+                return false;
+            }
+
+            valueExpression = currentValue;
+            return true;
+        }
+
+        private static bool StatementMutatesSymbolExceptLinearAssignment(
+            StatementSyntax statement,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            foreach (var node in statement.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !ExecutionVisibility.IsNestedCallableBoundary(candidate)))
+            {
+                if (MutatesSymbol(node, symbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryCreateEffectiveIndexExpressionFormula(
+            ExpressionSyntax expression,
+            SmtFormula lengthFormula,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula indexFormula)
+        {
+            expression = UnwrapFactExpression(expression);
+            if (expression is PrefixUnaryExpressionSyntax fromEndIndex &&
+                fromEndIndex.OperatorToken.IsKind(SyntaxKind.CaretToken))
+            {
+                if (!CSharpConditionToFormula.TryTranslateValue(
+                        fromEndIndex.Operand,
+                        semanticModel,
+                        cancellationToken,
+                        out var fromEndOffset,
+                        getSymbolVersion: null) ||
+                    fromEndOffset is not { Kind: SmtValueKind.Int })
+                {
+                    indexFormula = null!;
+                    return false;
+                }
+
+                indexFormula = new SmtIntegerBinaryTerm(
+                    SmtIntegerBinaryOperator.Subtract,
+                    lengthFormula,
+                    fromEndOffset);
+                return true;
+            }
+
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var ordinaryIndex,
+                    getSymbolVersion: null) ||
+                ordinaryIndex is not { Kind: SmtValueKind.Int })
+            {
+                indexFormula = null!;
+                return false;
+            }
+
+            indexFormula = ordinaryIndex;
+            return true;
+        }
+
+        private static bool IsSystemIndexType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol
+            {
+                Name: "Index",
+                ContainingNamespace: { } containingNamespace
+            } &&
+            containingNamespace.ToDisplayString() == "System";
         }
 
         private static bool IsReferenceType(ITypeSymbol? typeSymbol)
