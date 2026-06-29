@@ -1065,15 +1065,7 @@ public static class Utf8ParserAndCrc32CatalogSignatureSamples
     }
 }";
 
-            var packageAssemblyPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".nuget",
-                "packages",
-                "system.io.hashing",
-                "8.0.0",
-                "lib",
-                "net8.0",
-                "System.IO.Hashing.dll");
+            var packageAssemblyPath = typeof(System.IO.Hashing.Crc32).Assembly.Location;
             Assert.That(File.Exists(packageAssemblyPath), Is.True, packageAssemblyPath);
 
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));

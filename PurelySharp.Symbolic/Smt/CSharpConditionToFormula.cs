@@ -16,6 +16,7 @@ namespace PurelySharp.Symbolic.Smt
         private const int MaxSourcePredicateInlineDepth = 4;
         private const string ImplicitThisVariableName = "this";
         private static readonly ConditionalWeakTable<Compilation, ConcurrentDictionary<SourceBooleanFormulaCacheKey, SourceBooleanFormulaCacheEntry>> s_sourceBooleanFormulaCache = new();
+        private static readonly ConditionalWeakTable<Compilation, ConcurrentDictionary<ExpressionFormulaCacheKey, SourceBooleanFormulaCacheEntry>> s_expressionFormulaCache = new();
 
         private readonly struct SourceBooleanFormulaCacheEntry
         {
@@ -81,7 +82,77 @@ namespace PurelySharp.Symbolic.Smt
             }
         }
 
+        private readonly struct ExpressionFormulaCacheKey : IEquatable<ExpressionFormulaCacheKey>
+        {
+            private readonly string _kind;
+            private readonly SyntaxTree _syntaxTree;
+            private readonly int _spanStart;
+            private readonly int _spanLength;
+            private readonly int _inlineDepth;
+
+            public ExpressionFormulaCacheKey(
+                string kind,
+                SyntaxTree syntaxTree,
+                int spanStart,
+                int spanLength,
+                int inlineDepth)
+            {
+                _kind = kind;
+                _syntaxTree = syntaxTree;
+                _spanStart = spanStart;
+                _spanLength = spanLength;
+                _inlineDepth = inlineDepth;
+            }
+
+            public bool Equals(ExpressionFormulaCacheKey other)
+            {
+                return string.Equals(_kind, other._kind, StringComparison.Ordinal) &&
+                    ReferenceEquals(_syntaxTree, other._syntaxTree) &&
+                    _spanStart == other._spanStart &&
+                    _spanLength == other._spanLength &&
+                    _inlineDepth == other._inlineDepth;
+            }
+
+            public override bool Equals(object? obj)
+            {
+                return obj is ExpressionFormulaCacheKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    var hash = 17;
+                    hash = (hash * 31) + StringComparer.Ordinal.GetHashCode(_kind);
+                    hash = (hash * 31) + RuntimeHelpers.GetHashCode(_syntaxTree);
+                    hash = (hash * 31) + _spanStart;
+                    hash = (hash * 31) + _spanLength;
+                    hash = (hash * 31) + _inlineDepth;
+                    return hash;
+                }
+            }
+        }
+
         public static bool TryTranslate(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            return TryTranslateCached(
+                "condition",
+                expression,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth,
+                TryTranslateCore);
+        }
+
+        private static bool TryTranslateCore(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
@@ -4070,6 +4141,25 @@ namespace PurelySharp.Symbolic.Smt
             Func<ISymbol, int>? getSymbolVersion,
             int inlineDepth = 0)
         {
+            return TryTranslateCached(
+                "value",
+                expression,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth,
+                TryTranslateValueCore);
+        }
+
+        private static bool TryTranslateValueCore(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth = 0)
+        {
             expression = UnwrapExpression(expression);
             formula = null;
 
@@ -4206,6 +4296,63 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
+        }
+
+        private delegate bool FormulaTranslator(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth);
+
+        private static bool TryTranslateCached(
+            string kind,
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            FormulaTranslator translator)
+        {
+            expression = UnwrapExpression(expression);
+            if (getSymbolVersion != null)
+            {
+                return translator(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth);
+            }
+
+            var cache = s_expressionFormulaCache.GetValue(
+                semanticModel.Compilation,
+                static _ => new ConcurrentDictionary<ExpressionFormulaCacheKey, SourceBooleanFormulaCacheEntry>());
+            var cacheKey = new ExpressionFormulaCacheKey(
+                kind,
+                expression.SyntaxTree,
+                expression.SpanStart,
+                expression.Span.Length,
+                inlineDepth);
+            var entry = cache.GetOrAdd(
+                cacheKey,
+                _ =>
+                {
+                    var success = translator(
+                        expression,
+                        semanticModel,
+                        cancellationToken,
+                        out var translatedFormula,
+                        getSymbolVersion: null,
+                        inlineDepth);
+                    return new SourceBooleanFormulaCacheEntry(success, translatedFormula);
+                });
+
+            formula = entry.Formula;
+            return entry.Success;
         }
 
         private static bool TryTranslateDefaultValue(

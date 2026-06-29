@@ -102,6 +102,16 @@ namespace PurelySharp.Symbolic
             IReadOnlyList<SmtFormula> formulas,
             SmtAnalysisService? smtAnalysis)
         {
+            if (formulas.Count == 0)
+            {
+                return new SymbolicProgramPointAnalysis(
+                    spanStart,
+                    formulas,
+                    SymbolicReachability.Reachable,
+                    "no_path_conditions",
+                    SymbolicSmtDiagnostics.FromService(smtAnalysis));
+            }
+
             var proof = smtAnalysis?.ClassifyPathFeasibility(formulas);
             var reachability = proof?.PathFeasibility switch
             {
