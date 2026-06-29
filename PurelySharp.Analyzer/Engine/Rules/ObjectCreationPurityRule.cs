@@ -243,6 +243,18 @@ namespace PurelySharp.Analyzer.Engine.Rules
                             catalogSource: knownImpureMemberSource));
                 }
 
+                if (trustedMetadataPurity.AllowsKnownPureFallback &&
+                    PurityAnalysisEngine.TryCreateBclFallbackImpurity(
+                        constructorSymbol,
+                        objectCreationOperation.Syntax,
+                        objectCreationOperation,
+                        nameof(ObjectCreationPurityRule),
+                        out var bclFallbackConstructorResult))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [ObjCreateRule] Constructor '{constructorSymbol.ToDisplayString()}' has no trusted purity evidence; using BCL fallback guess.");
+                    return bclFallbackConstructorResult;
+                }
+
                 var constructorPurity = PurityAnalysisEngine.GetCalleePurity(constructorSymbol, context);
 
 

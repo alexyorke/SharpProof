@@ -62,7 +62,7 @@ Some roots cannot be proven from managed IL alone:
 - environment, current culture, time, randomness, process, and filesystem state
 - synchronization, threading, volatile, and interlocked state
 
-These should become explicit root seeds with categories and evidence, not broad guesses hidden in analyzer code.
+These should become explicit root seeds with categories and evidence, not broad guesses hidden in analyzer code. The analyzer has a separate low-confidence BCL fallback diagnostic path for otherwise unknown metadata members, but that path is non-authoritative and does not replace generated summary evidence.
 
 Examples:
 

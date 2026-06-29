@@ -38,7 +38,34 @@ namespace PurelySharp.Analyzer.Engine
                     ruleName: ruleName,
                     syntaxNode: syntaxNode,
                     symbol: symbol,
-                    catalogSource: catalogSource));
+                catalogSource: catalogSource));
+        }
+
+        internal static bool TryCreateBclFallbackImpurity(
+            ISymbol? symbol,
+            SyntaxNode? syntaxNode,
+            IOperation? operation,
+            string ruleName,
+            out PurityAnalysisResult result)
+        {
+            result = PurityAnalysisResult.Pure;
+            if (!BclPurityFallbackClassifier.TryClassify(symbol, out var classification))
+            {
+                return false;
+            }
+
+            var evidence = PurityEvidence.Create(
+                classification.Category,
+                ruleName: ruleName,
+                operation: operation,
+                syntaxNode: syntaxNode,
+                symbol: symbol,
+                catalogSource: BclPurityFallbackClassifier.CatalogSource,
+                bclFallbackGuess: classification.Guess,
+                bclFallbackConfidence: classification.Confidence,
+                bclFallbackReason: classification.Reason);
+            result = ImpureResult(syntaxNode ?? operation?.Syntax, evidence);
+            return true;
         }
 
         internal static bool TryGetTrustedGeneratedPurity(

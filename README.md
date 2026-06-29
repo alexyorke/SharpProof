@@ -17,7 +17,7 @@ marked pure, and SMT/exceptions fall back to unknown or no proof.
   `PurelySharp.Attributes` `0.0.4`.
 - Analyzer and symbolic library target `netstandard2.0`; the symbolic CLI
   targets `net8.0`.
-- Public diagnostics in active use are `PS0002` through `PS0011`.
+- Public diagnostics in active use are `PS0002` through `PS0012`.
 - Z3 is packaged with the analyzer via `PurelySharp.Symbolic.dll`,
   `SearchLib.dll`, `Microsoft.Z3.dll`, and native `libz3.dll`.
 - Built-in effect summaries are regenerated into `obj` during build/test and
@@ -85,7 +85,7 @@ dotnet add package PurelySharp.Attributes --version 0.0.4
 | --- | --- | --- | --- |
 | Attribute contracts | [x] | `[EnforcePure]` and `[Pure]` mark source methods for purity enforcement. `[PureExternal]` and `[Impure]` model trusted or rejected boundaries. `[AllowSynchronization]` can permit synchronization inside otherwise pure methods. | [BoundaryAttributeTests.cs](PurelySharp.Test/BoundaryAttributeTests.cs), [PurelySharpCodeFixTests.cs](PurelySharp.Test/PurelySharpCodeFixTests.cs) |
 | Purity diagnostics | [x] | `PS0002` reports marked methods whose bodies cannot be proven pure. `PS0003` reports misplaced purity attributes. `PS0004` suggests missing purity attributes on methods that appear pure. `PS0005` through `PS0008` cover conflicting purity attributes and synchronization attribute misuse. | [PurelySharpDiagnostics.cs](PurelySharp.Analyzer/PurelySharpDiagnostics.cs), [DiagnosticEvidenceTests.cs](PurelySharp.Test/DiagnosticEvidenceTests.cs) |
-| Optional explanation diagnostics | [x] | `PS0009` emits structured explanation data when `purelysharp_emit_explanations = true`. | [AnalyzerReleases.Unshipped.md](PurelySharp.Analyzer/AnalyzerReleases.Unshipped.md), [Ps0004ConfigurationTests.cs](PurelySharp.Test/Ps0004ConfigurationTests.cs) |
+| Optional explanation diagnostics | [x] | `PS0009` emits structured explanation data when `purelysharp_emit_explanations = true`. `PS0012` emits a non-authoritative BCL fallback guess when an otherwise unknown metadata BCL member has no stronger evidence. | [AnalyzerReleases.Unshipped.md](PurelySharp.Analyzer/AnalyzerReleases.Unshipped.md), [DiagnosticEvidenceTests.cs](PurelySharp.Test/DiagnosticEvidenceTests.cs) |
 | Code fixes | [x] | Code fixes add `[EnforcePure]`, remove conflicting attributes, remove invalid purity attributes, and clean up synchronization attributes. | [PurelySharpCodeFixTests.cs](PurelySharp.Test/PurelySharpCodeFixTests.cs) |
 | Analyzer configuration | [x] | `.editorconfig` and global analyzerconfig settings control known pure/impure methods, impure namespaces/types, purity profile, missing-attribute suggestions, explanations, exception reporting, effect-summary JSON, SMT mode, and SMT budgets. | [ConfigKeys.cs](PurelySharp.Analyzer/Configuration/ConfigKeys.cs), [AnalyzerConfiguration.cs](PurelySharp.Analyzer/Configuration/AnalyzerConfiguration.cs) |
 | Baseline suppression | [x] | `PurelySharp.Baseline.json` additional files can suppress known diagnostics by ID, symbol documentation ID, and path for incremental adoption. | [BaselineSuppressionTests.cs](PurelySharp.Test/BaselineSuppressionTests.cs) |
@@ -102,6 +102,7 @@ dotnet add package PurelySharp.Attributes --version 0.0.4
 | Dispatch, delegates, and LINQ | [~] | The analyzer narrows many exact concrete receiver flows, delegate targets, default equality/comparison dispatch, immutable collection operations, LINQ materialization, and enumerable hazards. Deeper heterogeneous merges, unknown dynamic dispatch, and unresolved external targets remain conservative. | [ExactConcreteDispatchFlowTests.cs](PurelySharp.Test/ExactConcreteDispatchFlowTests.cs), [DelegateTests.cs](PurelySharp.Test/DelegateTests.cs), [LinqOperationsTests.cs](PurelySharp.Test/LinqOperationsTests.cs), [LinqSoundnessStressTests.cs](PurelySharp.Test/LinqSoundnessStressTests.cs) |
 | Fresh ownership and mutation | [~] | Some fresh arrays, collection expressions, inline arrays, local mutation, fresh returns, and disposal cases are modeled. Full borrow-checker-grade ownership, escape, alias, lifetime, and resource-release analysis is not implemented. | [CollectionExpressionTests.cs](PurelySharp.Test/CollectionExpressionTests.cs), [ArrayMutationTests.cs](PurelySharp.Test/ArrayMutationTests.cs), [UsingStatementTests.cs](PurelySharp.Test/UsingStatementTests.cs), [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
 | BCL/.NET SDK coverage | [~] | Coverage is evidence-backed and member-level, using reviewed catalogs, generated build-time summaries, hand-coded conservative roots, and tests for many runtime families. There is no meaningful "percent of the .NET SDK" claim yet because SDK APIs are not a uniform denominator and many APIs depend on runtime, OS, culture, time, randomness, reflection, native state, or hidden implementation behavior. | [EffectSummaryToolTests.cs](PurelySharp.Test/EffectSummaryToolTests.cs), [ConstantsTests.cs](PurelySharp.Test/ConstantsTests.cs), [CryptographyTests.cs](PurelySharp.Test/CryptographyTests.cs), [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
+| BCL fallback guesses | [~] | When attributes, config, generated summaries, semantic catalogs, and source analysis all miss a metadata BCL member, `PS0002` now carries low-confidence fallback properties such as `probably_pure`, `probably_impure`, or `unknown`. With `purelysharp_emit_explanations = true`, `PS0012` reports the same guess as an info diagnostic. These guesses do not make a method pure. | [DiagnosticEvidenceTests.cs](PurelySharp.Test/DiagnosticEvidenceTests.cs), [BclPurityFallbackClassifier.cs](PurelySharp.Analyzer/Engine/BclPurityFallbackClassifier.cs) |
 | Full C# operation coverage | [~] | Every Roslyn operation kind should have an explicit coverage decision. Some shapes are intentionally conservative, including unsafe address capture, function pointer invocation, and custom interpolated-string-handler execution. | [RoslynConstructCoverageTests.cs](PurelySharp.Test/RoslynConstructCoverageTests.cs) |
 | Whole-program execution prediction | [ ] | PurelySharp does not run or fully simulate arbitrary C# programs. It derives bounded facts from syntax, semantics, CFG/path facts, catalogs, summaries, and SMT. | [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
 | Rust-style borrow checker | [ ] | A full borrow/resource ownership system is roadmap work. Current ownership handling is local, bounded, and purity-focused. | [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
@@ -120,6 +121,7 @@ dotnet add package PurelySharp.Attributes --version 0.0.4
 | `PS0009` | Info | Optional purity explanation emitted when `purelysharp_emit_explanations = true`. |
 | `PS0010` | Info | Optional escaping-exception summary emitted when `purelysharp_report_exceptions = true`. |
 | `PS0011` | Warning | Optional uncaught operation-site exception warning emitted when `purelysharp_checked_exceptions = true`. |
+| `PS0012` | Info | Optional non-authoritative BCL purity fallback guess emitted when `purelysharp_emit_explanations = true`. |
 
 ## Configuration
 
@@ -236,7 +238,8 @@ summary generation, and report-only SDK/runtime analysis. See
 - Purity for arbitrary C# is undecidable; PurelySharp is a bounded practical
   analyzer, not a proof assistant.
 - Unknown external calls remain conservative unless trusted by explicit
-  attributes, configuration, catalogs, or validated summaries.
+  attributes, configuration, catalogs, or validated summaries. BCL fallback
+  guesses add diagnostic context but do not prove purity.
 - Runtime-native, OS, environment, time, randomness, culture, reflection,
   threading, synchronization, unsafe, dynamic, and hidden implementation
   surfaces are intentionally conservative unless explicitly modeled.

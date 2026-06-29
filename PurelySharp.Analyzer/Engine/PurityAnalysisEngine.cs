@@ -165,6 +165,9 @@ namespace PurelySharp.Analyzer.Engine
             public string Symbol { get; }
             public string CatalogSource { get; }
             public string CalleeChain { get; }
+            public string BclFallbackGuess { get; }
+            public string BclFallbackConfidence { get; }
+            public string BclFallbackReason { get; }
 
             private PurityEvidence(
                 string category,
@@ -172,7 +175,10 @@ namespace PurelySharp.Analyzer.Engine
                 string operationKind,
                 string symbol,
                 string catalogSource,
-                string calleeChain)
+                string calleeChain,
+                string bclFallbackGuess,
+                string bclFallbackConfidence,
+                string bclFallbackReason)
             {
                 Category = category;
                 RuleName = ruleName;
@@ -180,6 +186,9 @@ namespace PurelySharp.Analyzer.Engine
                 Symbol = symbol;
                 CatalogSource = catalogSource;
                 CalleeChain = calleeChain;
+                BclFallbackGuess = bclFallbackGuess;
+                BclFallbackConfidence = bclFallbackConfidence;
+                BclFallbackReason = bclFallbackReason;
             }
 
             public static PurityEvidence None => default;
@@ -194,7 +203,10 @@ namespace PurelySharp.Analyzer.Engine
                 ISymbol? symbol = null,
                 string? catalogSource = null,
                 string? calleeChain = null,
-                string? operationKindOverride = null)
+                string? operationKindOverride = null,
+                string? bclFallbackGuess = null,
+                string? bclFallbackConfidence = null,
+                string? bclFallbackReason = null)
             {
                 var operationKind = operationKindOverride ?? operation?.Kind.ToString() ?? syntaxNode?.Kind().ToString() ?? string.Empty;
                 return new PurityEvidence(
@@ -203,7 +215,10 @@ namespace PurelySharp.Analyzer.Engine
                     operationKind,
                     symbol?.ToDisplayString(_signatureFormat) ?? string.Empty,
                     catalogSource ?? string.Empty,
-                    calleeChain ?? string.Empty);
+                    calleeChain ?? string.Empty,
+                    bclFallbackGuess ?? string.Empty,
+                    bclFallbackConfidence ?? string.Empty,
+                    bclFallbackReason ?? string.Empty);
             }
 
             public PurityEvidence WithSyntax(SyntaxNode syntaxNode)
@@ -213,7 +228,16 @@ namespace PurelySharp.Analyzer.Engine
                     return this;
                 }
 
-                return new PurityEvidence(Category, RuleName, syntaxNode.Kind().ToString(), Symbol, CatalogSource, CalleeChain);
+                return new PurityEvidence(
+                    Category,
+                    RuleName,
+                    syntaxNode.Kind().ToString(),
+                    Symbol,
+                    CatalogSource,
+                    CalleeChain,
+                    BclFallbackGuess,
+                    BclFallbackConfidence,
+                    BclFallbackReason);
             }
 
             public PurityEvidence WithCallee(string calleeSymbol, SyntaxNode? callSite)
@@ -231,7 +255,10 @@ namespace PurelySharp.Analyzer.Engine
                     operationKind,
                     string.IsNullOrEmpty(Symbol) ? calleeSymbol : Symbol,
                     CatalogSource,
-                    chain);
+                    chain,
+                    BclFallbackGuess,
+                    BclFallbackConfidence,
+                    BclFallbackReason);
             }
 
             public ImmutableDictionary<string, string?> ToDiagnosticProperties()
@@ -243,6 +270,9 @@ namespace PurelySharp.Analyzer.Engine
                 AddIfPresent(builder, PurelySharpDiagnostics.ImpuritySymbolProperty, Symbol);
                 AddIfPresent(builder, PurelySharpDiagnostics.ImpurityCatalogSourceProperty, CatalogSource);
                 AddIfPresent(builder, PurelySharpDiagnostics.ImpurityCalleeChainProperty, CalleeChain);
+                AddIfPresent(builder, PurelySharpDiagnostics.BclFallbackGuessProperty, BclFallbackGuess);
+                AddIfPresent(builder, PurelySharpDiagnostics.BclFallbackConfidenceProperty, BclFallbackConfidence);
+                AddIfPresent(builder, PurelySharpDiagnostics.BclFallbackReasonProperty, BclFallbackReason);
                 return builder.ToImmutable();
             }
 
@@ -251,10 +281,15 @@ namespace PurelySharp.Analyzer.Engine
                 var category = string.IsNullOrEmpty(Category) ? "unknown" : Category;
                 if (!string.IsNullOrEmpty(Symbol))
                 {
-                    return category + " at " + Symbol;
+                    var summary = category + " at " + Symbol;
+                    return string.IsNullOrEmpty(BclFallbackGuess)
+                        ? summary
+                        : summary + " with BCL fallback " + BclFallbackGuess;
                 }
 
-                return category;
+                return string.IsNullOrEmpty(BclFallbackGuess)
+                    ? category
+                    : category + " with BCL fallback " + BclFallbackGuess;
             }
 
             private static void AddIfPresent(ImmutableDictionary<string, string?>.Builder builder, string key, string value)
@@ -1280,6 +1315,19 @@ namespace PurelySharp.Analyzer.Engine
                         purityCache[methodSymbol] = generatedNoBodyResult;
                         LogDebug($"{indent}<< Exit DeterminePurity (Abstract/NoBody Generated Summary): {methodSymbol.ToDisplayString()}");
                         return generatedNoBodyResult;
+                    }
+
+                    if (TryCreateBclFallbackImpurity(
+                            methodSymbol,
+                            declaringSyntax,
+                            operation: null,
+                            ruleName: "MethodInvocationPurityRule",
+                            out var bclFallbackNoBodyResult))
+                    {
+                        LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} has no trusted purity evidence. Reporting BCL fallback guess.");
+                        purityCache[methodSymbol] = bclFallbackNoBodyResult;
+                        LogDebug($"{indent}<< Exit DeterminePurity (Abstract/NoBody BCL Fallback): {methodSymbol.ToDisplayString()}");
+                        return bclFallbackNoBodyResult;
                     }
 
                     LogDebug($"{indent}Method {methodSymbol.ToDisplayString()} is abstract or has no body AND lacks trusted purity evidence. Assuming impure.");

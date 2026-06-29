@@ -2891,17 +2891,23 @@ namespace PurelySharp.Symbolic.Smt
 
             foreach (var subpattern in subpatterns.Value)
             {
-                if (subpattern.NameColon?.Name == null)
+                if (!TryResolvePropertySubpatternValue(
+                        matchedValue,
+                        subpattern,
+                        semanticModel,
+                        cancellationToken,
+                        out var memberValue,
+                        out var memberType,
+                        out var pathCondition) ||
+                    memberValue == null ||
+                    memberType == null)
                 {
                     continue;
                 }
 
-                var memberSymbol = semanticModel.GetSymbolInfo(subpattern.NameColon.Name, cancellationToken).Symbol;
-                if (!TryGetMemberType(memberSymbol, out var memberType) ||
-                    !TryCreateMemberFormula(matchedValue, memberSymbol!.Name, memberType, out var memberValue) ||
-                    memberValue == null)
+                if (pathCondition != null)
                 {
-                    continue;
+                    formulas.Add(pathCondition);
                 }
 
                 AddPatternBindingFacts(
@@ -3426,28 +3432,130 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth)
         {
             formula = null;
-            if (subpattern.NameColon?.Name == null)
+            if (!TryResolvePropertySubpatternValue(
+                    receiver,
+                    subpattern,
+                    semanticModel,
+                    cancellationToken,
+                    out var memberValue,
+                    out var memberType,
+                    out var pathCondition) ||
+                memberValue == null ||
+                memberType == null)
             {
                 return false;
             }
 
-            var memberSymbol = semanticModel.GetSymbolInfo(subpattern.NameColon.Name, cancellationToken).Symbol;
-            if (memberSymbol?.Name == "Length" &&
-                memberSymbol.ContainingType?.SpecialType == SpecialType.System_String &&
-                TryCreateStringLengthFormula(receiver, out var stringLengthFormula))
-            {
-                var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
-                return TryTranslatePattern(stringLengthFormula, subpattern.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion, intType, inlineDepth);
-            }
-
-            if (!TryGetMemberType(memberSymbol, out var memberType) ||
-                !TryCreateMemberFormula(receiver, memberSymbol!.Name, memberType, out var memberValue) ||
-                memberValue == null)
+            if (!TryTranslatePattern(memberValue, subpattern.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion, memberType, inlineDepth) ||
+                formula == null)
             {
                 return false;
             }
 
-            return TryTranslatePattern(memberValue, subpattern.Pattern, semanticModel, cancellationToken, out formula, getSymbolVersion, memberType, inlineDepth);
+            if (pathCondition != null)
+            {
+                formula = new SmtBinaryFormula(SmtBinaryOperator.And, pathCondition, formula);
+            }
+
+            return true;
+        }
+
+        private static bool TryResolvePropertySubpatternValue(
+            SmtFormula receiver,
+            SubpatternSyntax subpattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? memberValue,
+            out ITypeSymbol? memberType,
+            out SmtFormula? pathCondition)
+        {
+            memberValue = null;
+            memberType = null;
+            pathCondition = null;
+
+            var propertyPath = (SyntaxNode?)subpattern.NameColon?.Name ?? subpattern.ExpressionColon?.Expression;
+            if (propertyPath == null ||
+                !TryGetPropertySubpatternMemberNames(propertyPath, out var memberNames))
+            {
+                return false;
+            }
+
+            var currentValue = receiver;
+            for (var index = 0; index < memberNames.Length; index++)
+            {
+                var memberName = memberNames[index];
+                var memberSymbol = semanticModel.GetSymbolInfo(memberName, cancellationToken).Symbol;
+                if (!TryGetMemberType(memberSymbol, out memberType))
+                {
+                    return false;
+                }
+
+                SmtFormula? nextValue;
+                if (memberSymbol?.Name == "Length" &&
+                    memberSymbol.ContainingType?.SpecialType == SpecialType.System_String &&
+                    TryCreateStringLengthFormula(currentValue, out var stringLengthFormula))
+                {
+                    memberType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+                    nextValue = stringLengthFormula;
+                }
+                else if (!TryCreateMemberFormula(currentValue, memberSymbol!.Name, memberType, out nextValue) ||
+                         nextValue == null)
+                {
+                    return false;
+                }
+
+                currentValue = nextValue;
+                if (index < memberNames.Length - 1 &&
+                    memberType.IsReferenceType)
+                {
+                    var nonNull = new SmtBinaryFormula(
+                        SmtBinaryOperator.NotEqual,
+                        currentValue,
+                        new SmtNullConstant());
+                    pathCondition = pathCondition == null
+                        ? nonNull
+                        : new SmtBinaryFormula(SmtBinaryOperator.And, pathCondition, nonNull);
+                }
+            }
+
+            memberValue = currentValue;
+            return memberType != null;
+        }
+
+        private static bool TryGetPropertySubpatternMemberNames(
+            SyntaxNode propertyPath,
+            out ImmutableArray<SimpleNameSyntax> memberNames)
+        {
+            var builder = ImmutableArray.CreateBuilder<SimpleNameSyntax>();
+            if (!AddPropertySubpatternMemberNames(propertyPath, builder) ||
+                builder.Count == 0)
+            {
+                memberNames = ImmutableArray<SimpleNameSyntax>.Empty;
+                return false;
+            }
+
+            memberNames = builder.ToImmutable();
+            return true;
+        }
+
+        private static bool AddPropertySubpatternMemberNames(
+            SyntaxNode propertyPath,
+            ImmutableArray<SimpleNameSyntax>.Builder memberNames)
+        {
+            switch (propertyPath)
+            {
+                case SimpleNameSyntax simpleName:
+                    memberNames.Add(simpleName);
+                    return true;
+                case QualifiedNameSyntax qualifiedName:
+                    return AddPropertySubpatternMemberNames(qualifiedName.Left, memberNames) &&
+                        AddPropertySubpatternMemberNames(qualifiedName.Right, memberNames);
+                case MemberAccessExpressionSyntax memberAccess:
+                    return AddPropertySubpatternMemberNames(memberAccess.Expression, memberNames) &&
+                        AddPropertySubpatternMemberNames(memberAccess.Name, memberNames);
+                default:
+                    return false;
+            }
         }
 
         private static bool TryTranslateListPattern(

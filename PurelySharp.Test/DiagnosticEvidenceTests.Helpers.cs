@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NUnit.Framework;
 using PurelySharp.Analyzer;
@@ -285,5 +287,52 @@ public class TestClass
 
         private static ImmutableArray<MetadataReference> GetTrustedPlatformReferences() =>
             AnalyzerTestHost.GetTrustedPlatformReferences();
+
+        private static MetadataOnlyAssemblyFixture CreateMetadataOnlyAssemblyFixture(
+            string assemblyName,
+            string source)
+        {
+            var tempDirectory = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                assemblyName + "-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDirectory);
+
+            var assemblyPath = Path.Combine(tempDirectory, assemblyName + ".dll");
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                assemblyName,
+                new[] { syntaxTree },
+                GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var emitResult = compilation.Emit(assemblyPath);
+            Assert.That(
+                emitResult.Success,
+                Is.True,
+                string.Join(Environment.NewLine, emitResult.Diagnostics.Select(diagnostic => diagnostic.ToString())));
+
+            return new MetadataOnlyAssemblyFixture(tempDirectory, assemblyPath);
+        }
+
+        private sealed class MetadataOnlyAssemblyFixture : IDisposable
+        {
+            public MetadataOnlyAssemblyFixture(string directoryPath, string assemblyPath)
+            {
+                DirectoryPath = directoryPath;
+                AssemblyPath = assemblyPath;
+                Reference = MetadataReference.CreateFromFile(assemblyPath);
+            }
+
+            public string DirectoryPath { get; }
+            public string AssemblyPath { get; }
+            public MetadataReference Reference { get; }
+
+            public void Dispose()
+            {
+                if (Directory.Exists(DirectoryPath))
+                {
+                    Directory.Delete(DirectoryPath, recursive: true);
+                }
+            }
+        }
     }
 }

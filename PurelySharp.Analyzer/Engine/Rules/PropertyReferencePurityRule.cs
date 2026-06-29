@@ -257,6 +257,18 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     return PurityAnalysisEngine.PurityAnalysisResult.Pure;
                 }
 
+                if (allowsKnownPureFallback &&
+                    PurityAnalysisEngine.TryCreateBclFallbackImpurity(
+                        propertySymbol,
+                        propertyReferenceOperation.Syntax,
+                        propertyReferenceOperation,
+                        nameof(PropertyReferencePurityRule),
+                        out var staticBclFallbackResult))
+                {
+                    PurityAnalysisEngine.LogDebug($"    [PropRefRule] Static property '{propertySymbol.Name}' has no trusted purity evidence; using BCL fallback guess.");
+                    return staticBclFallbackResult;
+                }
+
                 if (propertySymbol.GetMethod != null)
                 {
                     PurityAnalysisEngine.LogDebug($"    [PropRefRule] Static property '{propertySymbol.Name}' has a getter. Checking getter purity via service/recursion.");
@@ -385,6 +397,18 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     {
                         PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance property '{propertySymbol.Name}' is known pure BCL. Read is Pure.");
                         return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+                    }
+
+                    if (allowsKnownPureFallback &&
+                        PurityAnalysisEngine.TryCreateBclFallbackImpurity(
+                            propertySymbol,
+                            propertyReferenceOperation.Syntax,
+                            propertyReferenceOperation,
+                            nameof(PropertyReferencePurityRule),
+                            out var instanceBclFallbackResult))
+                    {
+                        PurityAnalysisEngine.LogDebug($"    [PropRefRule] Instance property '{propertySymbol.Name}' has no trusted purity evidence; using BCL fallback guess.");
+                        return instanceBclFallbackResult;
                     }
 
                     else if (propertySymbol.GetMethod != null && context.PureAttributeSymbol != null &&

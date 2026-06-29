@@ -183,6 +183,28 @@ public sealed class SourcePredicateBox
 }
 ";
 
+        private const string ExtendedPropertyPatternSource = @"
+public sealed class ExtendedPatternBox
+{
+    public ExtendedPatternBox(ExtendedPatternChild child)
+    {
+        Child = child;
+    }
+
+    public ExtendedPatternChild Child { get; }
+}
+
+public sealed class ExtendedPatternChild
+{
+    public ExtendedPatternChild(int value)
+    {
+        Value = value;
+    }
+
+    public int Value { get; }
+}
+";
+
         [Test]
         public void SymbolicSourceQueryService_QueryFile_RequestApiProvesImplication()
         {
@@ -4652,6 +4674,34 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesExtendedPropertyPatternMemberFact()
+        {
+            const string source = ExtendedPropertyPatternSource + @"
+public class TestClass
+{
+    public int TestMethod(ExtendedPatternBox box)
+    {
+        if (box is { Child.Value: > 0 })
+        {
+            return box.Child.Value;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ExtendedPropertyPatternMemberFact.cs",
+                FindLine(source, "return box.Child.Value;"),
+                20,
+                "box.Child != null && box.Child.Value > 0",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesNullableNotNullGuardHasValue()
         {
             const string source = @"
@@ -5188,6 +5238,17 @@ public class TestClass
         {
             Assert.That(
                 IsConditionAlwaysFalse("string text", "text is { Length: > 3 } && text.Length <= 3"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_ExtendedPropertyPatternContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "ExtendedPatternBox box",
+                    "box is { Child.Value: > 0 } && box.Child.Value <= 0",
+                    ExtendedPropertyPatternSource),
                 Is.True);
         }
 
@@ -7926,6 +7987,35 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0002_ExtendedPropertyPatternContradictoryImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+" + ExtendedPropertyPatternSource + @"
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(ExtendedPatternBox box)
+    {
+        if (box is { Child.Value: > 0 } && box.Child.Value <= 0)
+        {
+            Console.WriteLine(box.Child.Value);
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
+        [Test]
         public async Task Ps0002_NullableNotNullGuardContradictoryImpureCall_DoesNotReport()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
@@ -8511,6 +8601,51 @@ public class TestClass
 
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_ExtendedPropertyPatternImpliesZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(ExtendedPropertyPatternSource + @"
+public class TestClass
+{
+    public int TestMethod(ExtendedPatternBox box)
+    {
+        if (box is { Child.Value: 0 })
+        {
+            return 1 / box.Child.Value;
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_ExtendedPropertyPatternContradictoryZeroDivisor_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(ExtendedPropertyPatternSource + @"
+public class TestClass
+{
+    public int TestMethod(ExtendedPatternBox box)
+    {
+        if (box is { Child.Value: > 0 } && box.Child.Value == 0)
+        {
+            return 1 / box.Child.Value;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
 
         [Test]

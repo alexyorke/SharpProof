@@ -699,6 +699,24 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
+            if (dispatchWasProvenPure)
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (dispatch candidates were proven pure after receiver and argument validation)");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            if (allowsKnownPureFallback &&
+                PurityAnalysisEngine.TryCreateBclFallbackImpurity(
+                    originalDefinitionSymbol,
+                    invocationOperation.Syntax,
+                    invocationOperation,
+                    nameof(MethodInvocationPurityRule),
+                    out var bclFallbackResult))
+            {
+                PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (BCL fallback guess only; no trusted purity evidence)");
+                return bclFallbackResult;
+            }
+
             if (IsUntrustedMetadataOnlyMethod(originalDefinitionSymbol))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] --> IMPURE (Metadata-only external method without purity boundary)");
@@ -717,12 +735,6 @@ namespace PurelySharp.Analyzer.Engine.Rules
                     context.ContainingMethodSymbol.OriginalDefinition))
             {
                 PurityAnalysisEngine.LogDebug("  [MIR] Direct self-recursive invocation is purity-neutral.");
-                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
-            }
-
-            if (dispatchWasProvenPure)
-            {
-                PurityAnalysisEngine.LogDebug("  [MIR] --> PURE (dispatch candidates were proven pure after receiver and argument validation)");
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 

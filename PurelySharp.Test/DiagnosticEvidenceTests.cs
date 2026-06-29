@@ -25,6 +25,34 @@ namespace PurelySharp.Test
     [TestFixture]
     public partial class DiagnosticEvidenceTests
     {
+        private const string BclFallbackFixtureSource = @"
+namespace System.Experimental
+{
+    public static class NumericFacts
+    {
+        public static int Normalize(int value)
+        {
+            return value < 0 ? -value : value;
+        }
+    }
+
+    public static class MutatingSink
+    {
+        public static void WriteMetric(int value)
+        {
+        }
+    }
+
+    public sealed class StatefulBox
+    {
+        public StatefulBox Next()
+        {
+            return this;
+        }
+    }
+}
+";
+
         [Test]
         public async Task Ps0002_KnownImpureCatalogHit_IncludesStructuredEvidence()
         {
@@ -11274,6 +11302,140 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("unknown_external_call"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpuritySymbolProperty], Does.Contain("NativeMethods.ReadValue"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("extern"));
+        }
+
+        [Test]
+        public async Task Ps0002_MetadataBclFallback_ProbablyPureShape_IncludesGuessEvidence()
+        {
+            using var fixture = CreateMetadataOnlyAssemblyFixture(
+                "System.FallbackSdk",
+                BclFallbackFixtureSource);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(int value)
+    {
+        return System.Experimental.NumericFacts.Normalize(value);
+    }
+}",
+                globalOptions: ImmutableDictionary<string, string>.Empty.Add("purelysharp_emit_explanations", "true"),
+                additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("bcl_fallback_probably_pure"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("bcl_heuristic_fallback"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.BclFallbackGuessProperty], Is.EqualTo("probably_pure"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.BclFallbackConfidenceProperty], Is.EqualTo("low"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.BclFallbackReasonProperty], Is.EqualTo("value_return_no_ref_or_out"));
+
+            var fallbackDiagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.BclFallbackGuessId);
+            Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("probably_pure"));
+        }
+
+        [Test]
+        public async Task Ps0002_MetadataBclFallback_ProbablyImpureShape_IncludesGuessEvidence()
+        {
+            using var fixture = CreateMetadataOnlyAssemblyFixture(
+                "System.FallbackSdk",
+                BclFallbackFixtureSource);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int value)
+    {
+        System.Experimental.MutatingSink.WriteMetric(value);
+    }
+}",
+                globalOptions: ImmutableDictionary<string, string>.Empty.Add("purelysharp_emit_explanations", "true"),
+                additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("bcl_fallback_probably_impure"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("bcl_heuristic_fallback"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.BclFallbackGuessProperty], Is.EqualTo("probably_impure"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.BclFallbackReasonProperty], Is.EqualTo("void_returning_metadata_method"));
+
+            var fallbackDiagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.BclFallbackGuessId);
+            Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("probably_impure"));
+        }
+
+        [Test]
+        public async Task Ps0002_MetadataBclFallback_AmbiguousShape_IncludesUnknownGuessEvidence()
+        {
+            using var fixture = CreateMetadataOnlyAssemblyFixture(
+                "System.FallbackSdk",
+                BclFallbackFixtureSource);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public System.Experimental.StatefulBox TestMethod(System.Experimental.StatefulBox box)
+    {
+        return box.Next();
+    }
+}",
+                globalOptions: ImmutableDictionary<string, string>.Empty.Add("purelysharp_emit_explanations", "true"),
+                additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("bcl_fallback_unknown"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("bcl_heuristic_fallback"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.BclFallbackGuessProperty], Is.EqualTo("unknown"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.BclFallbackReasonProperty], Is.EqualTo("reference_returning_instance_metadata_method"));
+
+            var fallbackDiagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.BclFallbackGuessId);
+            Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("unknown"));
+        }
+
+        [Test]
+        public async Task Ps0002_MetadataBclFallback_DoesNotOverrideGeneratedSummaryEvidence()
+        {
+            using var fixture = CreateMetadataOnlyAssemblyFixture(
+                "System.FallbackSdk",
+                BclFallbackFixtureSource);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(int value)
+    {
+        return System.Experimental.NumericFacts.Normalize(value);
+    }
+}",
+                globalOptions: ImmutableDictionary<string, string>.Empty.Add("purelysharp_emit_explanations", "true"),
+                additionalFiles: ImmutableArray.Create<AdditionalText>(
+                    new InMemoryAdditionalText(
+                        "Synthetic.NumericFacts.Unknown.PurelySharp.EffectSummary.json",
+                        CreatePuritySummaryJson(
+                            fixture.AssemblyPath,
+                            "System.Experimental.NumericFacts.Normalize(int)",
+                            "conservative_unknown",
+                            "[\"metadata_only_or_external\"]"))),
+                additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("metadata_only_or_external"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("generated_purity_summary"));
+            Assert.That(diagnostic.Properties.ContainsKey(PurelySharpDiagnostics.BclFallbackGuessProperty), Is.False);
+            Assert.That(diagnostics.Any(candidate => candidate.Id == PurelySharpDiagnostics.BclFallbackGuessId), Is.False);
         }
 
         [Test]

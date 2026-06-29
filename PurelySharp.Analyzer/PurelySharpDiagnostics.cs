@@ -31,6 +31,9 @@ namespace PurelySharp.Analyzer
         public const string ImpuritySymbolProperty = "purelysharp.impurity.symbol";
         public const string ImpurityCatalogSourceProperty = "purelysharp.impurity.catalog_source";
         public const string ImpurityCalleeChainProperty = "purelysharp.impurity.callee_chain";
+        public const string BclFallbackGuessProperty = "purelysharp.bcl_fallback.guess";
+        public const string BclFallbackConfidenceProperty = "purelysharp.bcl_fallback.confidence";
+        public const string BclFallbackReasonProperty = "purelysharp.bcl_fallback.reason";
         private static readonly LocalizableString PurityNotVerifiedTitle = "Purity Not Verified";
         private static readonly LocalizableString PurityNotVerifiedMessageFormat = "Method '{0}' is marked [EnforcePure]/[Pure], but its body contains operations the analyzer cannot prove pure";
         private static readonly LocalizableString PurityNotVerifiedDescription = "Methods marked with [EnforcePure] require analysis. This diagnostic indicates the analysis rules did not determine the method's purity status.";
@@ -43,6 +46,20 @@ namespace PurelySharp.Analyzer
             defaultSeverity: DiagnosticSeverity.Error,
             isEnabledByDefault: true,
             description: PurityNotVerifiedDescription);
+
+        public const string BclFallbackGuessId = "PS0012";
+        private static readonly LocalizableString BclFallbackGuessTitle = "BCL Purity Fallback Guess";
+        private static readonly LocalizableString BclFallbackGuessMessageFormat = "BCL purity fallback for '{0}': {1} ({2})";
+        private static readonly LocalizableString BclFallbackGuessDescription = "Reports a non-authoritative purity guess for a metadata BCL member when no stronger analyzer, attribute, generated summary, or user configuration evidence was available.";
+
+        public static readonly DiagnosticDescriptor BclFallbackGuessRule = new DiagnosticDescriptor(
+            id: BclFallbackGuessId,
+            title: BclFallbackGuessTitle,
+            messageFormat: BclFallbackGuessMessageFormat,
+            category: "Purity",
+            defaultSeverity: DiagnosticSeverity.Info,
+            isEnabledByDefault: true,
+            description: BclFallbackGuessDescription);
 
         public const string PurityExplanationId = "PS0009";
         private static readonly LocalizableString PurityExplanationTitle = "Purity Diagnostic Explanation";

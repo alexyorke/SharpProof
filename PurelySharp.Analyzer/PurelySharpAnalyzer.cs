@@ -27,7 +27,8 @@ namespace PurelySharp.Analyzer
                                   PurelySharpDiagnostics.RedundantAllowSynchronizationRule,
                                   PurelySharpDiagnostics.PurityExplanationRule,
                                   PurelySharpDiagnostics.ExceptionSummaryRule,
-                                  PurelySharpDiagnostics.UncaughtExceptionSiteRule);
+                                  PurelySharpDiagnostics.UncaughtExceptionSiteRule,
+                                  PurelySharpDiagnostics.BclFallbackGuessRule);
 
         public override void Initialize(AnalysisContext context)
         {
