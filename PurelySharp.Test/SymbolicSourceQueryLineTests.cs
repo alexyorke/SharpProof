@@ -80,6 +80,57 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySyntaxTreeLine_WithExpressionProgramPoints_IncludesExpressionNodesOnLine()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value + 1;
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "LineExpressionQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "LineExpressionQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var defaultResult = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "return value + 1;"),
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "value > 0" });
+
+            Assert.That(defaultResult.ProgramPoints.Select(point => point.NodeKind), Does.Not.Contain("AddExpression"));
+
+            var expressionResult = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "return value + 1;"),
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "value > 0" },
+                includeExpressionProgramPoints: true);
+
+            Assert.That(expressionResult.ProgramPoints.Select(point => point.NodeKind), Does.Contain("ReturnStatement"));
+            var addPoint = expressionResult.ProgramPoints.Single(point => point.NodeKind == "AddExpression");
+            Assert.That(addPoint.MergedInvariantText, Is.EqualTo("value > 0"));
+            Assert.That(addPoint.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+            Assert.That(addPoint.NodeStartLine, Is.EqualTo(FindLine(source, "return value + 1;")));
+        }
+
+        [Test]
         public void QuerySyntaxTreeAtPosition_ReturnsFormattedInvariantAtAbsolutePosition()
         {
             const string source = @"
@@ -698,6 +749,62 @@ public class TestClass
         }
 
         [Test]
+        public async Task SymbolicCli_LineExpressions_AllowsFilteringToExpressionProgramPoint()
+        {
+            var source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value + 1;
+        }
+
+        return 0;
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliLineExpressions-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--line",
+                    FindLine(source, "return value + 1;").ToString(),
+                    "--line-invariants",
+                    "--line-expressions",
+                    "--node-kind",
+                    "AddExpression",
+                    "--check-reachability",
+                    "--implies",
+                    "value > 0",
+                    "--compact-json");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("line"));
+                Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
+                Assert.That(root.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
+
+                var point = root.GetProperty("programPoints")[0];
+                Assert.That(point.GetProperty("nodeKind").GetString(), Is.EqualTo("AddExpression"));
+                Assert.That(point.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
+                Assert.That(point.GetProperty("conditionProofs")[0].GetProperty("truthValue").GetString(), Is.EqualTo(SymbolicTruthValue.ProvenTrue.ToString()));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
         public async Task SymbolicCli_Json_EmitsEnumNames()
         {
             var sourcePath = Path.Combine(
@@ -767,6 +874,15 @@ public class TestClass
                     "-1");
                 Assert.That(negativeMaxPoints.ExitCode, Is.EqualTo(64));
                 Assert.That(negativeMaxPoints.StandardError, Does.Contain("non-negative integer"));
+
+                var lineExpressionsWithoutLineMode = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--position",
+                    "0",
+                    "--line-expressions");
+                Assert.That(lineExpressionsWithoutLineMode.ExitCode, Is.EqualTo(64));
+                Assert.That(lineExpressionsWithoutLineMode.StandardError, Does.Contain("--line-expressions requires --line-invariants or --all-lines."));
             }
             finally
             {

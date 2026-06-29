@@ -107,7 +107,7 @@ namespace TestNamespace
                 {
                     ""true"" => ""Boolean: True"",
                     ""false"" => ""Boolean: False"",
-                    var spn when spn.Length > 0 => $""String: {new string(spn)}"",
+                    var spn when spn.Length > 0 => ""Non-empty string"",
                     _ => ""Empty string""
                 };
             }

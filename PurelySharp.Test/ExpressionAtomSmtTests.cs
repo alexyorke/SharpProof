@@ -1,0 +1,223 @@
+using System;
+using NUnit.Framework;
+using PurelySharp.Symbolic;
+using PurelySharp.Symbolic.Smt;
+
+namespace PurelySharp.Test
+{
+    [TestFixture]
+    public sealed class ExpressionAtomSmtTests
+    {
+        [Test]
+        public void SymbolicSourceQueryService_ProvesConditionalNullableMemberFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool flag, int? left, int? right)
+    {
+        if (flag && left.HasValue && left.Value == 5)
+        {
+            return left.Value;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return left.Value;",
+                "(flag ? left : right).HasValue && (flag ? left : right).Value == 5");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesConditionalAccessReferenceNullCheck()
+        {
+            const string source = @"
+public sealed class Holder
+{
+    public string Text;
+}
+
+public class TestClass
+{
+    public string TestMethod(Holder holder)
+    {
+        if (holder != null && holder.Text != null)
+        {
+            return holder?.Text;
+        }
+
+        return null;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return holder?.Text;",
+                "holder?.Text != null");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesTupleEqualityElementRelation()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod((int A, int B) left, (int A, int B) right)
+    {
+        if (left == right)
+        {
+            return left.A;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return left.A;",
+                "left.B == right.B");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesEnumConstantComparison()
+        {
+            const string source = @"
+public enum Mode
+{
+    None = 0,
+    Ready = 1
+}
+
+public class TestClass
+{
+    public int TestMethod(Mode mode)
+    {
+        if (mode == Mode.Ready)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "mode != Mode.None");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesAsExpressionNonNullImpliesSourceNonNull()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(object value)
+    {
+        if ((value as string) != null)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "value != null");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesIdentityReferenceCastNullRelation()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        if ((object)text != null)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "text != null");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_NonNullObjectDoesNotProveTypeTest()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(object value)
+    {
+        if (value != null)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionUnknown(
+                source,
+                "return 1;",
+                "value is string");
+        }
+
+        private static void AssertConditionProven(string source, string sourceLine, string condition)
+        {
+            var proof = ProveCondition(source, sourceLine, condition);
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        private static void AssertConditionUnknown(string source, string sourceLine, string condition)
+        {
+            var proof = ProveCondition(source, sourceLine, condition);
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
+        private static SymbolicConditionProofResult ProveCondition(string source, string sourceLine, string condition)
+        {
+            return new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ExpressionAtomSmtTests.cs",
+                FindLine(source, sourceLine),
+                20,
+                condition,
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+        }
+
+        private static int FindLine(string source, string text)
+        {
+            var lines = source.Split('\n');
+            for (var index = 0; index < lines.Length; index++)
+            {
+                if (lines[index].Contains(text, StringComparison.Ordinal))
+                {
+                    return index + 1;
+                }
+            }
+
+            throw new InvalidOperationException("Text was not found in source.");
+        }
+    }
+}

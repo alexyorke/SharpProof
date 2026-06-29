@@ -38,7 +38,8 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                if (IsDefinitelyZeroExpression(binaryExpression.Right, binaryExpression, semanticModel, cancellationToken, smtAnalysis))
+                if (IsDefinitelyZeroExpression(binaryExpression.Right, binaryExpression, semanticModel, cancellationToken, smtAnalysis) &&
+                    IsExceptionPathReachable(binaryExpression, semanticModel, cancellationToken, smtAnalysis))
                 {
                     yield return binaryExpression;
                 }
@@ -54,17 +55,20 @@ namespace PurelySharp.Analyzer
             foreach (var node in GetRelevantDescendants<SyntaxNode>(methodNode))
             {
                 if (node is MemberAccessExpressionSyntax memberAccess &&
-                    IsDefinitelyNullExpression(memberAccess.Expression, memberAccess, semanticModel, cancellationToken, smtAnalysis))
+                    IsDefinitelyNullExpression(memberAccess.Expression, memberAccess, semanticModel, cancellationToken, smtAnalysis) &&
+                    IsExceptionPathReachable(memberAccess, semanticModel, cancellationToken, smtAnalysis))
                 {
                     yield return memberAccess;
                 }
                 else if (node is ElementAccessExpressionSyntax elementAccess &&
-                    IsDefinitelyNullExpression(elementAccess.Expression, elementAccess, semanticModel, cancellationToken, smtAnalysis))
+                    IsDefinitelyNullExpression(elementAccess.Expression, elementAccess, semanticModel, cancellationToken, smtAnalysis) &&
+                    IsExceptionPathReachable(elementAccess, semanticModel, cancellationToken, smtAnalysis))
                 {
                     yield return elementAccess;
                 }
                 else if (node is InvocationExpressionSyntax invocation &&
-                    IsDefinitelyNullExpression(invocation.Expression, invocation, semanticModel, cancellationToken, smtAnalysis))
+                    IsDefinitelyNullExpression(invocation.Expression, invocation, semanticModel, cancellationToken, smtAnalysis) &&
+                    IsExceptionPathReachable(invocation, semanticModel, cancellationToken, smtAnalysis))
                 {
                     yield return invocation;
                 }

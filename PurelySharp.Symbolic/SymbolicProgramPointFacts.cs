@@ -31,6 +31,11 @@ namespace PurelySharp.Symbolic
                     RemoveFactsInvalidatedByNestedMutations(containingBlock.Block, semanticModel, cancellationToken, facts);
                 }
 
+                var temporaryEntryFacts = AddTemporaryContainingBlockEntryFacts(
+                    containingBlock.Block,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
                 foreach (var statement in containingBlock.Block.Statements)
                 {
                     if (ReferenceEquals(statement, containingBlock.ContainingStatement))
@@ -40,6 +45,8 @@ namespace PurelySharp.Symbolic
 
                     AddPriorStatementFacts(statement, semanticModel, cancellationToken, facts);
                 }
+
+                RemoveTemporaryFacts(facts, temporaryEntryFacts);
             }
 
             return facts;
@@ -248,8 +255,8 @@ namespace PurelySharp.Symbolic
                     var matchingSection = switchStatementSyntax.Sections
                         .FirstOrDefault(section => section.Span.Contains(syntaxNode.SpanStart));
                     if (matchingSection != null &&
-                        !AnyReferencedSymbolAssignedBeforeUse(
-                            switchStatementSyntax.Expression,
+                        !AnySwitchStatementConditionSymbolAssignedBeforeUse(
+                            switchStatementSyntax,
                             matchingSection,
                             syntaxNode.SpanStart,
                             semanticModel,
@@ -269,8 +276,8 @@ namespace PurelySharp.Symbolic
                     var matchingArm = switchExpressionSyntax.Arms
                         .FirstOrDefault(arm => arm.Expression.Span.Contains(syntaxNode.SpanStart));
                     if (matchingArm != null &&
-                        !AnyReferencedSymbolAssignedBeforeUse(
-                            switchExpressionSyntax.GoverningExpression,
+                        !AnySwitchExpressionConditionSymbolAssignedBeforeUse(
+                            switchExpressionSyntax,
                             matchingArm,
                             syntaxNode.SpanStart,
                             semanticModel,
@@ -798,7 +805,7 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            var conditionSymbols = GetReferencedLocalAndParameterSymbols(condition, semanticModel, cancellationToken);
+            var conditionSymbols = GetConditionDependencySymbols(condition, semanticModel, cancellationToken);
             if (conditionSymbols.Count == 0)
             {
                 return false;
@@ -892,13 +899,58 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            var referencedSymbols = GetReferencedLocalAndParameterSymbols(condition, semanticModel, cancellationToken);
-            if (referencedSymbols.Count == 0)
+            var dependencySymbols = GetConditionDependencySymbols(condition, semanticModel, cancellationToken);
+            return AnySymbolAssignedBeforeUse(
+                dependencySymbols,
+                branchRoot,
+                useSpanStart,
+                semanticModel,
+                cancellationToken);
+        }
+
+        private static bool AnySwitchStatementConditionSymbolAssignedBeforeUse(
+            SwitchStatementSyntax switchStatement,
+            SwitchSectionSyntax section,
+            int useSpanStart,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return AnySymbolAssignedBeforeUse(
+                GetSwitchConditionSymbols(switchStatement, semanticModel, cancellationToken),
+                section,
+                useSpanStart,
+                semanticModel,
+                cancellationToken);
+        }
+
+        private static bool AnySwitchExpressionConditionSymbolAssignedBeforeUse(
+            SwitchExpressionSyntax switchExpression,
+            SwitchExpressionArmSyntax arm,
+            int useSpanStart,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return AnySymbolAssignedBeforeUse(
+                GetSwitchExpressionConditionSymbols(switchExpression, semanticModel, cancellationToken),
+                arm,
+                useSpanStart,
+                semanticModel,
+                cancellationToken);
+        }
+
+        private static bool AnySymbolAssignedBeforeUse(
+            IReadOnlyList<ISymbol> symbols,
+            SyntaxNode branchRoot,
+            int useSpanStart,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (symbols.Count == 0)
             {
                 return false;
             }
 
-            foreach (var symbol in referencedSymbols)
+            foreach (var symbol in symbols)
             {
                 if (IsSymbolAssignedBetween(
                         branchRoot,
@@ -988,6 +1040,17 @@ namespace PurelySharp.Symbolic
             return symbols;
         }
 
+        private static IReadOnlyList<ISymbol> GetConditionDependencySymbols(
+            SyntaxNode root,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var symbols = new List<ISymbol>();
+            AddReferencedSymbols(root, semanticModel, cancellationToken, symbols);
+            AddDeclaredPatternSymbols(root, semanticModel, cancellationToken, symbols);
+            return symbols;
+        }
+
         private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(SyntaxNode site)
         {
             for (SyntaxNode? current = site; current != null; current = current.Parent)
@@ -996,6 +1059,100 @@ namespace PurelySharp.Symbolic
                     statement.Parent is BlockSyntax block)
                 {
                     yield return (block, statement);
+                }
+            }
+        }
+
+        private static IReadOnlyList<SmtFormula> AddTemporaryContainingBlockEntryFacts(
+            BlockSyntax block,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            var entryFacts = CollectContainingBlockEntryFacts(block, semanticModel, cancellationToken);
+            if (entryFacts.Length == 0)
+            {
+                return Array.Empty<SmtFormula>();
+            }
+
+            var existingKeys = new HashSet<string>(facts.Select(GetFormulaKey), StringComparer.Ordinal);
+            var addedFacts = new List<SmtFormula>(entryFacts.Length);
+            foreach (var entryFact in entryFacts)
+            {
+                if (!existingKeys.Add(GetFormulaKey(entryFact)))
+                {
+                    continue;
+                }
+
+                facts.Add(entryFact);
+                addedFacts.Add(entryFact);
+            }
+
+            return addedFacts;
+        }
+
+        private static ImmutableArray<SmtFormula> CollectContainingBlockEntryFacts(
+            BlockSyntax block,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var builder = ImmutableArray.CreateBuilder<SmtFormula>();
+            switch (block.Parent)
+            {
+                case IfStatementSyntax ifStatement when ReferenceEquals(ifStatement.Statement, block):
+                    AddBranchConditionFacts(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, builder);
+                    break;
+                case ElseClauseSyntax { Parent: IfStatementSyntax ifStatement, Statement: var statement }
+                    when ReferenceEquals(statement, block):
+                    AddBranchConditionFacts(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, builder);
+                    break;
+                case WhileStatementSyntax whileStatement when ReferenceEquals(whileStatement.Statement, block):
+                    AddBranchConditionFacts(whileStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, builder);
+                    break;
+                case ForStatementSyntax { Condition: { } condition } forStatement when ReferenceEquals(forStatement.Statement, block):
+                    AddBranchConditionFacts(condition, branchWhenTrue: true, semanticModel, cancellationToken, builder);
+                    builder.AddRange(CollectForLoopBodyInvariantFacts(forStatement, semanticModel, cancellationToken));
+                    break;
+                case DoStatementSyntax doStatement when ReferenceEquals(doStatement.Statement, block):
+                    AddBranchConditionFacts(doStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, builder);
+                    break;
+                case ForEachStatementSyntax forEachStatement when ReferenceEquals(forEachStatement.Statement, block):
+                    AddForeachBodyEntryFacts(
+                        builder,
+                        forEachStatement.Expression,
+                        semanticModel.GetDeclaredSymbol(forEachStatement, cancellationToken) as ILocalSymbol,
+                        forEachStatement,
+                        semanticModel,
+                        cancellationToken);
+                    break;
+                case ForEachVariableStatementSyntax forEachVariableStatement when ReferenceEquals(forEachVariableStatement.Statement, block):
+                    AddForeachBodyEntryFacts(
+                        builder,
+                        forEachVariableStatement.Expression,
+                        iterationSymbol: null,
+                        forEachVariableStatement,
+                        semanticModel,
+                        cancellationToken);
+                    break;
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private static void RemoveTemporaryFacts(
+            List<SmtFormula> facts,
+            IReadOnlyList<SmtFormula> temporaryFacts)
+        {
+            if (temporaryFacts.Count == 0)
+            {
+                return;
+            }
+
+            for (var factIndex = facts.Count - 1; factIndex >= 0; factIndex--)
+            {
+                if (temporaryFacts.Any(temporaryFact => ReferenceEquals(temporaryFact, facts[factIndex])))
+                {
+                    facts.RemoveAt(factIndex);
                 }
             }
         }
@@ -1640,6 +1797,7 @@ namespace PurelySharp.Symbolic
                             break;
                         case CasePatternSwitchLabelSyntax patternLabel:
                             AddReferencedSymbols(patternLabel.Pattern, semanticModel, cancellationToken, symbols);
+                            AddDeclaredPatternSymbols(patternLabel.Pattern, semanticModel, cancellationToken, symbols);
                             if (patternLabel.WhenClause != null)
                             {
                                 AddReferencedSymbols(patternLabel.WhenClause.Condition, semanticModel, cancellationToken, symbols);
@@ -1647,6 +1805,27 @@ namespace PurelySharp.Symbolic
 
                             break;
                     }
+                }
+            }
+
+            return symbols;
+        }
+
+        private static IReadOnlyList<ISymbol> GetSwitchExpressionConditionSymbols(
+            SwitchExpressionSyntax switchExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var symbols = new List<ISymbol>();
+            AddReferencedSymbols(switchExpression.GoverningExpression, semanticModel, cancellationToken, symbols);
+
+            foreach (var arm in switchExpression.Arms)
+            {
+                AddReferencedSymbols(arm.Pattern, semanticModel, cancellationToken, symbols);
+                AddDeclaredPatternSymbols(arm.Pattern, semanticModel, cancellationToken, symbols);
+                if (arm.WhenClause != null)
+                {
+                    AddReferencedSymbols(arm.WhenClause.Condition, semanticModel, cancellationToken, symbols);
                 }
             }
 
@@ -1661,10 +1840,33 @@ namespace PurelySharp.Symbolic
         {
             foreach (var symbol in GetReferencedLocalAndParameterSymbols(root, semanticModel, cancellationToken))
             {
-                if (symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
+                AddSymbolIfAbsent(symbols, symbol);
+            }
+        }
+
+        private static void AddDeclaredPatternSymbols(
+            SyntaxNode root,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<ISymbol> symbols)
+        {
+            foreach (var node in root.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+            {
+                if (node is SingleVariableDesignationSyntax singleVariableDesignation &&
+                    singleVariableDesignation.Identifier.ValueText != "_" &&
+                    semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is ILocalSymbol localSymbol)
                 {
-                    symbols.Add(symbol);
+                    AddSymbolIfAbsent(symbols, localSymbol.OriginalDefinition);
                 }
+            }
+        }
+
+        private static void AddSymbolIfAbsent(ICollection<ISymbol> symbols, ISymbol symbol)
+        {
+            if (symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol)))
+            {
+                symbols.Add(symbol);
             }
         }
 
@@ -1959,6 +2161,96 @@ namespace PurelySharp.Symbolic
                 semanticModel,
                 cancellationToken,
                 facts);
+            AddNegatedPatternBranchBindingFacts(expressionSyntax, branchWhenTrue, semanticModel, cancellationToken, facts);
+        }
+
+        private static void AddNegatedPatternBranchBindingFacts(
+            ExpressionSyntax expressionSyntax,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (!TryGetPatternMatchedByNegatedBranch(
+                    expressionSyntax,
+                    branchWhenTrue,
+                    out var isPatternExpression,
+                    out var matchedPattern) ||
+                !CSharpConditionToFormula.TryTranslateValue(
+                    isPatternExpression.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var matchedValue,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) ||
+                matchedValue == null)
+            {
+                return;
+            }
+
+            var matchedType = semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(isPatternExpression.Expression, cancellationToken).Type;
+            CSharpConditionToFormula.TryCollectPatternBindingFacts(
+                matchedValue,
+                matchedType,
+                matchedPattern,
+                semanticModel,
+                cancellationToken,
+                facts);
+        }
+
+        private static bool TryGetPatternMatchedByNegatedBranch(
+            ExpressionSyntax expressionSyntax,
+            bool branchWhenTrue,
+            out IsPatternExpressionSyntax isPatternExpression,
+            out PatternSyntax matchedPattern)
+        {
+            expressionSyntax = UnwrapExpression(expressionSyntax);
+            if (expressionSyntax is PrefixUnaryExpressionSyntax prefixUnary &&
+                prefixUnary.IsKind(SyntaxKind.LogicalNotExpression))
+            {
+                return TryGetPatternMatchedByNegatedBranch(
+                    prefixUnary.Operand,
+                    !branchWhenTrue,
+                    out isPatternExpression,
+                    out matchedPattern);
+            }
+
+            if (expressionSyntax is IsPatternExpressionSyntax candidate &&
+                !branchWhenTrue &&
+                TryGetNegatedPattern(candidate.Pattern, out matchedPattern))
+            {
+                isPatternExpression = candidate;
+                return true;
+            }
+
+            isPatternExpression = null!;
+            matchedPattern = null!;
+            return false;
+        }
+
+        private static bool TryGetNegatedPattern(PatternSyntax pattern, out PatternSyntax negatedPattern)
+        {
+            pattern = UnwrapPattern(pattern);
+            if (pattern is UnaryPatternSyntax unaryPattern &&
+                unaryPattern.OperatorToken.IsKind(SyntaxKind.NotKeyword))
+            {
+                negatedPattern = UnwrapPattern(unaryPattern.Pattern);
+                return true;
+            }
+
+            negatedPattern = null!;
+            return false;
+        }
+
+        private static PatternSyntax UnwrapPattern(PatternSyntax pattern)
+        {
+            while (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
+            {
+                pattern = parenthesizedPattern.Pattern;
+            }
+
+            return pattern;
         }
 
         private static void AddCatchBodyEntryFacts(
@@ -2795,6 +3087,11 @@ namespace PurelySharp.Symbolic
                 facts.Add(fact);
             }
 
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
+            {
+                AddAssignedSourceSymbolSnapshotFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
                 TryCreateStringContentAssignedValueFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var stringContentFact))
             {
@@ -2870,6 +3167,261 @@ namespace PurelySharp.Symbolic
             {
                 AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
+        }
+
+        private static void AddAssignedSourceSymbolSnapshotFacts(
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (!TryGetDirectLocalOrParameterSymbol(valueExpression, semanticModel, cancellationToken, out var sourceSymbol) ||
+                SymbolEqualityComparer.Default.Equals(sourceSymbol, assignedSymbol))
+            {
+                return;
+            }
+
+            if (TryCreateSymbolSmtValue(sourceSymbol, out var sourceFormula) &&
+                TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula))
+            {
+                AddSubstitutedCurrentFacts(facts, sourceFormula, targetFormula);
+            }
+
+            if (TryCreateBuiltInLengthFormula(sourceSymbol, out var sourceLength) &&
+                TryCreateBuiltInLengthFormula(assignedSymbol, out var targetLength))
+            {
+                AddSubstitutedCurrentFacts(facts, sourceLength, targetLength);
+            }
+
+            if (TryCreateStringContentFormula(sourceSymbol, out var sourceString) &&
+                TryCreateStringContentFormula(assignedSymbol, out var targetString))
+            {
+                AddSubstitutedCurrentFacts(facts, sourceString, targetString);
+            }
+
+            if (TryCreateNullableHasValueFormula(sourceSymbol, out var sourceHasValue) &&
+                TryCreateNullableHasValueFormula(assignedSymbol, out var targetHasValue))
+            {
+                AddSubstitutedCurrentFacts(facts, sourceHasValue, targetHasValue);
+            }
+
+            if (TryCreateNullableValueFormula(sourceSymbol, out var sourceNullableValue) &&
+                TryCreateNullableValueFormula(assignedSymbol, out var targetNullableValue))
+            {
+                AddSubstitutedCurrentFacts(facts, sourceNullableValue, targetNullableValue);
+            }
+
+            AddTupleElementSourceSymbolSnapshotFacts(assignedSymbol, sourceSymbol, facts);
+        }
+
+        private static bool TryGetDirectLocalOrParameterSymbol(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ISymbol symbol)
+        {
+            var candidate = semanticModel.GetSymbolInfo(UnwrapExpression(expression), cancellationToken).Symbol?.OriginalDefinition;
+            if (candidate is ILocalSymbol or IParameterSymbol)
+            {
+                symbol = candidate;
+                return true;
+            }
+
+            symbol = null!;
+            return false;
+        }
+
+        private static void AddTupleElementSourceSymbolSnapshotFacts(
+            ISymbol assignedSymbol,
+            ISymbol sourceSymbol,
+            List<SmtFormula> facts)
+        {
+            if (!TryGetTupleElementStorageNames(assignedSymbol, expectedCount: 0, out var targetElementNames) ||
+                !TryGetTupleElementStorageNames(sourceSymbol, targetElementNames.Length, out var sourceElementNames))
+            {
+                return;
+            }
+
+            for (var index = 0; index < targetElementNames.Length; index++)
+            {
+                if (!TryCreateTupleElementSmtValue(sourceSymbol, sourceElementNames[index], out var sourceElement) ||
+                    !TryCreateTupleElementSmtValue(assignedSymbol, targetElementNames[index], out var targetElement))
+                {
+                    continue;
+                }
+
+                AddSubstitutedCurrentFacts(facts, sourceElement, targetElement);
+            }
+        }
+
+        private static void AddSubstitutedCurrentFacts(
+            List<SmtFormula> facts,
+            SmtFormula sourceFormula,
+            SmtFormula targetFormula)
+        {
+            if (sourceFormula.Kind != targetFormula.Kind ||
+                Equals(sourceFormula, targetFormula))
+            {
+                return;
+            }
+
+            var existingKeys = new HashSet<string>(facts.Select(GetFormulaKey), StringComparer.Ordinal);
+            foreach (var fact in facts.ToArray())
+            {
+                if (!TrySubstituteFormula(fact, sourceFormula, targetFormula, out var substituted) ||
+                    Equals(substituted, fact))
+                {
+                    continue;
+                }
+
+                var key = GetFormulaKey(substituted);
+                if (existingKeys.Add(key))
+                {
+                    facts.Add(substituted);
+                }
+            }
+        }
+
+        private static bool TrySubstituteFormula(
+            SmtFormula formula,
+            SmtFormula sourceFormula,
+            SmtFormula targetFormula,
+            out SmtFormula substituted)
+        {
+            if (Equals(formula, sourceFormula))
+            {
+                substituted = targetFormula;
+                return true;
+            }
+
+            switch (formula)
+            {
+                case SmtUnaryFormula unary:
+                    if (TrySubstituteFormula(unary.Operand, sourceFormula, targetFormula, out var operand))
+                    {
+                        substituted = new SmtUnaryFormula(unary.Operator, operand);
+                        return true;
+                    }
+
+                    break;
+                case SmtBinaryFormula binary:
+                    var leftChanged = TrySubstituteFormula(binary.Left, sourceFormula, targetFormula, out var left);
+                    var rightChanged = TrySubstituteFormula(binary.Right, sourceFormula, targetFormula, out var right);
+                    if (leftChanged || rightChanged)
+                    {
+                        substituted = new SmtBinaryFormula(
+                            binary.Operator,
+                            leftChanged ? left : binary.Left,
+                            rightChanged ? right : binary.Right);
+                        return true;
+                    }
+
+                    break;
+                case SmtIntegerUnaryTerm integerUnary:
+                    if (TrySubstituteFormula(integerUnary.Operand, sourceFormula, targetFormula, out var integerOperand))
+                    {
+                        substituted = new SmtIntegerUnaryTerm(integerUnary.Operator, integerOperand);
+                        return true;
+                    }
+
+                    break;
+                case SmtIntegerBinaryTerm integerBinary:
+                    var integerLeftChanged = TrySubstituteFormula(integerBinary.Left, sourceFormula, targetFormula, out var integerLeft);
+                    var integerRightChanged = TrySubstituteFormula(integerBinary.Right, sourceFormula, targetFormula, out var integerRight);
+                    if (integerLeftChanged || integerRightChanged)
+                    {
+                        substituted = new SmtIntegerBinaryTerm(
+                            integerBinary.Operator,
+                            integerLeftChanged ? integerLeft : integerBinary.Left,
+                            integerRightChanged ? integerRight : integerBinary.Right);
+                        return true;
+                    }
+
+                    break;
+                case SmtStringLengthTerm stringLength:
+                    if (TrySubstituteFormula(stringLength.Value, sourceFormula, targetFormula, out var stringLengthValue))
+                    {
+                        substituted = new SmtStringLengthTerm(stringLengthValue);
+                        return true;
+                    }
+
+                    break;
+                case SmtStringConcatTerm stringConcat:
+                    var stringConcatLeftChanged = TrySubstituteFormula(stringConcat.Left, sourceFormula, targetFormula, out var stringConcatLeft);
+                    var stringConcatRightChanged = TrySubstituteFormula(stringConcat.Right, sourceFormula, targetFormula, out var stringConcatRight);
+                    if (stringConcatLeftChanged || stringConcatRightChanged)
+                    {
+                        substituted = new SmtStringConcatTerm(
+                            stringConcatLeftChanged ? stringConcatLeft : stringConcat.Left,
+                            stringConcatRightChanged ? stringConcatRight : stringConcat.Right);
+                        return true;
+                    }
+
+                    break;
+                case SmtStringContainsFormula stringContains:
+                    var stringContainsValueChanged = TrySubstituteFormula(stringContains.Value, sourceFormula, targetFormula, out var stringContainsValue);
+                    var stringContainsSearchChanged = TrySubstituteFormula(stringContains.Search, sourceFormula, targetFormula, out var stringContainsSearch);
+                    if (stringContainsValueChanged || stringContainsSearchChanged)
+                    {
+                        substituted = new SmtStringContainsFormula(
+                            stringContainsValueChanged ? stringContainsValue : stringContains.Value,
+                            stringContainsSearchChanged ? stringContainsSearch : stringContains.Search);
+                        return true;
+                    }
+
+                    break;
+                case SmtStringStartsWithFormula stringStartsWith:
+                    var stringStartsWithValueChanged = TrySubstituteFormula(stringStartsWith.Value, sourceFormula, targetFormula, out var stringStartsWithValue);
+                    var stringStartsWithPrefixChanged = TrySubstituteFormula(stringStartsWith.Prefix, sourceFormula, targetFormula, out var stringStartsWithPrefix);
+                    if (stringStartsWithValueChanged || stringStartsWithPrefixChanged)
+                    {
+                        substituted = new SmtStringStartsWithFormula(
+                            stringStartsWithValueChanged ? stringStartsWithValue : stringStartsWith.Value,
+                            stringStartsWithPrefixChanged ? stringStartsWithPrefix : stringStartsWith.Prefix);
+                        return true;
+                    }
+
+                    break;
+                case SmtStringEndsWithFormula stringEndsWith:
+                    var stringEndsWithValueChanged = TrySubstituteFormula(stringEndsWith.Value, sourceFormula, targetFormula, out var stringEndsWithValue);
+                    var stringEndsWithSuffixChanged = TrySubstituteFormula(stringEndsWith.Suffix, sourceFormula, targetFormula, out var stringEndsWithSuffix);
+                    if (stringEndsWithValueChanged || stringEndsWithSuffixChanged)
+                    {
+                        substituted = new SmtStringEndsWithFormula(
+                            stringEndsWithValueChanged ? stringEndsWithValue : stringEndsWith.Value,
+                            stringEndsWithSuffixChanged ? stringEndsWithSuffix : stringEndsWith.Suffix);
+                        return true;
+                    }
+
+                    break;
+                case SmtRegexMatchFormula regexMatch:
+                    if (TrySubstituteFormula(regexMatch.Value, sourceFormula, targetFormula, out var regexValue))
+                    {
+                        substituted = new SmtRegexMatchFormula(regexValue, regexMatch.Pattern);
+                        return true;
+                    }
+
+                    break;
+                case SmtConditionalFormula conditional:
+                    var conditionChanged = TrySubstituteFormula(conditional.Condition, sourceFormula, targetFormula, out var condition);
+                    var whenTrueChanged = TrySubstituteFormula(conditional.WhenTrue, sourceFormula, targetFormula, out var whenTrue);
+                    var whenFalseChanged = TrySubstituteFormula(conditional.WhenFalse, sourceFormula, targetFormula, out var whenFalse);
+                    if (conditionChanged || whenTrueChanged || whenFalseChanged)
+                    {
+                        substituted = new SmtConditionalFormula(
+                            conditionChanged ? condition : conditional.Condition,
+                            whenTrueChanged ? whenTrue : conditional.WhenTrue,
+                            whenFalseChanged ? whenFalse : conditional.WhenFalse,
+                            conditional.ResultKind);
+                        return true;
+                    }
+
+                    break;
+            }
+
+            substituted = formula;
+            return false;
         }
 
         private static void AddStructuralReferenceNullStateAssignedValueFacts(
@@ -3455,6 +4007,7 @@ namespace PurelySharp.Symbolic
             };
 
             if (type is not INamedTypeSymbol { IsTupleType: true } tupleType ||
+                expectedCount > 0 &&
                 tupleType.TupleElements.Length != expectedCount)
             {
                 return false;
@@ -4318,6 +4871,12 @@ namespace PurelySharp.Symbolic
 
             for (var index = 0; index < targetSymbols.Count; index++)
             {
+                if (TryGetCurrentFormulaValue(facts, valueFormulas[index], out var currentValue) &&
+                    TryCreateAssignedValueFact(targetSymbols[index], currentValue, out var currentValueFact))
+                {
+                    facts.Add(currentValueFact);
+                }
+
                 if (TryCreateAssignedValueFact(targetSymbols[index], valueFormulas[index], out var fact))
                 {
                     facts.Add(fact);
@@ -4444,8 +5003,37 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
+            return TryGetCurrentFormulaValue(facts, targetFormula, out value);
+        }
+
+        private static bool TryGetCurrentFormulaValue(
+            List<SmtFormula> facts,
+            SmtFormula targetFormula,
+            out SmtFormula value)
+        {
+            value = null!;
             for (var index = facts.Count - 1; index >= 0; index--)
             {
+                if (targetFormula.Kind == SmtValueKind.Bool)
+                {
+                    if (Equals(facts[index], targetFormula))
+                    {
+                        value = new SmtBooleanConstant(true);
+                        return true;
+                    }
+
+                    if (facts[index] is SmtUnaryFormula
+                        {
+                            Operator: SmtUnaryOperator.Not,
+                            Operand: var operand
+                        } &&
+                        Equals(operand, targetFormula))
+                    {
+                        value = new SmtBooleanConstant(false);
+                        return true;
+                    }
+                }
+
                 if (facts[index] is SmtUnaryFormula
                     {
                         Operator: SmtUnaryOperator.Not,

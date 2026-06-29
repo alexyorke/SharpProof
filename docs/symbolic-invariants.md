@@ -7,8 +7,8 @@ The primary entrypoint is `SymbolicSourceQueryService`:
 
 - `QuerySyntaxTree` reports the merged invariant at a specific line and column.
 - `QuerySyntaxTreeAtPosition` reports the merged invariant at an absolute source position.
-- `QuerySyntaxTreeLine` reports every statement/expression program point that intersects a source line.
-- `QuerySyntaxTreeAllLines` reports every non-empty invariant line from one parse/compilation pass.
+- `QuerySyntaxTreeLine` reports statement-level program points that intersect a source line. Pass `includeExpressionProgramPoints: true` to also include selected expression nodes such as calls, element access, member access, assignments, binary expressions, conditionals, and patterns.
+- `QuerySyntaxTreeAllLines` reports every non-empty invariant line from one parse/compilation pass. It accepts the same expression-program-point option for callers that need finer line-level query results.
 - `SymbolicSourceQueryResult.Invariant` exposes a typed program-point invariant descriptor. Its `Conditions` are the SMT-backed path conditions, `MergeKind` is `Conjunction`, and `MergedInvariantText` is the condition conjunction used for proof queries.
 - `SymbolicSourceQueryResult.PathConditions` is a convenience view over the typed condition descriptors, including source-like condition text such as `value > 0`, formula kind, SMT value kind, merge target, whether the condition came from a real SMT formula, and whether it is a conservative unknown placeholder.
 - `SymbolicSourceQueryResult.PathConditionCount` and `ProofOutcomes` summarize the current point without requiring callers to traverse `PathConditions` or `ConditionProofs`.
@@ -43,6 +43,12 @@ Use `--all-lines` to enumerate every source line with statement/expression progr
 
 ```powershell
 dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --all-lines --check-reachability --json
+```
+
+Use `--line-expressions` with `--line-invariants` or `--all-lines` when a caller needs expression-level points without computing absolute positions. This is useful for querying the invariant at a call, element access, member access, or arithmetic expression on a line:
+
+```powershell
+dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --line 42 --line-invariants --line-expressions --node-kind AddExpression --check-reachability --implies "index >= 0" --compact-json
 ```
 
 Use `--node-kind`, `--with-facts`, or `--reachability` with `--line-invariants` or `--all-lines` to narrow aggregate output without changing symbolic inference:

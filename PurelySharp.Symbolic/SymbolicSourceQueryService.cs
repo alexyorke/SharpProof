@@ -113,7 +113,8 @@ namespace PurelySharp.Symbolic
             IEnumerable<MetadataReference>? references = null,
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
-            IEnumerable<string>? impliedConditions = null)
+            IEnumerable<string>? impliedConditions = null,
+            bool includeExpressionProgramPoints = false)
         {
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -132,7 +133,8 @@ namespace PurelySharp.Symbolic
                 references,
                 cancellationToken,
                 smtAnalysis,
-                impliedConditions);
+                impliedConditions,
+                includeExpressionProgramPoints);
         }
 
         public SymbolicFileQueryResult QueryFileAllLines(
@@ -140,7 +142,8 @@ namespace PurelySharp.Symbolic
             IEnumerable<MetadataReference>? references = null,
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
-            IEnumerable<string>? impliedConditions = null)
+            IEnumerable<string>? impliedConditions = null,
+            bool includeExpressionProgramPoints = false)
         {
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -158,7 +161,8 @@ namespace PurelySharp.Symbolic
                 references,
                 cancellationToken,
                 smtAnalysis,
-                impliedConditions);
+                impliedConditions,
+                includeExpressionProgramPoints);
         }
 
         public SymbolicProgramPointQueryResult AnalyzeFile(
@@ -321,7 +325,8 @@ namespace PurelySharp.Symbolic
             IEnumerable<MetadataReference>? references = null,
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
-            IEnumerable<string>? impliedConditions = null)
+            IEnumerable<string>? impliedConditions = null,
+            bool includeExpressionProgramPoints = false)
         {
             if (sourceText == null)
             {
@@ -350,7 +355,8 @@ namespace PurelySharp.Symbolic
                 line,
                 cancellationToken,
                 smtAnalysis,
-                impliedConditions);
+                impliedConditions,
+                includeExpressionProgramPoints);
         }
 
         public SymbolicFileQueryResult QuerySourceAllLines(
@@ -359,7 +365,8 @@ namespace PurelySharp.Symbolic
             IEnumerable<MetadataReference>? references = null,
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
-            IEnumerable<string>? impliedConditions = null)
+            IEnumerable<string>? impliedConditions = null,
+            bool includeExpressionProgramPoints = false)
         {
             if (sourceText == null)
             {
@@ -387,7 +394,8 @@ namespace PurelySharp.Symbolic
                 compilation,
                 cancellationToken,
                 smtAnalysis,
-                impliedConditions);
+                impliedConditions,
+                includeExpressionProgramPoints);
         }
 
         public SymbolicProgramPointQueryResult AnalyzeSource(
@@ -528,7 +536,8 @@ namespace PurelySharp.Symbolic
             int line,
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
-            IEnumerable<string>? impliedConditions = null)
+            IEnumerable<string>? impliedConditions = null,
+            bool includeExpressionProgramPoints = false)
         {
             if (syntaxTree == null)
             {
@@ -542,7 +551,12 @@ namespace PurelySharp.Symbolic
 
             var semanticModel = compilation.GetSemanticModel(syntaxTree);
             var root = syntaxTree.GetRoot(cancellationToken);
-            var nodes = FindQueryNodesOnLine(root, syntaxTree, line, cancellationToken);
+            var nodes = FindQueryNodesOnLine(
+                root,
+                syntaxTree,
+                line,
+                cancellationToken,
+                includeExpressionProgramPoints);
             var results = nodes
                 .Select(node =>
                 {
@@ -596,7 +610,8 @@ namespace PurelySharp.Symbolic
             Compilation compilation,
             CancellationToken cancellationToken = default,
             SmtAnalysisService? smtAnalysis = null,
-            IEnumerable<string>? impliedConditions = null)
+            IEnumerable<string>? impliedConditions = null,
+            bool includeExpressionProgramPoints = false)
         {
             if (syntaxTree == null)
             {
@@ -618,7 +633,8 @@ namespace PurelySharp.Symbolic
                     line,
                     cancellationToken,
                     smtAnalysis,
-                    impliedConditions);
+                    impliedConditions,
+                    includeExpressionProgramPoints);
                 if (lineResult.ProgramPoints.Count != 0)
                 {
                     lineResults.Add(lineResult);
@@ -1094,7 +1110,8 @@ namespace PurelySharp.Symbolic
             SyntaxNode root,
             SyntaxTree syntaxTree,
             int line,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool includeExpressionProgramPoints)
         {
             var lineSpan = GetLineSpan(syntaxTree, line, cancellationToken);
             if (lineSpan.Length == 0)
@@ -1103,16 +1120,35 @@ namespace PurelySharp.Symbolic
             }
 
             var seen = new HashSet<string>();
-            return root
+            var nodes = root
                 .DescendantTokens(descendIntoTrivia: false)
                 .Where(token => token.Span.Length > 0 && token.Span.IntersectsWith(lineSpan))
                 .Select(token => FindQueryNode(root, token.SpanStart))
                 .Where(static node => node is StatementSyntax or ExpressionSyntax)
-                .Where(node => node.Span.IntersectsWith(lineSpan))
+                .Where(node => node.Span.IntersectsWith(lineSpan));
+
+            if (includeExpressionProgramPoints)
+            {
+                nodes = nodes.Concat(root
+                    .DescendantNodes(descendIntoTrivia: false)
+                    .OfType<ExpressionSyntax>()
+                    .Where(expression => expression.Span.Length > 0 && expression.Span.IntersectsWith(lineSpan))
+                    .Where(IsUsefulLineExpressionProgramPoint));
+            }
+
+            return nodes
                 .Where(node => seen.Add(node.RawKind.ToString() + ":" + node.SpanStart.ToString() + ":" + node.Span.End.ToString()))
                 .OrderBy(static node => node.SpanStart)
                 .ThenBy(static node => node.Span.Length)
                 .ToArray();
+        }
+
+        private static bool IsUsefulLineExpressionProgramPoint(ExpressionSyntax expression)
+        {
+            return expression is AssignmentExpressionSyntax or AwaitExpressionSyntax or BinaryExpressionSyntax or CastExpressionSyntax or
+                ConditionalAccessExpressionSyntax or ConditionalExpressionSyntax or ElementAccessExpressionSyntax or InvocationExpressionSyntax or
+                IsPatternExpressionSyntax or MemberAccessExpressionSyntax or ObjectCreationExpressionSyntax or PrefixUnaryExpressionSyntax or
+                PostfixUnaryExpressionSyntax or RangeExpressionSyntax or SwitchExpressionSyntax or ThrowExpressionSyntax;
         }
 
         private static SyntaxNode? FindExpressionContextNode(SyntaxToken token, int position)

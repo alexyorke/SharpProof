@@ -152,7 +152,8 @@ namespace PurelySharp.Analyzer
                 }
 
                 if (statement is IfStatementSyntax ifStatement &&
-                    !IsSymbolAssignedBetween(block, ifStatement.Span.End, useNode.SpanStart, symbol, semanticModel, cancellationToken))
+                    !IsSymbolAssignedBetween(block, ifStatement.Span.End, useNode.SpanStart, symbol, semanticModel, cancellationToken) &&
+                    !AnyReferencedSymbolAssignedBetween(ifStatement.Condition, block, ifStatement.Span.End, useNode.SpanStart, semanticModel, cancellationToken))
                 {
                     AddCompletedIfStatementFacts(ifStatement, symbol, semanticModel, cancellationToken, pathConditions);
                 }
@@ -252,7 +253,7 @@ namespace PurelySharp.Analyzer
                 }
                 else if (binaryExpression.IsKind(SyntaxKind.CoalesceExpression))
                 {
-                    TryAddReferenceNullCondition(binaryExpression.Left, isNull: true, semanticModel, cancellationToken, pathConditions);
+                    TryAddCoalesceRightPathCondition(binaryExpression.Left, semanticModel, cancellationToken, pathConditions);
                 }
             }
 
@@ -406,7 +407,8 @@ namespace PurelySharp.Analyzer
                 }
 
                 if (statement is IfStatementSyntax ifStatement &&
-                    !AnySymbolAssignedBetween(block, ifStatement.Span.End, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken))
+                    !AnySymbolAssignedBetween(block, ifStatement.Span.End, useNode.SpanStart, invalidatedSymbols, semanticModel, cancellationToken) &&
+                    !AnyReferencedSymbolAssignedBetween(ifStatement.Condition, block, ifStatement.Span.End, useNode.SpanStart, semanticModel, cancellationToken))
                 {
                     AddCompletedIfStatementFacts(ifStatement, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
                 }
@@ -447,6 +449,21 @@ namespace PurelySharp.Analyzer
             {
                 pathConditions.Add(fact);
             }
+        }
+
+        private static bool IsExceptionPathReachable(
+            SyntaxNode useNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            var pathConditions = CollectPathConditionsForUse(
+                useNode,
+                CollectLocalAndParameterSymbols(useNode, semanticModel, cancellationToken),
+                semanticModel,
+                cancellationToken);
+
+            return PathConditionsAreSatisfiable(pathConditions, smtAnalysis);
         }
 
         private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(SyntaxNode useNode)
@@ -1578,6 +1595,26 @@ namespace PurelySharp.Analyzer
                 new SmtNullConstant()));
         }
 
+        private static void TryAddCoalesceRightPathCondition(
+            ExpressionSyntax leftExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
+        {
+            var originalCount = pathConditions.Count;
+            TryAddReferenceNullCondition(leftExpression, isNull: true, semanticModel, cancellationToken, pathConditions);
+            if (pathConditions.Count != originalCount)
+            {
+                return;
+            }
+
+            leftExpression = UnwrapFactExpression(leftExpression);
+            if (leftExpression is ConditionalAccessExpressionSyntax conditionalAccess)
+            {
+                TryAddReferenceNullCondition(conditionalAccess.Expression, isNull: true, semanticModel, cancellationToken, pathConditions);
+            }
+        }
+
         private static bool PathConditionsImplyFact(
             IEnumerable<SmtFormula> pathConditions,
             SmtFormula factFormula,
@@ -1623,6 +1660,19 @@ namespace PurelySharp.Analyzer
             var referencedSymbols = GetReferencedLocalAndParameterSymbols(condition, semanticModel, cancellationToken);
             return referencedSymbols.Count != 0 &&
                 AnySymbolAssignedBeforeUse(branchRoot, useSpanStart, referencedSymbols, semanticModel, cancellationToken);
+        }
+
+        private static bool AnyReferencedSymbolAssignedBetween(
+            SyntaxNode condition,
+            SyntaxNode root,
+            int afterSpanStart,
+            int beforeSpanStart,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var referencedSymbols = GetReferencedLocalAndParameterSymbols(condition, semanticModel, cancellationToken);
+            return referencedSymbols.Count != 0 &&
+                AnySymbolAssignedBetween(root, afterSpanStart, beforeSpanStart, referencedSymbols, semanticModel, cancellationToken);
         }
 
         private static bool IsSymbolAssignedBetween(

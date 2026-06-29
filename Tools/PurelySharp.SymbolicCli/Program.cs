@@ -19,18 +19,20 @@ try
 
     var queryService = new SymbolicSourceQueryService();
     object result = options.AllLines
-        ? queryService.QueryFileAllLines(
+            ? queryService.QueryFileAllLines(
             options.FilePath,
             options.CreateReferences(),
             smtAnalysis: smtAnalysis,
-            impliedConditions: options.ImpliedConditions)
+            impliedConditions: options.ImpliedConditions,
+            includeExpressionProgramPoints: options.LineExpressions)
         : options.LineInvariants
         ? queryService.QueryFileLine(
             options.FilePath,
             options.Line,
             options.CreateReferences(),
             smtAnalysis: smtAnalysis,
-            impliedConditions: options.ImpliedConditions)
+            impliedConditions: options.ImpliedConditions,
+            includeExpressionProgramPoints: options.LineExpressions)
         : options.Position.HasValue
             ? queryService.QueryFileAtPosition(
             options.FilePath,
@@ -319,6 +321,7 @@ Options:
   --column <n>        1-based source column to query. Default: 1.
   --line-invariants   Query every statement/expression program point on the line.
   --all-lines         Query every line that contains statement/expression program points.
+  --line-expressions  Include expression program points in --line-invariants or --all-lines.
   --position <n>      0-based absolute source position to query.
   --reference <path>  Metadata reference path. Can be repeated.
   --node-kind <kind>  Keep only matching Roslyn node kinds in --line-invariants or --all-lines output. Can be repeated.
@@ -357,6 +360,8 @@ Options:
     public bool LineInvariants { get; private set; }
 
     public bool AllLines { get; private set; }
+
+    public bool LineExpressions { get; private set; }
 
     public List<string> ReferencePaths { get; } = new();
 
@@ -436,6 +441,10 @@ Options:
                 case "--all-lines":
                 case "--file-invariants":
                     options.AllLines = true;
+                    break;
+                case "--line-expressions":
+                case "--include-expressions":
+                    options.LineExpressions = true;
                     break;
                 case "--reference":
                 case "-r":
@@ -544,6 +553,11 @@ Options:
             if (options.LineInvariants && options.Column != 1)
             {
                 throw new ArgumentException("--line-invariants cannot be combined with --column.");
+            }
+
+            if (options.LineExpressions && !options.LineInvariants && !options.AllLines)
+            {
+                throw new ArgumentException("--line-expressions requires --line-invariants or --all-lines.");
             }
 
             if (!options.AllLines && !options.Position.HasValue && options.Line == 0)

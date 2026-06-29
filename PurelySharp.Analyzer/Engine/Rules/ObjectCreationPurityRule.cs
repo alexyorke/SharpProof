@@ -1,4 +1,6 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 using System.Collections.Generic;
@@ -40,6 +42,12 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             if (!(operation is IObjectCreationOperation objectCreationOperation))
             {
+                return PurityAnalysisResult.Pure;
+            }
+
+            if (IsImplicitExhaustiveSwitchExpressionFallback(objectCreationOperation))
+            {
+                PurityAnalysisEngine.LogDebug("    [ObjCreateRule] Ignoring compiler-generated SwitchExpressionException fallback for exhaustive switch expression.");
                 return PurityAnalysisResult.Pure;
             }
 
@@ -428,6 +436,28 @@ namespace PurelySharp.Analyzer.Engine.Rules
 
             var typeName = constructorSymbol.ContainingType?.OriginalDefinition.ToDisplayString();
             return typeName == "System.Span<T>" || typeName == "System.ReadOnlySpan<T>";
+        }
+
+        private static bool IsImplicitExhaustiveSwitchExpressionFallback(IObjectCreationOperation objectCreationOperation)
+        {
+            if (!objectCreationOperation.IsImplicit ||
+                objectCreationOperation.Constructor?.ContainingType?.ToDisplayString() !=
+                "System.Runtime.CompilerServices.SwitchExpressionException")
+            {
+                return false;
+            }
+
+            return objectCreationOperation.Syntax
+                .AncestorsAndSelf()
+                .OfType<SwitchExpressionSyntax>()
+                .Any(HasUnconditionalDiscardArm);
+        }
+
+        private static bool HasUnconditionalDiscardArm(SwitchExpressionSyntax switchExpression)
+        {
+            return switchExpression.Arms.Any(static arm =>
+                arm.WhenClause == null &&
+                arm.Pattern.IsKind(SyntaxKind.DiscardPattern));
         }
 
         private static bool IsPureOwnedArrayConstructorArgument(

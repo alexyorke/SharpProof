@@ -431,6 +431,7 @@ namespace TestNamespace {
             Assert.That(source, Does.Contain("--smt-max-expression-nodes <n>"));
             Assert.That(source, Does.Contain("--position <n>"));
             Assert.That(source, Does.Contain("--all-lines"));
+            Assert.That(source, Does.Contain("--line-expressions"));
             Assert.That(source, Does.Contain("--node-kind <kind>"));
             Assert.That(source, Does.Contain("--with-facts"));
             Assert.That(source, Does.Contain("--reachability <r>"));
