@@ -23,6 +23,7 @@ namespace SearchLib.Smt
                 throw new InvalidOperationException("Only boolean SMT formulas can be used as conditions.");
             }
 
+            EnsureSafeRegexPolarity(formula, isNegativeContext: false);
             return (BoolExpr)Encode(formula);
         }
 
@@ -30,7 +31,7 @@ namespace SearchLib.Smt
         {
             var solver = _context.MkSolver();
             var parameters = _context.MkParams();
-            parameters.Add("timeout", (uint)Math.Max(1, timeout.TotalMilliseconds));
+            parameters.Add("timeout", GetTimeoutMilliseconds(timeout));
             solver.Parameters = parameters;
             return solver;
         }
@@ -154,12 +155,201 @@ namespace SearchLib.Smt
 
         private BoolExpr EncodeRegexMatch(SmtRegexMatchFormula formula)
         {
-            if (!Z3RegexTranslator.TryTranslate(_context, formula.Pattern, out var regex))
+            if (!Z3RegexTranslator.TryTranslate(_context, formula.Pattern, out var regex, out _))
             {
                 throw new InvalidOperationException("Unsupported SMT regex pattern.");
             }
 
             return _context.MkInRe(EncodeString(formula.Value), regex);
+        }
+
+        private void EnsureSafeRegexPolarity(SmtFormula formula, bool isNegativeContext)
+        {
+            switch (formula)
+            {
+                case SmtRegexMatchFormula regexMatch:
+                    if (isNegativeContext && IsApproximateRegexPattern(regexMatch.Pattern))
+                    {
+                        throw new InvalidOperationException("Approximate SMT regex patterns cannot be safely negated.");
+                    }
+
+                    EnsureSafeRegexInTerm(regexMatch.Value);
+                    return;
+                case SmtUnaryFormula { Operator: SmtUnaryOperator.Not } unaryFormula:
+                    EnsureSafeRegexPolarity(unaryFormula.Operand, !isNegativeContext);
+                    return;
+                case SmtBinaryFormula binaryFormula:
+                    EnsureSafeRegexPolarity(binaryFormula, isNegativeContext);
+                    return;
+                case SmtStringContainsFormula stringContainsFormula:
+                    EnsureSafeRegexInTerm(stringContainsFormula.Value);
+                    EnsureSafeRegexInTerm(stringContainsFormula.Search);
+                    return;
+                case SmtStringStartsWithFormula stringStartsWithFormula:
+                    EnsureSafeRegexInTerm(stringStartsWithFormula.Value);
+                    EnsureSafeRegexInTerm(stringStartsWithFormula.Prefix);
+                    return;
+                case SmtStringEndsWithFormula stringEndsWithFormula:
+                    EnsureSafeRegexInTerm(stringEndsWithFormula.Value);
+                    EnsureSafeRegexInTerm(stringEndsWithFormula.Suffix);
+                    return;
+                case SmtConditionalFormula { Kind: SmtValueKind.Bool } conditionalFormula:
+                    EnsureExactRegexUse(conditionalFormula.Condition);
+                    EnsureSafeRegexPolarity(conditionalFormula.WhenTrue, isNegativeContext);
+                    EnsureSafeRegexPolarity(conditionalFormula.WhenFalse, isNegativeContext);
+                    return;
+            }
+
+            EnsureSafeRegexInTerm(formula);
+        }
+
+        private void EnsureSafeRegexPolarity(SmtBinaryFormula formula, bool isNegativeContext)
+        {
+            if (formula.Operator is SmtBinaryOperator.And or SmtBinaryOperator.Or)
+            {
+                EnsureSafeRegexPolarity(formula.Left, isNegativeContext);
+                EnsureSafeRegexPolarity(formula.Right, isNegativeContext);
+                return;
+            }
+
+            if ((formula.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual) &&
+                formula.Left.Kind == SmtValueKind.Bool &&
+                formula.Right.Kind == SmtValueKind.Bool)
+            {
+                EnsureSafeBooleanComparisonRegexPolarity(formula, isNegativeContext);
+                return;
+            }
+
+            EnsureSafeRegexInTerm(formula.Left);
+            EnsureSafeRegexInTerm(formula.Right);
+        }
+
+        private void EnsureSafeBooleanComparisonRegexPolarity(SmtBinaryFormula formula, bool isNegativeContext)
+        {
+            if (formula.Left is SmtBooleanConstant leftConstant)
+            {
+                EnsureSafeRegexPolarity(
+                    formula.Right,
+                    GetBooleanComparisonOperandPolarity(formula.Operator, leftConstant.Value, isNegativeContext));
+                return;
+            }
+
+            if (formula.Right is SmtBooleanConstant rightConstant)
+            {
+                EnsureSafeRegexPolarity(
+                    formula.Left,
+                    GetBooleanComparisonOperandPolarity(formula.Operator, rightConstant.Value, isNegativeContext));
+                return;
+            }
+
+            EnsureExactRegexUse(formula.Left);
+            EnsureExactRegexUse(formula.Right);
+        }
+
+        private void EnsureSafeRegexInTerm(SmtFormula formula)
+        {
+            switch (formula)
+            {
+                case SmtIntegerUnaryTerm integerUnaryTerm:
+                    EnsureSafeRegexInTerm(integerUnaryTerm.Operand);
+                    return;
+                case SmtIntegerBinaryTerm integerBinaryTerm:
+                    EnsureSafeRegexInTerm(integerBinaryTerm.Left);
+                    EnsureSafeRegexInTerm(integerBinaryTerm.Right);
+                    return;
+                case SmtStringLengthTerm stringLengthTerm:
+                    EnsureSafeRegexInTerm(stringLengthTerm.Value);
+                    return;
+                case SmtStringConcatTerm stringConcatTerm:
+                    EnsureSafeRegexInTerm(stringConcatTerm.Left);
+                    EnsureSafeRegexInTerm(stringConcatTerm.Right);
+                    return;
+                case SmtConditionalFormula conditionalFormula:
+                    EnsureExactRegexUse(conditionalFormula.Condition);
+                    EnsureSafeRegexInTerm(conditionalFormula.WhenTrue);
+                    EnsureSafeRegexInTerm(conditionalFormula.WhenFalse);
+                    return;
+            }
+        }
+
+        private void EnsureExactRegexUse(SmtFormula formula)
+        {
+            switch (formula)
+            {
+                case SmtRegexMatchFormula regexMatch:
+                    if (IsApproximateRegexPattern(regexMatch.Pattern))
+                    {
+                        throw new InvalidOperationException("Approximate SMT regex patterns require positive polarity.");
+                    }
+
+                    EnsureSafeRegexInTerm(regexMatch.Value);
+                    return;
+                case SmtUnaryFormula unaryFormula:
+                    EnsureExactRegexUse(unaryFormula.Operand);
+                    return;
+                case SmtBinaryFormula binaryFormula:
+                    EnsureExactRegexUse(binaryFormula.Left);
+                    EnsureExactRegexUse(binaryFormula.Right);
+                    return;
+                case SmtIntegerUnaryTerm integerUnaryTerm:
+                    EnsureExactRegexUse(integerUnaryTerm.Operand);
+                    return;
+                case SmtIntegerBinaryTerm integerBinaryTerm:
+                    EnsureExactRegexUse(integerBinaryTerm.Left);
+                    EnsureExactRegexUse(integerBinaryTerm.Right);
+                    return;
+                case SmtStringLengthTerm stringLengthTerm:
+                    EnsureExactRegexUse(stringLengthTerm.Value);
+                    return;
+                case SmtStringConcatTerm stringConcatTerm:
+                    EnsureExactRegexUse(stringConcatTerm.Left);
+                    EnsureExactRegexUse(stringConcatTerm.Right);
+                    return;
+                case SmtStringContainsFormula stringContainsFormula:
+                    EnsureExactRegexUse(stringContainsFormula.Value);
+                    EnsureExactRegexUse(stringContainsFormula.Search);
+                    return;
+                case SmtStringStartsWithFormula stringStartsWithFormula:
+                    EnsureExactRegexUse(stringStartsWithFormula.Value);
+                    EnsureExactRegexUse(stringStartsWithFormula.Prefix);
+                    return;
+                case SmtStringEndsWithFormula stringEndsWithFormula:
+                    EnsureExactRegexUse(stringEndsWithFormula.Value);
+                    EnsureExactRegexUse(stringEndsWithFormula.Suffix);
+                    return;
+                case SmtConditionalFormula conditionalFormula:
+                    EnsureExactRegexUse(conditionalFormula.Condition);
+                    EnsureExactRegexUse(conditionalFormula.WhenTrue);
+                    EnsureExactRegexUse(conditionalFormula.WhenFalse);
+                    return;
+            }
+        }
+
+        private bool IsApproximateRegexPattern(string pattern)
+        {
+            return Z3RegexTranslator.TryTranslate(_context, pattern, out _, out var isExact) && !isExact;
+        }
+
+        private static bool GetBooleanComparisonOperandPolarity(
+            SmtBinaryOperator op,
+            bool constantValue,
+            bool isNegativeContext)
+        {
+            var preservesPolarity =
+                (op == SmtBinaryOperator.Equal && constantValue) ||
+                (op == SmtBinaryOperator.NotEqual && !constantValue);
+            return preservesPolarity ? isNegativeContext : !isNegativeContext;
+        }
+
+        private static uint GetTimeoutMilliseconds(TimeSpan timeout)
+        {
+            var totalMilliseconds = timeout.TotalMilliseconds;
+            if (totalMilliseconds >= uint.MaxValue)
+            {
+                return uint.MaxValue;
+            }
+
+            return (uint)Math.Max(1, totalMilliseconds);
         }
 
         private Expr GetOrCreateVariable(SmtVariable variable)
@@ -190,6 +380,7 @@ namespace SearchLib.Smt
             private readonly Context _context;
             private readonly string _pattern;
             private readonly Dictionary<string, RegexClassTranslation> _characterClassCache = new(StringComparer.Ordinal);
+            private bool _isExact = true;
             private int _position;
 
             private Z3RegexTranslator(Context context, string pattern)
@@ -198,9 +389,10 @@ namespace SearchLib.Smt
                 _pattern = pattern;
             }
 
-            public static bool TryTranslate(Context context, string pattern, out ReExpr regex)
+            public static bool TryTranslate(Context context, string pattern, out ReExpr regex, out bool isExact)
             {
                 regex = null!;
+                isExact = true;
                 if (pattern.Length > 256)
                 {
                     return false;
@@ -228,6 +420,7 @@ namespace SearchLib.Smt
                 }
 
                 regex = body;
+                isExact = translator._isExact;
                 if (!startAnchored && !strictStartAnchored)
                 {
                     regex = context.MkConcat(new[] { translator.CreateAnyStringRegex(), regex });
@@ -437,6 +630,7 @@ namespace SearchLib.Smt
                 var escaped = _pattern[_position++];
                 if (TryCreateEscapedCharacterClassRegex(escaped, out var escapedClass))
                 {
+                    _isExact &= escapedClass.IsExact;
                     regex = escapedClass.Regex;
                     return true;
                 }
@@ -491,6 +685,7 @@ namespace SearchLib.Smt
 
                 if (escaped is 'b' or 'B')
                 {
+                    _isExact = false;
                     regex = CreateLiteralRegex(string.Empty);
                     return true;
                 }
@@ -605,6 +800,7 @@ namespace SearchLib.Smt
                 var escaped = _pattern[_position++];
                 if (TryCreateEscapedCharacterClassRegex(escaped, out var escapedClass))
                 {
+                    _isExact &= escapedClass.IsExact;
                     part = new CharacterClassPart(
                         escapedClass.Regex,
                         exactCharacter: null,

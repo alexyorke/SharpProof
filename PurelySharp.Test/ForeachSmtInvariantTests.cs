@@ -196,6 +196,63 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesCompletedForeachReceiverNonNull()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string[] values)
+    {
+        foreach (var value in values)
+        {
+        }
+
+        return values.Length;
+    }
+}";
+
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "CompletedForeachReceiverNonNull.cs",
+                FindLine(source, "return values.Length;"),
+                16,
+                "values != null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_DoesNotProveCompletedForeachReceiverNonNullWhenBodyReassignsReceiver()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string[] values)
+    {
+        foreach (var value in values)
+        {
+            values = null;
+        }
+
+        return values == null ? 0 : values.Length;
+    }
+}";
+
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "CompletedForeachReceiverMaybeNull.cs",
+                FindLine(source, "return values == null ? 0 : values.Length;"),
+                16,
+                "values != null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
         public async Task Ps0010_FiniteForeachNonNullElementContradictoryNullDereference_DoesNotReport()
         {
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(

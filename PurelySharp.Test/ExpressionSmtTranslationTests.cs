@@ -122,6 +122,52 @@ public class TestClass
                 "x == y");
         }
 
+        [Test]
+        public void SymbolicSourceQueryService_ProvesNullableCoalesceValueFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int? left, int? right)
+    {
+        if ((left ?? right) == 5)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "(left ?? right).HasValue && (left ?? right).Value == 5");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesLiftedNullableBooleanCoalesceFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool? left, bool? right)
+    {
+        if ((left ?? right) == true)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "(left ?? right).HasValue && (left ?? right).Value");
+        }
+
         private static void AssertConditionProven(string source, string sourceLine, string condition)
         {
             var proof = ProveCondition(source, sourceLine, condition);

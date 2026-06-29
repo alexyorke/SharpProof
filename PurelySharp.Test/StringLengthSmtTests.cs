@@ -126,6 +126,29 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesStringLiteralLengthConstant()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        if (text != null && text.Length == ""abc"".Length)
+        {
+            return text.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return text.Length;",
+                "text.Length == 3");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_UnsupportedStringTransformLengthsRemainUnknown()
         {
             const string source = @"

@@ -190,6 +190,13 @@ static void PrintMergedPathFacts(
     if (facts.ConservativeUnknownCount != 0)
     {
         Console.WriteLine(label + " unknowns: " + string.Join("; ", facts.ConservativeUnknowns));
+        foreach (var diagnostic in facts.ConservativeUnknownDiagnostics)
+        {
+            Console.WriteLine(
+                label + " unknown diagnostic: " +
+                $"{diagnostic.UnknownText} target={diagnostic.Target} reason={diagnostic.Reason} " +
+                $"maybe={string.Join("; ", diagnostic.MaybeFacts)}");
+        }
     }
 }
 
@@ -204,6 +211,11 @@ static void PrintPointResult(
     }
 
     Console.WriteLine($"Node: {result.NodeKind}");
+    if (!string.IsNullOrWhiteSpace(result.MethodName))
+    {
+        Console.WriteLine($"Method: {result.MethodName}");
+    }
+
     Console.WriteLine($"Merged invariant: {result.MergedInvariantText}");
     Console.WriteLine($"Invariant merge: {result.Invariant.MergeKind}");
     Console.WriteLine($"Path conditions: {result.PathConditionCount}");
@@ -326,6 +338,13 @@ Options:
   --reference <path>  Metadata reference path. Can be repeated.
   --node-kind <kind>  Keep only matching Roslyn node kinds in --line-invariants or --all-lines output. Can be repeated.
   --with-facts        Keep only program points that have at least one reported fact.
+  --with-conditions   Keep only program points that have at least one path condition.
+  --method <name>     Keep only program points inside a matching method/local function. Can be repeated.
+  --condition-target <target>
+                      Keep only program points with a path condition for the target. Can be repeated.
+  --condition <expr>  Keep only program points with an exact source-like path condition. Can be repeated.
+  --condition-contains <text>
+                      Keep only program points with a path condition containing text. Can be repeated.
   --reachability <r>  Keep only program points with reachability NotChecked, Unknown, Reachable, or Unreachable. Can be repeated.
   --check-reachability
                       Use bounded SMT to classify whether the queried program point is reachable.
@@ -369,6 +388,16 @@ Options:
 
     public bool WithFacts { get; private set; }
 
+    public bool WithConditions { get; private set; }
+
+    public List<string> MethodNames { get; } = new();
+
+    public List<string> ConditionTargets { get; } = new();
+
+    public List<string> Conditions { get; } = new();
+
+    public List<string> ConditionContains { get; } = new();
+
     public List<SymbolicReachability> ReachabilityFilters { get; } = new();
 
     public bool Json { get; private set; }
@@ -408,6 +437,11 @@ Options:
     public bool HasResultFilter =>
         NodeKinds.Count != 0 ||
         WithFacts ||
+        WithConditions ||
+        MethodNames.Count != 0 ||
+        ConditionTargets.Count != 0 ||
+        Conditions.Count != 0 ||
+        ConditionContains.Count != 0 ||
         ReachabilityFilters.Count != 0;
 
     public static SymbolicCliOptions Parse(string[] args)
@@ -455,6 +489,22 @@ Options:
                     break;
                 case "--with-facts":
                     options.WithFacts = true;
+                    break;
+                case "--with-conditions":
+                    options.WithConditions = true;
+                    break;
+                case "--method":
+                    options.MethodNames.Add(ReadString(args, ref index, arg));
+                    break;
+                case "--condition-target":
+                case "--target":
+                    options.ConditionTargets.Add(ReadString(args, ref index, arg));
+                    break;
+                case "--condition":
+                    options.Conditions.Add(ReadString(args, ref index, arg));
+                    break;
+                case "--condition-contains":
+                    options.ConditionContains.Add(ReadString(args, ref index, arg));
                     break;
                 case "--reachability":
                     options.ReachabilityFilters.Add(ReadReachability(args, ref index, arg));
@@ -567,7 +617,7 @@ Options:
 
             if (options.HasResultFilter && !options.AllLines && !options.LineInvariants)
             {
-                throw new ArgumentException("--node-kind, --with-facts, and --reachability require --line-invariants or --all-lines.");
+                throw new ArgumentException("Result filters require --line-invariants or --all-lines.");
             }
 
             foreach (var referencePath in options.ReferencePaths)
@@ -584,7 +634,15 @@ Options:
 
     public SymbolicSourceQueryFilter CreateResultFilter()
     {
-        return new SymbolicSourceQueryFilter(NodeKinds, WithFacts, ReachabilityFilters);
+        return new SymbolicSourceQueryFilter(
+            NodeKinds,
+            WithFacts,
+            ReachabilityFilters,
+            MethodNames,
+            WithConditions,
+            ConditionTargets,
+            Conditions,
+            ConditionContains);
     }
 
     public SmtAnalysisOptions CreateSmtOptions()

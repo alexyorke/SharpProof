@@ -111,6 +111,122 @@ public class TestClass
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
         }
 
+        [Test]
+        public void SymbolicSourceQueryService_ProvesSwitchStatementPropertyPatternStructuralFact()
+        {
+            const string source = @"
+public sealed class Box
+{
+    public int Count { get; init; }
+
+    public object Tag { get; init; }
+}
+
+public class TestClass
+{
+    public int TestMethod(Box box)
+    {
+        switch (box)
+        {
+            case { Count: > 0, Tag: string text }:
+                return 10 / box.Count;
+            default:
+                return 0;
+        }
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / box.Count;");
+            var proof = ProveAtMarker(source, marker, "box != null && box.Count > 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesSwitchExpressionPropertyPatternStructuralFact()
+        {
+            const string source = @"
+public sealed class Box
+{
+    public int Count { get; init; }
+
+    public object Tag { get; init; }
+}
+
+public class TestClass
+{
+    public int TestMethod(Box box)
+    {
+        return box switch
+        {
+            { Count: > 0, Tag: string text } => 10 / box.Count,
+            _ => 0
+        };
+    }
+}";
+
+            var marker = FindMarker(source, "10 / box.Count");
+            var proof = ProveAtMarker(source, marker, "box != null && box.Count > 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_SwitchStatementFallbackUnknownGuardDoesNotExcludeCase()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        switch (value)
+        {
+            case 0 when RuntimeGuard(value):
+                return 0;
+            default:
+                return 10 / value;
+        }
+    }
+
+    private static bool RuntimeGuard(int value)
+    {
+        return value.ToString() == ""0"";
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / value;");
+            var proof = ProveAtMarker(source, marker, "value != 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_SwitchExpressionFallbackUnknownGuardDoesNotExcludeArm()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return value switch
+        {
+            0 when RuntimeGuard(value) => 0,
+            _ => 10 / value
+        };
+    }
+
+    private static bool RuntimeGuard(int value)
+    {
+        return value.ToString() == ""0"";
+    }
+}";
+
+            var marker = FindMarker(source, "10 / value");
+            var proof = ProveAtMarker(source, marker, "value != 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
         private static SymbolicProgramPointQueryResult AnalyzeAtPosition(string source, int position)
         {
             return new SymbolicSourceQueryService().AnalyzeSourceAtPosition(

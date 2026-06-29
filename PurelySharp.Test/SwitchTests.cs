@@ -211,6 +211,31 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task ExhaustiveSwitchExpressionWithDiscardArm_IgnoresCompilerFallbackException()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(ReadOnlySpan<char> value)
+    {
+        return value switch
+        {
+            ""true"" => ""yes"",
+            ""false"" => ""no"",
+            var text when text.Length > 0 => ""other"",
+            _ => ""empty""
+        };
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }
 

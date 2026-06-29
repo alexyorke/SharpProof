@@ -4716,7 +4716,7 @@ namespace PurelySharp.Symbolic.Smt
 
             var receiverType = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).ConvertedType ??
                 semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).Type;
-            if (!TryGetBuiltInElementAccessElementType(receiverType, out var elementType) ||
+            if (!TryGetBuiltInElementAccessElementType(receiverType, semanticModel.Compilation, out var elementType) ||
                 !TryGetValueKind(elementType, out var elementKind) ||
                 !TryCreateBuiltInElementAccessReceiverFormula(
                     elementAccess.Expression,
@@ -5617,11 +5617,20 @@ namespace PurelySharp.Symbolic.Smt
             return IsSupportedBuiltInElementAccessReceiver(typeSymbol);
         }
 
-        private static bool TryGetBuiltInElementAccessElementType(ITypeSymbol? receiverType, out ITypeSymbol elementType)
+        private static bool TryGetBuiltInElementAccessElementType(
+            ITypeSymbol? receiverType,
+            Compilation compilation,
+            out ITypeSymbol elementType)
         {
             if (receiverType is IArrayTypeSymbol { Rank: 1 } arrayType)
             {
                 elementType = arrayType.ElementType;
+                return true;
+            }
+
+            if (receiverType?.SpecialType == SpecialType.System_String)
+            {
+                elementType = compilation.GetSpecialType(SpecialType.System_Char);
                 return true;
             }
 
@@ -7430,6 +7439,40 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (expression is BinaryExpressionSyntax coalesceExpression &&
+                coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
+                TryGetNullableUnderlyingType(expressionType, out var coalesceUnderlyingType) &&
+                TryTranslateNullableValuePartsForUnderlyingType(
+                    coalesceExpression.Left,
+                    coalesceUnderlyingType,
+                    semanticModel,
+                    cancellationToken,
+                    out var coalesceLeftHasValue,
+                    out var coalesceLeftValue,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                coalesceLeftValue != null &&
+                TryTranslateNullableValuePartsForUnderlyingType(
+                    coalesceExpression.Right,
+                    coalesceUnderlyingType,
+                    semanticModel,
+                    cancellationToken,
+                    out var coalesceRightHasValue,
+                    out var coalesceRightValue,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                coalesceRightValue != null &&
+                coalesceLeftValue.Kind == coalesceRightValue.Kind)
+            {
+                hasValueFormula = new SmtBinaryFormula(SmtBinaryOperator.Or, coalesceLeftHasValue, coalesceRightHasValue);
+                valueFormula = new SmtConditionalFormula(
+                    coalesceLeftHasValue,
+                    coalesceLeftValue,
+                    coalesceRightValue,
+                    coalesceLeftValue.Kind);
+                return true;
+            }
+
             if (expression is ConditionalExpressionSyntax conditionalExpression &&
                 TryGetNullableUnderlyingType(expressionType, out var conditionalUnderlyingType) &&
                 TryTranslate(conditionalExpression.Condition, semanticModel, cancellationToken, out var conditionFormula, getSymbolVersion, inlineDepth) &&
@@ -7663,6 +7706,12 @@ namespace PurelySharp.Symbolic.Smt
 
             return sourceType switch
             {
+                SpecialType.System_Char => targetType is
+                    SpecialType.System_UInt16 or
+                    SpecialType.System_Int32 or
+                    SpecialType.System_UInt32 or
+                    SpecialType.System_Int64 or
+                    SpecialType.System_UInt64,
                 SpecialType.System_SByte => targetType is
                     SpecialType.System_Int16 or
                     SpecialType.System_Int32 or
@@ -8151,6 +8200,7 @@ namespace PurelySharp.Symbolic.Smt
         private static bool IsIntegralType(ITypeSymbol typeSymbol)
         {
             return typeSymbol.SpecialType is
+                SpecialType.System_Char or
                 SpecialType.System_SByte or
                 SpecialType.System_Byte or
                 SpecialType.System_Int16 or
@@ -8218,6 +8268,9 @@ namespace PurelySharp.Symbolic.Smt
                     return true;
                 case ulong unsignedLong when unsignedLong <= long.MaxValue:
                     integralValue = (long)unsignedLong;
+                    return true;
+                case char character:
+                    integralValue = character;
                     return true;
                 default:
                     integralValue = default;

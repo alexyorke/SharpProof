@@ -77,6 +77,102 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesForLoopExitMonotonicSourceLowerBound()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int start, int count)
+    {
+        var i = 0;
+        for (i = start; i < count; i++)
+        {
+        }
+
+        return i;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return i;", "i >= start");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesReverseForLoopExitInclusiveInitialUpperBound()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int limit)
+    {
+        var i = 0;
+        for (i = limit; i >= 0; i--)
+        {
+        }
+
+        return i;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return i;", "i <= limit");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesLoopExitConditionWhenBodyReturnDoesNotReachAfterLoop()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        while (index < values.Length)
+        {
+            if (index < 0)
+            {
+                return -1;
+            }
+
+            index++;
+        }
+
+        return index;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return index;", "index >= values.Length");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesSingleGuardedBreakExitCondition()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool ready)
+    {
+        for (;;)
+        {
+            if (ready)
+            {
+                break;
+            }
+        }
+
+        return ready ? 1 : 0;
+    }
+}";
+
+            var proof = ProveAtMarker(source, "return ready ? 1 : 0;", "ready");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_DoesNotProveForLoopExitBoundWhenBreakCanExit()
         {
             const string source = @"

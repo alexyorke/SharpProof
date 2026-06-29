@@ -360,11 +360,15 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            foreach (var initializer in EnumerateForLoopConstantInitializers(forStatement, semanticModel, cancellationToken))
+            foreach (var initializer in EnumerateForLoopInitializerBounds(forStatement, semanticModel, cancellationToken))
             {
                 if (!TryCreateSymbolSmtValue(initializer.Symbol, out var symbolFormula) ||
                     symbolFormula.Kind != SmtValueKind.Int ||
+                    initializer.Bound.Kind != SmtValueKind.Int ||
                     StatementMutatesSymbol(forStatement.Statement, initializer.Symbol, semanticModel, cancellationToken) ||
+                    initializer.BoundSymbols.Any(symbol =>
+                        StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
+                        ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
                     !ForLoopIncrementorsPreserveLowerBound(forStatement, initializer.Symbol, semanticModel, cancellationToken))
                 {
                     continue;
@@ -373,11 +377,11 @@ namespace PurelySharp.Symbolic
                 facts.Add(new SmtBinaryFormula(
                     SmtBinaryOperator.GreaterThanOrEqual,
                     symbolFormula,
-                    new SmtIntegerConstant(initializer.InitialValue)));
+                    initializer.Bound));
             }
         }
 
-        private static IEnumerable<(ISymbol Symbol, long InitialValue)> EnumerateForLoopConstantInitializers(
+        private static IEnumerable<(ISymbol Symbol, SmtFormula Bound, IReadOnlyList<ISymbol> BoundSymbols)> EnumerateForLoopInitializerBounds(
             ForStatementSyntax forStatement,
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
@@ -388,12 +392,18 @@ namespace PurelySharp.Symbolic
                 {
                     if (declarator.Initializer == null ||
                         semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is not ILocalSymbol localSymbol ||
-                        !TryGetIntegralConstant(declarator.Initializer.Value, semanticModel, cancellationToken, out var initialValue))
+                        !TryTranslateInitializerBound(
+                            declarator.Initializer.Value,
+                            localSymbol.OriginalDefinition,
+                            semanticModel,
+                            cancellationToken,
+                            out var lowerBound,
+                            out var boundSymbols))
                     {
                         continue;
                     }
 
-                    yield return (localSymbol.OriginalDefinition, initialValue);
+                    yield return (localSymbol.OriginalDefinition, lowerBound, boundSymbols);
                 }
             }
 
@@ -403,12 +413,18 @@ namespace PurelySharp.Symbolic
                     !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
                     semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol is not { } symbol ||
                     symbol is not ILocalSymbol and not IParameterSymbol ||
-                    !TryGetIntegralConstant(assignment.Right, semanticModel, cancellationToken, out var initialValue))
+                    !TryTranslateInitializerBound(
+                        assignment.Right,
+                        symbol.OriginalDefinition,
+                        semanticModel,
+                        cancellationToken,
+                        out var lowerBound,
+                        out var boundSymbols))
                 {
                     continue;
                 }
 
-                yield return (symbol.OriginalDefinition, initialValue);
+                yield return (symbol.OriginalDefinition, lowerBound, boundSymbols);
             }
         }
 
@@ -418,6 +434,8 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
+            AddForLoopMonotonicInitialUpperBoundFacts(facts, forStatement, semanticModel, cancellationToken);
+
             foreach (var initializer in EnumerateForLoopStrictUpperBoundInitializers(forStatement, semanticModel, cancellationToken))
             {
                 if (!TryCreateSymbolSmtValue(initializer.Symbol, out var symbolFormula) ||
@@ -425,8 +443,8 @@ namespace PurelySharp.Symbolic
                     initializer.UpperBound.Kind != SmtValueKind.Int ||
                     StatementMutatesSymbol(forStatement.Statement, initializer.Symbol, semanticModel, cancellationToken) ||
                     initializer.BoundSymbols.Any(symbol =>
-                        StatementMutatesSymbol(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
-                        ForLoopIncrementorsMutateSymbol(forStatement, symbol, semanticModel, cancellationToken)) ||
+                        StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
+                        ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
                     !ForLoopIncrementorsPreserveUpperBound(forStatement, initializer.Symbol, semanticModel, cancellationToken))
                 {
                     continue;
@@ -439,7 +457,34 @@ namespace PurelySharp.Symbolic
             }
         }
 
-        private static bool ForLoopIncrementorsMutateSymbol(
+        private static void AddForLoopMonotonicInitialUpperBoundFacts(
+            ICollection<SmtFormula> facts,
+            ForStatementSyntax forStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var initializer in EnumerateForLoopInitializerBounds(forStatement, semanticModel, cancellationToken))
+            {
+                if (!TryCreateSymbolSmtValue(initializer.Symbol, out var symbolFormula) ||
+                    symbolFormula.Kind != SmtValueKind.Int ||
+                    initializer.Bound.Kind != SmtValueKind.Int ||
+                    StatementMutatesSymbol(forStatement.Statement, initializer.Symbol, semanticModel, cancellationToken) ||
+                    initializer.BoundSymbols.Any(symbol =>
+                        StatementInvalidatesSymbolValue(forStatement.Statement, symbol, semanticModel, cancellationToken) ||
+                        ForLoopIncrementorsInvalidateSymbolValue(forStatement, symbol, semanticModel, cancellationToken)) ||
+                    !ForLoopIncrementorsPreserveUpperBound(forStatement, initializer.Symbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                facts.Add(new SmtBinaryFormula(
+                    SmtBinaryOperator.LessThanOrEqual,
+                    symbolFormula,
+                    initializer.Bound));
+            }
+        }
+
+        private static bool ForLoopIncrementorsInvalidateSymbolValue(
             ForStatementSyntax forStatement,
             ISymbol symbol,
             SemanticModel semanticModel,
@@ -447,7 +492,8 @@ namespace PurelySharp.Symbolic
         {
             foreach (var incrementor in forStatement.Incrementors)
             {
-                if (NodeMutatesSymbol(incrementor, symbol, semanticModel, cancellationToken))
+                if (NodeMutatesSymbol(incrementor, symbol, semanticModel, cancellationToken) ||
+                    NodeMayMutateSymbolThroughReference(incrementor, symbol, semanticModel, cancellationToken))
                 {
                     return true;
                 }
@@ -849,6 +895,17 @@ namespace PurelySharp.Symbolic
             }
 
             return false;
+        }
+
+        private static bool AnyConditionSymbolInvalidatedInStatement(
+            ExpressionSyntax condition,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var conditionSymbols = GetConditionDependencySymbols(condition, semanticModel, cancellationToken);
+            return conditionSymbols.Count != 0 &&
+                conditionSymbols.Any(symbol => StatementInvalidatesSymbolValue(statement, symbol, semanticModel, cancellationToken));
         }
 
         private static bool StatementMutatesSymbol(
@@ -2064,6 +2121,16 @@ namespace PurelySharp.Symbolic
                         cancellationToken,
                         facts);
                     break;
+                case WhileStatementSyntax whileStatement
+                    when TryCreateGuardedBreakLoopExitConditionFact(
+                        whileStatement,
+                        whileStatement.Statement,
+                        whileStatement.Condition,
+                        semanticModel,
+                        cancellationToken,
+                        out var exitCondition):
+                    facts.Add(exitCondition);
+                    break;
                 case ForStatementSyntax { Condition: { } condition } forStatement
                     when CanAssumeLoopConditionFalseAfterNormalExit(forStatement, forStatement.Statement):
                     AddBranchConditionFacts(
@@ -2075,11 +2142,57 @@ namespace PurelySharp.Symbolic
                     AddForLoopMonotonicLowerBoundFacts(facts, forStatement, semanticModel, cancellationToken);
                     AddForLoopMonotonicUpperBoundFacts(facts, forStatement, semanticModel, cancellationToken);
                     break;
+                case ForStatementSyntax { Condition: { } condition } forStatement
+                    when TryCreateGuardedBreakLoopExitConditionFact(
+                        forStatement,
+                        forStatement.Statement,
+                        condition,
+                        semanticModel,
+                        cancellationToken,
+                        out var exitCondition):
+                    facts.Add(exitCondition);
+                    break;
+                case ForStatementSyntax { Condition: null } forStatement
+                    when TryCreateGuardedBreakLoopExitConditionFact(
+                        forStatement,
+                        forStatement.Statement,
+                        condition: null,
+                        semanticModel,
+                        cancellationToken,
+                        out var exitCondition):
+                    facts.Add(exitCondition);
+                    break;
                 case DoStatementSyntax doStatement
                     when CanAssumeLoopConditionFalseAfterNormalExit(doStatement, doStatement.Statement):
                     AddBranchConditionFacts(
                         doStatement.Condition,
                         branchWhenTrue: false,
+                        semanticModel,
+                        cancellationToken,
+                        facts);
+                    break;
+                case DoStatementSyntax doStatement
+                    when TryCreateGuardedBreakLoopExitConditionFact(
+                        doStatement,
+                        doStatement.Statement,
+                        doStatement.Condition,
+                        semanticModel,
+                        cancellationToken,
+                        out var exitCondition):
+                    facts.Add(exitCondition);
+                    break;
+                case ForEachStatementSyntax forEachStatement:
+                    AddCompletedForeachStatementFacts(
+                        forEachStatement.Expression,
+                        forEachStatement.Statement,
+                        semanticModel,
+                        cancellationToken,
+                        facts);
+                    break;
+                case ForEachVariableStatementSyntax forEachVariableStatement:
+                    AddCompletedForeachStatementFacts(
+                        forEachVariableStatement.Expression,
+                        forEachVariableStatement.Statement,
                         semanticModel,
                         cancellationToken,
                         facts);
@@ -2097,9 +2210,6 @@ namespace PurelySharp.Symbolic
                 switch (node)
                 {
                     case GotoStatementSyntax:
-                    case ReturnStatementSyntax:
-                    case ThrowStatementSyntax:
-                    case ThrowExpressionSyntax:
                         return false;
                     case BreakStatementSyntax breakStatement when BreakTargetsLoop(breakStatement, loopStatement):
                         return false;
@@ -2107,6 +2217,179 @@ namespace PurelySharp.Symbolic
             }
 
             return true;
+        }
+
+        private static bool TryCreateGuardedBreakLoopExitConditionFact(
+            StatementSyntax loopStatement,
+            StatementSyntax loopBody,
+            ExpressionSyntax? condition,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula exitCondition)
+        {
+            exitCondition = null!;
+            if (LoopBodyContainsGoto(loopBody) ||
+                !TryCreateSingleTopLevelGuardedBreakCondition(
+                    loopStatement,
+                    loopBody,
+                    semanticModel,
+                    cancellationToken,
+                    out var breakCondition))
+            {
+                return false;
+            }
+
+            if (condition == null)
+            {
+                exitCondition = breakCondition;
+                return true;
+            }
+
+            if (!TryCreateBranchConditionFormula(
+                    condition,
+                    branchWhenTrue: false,
+                    semanticModel,
+                    cancellationToken,
+                    out var normalExitCondition))
+            {
+                return false;
+            }
+
+            exitCondition = new SmtBinaryFormula(SmtBinaryOperator.Or, normalExitCondition, breakCondition);
+            return true;
+        }
+
+        private static bool TryCreateSingleTopLevelGuardedBreakCondition(
+            StatementSyntax loopStatement,
+            StatementSyntax loopBody,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula breakCondition)
+        {
+            breakCondition = null!;
+            var loopBreaks = loopBody
+                .DescendantNodesAndSelf(descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+                .OfType<BreakStatementSyntax>()
+                .Where(breakStatement => BreakTargetsLoop(breakStatement, loopStatement))
+                .ToArray();
+            if (loopBreaks.Length != 1)
+            {
+                return false;
+            }
+
+            var breakStatement = loopBreaks[0];
+            var ifStatement = breakStatement.Ancestors().OfType<IfStatementSyntax>().FirstOrDefault();
+            if (ifStatement == null ||
+                !IsTopLevelLoopBodyStatement(ifStatement, loopBody) ||
+                !TryGetDirectBreakBranch(ifStatement, breakStatement, out var branchWhenTrue) ||
+                AnyConditionSymbolInvalidatedBeforeStatement(ifStatement.Condition, loopBody, ifStatement.SpanStart, semanticModel, cancellationToken) ||
+                !TryCreateBranchConditionFormula(
+                    ifStatement.Condition,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    out breakCondition))
+            {
+                breakCondition = null!;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsTopLevelLoopBodyStatement(
+            StatementSyntax statement,
+            StatementSyntax loopBody)
+        {
+            return ReferenceEquals(statement, loopBody) ||
+                loopBody is BlockSyntax block &&
+                ReferenceEquals(statement.Parent, block);
+        }
+
+        private static bool TryGetDirectBreakBranch(
+            IfStatementSyntax ifStatement,
+            BreakStatementSyntax breakStatement,
+            out bool branchWhenTrue)
+        {
+            if (StatementDirectlyContainsOnlyBreak(ifStatement.Statement, breakStatement))
+            {
+                branchWhenTrue = true;
+                return true;
+            }
+
+            if (ifStatement.Else?.Statement is { } elseStatement &&
+                StatementDirectlyContainsOnlyBreak(elseStatement, breakStatement))
+            {
+                branchWhenTrue = false;
+                return true;
+            }
+
+            branchWhenTrue = false;
+            return false;
+        }
+
+        private static bool StatementDirectlyContainsOnlyBreak(
+            StatementSyntax statement,
+            BreakStatementSyntax breakStatement)
+        {
+            statement = UnwrapSingleStatementBlock(statement);
+            return ReferenceEquals(statement, breakStatement);
+        }
+
+        private static bool AnyConditionSymbolInvalidatedBeforeStatement(
+            ExpressionSyntax condition,
+            StatementSyntax root,
+            int beforeSpanStart,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var conditionSymbols = GetConditionDependencySymbols(condition, semanticModel, cancellationToken);
+            if (conditionSymbols.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (var statement in EnumerateStatementsBefore(root, beforeSpanStart))
+            {
+                if (conditionSymbols.Any(symbol => StatementInvalidatesSymbolValue(statement, symbol, semanticModel, cancellationToken)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static IEnumerable<StatementSyntax> EnumerateStatementsBefore(
+            StatementSyntax root,
+            int beforeSpanStart)
+        {
+            if (root is BlockSyntax block)
+            {
+                foreach (var statement in block.Statements)
+                {
+                    if (statement.SpanStart >= beforeSpanStart)
+                    {
+                        yield break;
+                    }
+
+                    yield return statement;
+                }
+
+                yield break;
+            }
+
+            if (root.SpanStart < beforeSpanStart)
+            {
+                yield return root;
+            }
+        }
+
+        private static bool LoopBodyContainsGoto(StatementSyntax loopBody)
+        {
+            return loopBody
+                .DescendantNodesAndSelf(descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+                .Any(static node => node is GotoStatementSyntax);
         }
 
         private static bool BreakTargetsLoop(
@@ -2328,6 +2611,21 @@ namespace PurelySharp.Symbolic
             {
                 facts.Add(fact);
             }
+        }
+
+        private static void AddCompletedForeachStatementFacts(
+            ExpressionSyntax expressionSyntax,
+            StatementSyntax foreachBody,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (AnyConditionSymbolInvalidatedInStatement(expressionSyntax, foreachBody, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            AddReferenceNullCondition(facts, expressionSyntax, isNull: false, semanticModel, cancellationToken);
         }
 
         private static void AddForeachBodyEntryFacts(
@@ -2714,8 +3012,17 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken)
         {
-            return StatementMutatesSymbol(statement, receiverSymbol, semanticModel, cancellationToken) ||
-                StatementMayMutateSymbolThroughReference(statement, receiverSymbol, semanticModel, cancellationToken);
+            return StatementInvalidatesSymbolValue(statement, receiverSymbol, semanticModel, cancellationToken);
+        }
+
+        private static bool StatementInvalidatesSymbolValue(
+            StatementSyntax statement,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return StatementMutatesSymbol(statement, symbol, semanticModel, cancellationToken) ||
+                StatementMayMutateSymbolThroughReference(statement, symbol, semanticModel, cancellationToken);
         }
 
         private static bool AnyReferencedElementSymbolInvalidatedAfterAssignment(

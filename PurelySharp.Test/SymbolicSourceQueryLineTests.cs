@@ -216,6 +216,12 @@ public class TestClass
             Assert.That(result.MergedPathFacts.AlwaysFacts, Is.Empty);
             Assert.That(result.MergedPathFacts.MaybeFacts, Is.EquivalentTo(new[] { "value > 0", "!(value > 0)" }));
             Assert.That(result.MergedPathFacts.ConservativeUnknowns, Is.EquivalentTo(new[] { "unknown(value)" }));
+            var diagnostic = result.MergedPathFacts.ConservativeUnknownDiagnostics.Single();
+            Assert.That(diagnostic.UnknownText, Is.EqualTo("unknown(value)"));
+            Assert.That(diagnostic.Target, Is.EqualTo("value"));
+            Assert.That(diagnostic.Reason, Is.EqualTo("not_common_to_all_candidate_program_points"));
+            Assert.That(diagnostic.MaybeFacts, Is.EquivalentTo(new[] { "value > 0", "!(value > 0)" }));
+            Assert.That(diagnostic.CandidateProgramPointCount, Is.EqualTo(result.MergedPathFacts.CandidateProgramPointCount));
             Assert.That(result.MergedInvariantText, Is.EqualTo("unknown(value)"));
             Assert.That(result.MergedInvariant.Conditions.Single().IsConservativeUnknown, Is.True);
             Assert.That(result.MergedInvariant.Conditions.Single().Target, Is.EqualTo("value"));
@@ -456,6 +462,57 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryFilter_CanFilterByMethodAndConditionMetadata()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int First(int value)
+    {
+        if (value > 0) { return value; }
+        return 0;
+    }
+
+    public int Second(int other)
+    {
+        if (other > 0) { return other; }
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "MetadataFilterQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "MetadataFilterQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(syntaxTree, compilation);
+            var filtered = result.Filter(new SymbolicSourceQueryFilter(
+                methodNames: new[] { "First" },
+                requirePathConditions: true,
+                conditionTargets: new[] { "value" },
+                conditionTexts: new[] { "value > 0" },
+                conditionTextContains: new[] { "value" }));
+            var points = filtered.Lines.SelectMany(static line => line.ProgramPoints).ToArray();
+
+            Assert.That(points, Is.Not.Empty);
+            Assert.That(points.All(static point => point.MethodName == "First"), Is.True);
+            Assert.That(points.All(static point => point.PathConditions.Any(condition => condition.Target == "value")), Is.True);
+            Assert.That(points.All(static point => point.PathConditions.Any(condition => condition.Text == "value > 0")), Is.True);
+            Assert.That(points.All(static point => point.PathConditionCount > 0), Is.True);
+            Assert.That(points.Select(static point => point.MethodName), Does.Not.Contain("Second"));
+
+            var compact = filtered.ToCompactResult(new SymbolicCompactQueryOptions(maxProgramPoints: 10));
+            var compactPoints = compact.Lines.SelectMany(static line => line.ProgramPoints).ToArray();
+            Assert.That(compactPoints, Is.Not.Empty);
+            Assert.That(compactPoints.All(static point => point.MethodName == "First"), Is.True);
+            Assert.That(compactPoints.All(static point => point.ConservativeInvariant.Targets.Contains("value")), Is.True);
+        }
+
+        [Test]
         public void SymbolicSourceQueryResult_ToCompactResult_AppliesPointBoundsAndJsonShape()
         {
             const string source = @"
@@ -591,8 +648,14 @@ public class TestClass
             Assert.That(compact.ObservedInvariant.Text, Does.Contain("GreaterThan"));
             Assert.That(compact.ConservativeInvariant.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge.ToString()));
             Assert.That(compact.ConservativeInvariant.Text, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(compact.ConservativeInvariant.Targets, Does.Contain("value"));
             Assert.That(compact.ConservativeInvariant.MergedPathFacts, Is.Not.Null);
             Assert.That(compact.ConservativeInvariant.MergedPathFacts!.ConservativeUnknowns, Does.Contain("unknown(value)"));
+            var diagnostic = compact.ConservativeInvariant.MergedPathFacts.ConservativeUnknownDiagnostics.Single();
+            Assert.That(diagnostic.UnknownText, Is.EqualTo("unknown(value)"));
+            Assert.That(diagnostic.Target, Is.EqualTo("value"));
+            Assert.That(diagnostic.Reason, Is.EqualTo("not_common_to_all_candidate_program_points"));
+            Assert.That(diagnostic.MaybeFacts, Is.Not.Empty);
             Assert.That(compact.Reachability.ReachableCount, Is.EqualTo(result.ProgramPointSummary.Reachability.ReachableCount));
             Assert.That(compact.SmtDiagnostics.IsConfigured, Is.True);
             Assert.That(compact.SmtDiagnostics.Mode, Is.EqualTo(SmtAnalysisMode.Bounded.ToString()));
@@ -610,6 +673,7 @@ public class TestClass
             Assert.That(compactPoint.NodeStartColumn, Is.EqualTo(sourcePoint.NodeStartColumn));
             Assert.That(compactPoint.NodeEndLine, Is.EqualTo(sourcePoint.NodeEndLine));
             Assert.That(compactPoint.NodeEndColumn, Is.EqualTo(sourcePoint.NodeEndColumn));
+            Assert.That(compactPoint.MethodName, Is.EqualTo(sourcePoint.MethodName));
             Assert.That(compactPoint.MergedInvariantText, Is.EqualTo(sourcePoint.MergedInvariantText));
             Assert.That(compactPoint.Reachability, Is.EqualTo(sourcePoint.Reachability.ToString()));
             Assert.That(compactPoint.ReachabilityReason, Is.EqualTo(sourcePoint.ReachabilityReason));
@@ -797,6 +861,79 @@ public class TestClass
                 Assert.That(point.GetProperty("nodeKind").GetString(), Is.EqualTo("AddExpression"));
                 Assert.That(point.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
                 Assert.That(point.GetProperty("conditionProofs")[0].GetProperty("truthValue").GetString(), Is.EqualTo(SymbolicTruthValue.ProvenTrue.ToString()));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public async Task SymbolicCli_FilterMetadataSwitches_NarrowAllLinesCompactJson()
+        {
+            var source = @"
+public class TestClass
+{
+    public int First(int value)
+    {
+        if (value > 0)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+
+    public int Second(int other)
+    {
+        if (other > 0)
+        {
+            return other;
+        }
+
+        return 0;
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliMetadataFilters-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--all-lines",
+                    "--method",
+                    "First",
+                    "--with-conditions",
+                    "--condition-target",
+                    "value",
+                    "--condition",
+                    "value > 0",
+                    "--condition-contains",
+                    "value",
+                    "--compact-json");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("file"));
+                var points = root
+                    .GetProperty("lines")
+                    .EnumerateArray()
+                    .SelectMany(static line => line.GetProperty("programPoints").EnumerateArray())
+                    .ToArray();
+                Assert.That(points, Is.Not.Empty);
+                Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.EqualTo(points.Length));
+                foreach (var point in points)
+                {
+                    Assert.That(point.GetProperty("methodName").GetString(), Is.EqualTo("First"));
+                    Assert.That(
+                        point.GetProperty("conservativeInvariant").GetProperty("targets").EnumerateArray().Select(static target => target.GetString()),
+                        Does.Contain("value"));
+                }
             }
             finally
             {

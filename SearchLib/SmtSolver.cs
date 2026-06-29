@@ -41,7 +41,7 @@ namespace SearchLib.Smt
 
                 return ToFeasibility(solver.Check());
             }
-            catch (InvalidOperationException)
+            catch (Exception ex) when (IsConservativeSolverFailure(ex))
             {
                 return Feasibility.Unknown;
             }
@@ -108,7 +108,7 @@ namespace SearchLib.Smt
                     solver.Pop();
                 }
             }
-            catch (InvalidOperationException)
+            catch (Exception ex) when (IsConservativeSolverFailure(ex))
             {
                 return (Feasibility.Unknown, Feasibility.Unknown);
             }
@@ -127,6 +127,15 @@ namespace SearchLib.Smt
                 Status.UNSATISFIABLE => Feasibility.Unsatisfiable,
                 _ => Feasibility.Unknown,
             };
+        }
+
+        private static bool IsConservativeSolverFailure(Exception ex)
+        {
+            return ex is InvalidOperationException ||
+                ex is Z3Exception ||
+                ex is ArgumentException ||
+                ex is InvalidCastException ||
+                ex is ArithmeticException;
         }
 
         private enum ConcreteFactPreparationStatus

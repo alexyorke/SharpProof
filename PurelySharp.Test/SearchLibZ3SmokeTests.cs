@@ -87,6 +87,89 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_NegatedApproximateRegexWithLength_ReturnsUnknown()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtUnaryFormula(
+                        SmtUnaryOperator.Not,
+                        new SmtRegexMatchFormula(text, @"\A\d\z")),
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.Equal,
+                        new SmtStringLengthTerm(text),
+                        new SmtIntegerConstant(1)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
+        public void SmtSolver_ApproximateRegexConclusionDoesNotBecomeProof()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var lengthIsOne = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtStringLengthTerm(text),
+                new SmtIntegerConstant(1));
+            var textIsDigit = new SmtRegexMatchFormula(text, @"\A\d\z");
+
+            var result = solver.Implies(
+                new[] { lengthIsOne },
+                textIsDigit,
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
+        public void SmtSolver_MismatchedEqualitySorts_ReturnsUnknown()
+        {
+            using var solver = new SmtSolver();
+            var intValue = new SmtVariable("mixed", SmtValueKind.Int);
+            var stringValue = new SmtVariable("mixed", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, intValue, stringValue),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
+        public void SmtSolver_ConditionalIntegerTermHonorsSelectedBranch()
+        {
+            using var solver = new SmtSolver();
+            var useFirstBranch = new SmtVariable("useFirstBranch", SmtValueKind.Bool);
+            var selectedValue = new SmtConditionalFormula(
+                useFirstBranch,
+                new SmtIntegerConstant(1),
+                new SmtIntegerConstant(2),
+                SmtValueKind.Int);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    useFirstBranch,
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.NotEqual,
+                        selectedValue,
+                        new SmtIntegerConstant(1)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void SmtSolver_AffineGuardImpliesExactValue_IsUnsatisfiable()
         {
             using var solver = new SmtSolver();

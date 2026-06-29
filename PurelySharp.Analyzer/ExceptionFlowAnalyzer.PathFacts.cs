@@ -1609,10 +1609,52 @@ namespace PurelySharp.Analyzer
             }
 
             leftExpression = UnwrapFactExpression(leftExpression);
-            if (leftExpression is ConditionalAccessExpressionSyntax conditionalAccess)
+            if (leftExpression is ConditionalAccessExpressionSyntax conditionalAccess &&
+                ConditionalAccessFallbackRequiresNullReceiver(conditionalAccess, semanticModel, cancellationToken))
             {
                 TryAddReferenceNullCondition(conditionalAccess.Expression, isNull: true, semanticModel, cancellationToken, pathConditions);
             }
+        }
+
+        private static bool ConditionalAccessFallbackRequiresNullReceiver(
+            ConditionalAccessExpressionSyntax conditionalAccess,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var whenNotNullType = GetConditionalAccessWhenNotNullType(
+                conditionalAccess.WhenNotNull,
+                semanticModel,
+                cancellationToken);
+            return IsKnownNonNullableValueType(whenNotNullType);
+        }
+
+        private static ITypeSymbol? GetConditionalAccessWhenNotNullType(
+            ExpressionSyntax whenNotNullExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var typeInfo = semanticModel.GetTypeInfo(whenNotNullExpression, cancellationToken);
+            var type = typeInfo.ConvertedType ?? typeInfo.Type;
+            if (type != null)
+            {
+                return type;
+            }
+
+            var symbol = semanticModel.GetSymbolInfo(whenNotNullExpression, cancellationToken).Symbol;
+            return symbol switch
+            {
+                IFieldSymbol fieldSymbol => fieldSymbol.Type,
+                IPropertySymbol propertySymbol => propertySymbol.Type,
+                IEventSymbol eventSymbol => eventSymbol.Type,
+                IMethodSymbol methodSymbol => methodSymbol.ReturnType,
+                _ => null
+            };
+        }
+
+        private static bool IsKnownNonNullableValueType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol?.IsValueType == true &&
+                typeSymbol.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T;
         }
 
         private static bool PathConditionsImplyFact(

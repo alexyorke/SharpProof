@@ -91,6 +91,64 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_NonNullConditionalAccessNullableValueCoalesceDivideByZeroFallback_Reports()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public sealed class Box
+{
+    public int? Maybe { get; set; }
+}
+
+public class TestClass
+{
+    public int TestMethod(Box box)
+    {
+        var zero = 0;
+        if (box != null)
+        {
+            return box?.Maybe ?? (10 / zero);
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_NonNullConditionalAccessNullableValueCoalesceOutOfRangeFallback_Reports()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public sealed class Box
+{
+    public int? Maybe { get; set; }
+}
+
+public class TestClass
+{
+    public int TestMethod(Box box)
+    {
+        var values = new int[1];
+        if (box != null)
+        {
+            return box?.Maybe ?? values[1];
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
         public async Task Ps0010_EarlyReturnGuardContradictsDivideByZeroBranch_DoesNotReport()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"

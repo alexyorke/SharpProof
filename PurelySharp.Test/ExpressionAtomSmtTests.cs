@@ -112,6 +112,58 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesNullableEnumCoalesceComparisonFacts()
+        {
+            const string source = @"
+public enum Mode
+{
+    None = 0,
+    Ready = 1
+}
+
+public class TestClass
+{
+    public int TestMethod(Mode? left, Mode? right)
+    {
+        if ((left ?? right) == Mode.Ready)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "(left ?? right).HasValue && (left ?? right).Value != Mode.None");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesStringIndexCharAtom()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        if (text != null && text.Length > 0 && text[0] == 'A')
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "text[0] != 'B'");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesAsExpressionNonNullImpliesSourceNonNull()
         {
             const string source = @"
