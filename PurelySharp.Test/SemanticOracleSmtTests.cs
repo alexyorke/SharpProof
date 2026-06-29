@@ -5335,6 +5335,28 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_ShorthandRegexImpliesStringLength()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\A\d\s\w\z"") && text.Length != 3",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NegatedShorthandRegexClassRemainsConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\A[^\d]\z"") && text == ""A""",
+                    "using System.Text.RegularExpressions;"),
+                Is.False);
+        }
+
+        [Test]
         public void ExecutionVisibility_UnsupportedRegexOptionsRemainConservative()
         {
             Assert.That(

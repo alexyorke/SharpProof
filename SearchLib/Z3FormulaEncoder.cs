@@ -429,6 +429,11 @@ namespace SearchLib.Smt
                 }
 
                 var escaped = _pattern[_position++];
+                if (TryCreateEscapedCharacterClassRegex(escaped, out regex))
+                {
+                    return true;
+                }
+
                 if (escaped == 'x')
                 {
                     if (!TryReadFixedHexChar(2, out var hexChar))
@@ -483,6 +488,20 @@ namespace SearchLib.Smt
                 return true;
             }
 
+            private readonly struct CharacterClassPart
+            {
+                public CharacterClassPart(ReExpr regex, char? exactCharacter, bool isApproximation)
+                {
+                    Regex = regex;
+                    ExactCharacter = exactCharacter;
+                    IsApproximation = isApproximation;
+                }
+
+                public ReExpr Regex { get; }
+                public char? ExactCharacter { get; }
+                public bool IsApproximation { get; }
+            }
+
             private bool TryParseCharClass(out ReExpr regex)
             {
                 regex = null!;
@@ -493,10 +512,10 @@ namespace SearchLib.Smt
                     _position++;
                 }
 
-                var parts = new List<ReExpr>();
+                var parts = new List<CharacterClassPart>();
                 while (_position < _pattern.Length && !Peek(']'))
                 {
-                    if (!TryReadClassChar(out var start))
+                    if (!TryReadClassPart(out var start))
                     {
                         return false;
                     }
@@ -506,18 +525,24 @@ namespace SearchLib.Smt
                         _pattern[_position + 1] != ']')
                     {
                         _position++;
-                        if (!TryReadClassChar(out var end) || end < start)
+                        if (start.ExactCharacter is not { } startCharacter ||
+                            !TryReadClassPart(out var end) ||
+                            end.ExactCharacter is not { } endCharacter ||
+                            endCharacter < startCharacter)
                         {
                             return false;
                         }
 
-                        parts.Add(_context.MkRange(
-                            _context.MkString(start.ToString()),
-                            _context.MkString(end.ToString())));
+                        parts.Add(new CharacterClassPart(
+                            _context.MkRange(
+                                _context.MkString(startCharacter.ToString()),
+                                _context.MkString(endCharacter.ToString())),
+                            exactCharacter: null,
+                            isApproximation: false));
                     }
                     else
                     {
-                        parts.Add(CreateLiteralRegex(start.ToString()));
+                        parts.Add(start);
                     }
                 }
 
@@ -527,18 +552,23 @@ namespace SearchLib.Smt
                 }
 
                 _position++;
-                regex = parts.Count == 1 ? parts[0] : _context.MkUnion(parts.ToArray());
+                regex = parts.Count == 1 ? parts[0].Regex : _context.MkUnion(parts.Select(static part => part.Regex).ToArray());
                 if (negate)
                 {
+                    if (parts.Any(static part => part.IsApproximation))
+                    {
+                        return false;
+                    }
+
                     regex = _context.MkDiff(CreateAnyCharRegex(), regex);
                 }
 
                 return true;
             }
 
-            private bool TryReadClassChar(out char value)
+            private bool TryReadClassPart(out CharacterClassPart part)
             {
-                value = default;
+                part = default;
                 if (_position >= _pattern.Length)
                 {
                     return false;
@@ -547,7 +577,7 @@ namespace SearchLib.Smt
                 var current = _pattern[_position++];
                 if (current != '\\')
                 {
-                    value = current;
+                    part = CreateClassCharacterPart(current);
                     return true;
                 }
 
@@ -557,17 +587,35 @@ namespace SearchLib.Smt
                 }
 
                 var escaped = _pattern[_position++];
+                if (TryCreateEscapedCharacterClassRegex(escaped, out var escapedClassRegex))
+                {
+                    part = new CharacterClassPart(escapedClassRegex, exactCharacter: null, isApproximation: true);
+                    return true;
+                }
+
                 if (escaped == 'x')
                 {
-                    return TryReadFixedHexChar(2, out value);
+                    if (!TryReadFixedHexChar(2, out var hexChar))
+                    {
+                        return false;
+                    }
+
+                    part = CreateClassCharacterPart(hexChar);
+                    return true;
                 }
 
                 if (escaped == 'u')
                 {
-                    return TryReadFixedHexChar(4, out value);
+                    if (!TryReadFixedHexChar(4, out var unicodeChar))
+                    {
+                        return false;
+                    }
+
+                    part = CreateClassCharacterPart(unicodeChar);
+                    return true;
                 }
 
-                value = escaped switch
+                var value = escaped switch
                 {
                     'n' => '\n',
                     'r' => '\r',
@@ -579,7 +627,35 @@ namespace SearchLib.Smt
                     _ => '\0'
                 };
 
-                return value != '\0';
+                if (value == '\0')
+                {
+                    return false;
+                }
+
+                part = CreateClassCharacterPart(value);
+                return true;
+            }
+
+            private CharacterClassPart CreateClassCharacterPart(char value)
+            {
+                return new CharacterClassPart(
+                    CreateLiteralRegex(value.ToString()),
+                    exactCharacter: value,
+                    isApproximation: false);
+            }
+
+            private bool TryCreateEscapedCharacterClassRegex(char escaped, out ReExpr regex)
+            {
+                regex = null!;
+                if (escaped is not ('d' or 'D' or 's' or 'S' or 'w' or 'W'))
+                {
+                    return false;
+                }
+
+                // .NET's shorthand classes are Unicode-aware by default. One-char over-approximation
+                // preserves soundness for reachability proofs while still exposing length facts to Z3.
+                regex = CreateAnyCharRegex();
+                return true;
             }
 
             private bool TryReadFixedHexChar(int digitCount, out char value)

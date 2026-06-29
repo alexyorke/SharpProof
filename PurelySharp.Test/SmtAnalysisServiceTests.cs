@@ -311,6 +311,43 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ClassifyImplication_ProvesShorthandRegexLengthFact()
+        {
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtRegexMatchFormula(text, @"\A\d\s\w\z"),
+            };
+            var fact = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtStringLengthTerm(text),
+                new SmtIntegerConstant(3));
+
+            var result = service.ClassifyImplication(pathConditions, fact);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_NegatedShorthandRegexClassRemainsConservative()
+        {
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtRegexMatchFormula(text, @"\A[^\d]\z"),
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("A")),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.Unknown));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
         public void ClassifyPathFeasibility_CombinesStringContainsAndEquality()
         {
             var text = new SmtVariable("text", SmtValueKind.String);
