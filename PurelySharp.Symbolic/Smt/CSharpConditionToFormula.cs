@@ -4289,8 +4289,11 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            var argumentExpression = UnwrapElementAccessIndexExpression(elementAccess.ArgumentList.Arguments[0].Expression);
-            if (argumentExpression is not RangeExpressionSyntax rangeExpression ||
+            if (!TryResolveBuiltInRangeAccessRangeExpression(
+                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var rangeExpression) ||
                 !TryCreateBuiltInElementAccessLengthFormula(
                     elementAccess.Expression,
                     semanticModel,
@@ -4322,6 +4325,318 @@ namespace PurelySharp.Symbolic.Smt
 
             lengthFormula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, endFormula, startFormula);
             return true;
+        }
+
+        private static bool TryResolveBuiltInRangeAccessRangeExpression(
+            ExpressionSyntax argumentExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RangeExpressionSyntax rangeExpression)
+        {
+            argumentExpression = UnwrapElementAccessIndexExpression(argumentExpression);
+            if (argumentExpression is RangeExpressionSyntax directRangeExpression)
+            {
+                rangeExpression = directRangeExpression;
+                return true;
+            }
+
+            if (!IsSystemRangeExpression(argumentExpression, semanticModel, cancellationToken) ||
+                !TryGetLocalOrParameterRangeSymbol(argumentExpression, semanticModel, cancellationToken, out var rangeSymbol))
+            {
+                rangeExpression = null!;
+                return false;
+            }
+
+            return TryResolveAssignedRangeExpression(
+                argumentExpression,
+                rangeSymbol,
+                semanticModel,
+                cancellationToken,
+                out rangeExpression);
+        }
+
+        private static bool TryGetLocalOrParameterRangeSymbol(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ISymbol rangeSymbol)
+        {
+            var symbol = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol;
+            if (symbol is ILocalSymbol localSymbol &&
+                IsSystemRangeType(localSymbol.Type, semanticModel.Compilation))
+            {
+                rangeSymbol = localSymbol;
+                return true;
+            }
+
+            if (symbol is IParameterSymbol { RefKind: RefKind.None } parameterSymbol &&
+                IsSystemRangeType(parameterSymbol.Type, semanticModel.Compilation))
+            {
+                rangeSymbol = parameterSymbol;
+                return true;
+            }
+
+            rangeSymbol = null!;
+            return false;
+        }
+
+        private static bool TryResolveAssignedRangeExpression(
+            ExpressionSyntax useExpression,
+            ISymbol rangeSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RangeExpressionSyntax rangeExpression)
+        {
+            rangeExpression = null!;
+            if (!TryGetEnclosingStatementInBlock(useExpression, out var block, out var useStatement))
+            {
+                return false;
+            }
+
+            var foundAssignment = false;
+            foreach (var statement in block.Statements)
+            {
+                if (statement == useStatement)
+                {
+                    break;
+                }
+
+                TryGetRangeAssignmentFromPrecedingStatement(
+                    statement,
+                    rangeSymbol,
+                    semanticModel,
+                    cancellationToken,
+                    out var writesRangeSymbol,
+                    out var assignedRangeExpression);
+                if (!writesRangeSymbol)
+                {
+                    continue;
+                }
+
+                if (foundAssignment || assignedRangeExpression == null)
+                {
+                    rangeExpression = null!;
+                    return false;
+                }
+
+                rangeExpression = assignedRangeExpression;
+                foundAssignment = true;
+            }
+
+            if (!foundAssignment ||
+                ContainsRangeSymbolWrite(useStatement, rangeSymbol, semanticModel, cancellationToken))
+            {
+                rangeExpression = null!;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryGetEnclosingStatementInBlock(
+            SyntaxNode node,
+            out BlockSyntax block,
+            out StatementSyntax statement)
+        {
+            statement = node.Ancestors().OfType<StatementSyntax>().FirstOrDefault(static candidate => candidate.Parent is BlockSyntax)!;
+            if (statement?.Parent is BlockSyntax parentBlock)
+            {
+                block = parentBlock;
+                return true;
+            }
+
+            block = null!;
+            statement = null!;
+            return false;
+        }
+
+        private static void TryGetRangeAssignmentFromPrecedingStatement(
+            StatementSyntax statement,
+            ISymbol rangeSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out bool writesRangeSymbol,
+            out RangeExpressionSyntax? rangeExpression)
+        {
+            rangeExpression = null;
+            writesRangeSymbol = false;
+
+            if (TryGetRangeAssignmentFromLocalDeclaration(
+                    statement,
+                    rangeSymbol,
+                    semanticModel,
+                    cancellationToken,
+                    out writesRangeSymbol,
+                    out rangeExpression))
+            {
+                return;
+            }
+
+            if (TryGetRangeAssignmentFromExpressionStatement(
+                    statement,
+                    rangeSymbol,
+                    semanticModel,
+                    cancellationToken,
+                    out writesRangeSymbol,
+                    out rangeExpression))
+            {
+                return;
+            }
+
+            writesRangeSymbol = ContainsRangeSymbolWrite(statement, rangeSymbol, semanticModel, cancellationToken);
+        }
+
+        private static bool TryGetRangeAssignmentFromLocalDeclaration(
+            StatementSyntax statement,
+            ISymbol rangeSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out bool writesRangeSymbol,
+            out RangeExpressionSyntax? rangeExpression)
+        {
+            rangeExpression = null;
+            writesRangeSymbol = false;
+            if (statement is not LocalDeclarationStatementSyntax localDeclaration)
+            {
+                return false;
+            }
+
+            foreach (var variable in localDeclaration.Declaration.Variables)
+            {
+                var declaredSymbol = semanticModel.GetDeclaredSymbol(variable, cancellationToken);
+                if (!IsSameSymbol(declaredSymbol, rangeSymbol))
+                {
+                    continue;
+                }
+
+                if (variable.Initializer == null)
+                {
+                    return true;
+                }
+
+                writesRangeSymbol = true;
+                if (localDeclaration.Declaration.Variables.Count != 1 ||
+                    UnwrapElementAccessIndexExpression(variable.Initializer.Value) is not RangeExpressionSyntax assignedRangeExpression)
+                {
+                    return true;
+                }
+
+                rangeExpression = assignedRangeExpression;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetRangeAssignmentFromExpressionStatement(
+            StatementSyntax statement,
+            ISymbol rangeSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out bool writesRangeSymbol,
+            out RangeExpressionSyntax? rangeExpression)
+        {
+            rangeExpression = null;
+            writesRangeSymbol = false;
+            if (statement is not ExpressionStatementSyntax
+                {
+                    Expression: AssignmentExpressionSyntax assignment
+                } ||
+                !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                !IsRangeSymbolReference(assignment.Left, rangeSymbol, semanticModel, cancellationToken))
+            {
+                return false;
+            }
+
+            writesRangeSymbol = true;
+            if (UnwrapElementAccessIndexExpression(assignment.Right) is RangeExpressionSyntax assignedRangeExpression)
+            {
+                rangeExpression = assignedRangeExpression;
+            }
+
+            return true;
+        }
+
+        private static bool ContainsRangeSymbolWrite(
+            SyntaxNode node,
+            ISymbol rangeSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var assignment in node.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            {
+                if (IsRangeSymbolReference(assignment.Left, rangeSymbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var unary in node.DescendantNodes().OfType<PrefixUnaryExpressionSyntax>())
+            {
+                if ((unary.IsKind(SyntaxKind.PreIncrementExpression) ||
+                     unary.IsKind(SyntaxKind.PreDecrementExpression)) &&
+                    IsRangeSymbolReference(unary.Operand, rangeSymbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var unary in node.DescendantNodes().OfType<PostfixUnaryExpressionSyntax>())
+            {
+                if ((unary.IsKind(SyntaxKind.PostIncrementExpression) ||
+                     unary.IsKind(SyntaxKind.PostDecrementExpression)) &&
+                    IsRangeSymbolReference(unary.Operand, rangeSymbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var argument in node.DescendantNodes().OfType<ArgumentSyntax>())
+            {
+                if ((argument.RefKindKeyword.IsKind(SyntaxKind.RefKeyword) ||
+                     argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword)) &&
+                    IsRangeSymbolReference(argument.Expression, rangeSymbol, semanticModel, cancellationToken))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsRangeSymbolReference(
+            ExpressionSyntax expression,
+            ISymbol rangeSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return IsSameSymbol(
+                semanticModel.GetSymbolInfo(UnwrapElementAccessIndexExpression(expression), cancellationToken).Symbol,
+                rangeSymbol);
+        }
+
+        private static bool IsSameSymbol(ISymbol? candidate, ISymbol target)
+        {
+            return candidate != null &&
+                (SymbolEqualityComparer.Default.Equals(candidate, target) ||
+                 SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, target.OriginalDefinition));
+        }
+
+        private static bool IsSystemRangeExpression(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            return IsSystemRangeType(typeInfo.ConvertedType ?? typeInfo.Type, semanticModel.Compilation);
+        }
+
+        private static bool IsSystemRangeType(ITypeSymbol? typeSymbol, Compilation compilation)
+        {
+            var rangeType = compilation.GetTypeByMetadataName("System.Range");
+            return typeSymbol != null &&
+                rangeType != null &&
+                SymbolEqualityComparer.Default.Equals(typeSymbol, rangeType);
         }
 
         private static bool TryCreateArrayLengthFormula(
@@ -4467,8 +4782,11 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth)
         {
             formula = null!;
-            argumentExpression = UnwrapElementAccessIndexExpression(argumentExpression);
-            if (argumentExpression is not RangeExpressionSyntax rangeExpression ||
+            if (!TryResolveBuiltInRangeAccessRangeExpression(
+                    argumentExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var rangeExpression) ||
                 !TryCreateEffectiveRangeEndpointFormula(
                     rangeExpression.LeftOperand,
                     lengthFormula,

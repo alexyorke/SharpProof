@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -511,7 +512,7 @@ namespace PurelySharp.Symbolic
                 query.Analysis.ReachabilityReason,
                 conditionProofs,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis),
-                query.Analysis.MergedInvariantText,
+                SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions),
                 query.Analysis.PathConditions);
         }
 
@@ -566,7 +567,7 @@ namespace PurelySharp.Symbolic
                         query.Analysis.ReachabilityReason,
                         conditionProofs,
                         SymbolicSmtDiagnostics.FromService(smtAnalysis),
-                        query.Analysis.MergedInvariantText,
+                        SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions),
                         query.Analysis.PathConditions);
                 })
                 .ToArray();
@@ -664,7 +665,7 @@ namespace PurelySharp.Symbolic
                 query.Analysis.ReachabilityReason,
                 conditionProofs,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis),
-                query.Analysis.MergedInvariantText,
+                SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions),
                 query.Analysis.PathConditions);
         }
 
@@ -1292,11 +1293,14 @@ namespace PurelySharp.Symbolic
             ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
             var factSummary = SymbolicInvariantService.MergeInvariantFacts(ProgramPoints.Select(static point => point.Facts));
             Facts = factSummary.Facts;
-            MergedInvariantText = factSummary.MergedInvariantText;
-            MergedInvariant = SymbolicInvariantResult.FromFacts(
+            ObservedFactCount = Facts.Count;
+            ObservedInvariant = SymbolicInvariantResult.FromFacts(
                 Facts,
-                MergedInvariantText,
+                factSummary.MergedInvariantText,
                 SymbolicInvariantMergeKind.DistinctFactUnion);
+            MergedPathFacts = SymbolicMergedPathFacts.FromProgramPoints(ProgramPoints);
+            MergedInvariantText = MergedPathFacts.MergedInvariantText;
+            MergedInvariant = SymbolicInvariantResult.FromMergedPathFacts(MergedPathFacts);
             ProgramPointSummary = SymbolicProgramPointSummary.FromProgramPoints(ProgramPoints);
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
         }
@@ -1308,6 +1312,12 @@ namespace PurelySharp.Symbolic
         public IReadOnlyList<SymbolicSourceQueryResult> ProgramPoints { get; }
 
         public IReadOnlyList<string> Facts { get; }
+
+        public int ObservedFactCount { get; }
+
+        public SymbolicInvariantResult ObservedInvariant { get; }
+
+        public SymbolicMergedPathFacts MergedPathFacts { get; }
 
         public string MergedInvariantText { get; }
 
@@ -1358,6 +1368,9 @@ namespace PurelySharp.Symbolic
                 ObservedFacts,
                 factSummary.MergedInvariantText,
                 SymbolicInvariantMergeKind.DistinctFactUnion);
+            MergedPathFacts = SymbolicMergedPathFacts.FromProgramPoints(programPoints);
+            MergedInvariantText = MergedPathFacts.MergedInvariantText;
+            MergedInvariant = SymbolicInvariantResult.FromMergedPathFacts(MergedPathFacts);
             ProgramPointSummary = SymbolicProgramPointSummary.FromProgramPoints(programPoints);
             Reachability = ProgramPointSummary.Reachability;
             ConditionProofs = SymbolicConditionProofSummary.FromProgramPoints(programPoints);
@@ -1382,6 +1395,12 @@ namespace PurelySharp.Symbolic
 
         public SymbolicInvariantResult ObservedInvariant { get; }
 
+        public SymbolicMergedPathFacts MergedPathFacts { get; }
+
+        public string MergedInvariantText { get; }
+
+        public SymbolicInvariantResult MergedInvariant { get; }
+
         public SymbolicReachabilitySummary Reachability { get; }
 
         public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
@@ -1404,6 +1423,165 @@ namespace PurelySharp.Symbolic
                 LineCount,
                 lines,
                 SmtDiagnostics);
+        }
+    }
+
+    public sealed class SymbolicMergedPathFacts
+    {
+        private SymbolicMergedPathFacts(
+            IReadOnlyList<string> alwaysFacts,
+            IReadOnlyList<string> maybeFacts,
+            IReadOnlyList<string> conservativeUnknowns,
+            IReadOnlyList<string> mergedFacts,
+            string mergedInvariantText,
+            int candidateProgramPointCount,
+            int unreachableProgramPointCount,
+            bool isUnreachable)
+        {
+            AlwaysFacts = alwaysFacts ?? throw new ArgumentNullException(nameof(alwaysFacts));
+            MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
+            ConservativeUnknowns = conservativeUnknowns ?? throw new ArgumentNullException(nameof(conservativeUnknowns));
+            MergedFacts = mergedFacts ?? throw new ArgumentNullException(nameof(mergedFacts));
+            MergedInvariantText = mergedInvariantText ?? throw new ArgumentNullException(nameof(mergedInvariantText));
+            CandidateProgramPointCount = candidateProgramPointCount;
+            UnreachableProgramPointCount = unreachableProgramPointCount;
+            IsUnreachable = isUnreachable;
+        }
+
+        public IReadOnlyList<string> AlwaysFacts { get; }
+
+        public IReadOnlyList<string> MaybeFacts { get; }
+
+        public IReadOnlyList<string> ConservativeUnknowns { get; }
+
+        public int ConservativeUnknownCount => ConservativeUnknowns.Count;
+
+        public IReadOnlyList<string> MergedFacts { get; }
+
+        public string MergedInvariantText { get; }
+
+        public int CandidateProgramPointCount { get; }
+
+        public int UnreachableProgramPointCount { get; }
+
+        public bool IsUnreachable { get; }
+
+        public static SymbolicMergedPathFacts FromProgramPoints(
+            IEnumerable<SymbolicSourceQueryResult> programPoints)
+        {
+            if (programPoints == null)
+            {
+                throw new ArgumentNullException(nameof(programPoints));
+            }
+
+            var points = programPoints.ToArray();
+            if (points.Length == 0)
+            {
+                return new SymbolicMergedPathFacts(
+                    Array.Empty<string>(),
+                    Array.Empty<string>(),
+                    Array.Empty<string>(),
+                    Array.Empty<string>(),
+                    "true",
+                    0,
+                    0,
+                    isUnreachable: false);
+            }
+
+            var candidatePoints = points
+                .Where(static point => point.Reachability != SymbolicReachability.Unreachable)
+                .ToArray();
+            var unreachableProgramPointCount = points.Length - candidatePoints.Length;
+            if (candidatePoints.Length == 0)
+            {
+                return new SymbolicMergedPathFacts(
+                    Array.Empty<string>(),
+                    Array.Empty<string>(),
+                    Array.Empty<string>(),
+                    new[] { "false" },
+                    "false",
+                    0,
+                    unreachableProgramPointCount,
+                    isUnreachable: true);
+            }
+
+            var seenConditionTexts = new HashSet<string>(StringComparer.Ordinal);
+            var orderedConditions = new List<SymbolicInvariantCondition>();
+            var conditionSets = new List<HashSet<string>>();
+            foreach (var point in candidatePoints)
+            {
+                var conditionSet = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var condition in point.PathConditions)
+                {
+                    if (string.IsNullOrWhiteSpace(condition.Text))
+                    {
+                        continue;
+                    }
+
+                    if (conditionSet.Add(condition.Text) &&
+                        seenConditionTexts.Add(condition.Text))
+                    {
+                        orderedConditions.Add(condition);
+                    }
+                }
+
+                conditionSets.Add(conditionSet);
+            }
+
+            var commonTexts = new HashSet<string>(conditionSets[0], StringComparer.Ordinal);
+            for (var index = 1; index < conditionSets.Count; index++)
+            {
+                commonTexts.IntersectWith(conditionSets[index]);
+            }
+
+            var alwaysFacts = orderedConditions
+                .Where(condition => commonTexts.Contains(condition.Text))
+                .Select(static condition => condition.Text)
+                .ToArray();
+            var maybeConditions = orderedConditions
+                .Where(condition => !commonTexts.Contains(condition.Text))
+                .ToArray();
+            var maybeFacts = maybeConditions
+                .Select(static condition => condition.Text)
+                .ToArray();
+            var conservativeUnknowns = CreateConservativeUnknowns(maybeConditions);
+            var mergedFacts = alwaysFacts
+                .Concat(conservativeUnknowns)
+                .ToArray();
+
+            return new SymbolicMergedPathFacts(
+                alwaysFacts,
+                maybeFacts,
+                conservativeUnknowns,
+                mergedFacts,
+                SymbolicInvariantService.FormatMergedInvariantFacts(mergedFacts),
+                candidatePoints.Length,
+                unreachableProgramPointCount,
+                isUnreachable: false);
+        }
+
+        private static IReadOnlyList<string> CreateConservativeUnknowns(
+            IReadOnlyList<SymbolicInvariantCondition> maybeConditions)
+        {
+            var seenTargets = new HashSet<string>(StringComparer.Ordinal);
+            var unknowns = new List<string>();
+            foreach (var condition in maybeConditions)
+            {
+                var target = string.IsNullOrWhiteSpace(condition.Target)
+                    ? "path"
+                    : condition.Target;
+                if (seenTargets.Add(target))
+                {
+                    unknowns.Add(FormatConservativeUnknown(target));
+                }
+            }
+
+            return unknowns;
+        }
+
+        internal static string FormatConservativeUnknown(string target)
+        {
+            return "unknown(" + (string.IsNullOrWhiteSpace(target) ? "path" : target) + ")";
         }
     }
 
@@ -1728,6 +1906,255 @@ namespace PurelySharp.Symbolic
         }
     }
 
+    internal static class SymbolicFormulaDisplay
+    {
+        public static string FormatMergedInvariant(IReadOnlyList<SmtFormula> pathConditions)
+        {
+            if (pathConditions == null)
+            {
+                throw new ArgumentNullException(nameof(pathConditions));
+            }
+
+            if (pathConditions.Count == 0)
+            {
+                return "true";
+            }
+
+            if (pathConditions.Count == 1)
+            {
+                return Format(pathConditions[0]);
+            }
+
+            return string.Join(" && ", pathConditions.Select(static condition => "(" + Format(condition) + ")"));
+        }
+
+        public static string Format(SmtFormula formula)
+        {
+            if (formula == null)
+            {
+                throw new ArgumentNullException(nameof(formula));
+            }
+
+            switch (formula)
+            {
+                case SmtBooleanConstant boolean:
+                    return boolean.Value ? "true" : "false";
+                case SmtIntegerConstant integer:
+                    return integer.Value.ToString(CultureInfo.InvariantCulture);
+                case SmtStringConstant text:
+                    return "\"" + EscapeString(text.Value) + "\"";
+                case SmtNullConstant:
+                    return "null";
+                case SmtVariable variable:
+                    return FormatVariableName(variable.Name);
+                case SmtUnaryFormula unary:
+                    return "!(" + Format(unary.Operand) + ")";
+                case SmtBinaryFormula binary:
+                    return FormatBinary(binary);
+                case SmtIntegerUnaryTerm unary:
+                    return "-" + FormatTerm(unary.Operand);
+                case SmtIntegerBinaryTerm binary:
+                    return FormatIntegerBinary(binary);
+                case SmtStringLengthTerm length:
+                    return FormatTerm(length.Value) + ".Length";
+                case SmtStringConcatTerm concat:
+                    return FormatTerm(concat.Left) + " + " + FormatTerm(concat.Right);
+                case SmtStringContainsFormula contains:
+                    return FormatTerm(contains.Value) + ".Contains(" + Format(contains.Search) + ")";
+                case SmtStringStartsWithFormula startsWith:
+                    return FormatTerm(startsWith.Value) + ".StartsWith(" + Format(startsWith.Prefix) + ")";
+                case SmtStringEndsWithFormula endsWith:
+                    return FormatTerm(endsWith.Value) + ".EndsWith(" + Format(endsWith.Suffix) + ")";
+                case SmtRegexMatchFormula regex:
+                    return "Regex.IsMatch(" + FormatTerm(regex.Value) + ", \"" + EscapeString(regex.Pattern) + "\")";
+                case SmtConditionalFormula conditional:
+                    return "(" +
+                        Format(conditional.Condition) +
+                        " ? " +
+                        Format(conditional.WhenTrue) +
+                        " : " +
+                        Format(conditional.WhenFalse) +
+                        ")";
+                default:
+                    return formula.ToString() ?? string.Empty;
+            }
+        }
+
+        public static string GetMergeTarget(SmtFormula formula)
+        {
+            if (formula == null)
+            {
+                throw new ArgumentNullException(nameof(formula));
+            }
+
+            switch (formula)
+            {
+                case SmtUnaryFormula unary:
+                    return GetMergeTarget(unary.Operand);
+                case SmtBinaryFormula binary when IsComparison(binary.Operator):
+                    return GetComparisonTarget(binary);
+                case SmtStringContainsFormula contains:
+                    return FormatTerm(contains.Value);
+                case SmtStringStartsWithFormula startsWith:
+                    return FormatTerm(startsWith.Value);
+                case SmtStringEndsWithFormula endsWith:
+                    return FormatTerm(endsWith.Value);
+                case SmtRegexMatchFormula regex:
+                    return FormatTerm(regex.Value);
+                case SmtVariable variable:
+                    return FormatVariableName(variable.Name);
+                default:
+                    return Format(formula);
+            }
+        }
+
+        private static string FormatBinary(SmtBinaryFormula binary)
+        {
+            var op = binary.Operator switch
+            {
+                SmtBinaryOperator.And => "&&",
+                SmtBinaryOperator.Or => "||",
+                SmtBinaryOperator.Equal => "==",
+                SmtBinaryOperator.NotEqual => "!=",
+                SmtBinaryOperator.LessThan => "<",
+                SmtBinaryOperator.LessThanOrEqual => "<=",
+                SmtBinaryOperator.GreaterThan => ">",
+                SmtBinaryOperator.GreaterThanOrEqual => ">=",
+                _ => binary.Operator.ToString(),
+            };
+
+            if (binary.Operator == SmtBinaryOperator.And ||
+                binary.Operator == SmtBinaryOperator.Or)
+            {
+                return FormatConditionTerm(binary.Left) + " " + op + " " + FormatConditionTerm(binary.Right);
+            }
+
+            return FormatTerm(binary.Left) + " " + op + " " + FormatTerm(binary.Right);
+        }
+
+        private static string FormatIntegerBinary(SmtIntegerBinaryTerm binary)
+        {
+            var op = binary.Operator switch
+            {
+                SmtIntegerBinaryOperator.Add => "+",
+                SmtIntegerBinaryOperator.Subtract => "-",
+                SmtIntegerBinaryOperator.Multiply => "*",
+                SmtIntegerBinaryOperator.Divide => "/",
+                SmtIntegerBinaryOperator.Remainder => "%",
+                _ => binary.Operator.ToString(),
+            };
+
+            return FormatTerm(binary.Left) + " " + op + " " + FormatTerm(binary.Right);
+        }
+
+        private static string FormatConditionTerm(SmtFormula formula)
+        {
+            return formula is SmtBinaryFormula or SmtConditionalFormula
+                ? "(" + Format(formula) + ")"
+                : Format(formula);
+        }
+
+        private static string FormatTerm(SmtFormula formula)
+        {
+            return formula is SmtBinaryFormula or SmtIntegerBinaryTerm or SmtConditionalFormula
+                ? "(" + Format(formula) + ")"
+                : Format(formula);
+        }
+
+        private static string GetComparisonTarget(SmtBinaryFormula binary)
+        {
+            var leftTarget = TryGetTermTarget(binary.Left);
+            var rightTarget = TryGetTermTarget(binary.Right);
+            if (leftTarget != null && IsConstant(binary.Right))
+            {
+                return leftTarget;
+            }
+
+            if (rightTarget != null && IsConstant(binary.Left))
+            {
+                return rightTarget;
+            }
+
+            if (leftTarget != null && rightTarget != null)
+            {
+                return leftTarget + "," + rightTarget;
+            }
+
+            return Format(binary);
+        }
+
+        private static string? TryGetTermTarget(SmtFormula formula)
+        {
+            switch (formula)
+            {
+                case SmtVariable variable:
+                    return FormatVariableName(variable.Name);
+                case SmtStringLengthTerm length:
+                    return FormatTerm(length.Value) + ".Length";
+                case SmtStringConcatTerm:
+                case SmtIntegerBinaryTerm:
+                case SmtIntegerUnaryTerm:
+                    return Format(formula);
+                default:
+                    return null;
+            }
+        }
+
+        private static bool IsComparison(SmtBinaryOperator op)
+        {
+            return op == SmtBinaryOperator.Equal ||
+                op == SmtBinaryOperator.NotEqual ||
+                op == SmtBinaryOperator.LessThan ||
+                op == SmtBinaryOperator.LessThanOrEqual ||
+                op == SmtBinaryOperator.GreaterThan ||
+                op == SmtBinaryOperator.GreaterThanOrEqual;
+        }
+
+        private static bool IsConstant(SmtFormula formula)
+        {
+            return formula is SmtBooleanConstant or SmtIntegerConstant or SmtStringConstant or SmtNullConstant;
+        }
+
+        private static string FormatVariableName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return name ?? string.Empty;
+            }
+
+            var hashIndex = name.LastIndexOf('#');
+            if (hashIndex > 0 && hashIndex + 1 < name.Length)
+            {
+                var allDigits = true;
+                for (var index = hashIndex + 1; index < name.Length; index++)
+                {
+                    if (!char.IsDigit(name[index]))
+                    {
+                        allDigits = false;
+                        break;
+                    }
+                }
+
+                if (allDigits)
+                {
+                    return name.Substring(0, hashIndex);
+                }
+            }
+
+            return name;
+        }
+
+        private static string EscapeString(string value)
+        {
+            return (value ?? string.Empty)
+                .Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\r", "\\r")
+                .Replace("\n", "\\n")
+                .Replace("\t", "\\t");
+        }
+    }
+
     public sealed class SymbolicSourceQueryResult
     {
         public SymbolicSourceQueryResult(
@@ -1751,8 +2178,11 @@ namespace PurelySharp.Symbolic
             Position = position;
             NodeSpanStart = nodeSpanStart;
             NodeKind = nodeKind;
-            Facts = facts;
-            MergedInvariantText = mergedInvariantText ?? FormatMergedInvariantText(facts);
+            Facts = facts ?? Array.Empty<string>();
+            MergedInvariantText = mergedInvariantText ??
+                (pathConditions == null
+                    ? FormatMergedInvariantText(Facts)
+                    : SymbolicFormulaDisplay.FormatMergedInvariant(pathConditions));
             Invariant = pathConditions == null
                 ? SymbolicInvariantResult.FromFacts(
                     Facts,
@@ -1849,7 +2279,7 @@ namespace PurelySharp.Symbolic
                 pathConditions
                     .Select(static (condition, index) => SymbolicInvariantCondition.FromFormula(index, condition))
                     .ToArray(),
-                mergedInvariantText ?? SymbolicInvariantService.FormatMergedInvariant(pathConditions),
+                mergedInvariantText ?? SymbolicFormulaDisplay.FormatMergedInvariant(pathConditions),
                 SymbolicInvariantMergeKind.Conjunction);
         }
 
@@ -1870,6 +2300,35 @@ namespace PurelySharp.Symbolic
                 mergedInvariantText ?? SymbolicInvariantService.FormatMergedInvariantFacts(facts),
                 mergeKind);
         }
+
+        public static SymbolicInvariantResult FromMergedPathFacts(SymbolicMergedPathFacts facts)
+        {
+            if (facts == null)
+            {
+                throw new ArgumentNullException(nameof(facts));
+            }
+
+            var conditions = new List<SymbolicInvariantCondition>();
+            foreach (var fact in facts.AlwaysFacts)
+            {
+                conditions.Add(SymbolicInvariantCondition.FromText(conditions.Count, fact));
+            }
+
+            foreach (var unknown in facts.ConservativeUnknowns)
+            {
+                conditions.Add(SymbolicInvariantCondition.FromConservativeUnknown(conditions.Count, unknown));
+            }
+
+            if (facts.IsUnreachable)
+            {
+                conditions.Add(SymbolicInvariantCondition.FromText(conditions.Count, "false"));
+            }
+
+            return new SymbolicInvariantResult(
+                conditions,
+                facts.MergedInvariantText,
+                SymbolicInvariantMergeKind.ConservativeFactMerge);
+        }
     }
 
     public sealed class SymbolicInvariantCondition
@@ -1879,13 +2338,17 @@ namespace PurelySharp.Symbolic
             string text,
             string formulaKind,
             string valueKind,
-            bool hasSmtFormula)
+            bool hasSmtFormula,
+            string target,
+            bool isConservativeUnknown)
         {
             Index = index;
             Text = text ?? throw new ArgumentNullException(nameof(text));
             FormulaKind = formulaKind ?? throw new ArgumentNullException(nameof(formulaKind));
             ValueKind = valueKind ?? throw new ArgumentNullException(nameof(valueKind));
             HasSmtFormula = hasSmtFormula;
+            Target = target ?? string.Empty;
+            IsConservativeUnknown = isConservativeUnknown;
         }
 
         public int Index { get; }
@@ -1898,6 +2361,10 @@ namespace PurelySharp.Symbolic
 
         public bool HasSmtFormula { get; }
 
+        public string Target { get; }
+
+        public bool IsConservativeUnknown { get; }
+
         public static SymbolicInvariantCondition FromFormula(int index, SmtFormula formula)
         {
             if (formula == null)
@@ -1907,10 +2374,12 @@ namespace PurelySharp.Symbolic
 
             return new SymbolicInvariantCondition(
                 index,
-                formula.ToString() ?? string.Empty,
+                SymbolicFormulaDisplay.Format(formula),
                 GetFormulaKind(formula),
                 formula.Kind.ToString(),
-                hasSmtFormula: true);
+                hasSmtFormula: true,
+                SymbolicFormulaDisplay.GetMergeTarget(formula),
+                isConservativeUnknown: false);
         }
 
         public static SymbolicInvariantCondition FromText(int index, string text)
@@ -1920,7 +2389,22 @@ namespace PurelySharp.Symbolic
                 text ?? string.Empty,
                 "Text",
                 "Unknown",
-                hasSmtFormula: false);
+                hasSmtFormula: false,
+                text ?? string.Empty,
+                isConservativeUnknown: false);
+        }
+
+        public static SymbolicInvariantCondition FromConservativeUnknown(int index, string text)
+        {
+            var target = ExtractConservativeUnknownTarget(text);
+            return new SymbolicInvariantCondition(
+                index,
+                text ?? string.Empty,
+                "ConservativeUnknown",
+                "Unknown",
+                hasSmtFormula: false,
+                target,
+                isConservativeUnknown: true);
         }
 
         private static string GetFormulaKind(SmtFormula formula)
@@ -1930,12 +2414,27 @@ namespace PurelySharp.Symbolic
                 ? name.Substring(0, name.Length - "Formula".Length)
                 : name;
         }
+
+        private static string ExtractConservativeUnknownTarget(string? text)
+        {
+            const string prefix = "unknown(";
+            if (text != null &&
+                text.StartsWith(prefix, StringComparison.Ordinal) &&
+                text.EndsWith(")", StringComparison.Ordinal) &&
+                text.Length > prefix.Length + 1)
+            {
+                return text.Substring(prefix.Length, text.Length - prefix.Length - 1);
+            }
+
+            return text ?? string.Empty;
+        }
     }
 
     public enum SymbolicInvariantMergeKind
     {
         Conjunction,
         DistinctFactUnion,
+        ConservativeFactMerge,
     }
 
     public sealed class SymbolicProgramPointQueryResult

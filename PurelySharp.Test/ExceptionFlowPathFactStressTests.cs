@@ -538,6 +538,112 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_DirectArrayRangeStartAfterEnd_ReportsArgumentOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int[] TestMethod(int[] values)
+    {
+        return values[2..1];
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_range_out_of_range"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.ArgumentOutOfRangeException=definite_range_out_of_range:range_slice"));
+        }
+
+        [Test]
+        public async Task Ps0010_ArrayRangeGuardedStartAfterEnd_ReportsArgumentOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int[] TestMethod(int[] values, int start, int end)
+    {
+        if (start > end)
+        {
+            return values[start..end];
+        }
+
+        return values[0..0];
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_range_out_of_range"));
+        }
+
+        [Test]
+        public async Task Ps0010_ArrayRangeGuardedInRange_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int[] TestMethod(int[] values, int start, int end)
+    {
+        if (start >= 0 && start <= end && end <= values.Length)
+        {
+            return values[start..end];
+        }
+
+        return values[0..0];
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_SystemRangeVariableStartAfterEnd_ReportsArgumentOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public int[] TestMethod(int[] values, int start, int end)
+    {
+        Range range = start..end;
+        if (start > end)
+        {
+            return values[range];
+        }
+
+        return values[0..0];
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_range_out_of_range"));
+        }
+
+        [Test]
+        public async Task Ps0010_SystemRangeVariableReassignedFromUnknown_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int[] TestMethod(int[] values, int start, int end, Range other)
+    {
+        Range range = start..end;
+        range = other;
+        if (start > end)
+        {
+            return values[range];
+        }
+
+        return values[0..0];
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_InRangeArrayIndexGuard_DoesNotReport()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
@@ -1972,6 +2078,55 @@ public class TestClass
         }
 
         return 0;
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0011_DirectArrayRangeStartAfterEnd_ReportsExceptionSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+public class TestClass
+{
+    public int[] TestMethod(int[] values)
+    {
+        return values[2..1];
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_range_out_of_range"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.ArgumentOutOfRangeException=definite_range_out_of_range:range_slice"));
+        }
+
+        [Test]
+        public async Task Ps0011_DirectArrayRangeStartAfterEndCaught_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values)
+    {
+        try
+        {
+            _ = values[2..1];
+            return 1;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return 0;
+        }
     }
 }",
                 reportExceptions: false,

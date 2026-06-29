@@ -99,6 +99,10 @@ static void PrintFileResult(
     Console.WriteLine($"Lines with program points: {result.LinesWithProgramPoints}");
     Console.WriteLine($"Program points: {result.ProgramPointCount}");
     PrintProgramPointSummary(result.ProgramPointSummary, options);
+    Console.WriteLine($"Merged invariant: {result.MergedInvariantText}");
+    Console.WriteLine($"Merged invariant merge: {result.MergedInvariant.MergeKind}");
+    Console.WriteLine($"Merged invariant conditions: {result.MergedInvariant.ConditionCount}");
+    PrintMergedPathFacts("Merged path facts", result.MergedPathFacts);
     Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
     Console.WriteLine($"Observed invariant merge: {result.ObservedInvariant.MergeKind}");
     Console.WriteLine($"Observed invariant conditions: {result.ObservedInvariant.ConditionCount}");
@@ -139,9 +143,11 @@ static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions o
     Console.WriteLine($"{result.FilePath}:{result.Line}");
     Console.WriteLine($"Program points: {result.ProgramPoints.Count}");
     PrintProgramPointSummary(result.ProgramPointSummary, options);
+    Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
     Console.WriteLine($"Line merged invariant: {result.MergedInvariantText}");
     Console.WriteLine($"Line invariant merge: {result.MergedInvariant.MergeKind}");
     Console.WriteLine($"Line invariant conditions: {result.MergedInvariant.ConditionCount}");
+    PrintMergedPathFacts("Line merged path facts", result.MergedPathFacts);
     foreach (var point in result.ProgramPoints)
     {
         Console.WriteLine();
@@ -151,6 +157,23 @@ static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions o
     if (result.SmtDiagnostics.IsConfigured && result.ProgramPoints.Count == 0)
     {
         PrintSmtDiagnostics(result.SmtDiagnostics);
+    }
+}
+
+static void PrintMergedPathFacts(
+    string label,
+    SymbolicMergedPathFacts facts)
+{
+    Console.WriteLine(
+        $"{label}: " +
+        $"Always={facts.AlwaysFacts.Count}, " +
+        $"Maybe={facts.MaybeFacts.Count}, " +
+        $"Unknown={facts.ConservativeUnknownCount}, " +
+        $"CandidatePoints={facts.CandidateProgramPointCount}, " +
+        $"UnreachablePoints={facts.UnreachableProgramPointCount}");
+    if (facts.ConservativeUnknownCount != 0)
+    {
+        Console.WriteLine(label + " unknowns: " + string.Join("; ", facts.ConservativeUnknowns));
     }
 }
 

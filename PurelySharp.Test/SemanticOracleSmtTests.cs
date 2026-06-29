@@ -484,6 +484,177 @@ public class TestClass
         }
 
         [Test]
+        public void CSharpConditionToFormula_ElementAccessInRange_TranslatesLocalRangeEndpoints()
+        {
+            var source = @"
+using System;
+
+public class TestClass
+{
+    public int[] TestMethod(int[] values, int start, int end)
+    {
+        if (start >= 0 && start <= end && end <= values.Length)
+        {
+            Range range = start..end;
+            return values[range];
+        }
+
+        return values;
+    }
+}";
+            var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
+                source,
+                "ElementAccessLocalRangeInRangeHost");
+            var guard = root.DescendantNodes().OfType<IfStatementSyntax>().Single().Condition;
+            var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
+
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+                    elementAccess,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var inRangeFormula),
+                Is.True);
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslate(
+                    guard,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var guardFormula),
+                Is.True);
+            Assert.That(guardFormula, Is.Not.Null);
+
+            var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
+                .ClassifyImplication(new[] { guardFormula! }, inRangeFormula);
+
+            Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        }
+
+        [Test]
+        public void CSharpConditionToFormula_ElementAccessInRange_TranslatesParameterAssignedFromEndRangeEndpoints()
+        {
+            var source = @"
+using System;
+
+public class TestClass
+{
+    public int[] TestMethod(int[] values, Range range)
+    {
+        if (values.Length >= 2)
+        {
+            range = 1..^1;
+            return values[range];
+        }
+
+        return values;
+    }
+}";
+            var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
+                source,
+                "ElementAccessParameterRangeInRangeHost");
+            var guard = root.DescendantNodes().OfType<IfStatementSyntax>().Single().Condition;
+            var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
+
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+                    elementAccess,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var inRangeFormula),
+                Is.True);
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslate(
+                    guard,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var guardFormula),
+                Is.True);
+            Assert.That(guardFormula, Is.Not.Null);
+
+            var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
+                .ClassifyImplication(new[] { guardFormula! }, inRangeFormula);
+
+            Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        }
+
+        [Test]
+        public void CSharpConditionToFormula_ElementAccessInRange_ProvesInvalidLocalRangeOutOfRange()
+        {
+            var source = @"
+using System;
+
+public class TestClass
+{
+    public int[] TestMethod(int[] values)
+    {
+        Range range = 2..1;
+        return values[range];
+    }
+}";
+            var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
+                source,
+                "ElementAccessInvalidLocalRangeHost");
+            var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
+
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+                    elementAccess,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var inRangeFormula),
+                Is.True);
+
+            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+            var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
+                .ClassifyImplication(Array.Empty<SmtFormula>(), outOfRangeFormula);
+
+            Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        }
+
+        [Test]
+        public void CSharpConditionToFormula_ElementAccessInRange_RejectsReassignedLocalRange()
+        {
+            var source = @"
+using System;
+
+public class TestClass
+{
+    public int[] TestMethod(int[] values)
+    {
+        Range range = 0..^0;
+        range = 1..^1;
+        return values[range];
+    }
+}";
+            var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
+                source,
+                "ElementAccessReassignedLocalRangeHost");
+            var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
+
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+                    elementAccess,
+                    semanticModel,
+                    CancellationToken.None,
+                    out _),
+                Is.False);
+        }
+
+        private static (SemanticModel SemanticModel, SyntaxNode Root) CreateElementAccessRangeFormulaHost(
+            string source,
+            string assemblyName)
+        {
+            var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
+            var compilation = CSharpCompilation.Create(
+                assemblyName,
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            return (compilation.GetSemanticModel(syntaxTree), syntaxTree.GetRoot());
+        }
+
+        [Test]
         public void ExecutionVisibility_TautologicalCondition_IsAlwaysTrue()
         {
             Assert.That(
@@ -1499,7 +1670,7 @@ public class TestClass
 
             Assert.That(result.NodeKind, Is.EqualTo("ReturnStatement"));
             Assert.That(result.Facts, Is.Not.Empty);
-            Assert.That(result.MergedInvariantText, Does.Contain("And"));
+            Assert.That(result.MergedInvariantText, Does.Contain("&&"));
             Assert.That(result.Facts.Any(fact => fact.Contains("LessThan", StringComparison.Ordinal)), Is.True);
             Assert.That(result.Facts.Any(fact => fact.Contains("GreaterThanOrEqual", StringComparison.Ordinal)), Is.True);
         }
@@ -5367,6 +5538,175 @@ public class TestClass
                 AnalyzerTestHost.GetTrustedPlatformReferences());
 
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalesceNullResultImpliesOperandsNull()
+        {
+            const string source = @"
+public class TestClass
+{
+    public string TestMethod(string value, string fallback)
+    {
+        var result = value ?? fallback;
+        return result;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "CoalesceNullResultImpliesOperandsNull.cs",
+                FindLine(source, "return result;"),
+                16,
+                "result != null || (value == null && fallback == null)",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalExpressionNullResultImpliesSelectedBranchNull()
+        {
+            const string source = @"
+public class TestClass
+{
+    public string TestMethod(bool flag, string first, string second)
+    {
+        var result = flag ? first : second;
+        return result;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ConditionalExpressionNullResultImpliesSelectedBranchNull.cs",
+                FindLine(source, "return result;"),
+                16,
+                "(!flag || result != null || first == null) && (flag || result != null || second == null)",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessMemberNullFacts()
+        {
+            const string source = @"
+public sealed class Holder
+{
+    public string Text;
+}
+
+public class TestClass
+{
+    public string TestMethod(Holder holder)
+    {
+        var text = holder?.Text;
+        return text;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ConditionalAccessMemberNullFacts.cs",
+                FindLine(source, "return text;"),
+                16,
+                "text != null || holder == null || holder.Text == null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesConditionalAccessMemberNullContradiction()
+        {
+            const string source = @"
+public sealed class Holder
+{
+    public string Text;
+}
+
+public class TestClass
+{
+    public string TestMethod(Holder holder)
+    {
+        var text = holder?.Text;
+        if (holder != null && holder.Text != null && text == null)
+        {
+            return text;
+        }
+
+        return text;
+    }
+}";
+            var result = new SymbolicSourceQueryService().AnalyzeSource(
+                source,
+                "ConditionalAccessMemberNullContradiction.cs",
+                FindLine(source, "return text;"),
+                20,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCoalesceAssignmentConditionalAccessNullImplication()
+        {
+            const string source = @"
+public sealed class Holder
+{
+    public string Text;
+}
+
+public class TestClass
+{
+    public string TestMethod(string current, Holder holder)
+    {
+        var target = current;
+        target ??= holder?.Text;
+        return target;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "CoalesceAssignmentConditionalAccessNullImplication.cs",
+                FindLine(source, "return target;"),
+                16,
+                "target != null || holder == null || holder.Text == null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ConditionalAccessInvocationResultRemainsUnknown()
+        {
+            const string source = @"
+public sealed class Holder
+{
+    public string GetText() => null;
+}
+
+public class TestClass
+{
+    public string TestMethod(Holder holder)
+    {
+        var text = holder?.GetText();
+        return text;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "ConditionalAccessInvocationResultRemainsUnknown.cs",
+                FindLine(source, "return text;"),
+                16,
+                "holder == null || text != null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
         }
 
         [Test]

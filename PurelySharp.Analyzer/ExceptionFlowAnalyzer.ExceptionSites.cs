@@ -86,6 +86,21 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        internal static IEnumerable<ElementAccessExpressionSyntax> GetDefiniteArgumentOutOfRangeNodes(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            foreach (var elementAccess in GetRelevantDescendants<ElementAccessExpressionSyntax>(methodNode))
+            {
+                if (IsDefinitelyOutOfRangeBuiltInRangeAccess(elementAccess, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    yield return elementAccess;
+                }
+            }
+        }
+
         internal static ITypeSymbol? GetThrownExceptionType(
             SyntaxNode throwNode,
             SemanticModel semanticModel,
@@ -260,15 +275,11 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            if (elementAccess.ArgumentList.Arguments.Count != 1)
-            {
-                return false;
-            }
-
-            var receiverTypeInfo = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken);
-            var receiverType = receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type;
-            if (receiverType is not IArrayTypeSymbol { Rank: 1 } &&
-                receiverType?.SpecialType != SpecialType.System_String)
+            if (!IsBuiltInArrayOrStringElementAccess(elementAccess, semanticModel, cancellationToken) ||
+                IsBuiltInRangeAccessArgument(
+                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    semanticModel,
+                    cancellationToken))
             {
                 return false;
             }
@@ -282,16 +293,84 @@ namespace PurelySharp.Analyzer
                 return false;
             }
 
-            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula);
+            return IsDefinitelyFalseAtUse(elementAccess, inRangeFormula, semanticModel, cancellationToken, smtAnalysis);
+        }
+
+        private static bool IsDefinitelyOutOfRangeBuiltInRangeAccess(
+            ElementAccessExpressionSyntax elementAccess,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (!IsBuiltInArrayOrStringElementAccess(elementAccess, semanticModel, cancellationToken) ||
+                !IsBuiltInRangeAccessArgument(
+                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    semanticModel,
+                    cancellationToken))
+            {
+                return false;
+            }
+
+            if (!TryTranslateBuiltInRangeAccessInRangeForExceptionFlow(
+                    elementAccess,
+                    semanticModel,
+                    cancellationToken,
+                    out var inRangeFormula))
+            {
+                return false;
+            }
+
+            return IsDefinitelyFalseAtUse(elementAccess, inRangeFormula, semanticModel, cancellationToken, smtAnalysis);
+        }
+
+        private static bool IsDefinitelyFalseAtUse(
+            SyntaxNode useNode,
+            SmtFormula formula,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            var outOfRangeFormula = new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
 
             var pathConditions = CollectPathConditionsForUse(
-                elementAccess,
-                CollectLocalAndParameterSymbols(elementAccess, semanticModel, cancellationToken),
+                useNode,
+                CollectLocalAndParameterSymbols(useNode, semanticModel, cancellationToken),
                 semanticModel,
                 cancellationToken);
 
             return PathConditionsAreSatisfiable(pathConditions, smtAnalysis) &&
                 PathConditionsImplyFact(pathConditions, outOfRangeFormula, smtAnalysis);
+        }
+
+        private static bool IsBuiltInArrayOrStringElementAccess(
+            ElementAccessExpressionSyntax elementAccess,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            if (elementAccess.ArgumentList.Arguments.Count != 1)
+            {
+                return false;
+            }
+
+            var receiverTypeInfo = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken);
+            var receiverType = receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type;
+            return receiverType is IArrayTypeSymbol { Rank: 1 } ||
+                receiverType?.SpecialType == SpecialType.System_String;
+        }
+
+        private static bool IsBuiltInRangeAccessArgument(
+            ExpressionSyntax argumentExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            argumentExpression = UnwrapFactExpression(argumentExpression);
+            if (argumentExpression is RangeExpressionSyntax)
+            {
+                return true;
+            }
+
+            var typeInfo = semanticModel.GetTypeInfo(argumentExpression, cancellationToken);
+            return IsSystemRangeType(typeInfo.ConvertedType ?? typeInfo.Type);
         }
 
         private static bool TryTranslateBuiltInElementAccessInRangeForExceptionFlow(
@@ -339,6 +418,124 @@ namespace PurelySharp.Analyzer
             return true;
         }
 
+        private static bool TryTranslateBuiltInRangeAccessInRangeForExceptionFlow(
+            ElementAccessExpressionSyntax elementAccess,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula inRangeFormula)
+        {
+            if (CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+                    elementAccess,
+                    semanticModel,
+                    cancellationToken,
+                    out inRangeFormula))
+            {
+                return true;
+            }
+
+            if (!CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+                    elementAccess.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var lengthFormula) ||
+                lengthFormula is not { Kind: SmtValueKind.Int } ||
+                !TryCreateSystemRangeVariableInRangeFormula(
+                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    elementAccess,
+                    lengthFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out inRangeFormula))
+            {
+                inRangeFormula = null!;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryCreateSystemRangeVariableInRangeFormula(
+            ExpressionSyntax rangeExpression,
+            SyntaxNode useNode,
+            SmtFormula lengthFormula,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula inRangeFormula)
+        {
+            rangeExpression = UnwrapFactExpression(rangeExpression);
+            if (!TryResolveCurrentSystemRangeValueExpression(
+                    rangeExpression,
+                    useNode,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueExpression))
+            {
+                inRangeFormula = null!;
+                return false;
+            }
+
+            valueExpression = UnwrapFactExpression(valueExpression);
+            if (valueExpression is not RangeExpressionSyntax resolvedRange ||
+                !TryCreateEffectiveRangeEndpointFormula(
+                    resolvedRange.LeftOperand,
+                    lengthFormula,
+                    defaultWhenOmitted: new SmtIntegerConstant(0),
+                    semanticModel,
+                    cancellationToken,
+                    out var startFormula) ||
+                !TryCreateEffectiveRangeEndpointFormula(
+                    resolvedRange.RightOperand,
+                    lengthFormula,
+                    defaultWhenOmitted: lengthFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out var endFormula))
+            {
+                inRangeFormula = null!;
+                return false;
+            }
+
+            var nonNegativeStart = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                startFormula,
+                new SmtIntegerConstant(0));
+            var orderedEndpoints = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThanOrEqual,
+                startFormula,
+                endFormula);
+            var endWithinLength = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThanOrEqual,
+                endFormula,
+                lengthFormula);
+            inRangeFormula = new SmtBinaryFormula(
+                SmtBinaryOperator.And,
+                nonNegativeStart,
+                new SmtBinaryFormula(SmtBinaryOperator.And, orderedEndpoints, endWithinLength));
+            return true;
+        }
+
+        private static bool TryCreateEffectiveRangeEndpointFormula(
+            ExpressionSyntax? endpointExpression,
+            SmtFormula lengthFormula,
+            SmtFormula defaultWhenOmitted,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula endpointFormula)
+        {
+            if (endpointExpression == null)
+            {
+                endpointFormula = defaultWhenOmitted;
+                return true;
+            }
+
+            return TryCreateEffectiveIndexExpressionFormula(
+                endpointExpression,
+                lengthFormula,
+                semanticModel,
+                cancellationToken,
+                out endpointFormula);
+        }
+
         private static bool TryCreateEffectiveSystemIndexVariableFormula(
             ExpressionSyntax indexExpression,
             SyntaxNode useNode,
@@ -378,6 +575,83 @@ namespace PurelySharp.Analyzer
             var symbol = GetLocalOrParameterSymbol(indexExpression, semanticModel, cancellationToken);
             if (symbol == null ||
                 !IsSystemIndexType(GetTrackedSymbolType(symbol)))
+            {
+                return false;
+            }
+
+            ExpressionSyntax? currentValue = null;
+            foreach (var (block, containingStatement) in EnumerateContainingBlocks(useNode).Reverse())
+            {
+                foreach (var statement in block.Statements)
+                {
+                    if (ReferenceEquals(statement, containingStatement))
+                    {
+                        break;
+                    }
+
+                    if (statement is LocalDeclarationStatementSyntax localDeclaration)
+                    {
+                        foreach (var declarator in localDeclaration.Declaration.Variables)
+                        {
+                            if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol &&
+                                SymbolEqualityComparer.Default.Equals(localSymbol.OriginalDefinition, symbol))
+                            {
+                                currentValue = declarator.Initializer?.Value;
+                            }
+                        }
+
+                        if (StatementMutatesSymbolExceptLinearAssignment(statement, symbol, semanticModel, cancellationToken))
+                        {
+                            currentValue = null;
+                        }
+
+                        continue;
+                    }
+
+                    if (statement is ExpressionStatementSyntax
+                        {
+                            Expression: AssignmentExpressionSyntax assignment
+                        } &&
+                        ExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken))
+                    {
+                        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                            ExpressionReferencesSymbol(assignment.Right, symbol, semanticModel, cancellationToken))
+                        {
+                            currentValue = null;
+                            continue;
+                        }
+
+                        currentValue = assignment.Right;
+                        continue;
+                    }
+
+                    if (StatementMutatesSymbolExceptLinearAssignment(statement, symbol, semanticModel, cancellationToken))
+                    {
+                        currentValue = null;
+                    }
+                }
+            }
+
+            if (currentValue == null)
+            {
+                return false;
+            }
+
+            valueExpression = currentValue;
+            return true;
+        }
+
+        private static bool TryResolveCurrentSystemRangeValueExpression(
+            ExpressionSyntax rangeExpression,
+            SyntaxNode useNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out ExpressionSyntax valueExpression)
+        {
+            valueExpression = null!;
+            var symbol = GetLocalOrParameterSymbol(rangeExpression, semanticModel, cancellationToken);
+            if (symbol == null ||
+                !IsSystemRangeType(GetTrackedSymbolType(symbol)))
             {
                 return false;
             }
@@ -513,6 +787,16 @@ namespace PurelySharp.Analyzer
             return typeSymbol is INamedTypeSymbol
             {
                 Name: "Index",
+                ContainingNamespace: { } containingNamespace
+            } &&
+            containingNamespace.ToDisplayString() == "System";
+        }
+
+        private static bool IsSystemRangeType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol
+            {
+                Name: "Range",
                 ContainingNamespace: { } containingNamespace
             } &&
             containingNamespace.ToDisplayString() == "System";

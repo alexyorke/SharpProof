@@ -224,6 +224,34 @@ namespace PurelySharp.Analyzer
                         "definite_index_out_of_range",
                         "array_index"));
             }
+
+            foreach (var argumentOutOfRangeNode in ExceptionFlowAnalyzer.GetDefiniteArgumentOutOfRangeNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                if (IsInStaticallyUnreachableBranch(argumentOutOfRangeNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (ExceptionFlowAnalyzer.IsShadowedByDefinitelyThrowingFinally(argumentOutOfRangeNode))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.ArgumentOutOfRangeException");
+                if (IsCaughtWithinMethod(argumentOutOfRangeNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    argumentOutOfRangeNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        "System.ArgumentOutOfRangeException",
+                        "definite_range_out_of_range",
+                        "range_slice"));
+            }
         }
 
         private static IEnumerable<ExceptionCandidate> CollectSourceCalleeExceptions(
@@ -550,7 +578,9 @@ namespace PurelySharp.Analyzer
                 string.Equals(category, "source_callee", StringComparison.Ordinal) ||
                 string.Equals(category, "effect_summary", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_divide_by_zero", StringComparison.Ordinal) ||
-                string.Equals(category, "definite_null_dereference", StringComparison.Ordinal);
+                string.Equals(category, "definite_null_dereference", StringComparison.Ordinal) ||
+                string.Equals(category, "definite_index_out_of_range", StringComparison.Ordinal) ||
+                string.Equals(category, "definite_range_out_of_range", StringComparison.Ordinal);
         }
 
         private static ITypeSymbol? TryResolveExceptionType(Compilation compilation, string displayName)

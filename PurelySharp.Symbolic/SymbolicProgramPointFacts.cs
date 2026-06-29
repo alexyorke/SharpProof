@@ -16,6 +16,7 @@ namespace PurelySharp.Symbolic
         private const int MaxMergedIfElseFacts = 16;
         private const int MaxMergedSwitchFacts = 32;
         private const int MaxFiniteForeachElementFacts = 8;
+        private const int MaxStructuralNullStateDepth = 4;
 
         public static List<SmtFormula> CollectPriorAssignmentFacts(
             SyntaxNode site,
@@ -2394,6 +2395,7 @@ namespace PurelySharp.Symbolic
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
             {
+                AddStructuralReferenceNullStateAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
                 AddNullableAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
                 AddAsExpressionAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
                 AddConditionalAccessAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
@@ -2418,6 +2420,230 @@ namespace PurelySharp.Symbolic
             {
                 AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
+        }
+
+        private static void AddStructuralReferenceNullStateAssignedValueFacts(
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (!IsStructuralReferenceNullStateExpression(valueExpression) ||
+                !TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula) ||
+                targetFormula is not { Kind: SmtValueKind.Reference } ||
+                !TryCreateReferenceNullStateFormula(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    depth: 0,
+                    out var valueNullState))
+            {
+                return;
+            }
+
+            facts.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                CreateReferenceNullFormula(targetFormula),
+                valueNullState));
+        }
+
+        private static bool IsStructuralReferenceNullStateExpression(ExpressionSyntax expression)
+        {
+            expression = UnwrapExpression(expression);
+            return expression is ConditionalExpressionSyntax ||
+                expression is ConditionalAccessExpressionSyntax ||
+                expression is BinaryExpressionSyntax binaryExpression &&
+                binaryExpression.IsKind(SyntaxKind.CoalesceExpression);
+        }
+
+        private static bool TryCreateReferenceNullStateFormula(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            int depth,
+            out SmtFormula formula)
+        {
+            formula = null!;
+            if (depth > MaxStructuralNullStateDepth)
+            {
+                return false;
+            }
+
+            expression = UnwrapExpression(expression);
+            if (semanticModel.GetConstantValue(expression, cancellationToken) is { HasValue: true, Value: null })
+            {
+                formula = new SmtBooleanConstant(true);
+                return true;
+            }
+
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            var type = typeInfo.ConvertedType ?? typeInfo.Type;
+            if (type?.IsReferenceType != true)
+            {
+                return false;
+            }
+
+            if (IsDefinitelyNonNullReferenceValue(expression, semanticModel, cancellationToken))
+            {
+                formula = new SmtBooleanConstant(false);
+                return true;
+            }
+
+            if (expression is ConditionalExpressionSyntax conditionalExpression)
+            {
+                return TryCreateConditionalReferenceNullStateFormula(
+                    conditionalExpression,
+                    semanticModel,
+                    cancellationToken,
+                    depth,
+                    out formula);
+            }
+
+            if (expression is BinaryExpressionSyntax coalesceExpression &&
+                coalesceExpression.IsKind(SyntaxKind.CoalesceExpression))
+            {
+                return TryCreateCoalesceReferenceNullStateFormula(
+                    coalesceExpression,
+                    semanticModel,
+                    cancellationToken,
+                    depth,
+                    out formula);
+            }
+
+            if (expression is ConditionalAccessExpressionSyntax conditionalAccess)
+            {
+                return TryCreateConditionalAccessReferenceNullStateFormula(
+                    conditionalAccess,
+                    semanticModel,
+                    cancellationToken,
+                    depth,
+                    out formula);
+            }
+
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) ||
+                valueFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            formula = CreateReferenceNullFormula(valueFormula);
+            return true;
+        }
+
+        private static bool TryCreateConditionalReferenceNullStateFormula(
+            ConditionalExpressionSyntax conditionalExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            int depth,
+            out SmtFormula formula)
+        {
+            formula = null!;
+            if (!CSharpConditionToFormula.TryTranslate(
+                    conditionalExpression.Condition,
+                    semanticModel,
+                    cancellationToken,
+                    out var conditionFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) ||
+                conditionFormula == null ||
+                !TryCreateReferenceNullStateFormula(
+                    conditionalExpression.WhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    depth + 1,
+                    out var whenTrueNullState) ||
+                !TryCreateReferenceNullStateFormula(
+                    conditionalExpression.WhenFalse,
+                    semanticModel,
+                    cancellationToken,
+                    depth + 1,
+                    out var whenFalseNullState))
+            {
+                return false;
+            }
+
+            formula = new SmtConditionalFormula(conditionFormula, whenTrueNullState, whenFalseNullState, SmtValueKind.Bool);
+            return true;
+        }
+
+        private static bool TryCreateCoalesceReferenceNullStateFormula(
+            BinaryExpressionSyntax coalesceExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            int depth,
+            out SmtFormula formula)
+        {
+            formula = null!;
+            if (!TryCreateReferenceNullStateFormula(
+                    coalesceExpression.Left,
+                    semanticModel,
+                    cancellationToken,
+                    depth + 1,
+                    out var leftNullState) ||
+                !TryCreateReferenceNullStateFormula(
+                    coalesceExpression.Right,
+                    semanticModel,
+                    cancellationToken,
+                    depth + 1,
+                    out var rightNullState))
+            {
+                return false;
+            }
+
+            formula = new SmtBinaryFormula(SmtBinaryOperator.And, leftNullState, rightNullState);
+            return true;
+        }
+
+        private static bool TryCreateConditionalAccessReferenceNullStateFormula(
+            ConditionalAccessExpressionSyntax conditionalAccess,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            int depth,
+            out SmtFormula formula)
+        {
+            formula = null!;
+            if (depth >= MaxStructuralNullStateDepth ||
+                !CSharpConditionToFormula.TryTranslateValue(
+                    conditionalAccess.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) ||
+                receiverFormula is not { Kind: SmtValueKind.Reference } ||
+                !TryCreateConditionalAccessWhenNotNullValueFormula(
+                    conditionalAccess,
+                    receiverFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out var whenNotNullValue) ||
+                whenNotNullValue is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            formula = new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                CreateReferenceNullFormula(receiverFormula),
+                CreateReferenceNullFormula(whenNotNullValue));
+            return true;
+        }
+
+        private static SmtFormula CreateReferenceNullFormula(SmtFormula formula)
+        {
+            return new SmtBinaryFormula(SmtBinaryOperator.Equal, formula, new SmtNullConstant());
+        }
+
+        private static SmtFormula CreateReferenceNonNullFormula(SmtFormula formula)
+        {
+            return new SmtBinaryFormula(SmtBinaryOperator.NotEqual, formula, new SmtNullConstant());
         }
 
         private static bool TryTranslateAssignedValueExpression(
@@ -2800,6 +3026,8 @@ namespace PurelySharp.Symbolic
                 return;
             }
 
+            AddCoalesceAssignmentRightNullImplication(targetFormula, rightExpression, semanticModel, cancellationToken, facts);
+
             if (!CSharpConditionToFormula.TryTranslateValue(
                     rightExpression,
                     semanticModel,
@@ -2821,6 +3049,30 @@ namespace PurelySharp.Symbolic
                 targetFormula,
                 rightFormula);
             facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Or, targetNonNull, targetEqualsRight));
+        }
+
+        private static void AddCoalesceAssignmentRightNullImplication(
+            SmtFormula targetFormula,
+            ExpressionSyntax rightExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (!IsStructuralReferenceNullStateExpression(rightExpression) ||
+                !TryCreateReferenceNullStateFormula(
+                    rightExpression,
+                    semanticModel,
+                    cancellationToken,
+                    depth: 0,
+                    out var rightNullState))
+            {
+                return;
+            }
+
+            facts.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                CreateReferenceNonNullFormula(targetFormula),
+                rightNullState));
         }
 
         private static void AddNullableCoalesceAssignmentFacts(
