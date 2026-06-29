@@ -289,7 +289,8 @@ namespace PurelySharp.Analyzer
                 semanticModel,
                 cancellationToken);
 
-            return PathConditionsImplyFact(pathConditions, outOfRangeFormula, smtAnalysis);
+            return PathConditionsAreSatisfiable(pathConditions, smtAnalysis) &&
+                PathConditionsImplyFact(pathConditions, outOfRangeFormula, smtAnalysis);
         }
 
         private static bool IsReferenceType(ITypeSymbol? typeSymbol)

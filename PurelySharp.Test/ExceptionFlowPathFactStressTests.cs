@@ -282,6 +282,46 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_ContradictoryShortCircuitDivideByZero_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (divisor != 0 && divisor == 0)
+        {
+            return value / divisor;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_ContradictoryShortCircuitNullDereference_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        if (value != null && value == null)
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_GuardFalsePathReassignedBeforeUse_DoesNotReport()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
@@ -436,6 +476,26 @@ public class TestClass
     public int TestMethod(int[] values, int index)
     {
         if (index >= 0 && index < values.Length)
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_ContradictoryShortCircuitIndexOutOfRange_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        if (index >= 0 && index < values.Length && index >= values.Length)
         {
             return values[index];
         }

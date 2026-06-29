@@ -96,7 +96,7 @@ dotnet add package PurelySharp.Attributes --version 0.0.4
 | Z3/SMT service | [~] | One bounded `SmtAnalysisService` classifies reachability and implication, caches repeated queries, handles budgets/timeouts, and falls back conservatively when SMT is off, over budget, or unavailable. | [SmtAnalysisServiceTests.cs](PurelySharp.Test/SmtAnalysisServiceTests.cs), [SearchLibZ3SmokeTests.cs](PurelySharp.Test/SearchLibZ3SmokeTests.cs) |
 | Path-sensitive facts | [~] | Path facts include local/parameter versions, constants, null/non-null, numeric comparisons, affine arithmetic, multiplication by constant, boolean short-circuiting, conditionals, coalesce, switch arms, relational patterns, property/list patterns, assignments, tuple/array/list facts, and guarded exception hazards. | [SemanticOracleSmtTests.cs](PurelySharp.Test/SemanticOracleSmtTests.cs), [ExceptionFlowPathFactStressTests.cs](PurelySharp.Test/ExceptionFlowPathFactStressTests.cs) |
 | String and regex SMT facts | [~] | Z3 string theory is used for string equality, concatenation, length, contains, starts-with, ends-with, and a translated subset of .NET regex patterns. Concrete regex/string facts are self-validated with .NET regex where applicable. Unsupported regex options or patterns stay unknown. Regex APIs are not automatically pure just because their predicates can feed SMT. | [SmtAnalysisServiceTests.cs](PurelySharp.Test/SmtAnalysisServiceTests.cs), [SemanticOracleSmtTests.cs](PurelySharp.Test/SemanticOracleSmtTests.cs), [RegexTests.cs](PurelySharp.Test/RegexTests.cs) |
-| Symbolic invariant API | [~] | `PurelySharp.Symbolic` can query merged invariants at a line, column, or syntax position and can use SMT to check reachability or implication. Line queries expose per-program-point facts plus a merged line-level fact summary. It is useful as a library independent of the analyzer package, but the facts are still bounded and syntax/semantic-model derived. | [SymbolicSourceQueryLineTests.cs](PurelySharp.Test/SymbolicSourceQueryLineTests.cs), [docs/symbolic-invariants.md](docs/symbolic-invariants.md), [SymbolicSourceQueryService.cs](PurelySharp.Symbolic/SymbolicSourceQueryService.cs) |
+| Symbolic invariant API | [~] | `PurelySharp.Symbolic` can query merged invariants at a line, column, syntax position, or all source lines, and can use SMT to check reachability or implication. Line and file queries expose per-program-point facts plus merged aggregate summaries. It is useful as a library independent of the analyzer package, but the facts are still bounded and syntax/semantic-model derived. | [SymbolicSourceQueryLineTests.cs](PurelySharp.Test/SymbolicSourceQueryLineTests.cs), [docs/symbolic-invariants.md](docs/symbolic-invariants.md), [SymbolicSourceQueryService.cs](PurelySharp.Symbolic/SymbolicSourceQueryService.cs) |
 | Symbolic CLI | [x] | `Tools/PurelySharp.SymbolicCli` exposes line, position, and all-lines invariant queries, references, JSON output, reachability checks, implication checks, and SMT budget switches. | [AnalyzerPackagingTests.cs](PurelySharp.Test/AnalyzerPackagingTests.cs), [Program.cs](Tools/PurelySharp.SymbolicCli/Program.cs) |
 | Exception-flow diagnostics | [~] | `PS0010` reports method-level escaping exceptions when `purelysharp_report_exceptions = true`. `PS0011` reports uncaught operation sites when `purelysharp_checked_exceptions = true`. The analyzer tracks direct throws, rethrows, source call chains, trusted metadata summaries, divide-by-zero, null dereference, index hazards, catch filters, and some resource disposal flows. | [SemanticOracleSmtTests.cs](PurelySharp.Test/SemanticOracleSmtTests.cs), [ExceptionSummaryCatalogValidationTests.cs](PurelySharp.Test/ExceptionSummaryCatalogValidationTests.cs), [RecursiveExceptionFlowTests.cs](PurelySharp.Test/RecursiveExceptionFlowTests.cs) |
 | Dispatch, delegates, and LINQ | [~] | The analyzer narrows many exact concrete receiver flows, delegate targets, default equality/comparison dispatch, immutable collection operations, LINQ materialization, and enumerable hazards. Deeper heterogeneous merges, unknown dynamic dispatch, and unresolved external targets remain conservative. | [ExactConcreteDispatchFlowTests.cs](PurelySharp.Test/ExactConcreteDispatchFlowTests.cs), [DelegateTests.cs](PurelySharp.Test/DelegateTests.cs), [LinqOperationsTests.cs](PurelySharp.Test/LinqOperationsTests.cs), [LinqSoundnessStressTests.cs](PurelySharp.Test/LinqSoundnessStressTests.cs) |
@@ -195,9 +195,13 @@ than by hard-coding one method's control flow.
 - `QuerySyntaxTree`
 - `QuerySyntaxTreeAtPosition`
 - `QuerySyntaxTreeLine`
+- `QuerySyntaxTreeAllLines`
 - `QueryFileLine`
+- `QueryFileAllLines`
 - `QuerySourceLine`
+- `QuerySourceAllLines`
 - line-level merged fact summaries via `SymbolicLineQueryResult`
+- file-level aggregate summaries via `SymbolicFileQueryResult`
 
 The CLI mirrors the library:
 
@@ -205,7 +209,12 @@ The CLI mirrors the library:
 dotnet run --project Tools/PurelySharp.SymbolicCli -- --file Example.cs --line 42 --line-invariants --check-reachability --implies "index >= 0"
 ```
 
-Use `--all-lines` to enumerate every source line with statement/expression program points from one parse/compilation pass.
+Use `--all-lines` to enumerate every source line with statement/expression
+program points from one parse/compilation pass. Text output includes file-level
+line/program-point counts, observed distinct fact counts, and aggregate
+reachability/implication counts when SMT checks are requested. File-level
+observed facts are an overview; line and point results remain the source of
+actual merged invariants.
 
 Use `--json` for machine-readable output. Pass `--smt-mode`, `--smt-timeout-ms`,
 `--smt-method-budget-ms`, `--smt-max-path-conditions`, and

@@ -57,7 +57,9 @@ namespace PurelySharp.Analyzer
             AddLoopPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
             AddExpressionBranchPathConditions(useNode, invalidatedSymbols, semanticModel, cancellationToken, pathConditions);
             AddPrecedingGuardConditions(invalidatedSymbols, useNode, semanticModel, cancellationToken, pathConditions);
-            return pathConditions.Count > 0 && PathConditionsImplyFact(pathConditions, factFormula, smtAnalysis);
+            return pathConditions.Count > 0 &&
+                PathConditionsAreSatisfiable(pathConditions, smtAnalysis) &&
+                PathConditionsImplyFact(pathConditions, factFormula, smtAnalysis);
         }
 
         private static bool IsKnownByPriorAssignment(
@@ -1558,6 +1560,13 @@ namespace PurelySharp.Analyzer
             SmtAnalysisService smtAnalysis)
         {
             return smtAnalysis.PathConditionsImply(pathConditions, factFormula);
+        }
+
+        private static bool PathConditionsAreSatisfiable(
+            IEnumerable<SmtFormula> pathConditions,
+            SmtAnalysisService smtAnalysis)
+        {
+            return smtAnalysis.ClassifyPathFeasibility(pathConditions).PathFeasibility != Feasibility.Unsatisfiable;
         }
 
         private static bool IsSymbolAssignedBeforeUse(

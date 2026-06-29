@@ -85,5 +85,52 @@ public class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task Coalesce_ImpossibleWhenNullWithImpureCall_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(string value)
+    {
+        if (value is null)
+        {
+            return string.Empty;
+        }
+
+        return value ?? Impure();
+    }
+
+    [Impure]
+    private static string Impure() => string.Empty;
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task Coalesce_WhenNullBranchReceivesNullFact_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(string value)
+    {
+        return value ?? (value is null ? string.Empty : Impure());
+    }
+
+    [Impure]
+    private static string Impure() => string.Empty;
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

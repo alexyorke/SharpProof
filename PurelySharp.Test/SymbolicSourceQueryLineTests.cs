@@ -74,6 +74,51 @@ public class TestClass
             Assert.That(result.MergedInvariantText, Is.EqualTo("true"));
         }
 
+        [Test]
+        public void QuerySyntaxTreeAllLines_ReturnsFileLevelAggregateSummary()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0) { return value; }
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "AllLinesQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "AllLinesQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeAllLines(
+                syntaxTree,
+                compilation,
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "value > 0" });
+
+            Assert.That(result.FilePath, Is.EqualTo("AllLinesQuery.cs"));
+            Assert.That(result.LineCount, Is.EqualTo(syntaxTree.GetText().Lines.Count));
+            Assert.That(result.LinesWithProgramPoints, Is.EqualTo(result.Lines.Count));
+            Assert.That(result.ProgramPointCount, Is.EqualTo(result.Lines.Sum(line => line.ProgramPoints.Count)));
+            Assert.That(result.ProgramPointCount, Is.GreaterThan(0));
+            Assert.That(result.ObservedFacts, Is.EquivalentTo(result.Lines.SelectMany(line => line.ProgramPoints).SelectMany(point => point.Facts).Distinct()));
+            Assert.That(result.ObservedFactCount, Is.EqualTo(result.ObservedFacts.Count));
+            Assert.That(result.ObservedFacts.Any(fact => fact.Contains("value", StringComparison.Ordinal)), Is.True);
+            Assert.That(result.Reachability.ReachableCount, Is.EqualTo(result.ProgramPointCount));
+            var proofSummary = result.ConditionProofs.Single(summary => summary.Condition == "value > 0");
+            Assert.That(proofSummary.ProvenTrueCount, Is.GreaterThan(0));
+            Assert.That(
+                proofSummary.ProvenTrueCount + proofSummary.ProvenFalseCount + proofSummary.UnreachableCount + proofSummary.UnknownCount,
+                Is.EqualTo(result.ProgramPointCount));
+        }
+
         private static int FindLine(string source, string text)
         {
             var lines = source.Split('\n');

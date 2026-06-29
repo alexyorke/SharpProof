@@ -134,6 +134,32 @@ namespace PurelySharp.Symbolic
                 impliedConditions);
         }
 
+        public SymbolicFileQueryResult QueryFileAllLines(
+            string filePath,
+            IEnumerable<MetadataReference>? references = null,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null,
+            IEnumerable<string>? impliedConditions = null)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                throw new ArgumentException("File path is required.", nameof(filePath));
+            }
+
+            if (!File.Exists(filePath))
+            {
+                throw new FileNotFoundException("Source file does not exist.", filePath);
+            }
+
+            return QuerySourceAllLines(
+                File.ReadAllText(filePath),
+                Path.GetFullPath(filePath),
+                references,
+                cancellationToken,
+                smtAnalysis,
+                impliedConditions);
+        }
+
         public SymbolicProgramPointQueryResult AnalyzeFile(
             SymbolicFileQuery query,
             CancellationToken cancellationToken = default,
@@ -326,6 +352,43 @@ namespace PurelySharp.Symbolic
                 impliedConditions);
         }
 
+        public SymbolicFileQueryResult QuerySourceAllLines(
+            string sourceText,
+            string filePath,
+            IEnumerable<MetadataReference>? references = null,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null,
+            IEnumerable<string>? impliedConditions = null)
+        {
+            if (sourceText == null)
+            {
+                throw new ArgumentNullException(nameof(sourceText));
+            }
+
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                filePath = "PurelySharp.Symbolic.Query.cs";
+            }
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                sourceText,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                filePath,
+                cancellationToken: cancellationToken);
+            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
+            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query",
+                new[] { syntaxTree },
+                referenceArray,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            return QuerySyntaxTreeAllLines(
+                syntaxTree,
+                compilation,
+                cancellationToken,
+                smtAnalysis,
+                impliedConditions);
+        }
+
         public SymbolicProgramPointQueryResult AnalyzeSource(
             string sourceText,
             string filePath,
@@ -510,6 +573,47 @@ namespace PurelySharp.Symbolic
                 syntaxTree.FilePath,
                 line,
                 results,
+                SymbolicSmtDiagnostics.FromService(smtAnalysis));
+        }
+
+        public SymbolicFileQueryResult QuerySyntaxTreeAllLines(
+            SyntaxTree syntaxTree,
+            Compilation compilation,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null,
+            IEnumerable<string>? impliedConditions = null)
+        {
+            if (syntaxTree == null)
+            {
+                throw new ArgumentNullException(nameof(syntaxTree));
+            }
+
+            if (compilation == null)
+            {
+                throw new ArgumentNullException(nameof(compilation));
+            }
+
+            var lineCount = syntaxTree.GetText(cancellationToken).Lines.Count;
+            var lineResults = new List<SymbolicLineQueryResult>();
+            for (var line = 1; line <= lineCount; line++)
+            {
+                var lineResult = QuerySyntaxTreeLine(
+                    syntaxTree,
+                    compilation,
+                    line,
+                    cancellationToken,
+                    smtAnalysis,
+                    impliedConditions);
+                if (lineResult.ProgramPoints.Count != 0)
+                {
+                    lineResults.Add(lineResult);
+                }
+            }
+
+            return new SymbolicFileQueryResult(
+                syntaxTree.FilePath,
+                lineCount,
+                lineResults,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis));
         }
 
@@ -1200,6 +1304,193 @@ namespace PurelySharp.Symbolic
         public string MergedInvariantText { get; }
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+    }
+
+    public sealed class SymbolicFileQueryResult
+    {
+        public SymbolicFileQueryResult(
+            string filePath,
+            int lineCount,
+            IReadOnlyList<SymbolicLineQueryResult> lines,
+            SymbolicSmtDiagnostics? smtDiagnostics = null)
+        {
+            if (lineCount < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(lineCount), "Line count cannot be negative.");
+            }
+
+            FilePath = filePath;
+            LineCount = lineCount;
+            Lines = lines ?? throw new ArgumentNullException(nameof(lines));
+            LinesWithProgramPoints = Lines.Count;
+            ProgramPointCount = Lines.Sum(static line => line.ProgramPoints.Count);
+            var programPoints = Lines.SelectMany(static line => line.ProgramPoints).ToArray();
+            var factSummary = SymbolicInvariantService.MergeInvariantFacts(programPoints.Select(static point => point.Facts));
+            ObservedFacts = factSummary.Facts;
+            ObservedFactCount = ObservedFacts.Count;
+            Reachability = SymbolicReachabilitySummary.FromProgramPoints(programPoints);
+            ConditionProofs = SymbolicConditionProofSummary.FromProgramPoints(programPoints);
+            SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
+        }
+
+        public string FilePath { get; }
+
+        public int LineCount { get; }
+
+        public int LinesWithProgramPoints { get; }
+
+        public int ProgramPointCount { get; }
+
+        public IReadOnlyList<SymbolicLineQueryResult> Lines { get; }
+
+        public IReadOnlyList<string> ObservedFacts { get; }
+
+        public int ObservedFactCount { get; }
+
+        public SymbolicReachabilitySummary Reachability { get; }
+
+        public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
+
+        public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+    }
+
+    public sealed class SymbolicReachabilitySummary
+    {
+        public SymbolicReachabilitySummary(
+            int notCheckedCount,
+            int unknownCount,
+            int reachableCount,
+            int unreachableCount)
+        {
+            NotCheckedCount = notCheckedCount;
+            UnknownCount = unknownCount;
+            ReachableCount = reachableCount;
+            UnreachableCount = unreachableCount;
+        }
+
+        public int NotCheckedCount { get; }
+
+        public int UnknownCount { get; }
+
+        public int ReachableCount { get; }
+
+        public int UnreachableCount { get; }
+
+        public static SymbolicReachabilitySummary FromProgramPoints(
+            IEnumerable<SymbolicSourceQueryResult> programPoints)
+        {
+            if (programPoints == null)
+            {
+                throw new ArgumentNullException(nameof(programPoints));
+            }
+
+            var notCheckedCount = 0;
+            var unknownCount = 0;
+            var reachableCount = 0;
+            var unreachableCount = 0;
+            foreach (var point in programPoints)
+            {
+                switch (point.Reachability)
+                {
+                    case SymbolicReachability.NotChecked:
+                        notCheckedCount++;
+                        break;
+                    case SymbolicReachability.Unknown:
+                        unknownCount++;
+                        break;
+                    case SymbolicReachability.Reachable:
+                        reachableCount++;
+                        break;
+                    case SymbolicReachability.Unreachable:
+                        unreachableCount++;
+                        break;
+                }
+            }
+
+            return new SymbolicReachabilitySummary(
+                notCheckedCount,
+                unknownCount,
+                reachableCount,
+                unreachableCount);
+        }
+    }
+
+    public sealed class SymbolicConditionProofSummary
+    {
+        public SymbolicConditionProofSummary(
+            string condition,
+            int unknownCount,
+            int provenTrueCount,
+            int provenFalseCount,
+            int unreachableCount)
+        {
+            Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+            UnknownCount = unknownCount;
+            ProvenTrueCount = provenTrueCount;
+            ProvenFalseCount = provenFalseCount;
+            UnreachableCount = unreachableCount;
+        }
+
+        public string Condition { get; }
+
+        public int UnknownCount { get; }
+
+        public int ProvenTrueCount { get; }
+
+        public int ProvenFalseCount { get; }
+
+        public int UnreachableCount { get; }
+
+        public static IReadOnlyList<SymbolicConditionProofSummary> FromProgramPoints(
+            IEnumerable<SymbolicSourceQueryResult> programPoints)
+        {
+            if (programPoints == null)
+            {
+                throw new ArgumentNullException(nameof(programPoints));
+            }
+
+            return programPoints
+                .SelectMany(static point => point.ConditionProofs)
+                .GroupBy(static proof => proof.Condition, StringComparer.Ordinal)
+                .OrderBy(static group => group.Key, StringComparer.Ordinal)
+                .Select(static group => Create(group.Key, group))
+                .ToArray();
+        }
+
+        private static SymbolicConditionProofSummary Create(
+            string condition,
+            IEnumerable<SymbolicConditionProofResult> proofs)
+        {
+            var unknownCount = 0;
+            var provenTrueCount = 0;
+            var provenFalseCount = 0;
+            var unreachableCount = 0;
+            foreach (var proof in proofs)
+            {
+                switch (proof.TruthValue)
+                {
+                    case SymbolicTruthValue.Unknown:
+                        unknownCount++;
+                        break;
+                    case SymbolicTruthValue.ProvenTrue:
+                        provenTrueCount++;
+                        break;
+                    case SymbolicTruthValue.ProvenFalse:
+                        provenFalseCount++;
+                        break;
+                    case SymbolicTruthValue.Unreachable:
+                        unreachableCount++;
+                        break;
+                }
+            }
+
+            return new SymbolicConditionProofSummary(
+                condition,
+                unknownCount,
+                provenTrueCount,
+                provenFalseCount,
+                unreachableCount);
+        }
     }
 
     public sealed class SymbolicSourceQueryResult

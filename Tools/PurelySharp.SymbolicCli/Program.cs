@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
 
@@ -19,7 +18,11 @@ try
 
     var queryService = new SymbolicSourceQueryService();
     object result = options.AllLines
-        ? QueryFileAllLines(queryService, options, smtAnalysis)
+        ? queryService.QueryFileAllLines(
+            options.FilePath,
+            options.CreateReferences(),
+            smtAnalysis: smtAnalysis,
+            impliedConditions: options.ImpliedConditions)
         : options.LineInvariants
         ? queryService.QueryFileLine(
             options.FilePath,
@@ -47,16 +50,16 @@ try
     {
         var json = result switch
         {
-            IReadOnlyList<SymbolicLineQueryResult> fileResult => JsonSerializer.Serialize(fileResult, new JsonSerializerOptions { WriteIndented = true }),
+            SymbolicFileQueryResult fileResult => JsonSerializer.Serialize(fileResult, new JsonSerializerOptions { WriteIndented = true }),
             SymbolicLineQueryResult lineResult => JsonSerializer.Serialize(lineResult, new JsonSerializerOptions { WriteIndented = true }),
             SymbolicSourceQueryResult pointResult => JsonSerializer.Serialize(pointResult, new JsonSerializerOptions { WriteIndented = true }),
             _ => throw new InvalidOperationException("Unexpected query result type."),
         };
         Console.WriteLine(json);
     }
-    else if (result is IReadOnlyList<SymbolicLineQueryResult> fileResult)
+    else if (result is SymbolicFileQueryResult fileResult)
     {
-        PrintFileResult(fileResult, options, smtAnalysis);
+        PrintFileResult(fileResult, options);
     }
     else if (result is SymbolicLineQueryResult lineResult)
     {
@@ -76,59 +79,44 @@ catch (ArgumentException ex)
     return 64;
 }
 
-static IReadOnlyList<SymbolicLineQueryResult> QueryFileAllLines(
-    SymbolicSourceQueryService queryService,
-    SymbolicCliOptions options,
-    SmtAnalysisService? smtAnalysis)
+static void PrintFileResult(
+    SymbolicFileQueryResult result,
+    SymbolicCliOptions options)
 {
-    var filePath = Path.GetFullPath(options.FilePath!);
-    var sourceText = File.ReadAllText(filePath);
-    var syntaxTree = CSharpSyntaxTree.ParseText(
-        sourceText,
-        new CSharpParseOptions(LanguageVersion.Preview),
-        filePath);
-    var references = options.CreateReferences()?.ToArray() ??
-        SymbolicSourceQueryService.GetTrustedPlatformReferences().ToArray();
-    var compilation = CSharpCompilation.Create(
-        "PurelySharp.SymbolicCli.Query",
-        new[] { syntaxTree },
-        references,
-        new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-    var lineCount = syntaxTree.GetText().Lines.Count;
-    var results = new List<SymbolicLineQueryResult>();
-    for (var line = 1; line <= lineCount; line++)
+    Console.WriteLine($"{result.FilePath}");
+    Console.WriteLine($"Total lines: {result.LineCount}");
+    Console.WriteLine($"Lines with program points: {result.LinesWithProgramPoints}");
+    Console.WriteLine($"Program points: {result.ProgramPointCount}");
+    Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
+    if (options.CheckReachability)
     {
-        var lineResult = queryService.QuerySyntaxTreeLine(
-            syntaxTree,
-            compilation,
-            line,
-            smtAnalysis: smtAnalysis,
-            impliedConditions: options.ImpliedConditions);
-        if (lineResult.ProgramPoints.Count != 0)
-        {
-            results.Add(lineResult);
-        }
+        Console.WriteLine(
+            "Reachability summary: " +
+            $"Reachable={result.Reachability.ReachableCount}, " +
+            $"Unreachable={result.Reachability.UnreachableCount}, " +
+            $"Unknown={result.Reachability.UnknownCount}, " +
+            $"NotChecked={result.Reachability.NotCheckedCount}");
     }
 
-    return results;
-}
+    foreach (var proof in result.ConditionProofs)
+    {
+        Console.WriteLine(
+            $"Implies '{proof.Condition}' summary: " +
+            $"ProvenTrue={proof.ProvenTrueCount}, " +
+            $"ProvenFalse={proof.ProvenFalseCount}, " +
+            $"Unreachable={proof.UnreachableCount}, " +
+            $"Unknown={proof.UnknownCount}");
+    }
 
-static void PrintFileResult(
-    IReadOnlyList<SymbolicLineQueryResult> results,
-    SymbolicCliOptions options,
-    SmtAnalysisService? smtAnalysis)
-{
-    Console.WriteLine($"{options.FilePath}");
-    Console.WriteLine($"Lines with program points: {results.Count}");
-    foreach (var lineResult in results)
+    foreach (var lineResult in result.Lines)
     {
         Console.WriteLine();
         PrintLineResult(lineResult, options);
     }
 
-    if (results.Count == 0 && smtAnalysis != null)
+    if (result.SmtDiagnostics.IsConfigured && result.Lines.Count == 0)
     {
-        PrintSmtDiagnostics(SymbolicSmtDiagnostics.FromService(smtAnalysis));
+        PrintSmtDiagnostics(result.SmtDiagnostics);
     }
 }
 

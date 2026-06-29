@@ -2546,6 +2546,83 @@ namespace PurelySharp.Analyzer.Engine
             return false;
         }
 
+        internal static bool TryCreateReferenceNullAssumptionState(
+            PurityAnalysisState currentState,
+            IOperation? value,
+            bool isNull,
+            SmtAnalysisService smtAnalysis,
+            out PurityAnalysisState branchState)
+        {
+            branchState = currentState;
+
+            value = SkipImplicitConversions(value);
+            if (value?.ConstantValue.HasValue == true)
+            {
+                return (value.ConstantValue.Value == null) == isNull;
+            }
+
+            if (!TryCreateReferenceVariableFormula(value, currentState, out var valueFormula))
+            {
+                return true;
+            }
+
+            var nullComparison = new SmtBinaryFormula(
+                isNull ? SmtBinaryOperator.Equal : SmtBinaryOperator.NotEqual,
+                valueFormula,
+                new SmtNullConstant());
+            var nextPathConditions = currentState.PathConditions.Add(nullComparison);
+            if (ArePathConditionsUnsatisfiable(currentState, nextPathConditions, smtAnalysis))
+            {
+                return false;
+            }
+
+            branchState = currentState.WithPathConditions(nextPathConditions);
+            return true;
+        }
+
+        internal static bool TryGetKnownReferenceNullValueFromPathFacts(
+            PurityAnalysisState currentState,
+            IOperation? value,
+            SmtAnalysisService smtAnalysis,
+            out bool isNull)
+        {
+            isNull = false;
+
+            value = SkipImplicitConversions(value);
+            if (value?.ConstantValue.HasValue == true)
+            {
+                isNull = value.ConstantValue.Value == null;
+                return true;
+            }
+
+            if (!TryCreateReferenceVariableFormula(value, currentState, out var valueFormula))
+            {
+                return false;
+            }
+
+            var nullPathConditions = currentState.PathConditions.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                valueFormula,
+                new SmtNullConstant()));
+            if (ArePathConditionsUnsatisfiable(currentState, nullPathConditions, smtAnalysis))
+            {
+                isNull = false;
+                return true;
+            }
+
+            var nonNullPathConditions = currentState.PathConditions.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.NotEqual,
+                valueFormula,
+                new SmtNullConstant()));
+            if (ArePathConditionsUnsatisfiable(currentState, nonNullPathConditions, smtAnalysis))
+            {
+                isNull = true;
+                return true;
+            }
+
+            return false;
+        }
+
         private static bool IsBranchAssumptionUnsatisfiable(
             PurityAnalysisState currentState,
             ExpressionSyntax expressionSyntax,

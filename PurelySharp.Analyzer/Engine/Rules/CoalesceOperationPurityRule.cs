@@ -43,7 +43,29 @@ namespace PurelySharp.Analyzer.Engine.Rules
                 return PurityAnalysisEngine.PurityAnalysisResult.Pure;
             }
 
-            var rightResult = PurityAnalysisEngine.CheckSingleOperation(coalesceOperation.WhenNull, context, currentState);
+            if (PurityAnalysisEngine.TryGetKnownReferenceNullValueFromPathFacts(
+                    currentState,
+                    coalesceOperation.Value,
+                    context.SmtAnalysis,
+                    out var leftIsNull) &&
+                !leftIsNull)
+            {
+                PurityAnalysisEngine.LogDebug($"    [CoalesceRule] Path facts prove non-null left side skips WhenNull. Coalesce Operation is Pure.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            if (!PurityAnalysisEngine.TryCreateReferenceNullAssumptionState(
+                    currentState,
+                    coalesceOperation.Value,
+                    isNull: true,
+                    context.SmtAnalysis,
+                    out var whenNullState))
+            {
+                PurityAnalysisEngine.LogDebug($"    [CoalesceRule] SMT proves WhenNull branch is unreachable. Coalesce Operation is Pure.");
+                return PurityAnalysisEngine.PurityAnalysisResult.Pure;
+            }
+
+            var rightResult = PurityAnalysisEngine.CheckSingleOperation(coalesceOperation.WhenNull, context, whenNullState);
             if (!rightResult.IsPure)
             {
                 PurityAnalysisEngine.LogDebug($"    [CoalesceRule] Right side (WhenNull) is Impure: {coalesceOperation.WhenNull.Syntax}");

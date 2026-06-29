@@ -431,13 +431,14 @@ namespace TestNamespace {
             Assert.That(source, Does.Contain("--smt-max-expression-nodes <n>"));
             Assert.That(source, Does.Contain("--position <n>"));
             Assert.That(source, Does.Contain("--all-lines"));
-            Assert.That(source, Does.Contain("QueryFileAllLines"));
-            Assert.That(source, Does.Contain("QuerySyntaxTreeLine"));
-            Assert.That(source, Does.Contain("GetTrustedPlatformReferences"));
+            Assert.That(source, Does.Contain("queryService.QueryFileAllLines"));
+            Assert.That(source, Does.Contain("SymbolicFileQueryResult"));
             Assert.That(source, Does.Contain("QueryFileAtPosition"));
             Assert.That(source, Does.Contain("options.CreateSmtOptions()"));
             Assert.That(source, Does.Contain("Merged invariant"));
             Assert.That(source, Does.Contain("Line merged invariant"));
+            Assert.That(source, Does.Contain("Observed distinct facts"));
+            Assert.That(source, Does.Contain("Reachability summary"));
             Assert.That(source, Does.Contain("Lines with program points"));
             Assert.That(source, Does.Contain("Executed queries"));
             Assert.That(source, Does.Contain("Cache entries"));

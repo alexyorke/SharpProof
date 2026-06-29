@@ -3985,6 +3985,17 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (TryCreateBuiltInRangeAccessResultLengthFormula(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out lengthFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             var receiverTypeInfo = semanticModel.GetTypeInfo(receiverExpression, cancellationToken);
             if ((receiverTypeInfo.Type is IArrayTypeSymbol { Rank: 1 } ||
                  receiverTypeInfo.ConvertedType is IArrayTypeSymbol { Rank: 1 }) &&
@@ -4029,6 +4040,64 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             lengthFormula = candidate;
+            return true;
+        }
+
+        private static bool TryCreateBuiltInRangeAccessResultLengthFormula(
+            ExpressionSyntax receiverExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            lengthFormula = null!;
+            if (receiverExpression is not ElementAccessExpressionSyntax elementAccess ||
+                elementAccess.ArgumentList.Arguments.Count != 1)
+            {
+                return false;
+            }
+
+            var sourceType = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).Type;
+            if (sourceType is not IArrayTypeSymbol { Rank: 1 } &&
+                sourceType?.SpecialType != SpecialType.System_String)
+            {
+                return false;
+            }
+
+            var argumentExpression = UnwrapElementAccessIndexExpression(elementAccess.ArgumentList.Arguments[0].Expression);
+            if (argumentExpression is not RangeExpressionSyntax rangeExpression ||
+                !TryCreateBuiltInElementAccessLengthFormula(
+                    elementAccess.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var sourceLengthFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                !TryCreateEffectiveRangeEndpointFormula(
+                    rangeExpression.LeftOperand,
+                    sourceLengthFormula,
+                    defaultWhenOmitted: new SmtIntegerConstant(0),
+                    semanticModel,
+                    cancellationToken,
+                    out var startFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                !TryCreateEffectiveRangeEndpointFormula(
+                    rangeExpression.RightOperand,
+                    sourceLengthFormula,
+                    defaultWhenOmitted: sourceLengthFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out var endFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            lengthFormula = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Subtract, endFormula, startFormula);
             return true;
         }
 
@@ -5129,6 +5198,19 @@ namespace PurelySharp.Symbolic.Smt
                 TryGetKnownStringLength(memberAccess.Expression, semanticModel, cancellationToken, out var stringLength))
             {
                 formula = new SmtIntegerConstant(stringLength);
+                return true;
+            }
+
+            if (memberSymbol.Name == "Length" &&
+                TryCreateBuiltInElementAccessLengthFormula(
+                    memberAccess.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var builtInLength,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                formula = builtInLength;
                 return true;
             }
 
