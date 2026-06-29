@@ -83,6 +83,30 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void Classify_DuplicateAndTruePathConditions_AreNormalizedBeforeBudgetAndCache()
+        {
+            var x = new SmtVariable("x", SmtValueKind.Int);
+            var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
+            var fact = new SmtBinaryFormula(SmtBinaryOperator.LessThanOrEqual, x, new SmtIntegerConstant(0));
+            var service = new SmtAnalysisService(new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.FromMilliseconds(250),
+                TimeSpan.FromMilliseconds(1000),
+                maxPathConditions: 1,
+                maxExpressionNodes: 32));
+
+            var first = service.ClassifyImplication(
+                new SmtFormula[] { xIsZero, new SmtBooleanConstant(true), xIsZero },
+                fact);
+            var second = service.ClassifyImplication(new[] { xIsZero }, fact);
+
+            Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(second.Outcome, Is.EqualTo(first.Outcome));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(1));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(1));
+        }
+
+        [Test]
         public void Classify_ExpressionNodeBudgetExceeded_ReturnsConservativeUnknownWithoutSolver()
         {
             var x = new SmtVariable("x", SmtValueKind.Int);

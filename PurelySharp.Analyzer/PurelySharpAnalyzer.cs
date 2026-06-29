@@ -48,11 +48,11 @@ namespace PurelySharp.Analyzer
                     : ExceptionSummaryCatalog.Empty;
                 var generatedPurityCatalog = config.EnableEffectSummaryJson
                     ? GeneratedPurityCatalog.FromOptions(startContext.Options, startContext.CancellationToken)
-                    : GeneratedPurityCatalog.Current;
+                    : null;
 
                 startContext.RegisterSyntaxNodeAction(c =>
                 {
-                    using (GeneratedPurityCatalog.UseCurrent(generatedPurityCatalog))
+                    using (generatedPurityCatalog == null ? null : GeneratedPurityCatalog.UseCurrent(generatedPurityCatalog))
                     using (Engine.ImpurityCatalog.UseConfiguredOverrides(config))
                     {
                         MethodPurityAnalyzer.AnalyzeSymbolForPurity(c, purityService, missingPuritySuggestions, emitExplanations, baseline);

@@ -44,8 +44,15 @@ namespace PurelySharp.Analyzer
             _entriesBySymbol = entriesBySymbol;
         }
 
+        private bool IsEmpty => _entriesBySymbol.IsEmpty;
+
         public static ExceptionSummaryCatalog FromOptions(AnalyzerOptions options, CancellationToken cancellationToken)
         {
+            if (!BuiltInEffectSummaryLoader.HasAdditionalSummaryJsonDocuments(options))
+            {
+                return BuiltInCatalog.Value;
+            }
+
             var entriesBySymbol = CreateMutableEntries(BuiltInCatalog.Value);
             BuiltInEffectSummaryLoader.LoadAdditionalSummaryJsonDocuments(
                 options,
@@ -59,6 +66,12 @@ namespace PurelySharp.Analyzer
             Compilation? compilation,
             out ImmutableArray<SummaryExceptionInfo> exceptionInfos)
         {
+            if (IsEmpty)
+            {
+                exceptionInfos = ImmutableArray<SummaryExceptionInfo>.Empty;
+                return false;
+            }
+
             var matchedExceptionSources = new Dictionary<string, ImmutableSortedSet<string>.Builder>(StringComparer.Ordinal);
             var matchedExceptionEdges = new Dictionary<string, Dictionary<SummaryExceptionEdgeInfo, SummaryExceptionEdgeInfo>>(StringComparer.Ordinal);
             var actualAssemblyIdentity = compilation is null

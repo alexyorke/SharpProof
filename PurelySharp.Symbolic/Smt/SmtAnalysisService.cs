@@ -74,7 +74,7 @@ namespace PurelySharp.Symbolic.Smt
                 return Unknown("smt_unavailable");
             }
 
-            var pathConditions = query.PathConditions.ToImmutableArray();
+            var pathConditions = NormalizePathConditions(query.PathConditions);
             if (pathConditions.Length > Options.MaxPathConditions)
             {
                 return Unknown("smt_path_condition_budget_exceeded");
@@ -162,6 +162,26 @@ namespace PurelySharp.Symbolic.Smt
                 query.Hazard.Visibility +
                 "|" +
                 query.Hazard.TriggerCondition;
+        }
+
+        private static ImmutableArray<SmtFormula> NormalizePathConditions(IEnumerable<SmtFormula> pathConditions)
+        {
+            var builder = ImmutableArray.CreateBuilder<SmtFormula>();
+            var seen = new HashSet<SmtFormula>();
+            foreach (var pathCondition in pathConditions)
+            {
+                if (pathCondition is SmtBooleanConstant { Value: true })
+                {
+                    continue;
+                }
+
+                if (seen.Add(pathCondition))
+                {
+                    builder.Add(pathCondition);
+                }
+            }
+
+            return builder.ToImmutable();
         }
 
         private static int CountFormulaNodes(IEnumerable<SmtFormula> formulas)

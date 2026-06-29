@@ -11,6 +11,12 @@ namespace PurelySharp.Test
 {
     internal static class AnalyzerTestHost
     {
+        private static readonly Lazy<ImmutableArray<MetadataReference>> TrustedPlatformReferences =
+            new Lazy<ImmutableArray<MetadataReference>>(CreateTrustedPlatformReferences);
+
+        private static readonly Lazy<MetadataReference> EnforcePureAttributeReference =
+            new Lazy<MetadataReference>(() => MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
+
         internal readonly record struct ConditionContext(
             SemanticModel SemanticModel,
             ExpressionSyntax Expression);
@@ -45,7 +51,7 @@ namespace PurelySharp.Test
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
             var references = GetTrustedPlatformReferences()
-                .Add(MetadataReference.CreateFromFile(typeof(PurelySharp.Attributes.EnforcePureAttribute).Assembly.Location));
+                .Add(EnforcePureAttributeReference.Value);
             if (additionalMetadataReferences.HasValue)
             {
                 references = references.AddRange(additionalMetadataReferences.Value);
@@ -174,6 +180,11 @@ public static class ConditionHost
         }
 
         internal static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
+        {
+            return TrustedPlatformReferences.Value;
+        }
+
+        private static ImmutableArray<MetadataReference> CreateTrustedPlatformReferences()
         {
             var trustedPlatformAssemblies = (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES");
             if (string.IsNullOrWhiteSpace(trustedPlatformAssemblies))

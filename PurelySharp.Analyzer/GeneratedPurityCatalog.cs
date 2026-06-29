@@ -53,6 +53,11 @@ namespace PurelySharp.Analyzer
 
         public static GeneratedPurityCatalog FromOptions(AnalyzerOptions options, CancellationToken cancellationToken)
         {
+            if (!BuiltInEffectSummaryLoader.HasAdditionalSummaryJsonDocuments(options))
+            {
+                return BuiltInCatalog.Value;
+            }
+
             var entriesBySymbol = CreateMutableEntries(BuiltInCatalog.Value);
             BuiltInEffectSummaryLoader.LoadAdditionalSummaryJsonDocuments(
                 options,

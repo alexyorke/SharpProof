@@ -36,6 +36,19 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        internal static bool HasAdditionalSummaryJsonDocuments(AnalyzerOptions options)
+        {
+            foreach (var additionalFile in options.AdditionalFiles)
+            {
+                if (IsSummaryFile(additionalFile.Path))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         internal static bool IsSummaryFile(string path)
         {
             var fileName = Path.GetFileName(path);
