@@ -162,6 +162,212 @@ namespace PurelySharp.Analyzer.Engine
             return false;
         }
 
+        public static bool IsEvaluationPathUnsatisfiableUsingSmt(
+            SyntaxNode syntaxNode,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            IReadOnlyCollection<SmtFormula> basePathConditions,
+            Func<ISymbol, int>? getSymbolVersion,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (basePathConditions.Count == 0)
+            {
+                return false;
+            }
+
+            var pathConditions = basePathConditions.ToList();
+            var originalCount = pathConditions.Count;
+            foreach (var ancestor in syntaxNode.Ancestors())
+            {
+                AddEvaluationPathFacts(
+                    syntaxNode,
+                    ancestor,
+                    semanticModel,
+                    cancellationToken,
+                    pathConditions,
+                    getSymbolVersion);
+
+                if (pathConditions.Count > originalCount &&
+                    PathConditionsAreUnsatisfiable(pathConditions, smtAnalysis))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void AddEvaluationPathFacts(
+            SyntaxNode syntaxNode,
+            SyntaxNode ancestor,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (ancestor is IfStatementSyntax ifStatement)
+            {
+                if (ifStatement.Statement.Span.Contains(syntaxNode.SpanStart))
+                {
+                    AddBranchConditionFact(
+                        ifStatement.Condition,
+                        branchWhenTrue: true,
+                        semanticModel,
+                        cancellationToken,
+                        pathConditions,
+                        getSymbolVersion);
+                }
+                else if (ifStatement.Else?.Statement.Span.Contains(syntaxNode.SpanStart) == true)
+                {
+                    AddBranchConditionFact(
+                        ifStatement.Condition,
+                        branchWhenTrue: false,
+                        semanticModel,
+                        cancellationToken,
+                        pathConditions,
+                        getSymbolVersion);
+                }
+
+                return;
+            }
+
+            if (ancestor is ConditionalExpressionSyntax conditionalExpression)
+            {
+                if (conditionalExpression.WhenTrue.Span.Contains(syntaxNode.SpanStart))
+                {
+                    AddBranchConditionFact(
+                        conditionalExpression.Condition,
+                        branchWhenTrue: true,
+                        semanticModel,
+                        cancellationToken,
+                        pathConditions,
+                        getSymbolVersion);
+                }
+                else if (conditionalExpression.WhenFalse.Span.Contains(syntaxNode.SpanStart))
+                {
+                    AddBranchConditionFact(
+                        conditionalExpression.Condition,
+                        branchWhenTrue: false,
+                        semanticModel,
+                        cancellationToken,
+                        pathConditions,
+                        getSymbolVersion);
+                }
+
+                return;
+            }
+
+            if (ancestor is BinaryExpressionSyntax binaryExpression)
+            {
+                if (!binaryExpression.Right.Span.Contains(syntaxNode.SpanStart))
+                {
+                    return;
+                }
+
+                if (binaryExpression.IsKind(SyntaxKind.LogicalAndExpression))
+                {
+                    AddBranchConditionFact(
+                        binaryExpression.Left,
+                        branchWhenTrue: true,
+                        semanticModel,
+                        cancellationToken,
+                        pathConditions,
+                        getSymbolVersion);
+                }
+                else if (binaryExpression.IsKind(SyntaxKind.LogicalOrExpression))
+                {
+                    AddBranchConditionFact(
+                        binaryExpression.Left,
+                        branchWhenTrue: false,
+                        semanticModel,
+                        cancellationToken,
+                        pathConditions,
+                        getSymbolVersion);
+                }
+                else if (binaryExpression.IsKind(SyntaxKind.CoalesceExpression))
+                {
+                    AddReferenceNullStateFact(
+                        binaryExpression.Left,
+                        equalToNull: true,
+                        semanticModel,
+                        cancellationToken,
+                        pathConditions,
+                        getSymbolVersion);
+                }
+
+                return;
+            }
+
+            if (ancestor is ConditionalAccessExpressionSyntax conditionalAccessExpression &&
+                conditionalAccessExpression.WhenNotNull.Span.Contains(syntaxNode.SpanStart))
+            {
+                AddReferenceNullStateFact(
+                    conditionalAccessExpression.Expression,
+                    equalToNull: false,
+                    semanticModel,
+                    cancellationToken,
+                    pathConditions,
+                    getSymbolVersion);
+            }
+        }
+
+        private static void AddBranchConditionFact(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            var originalCount = pathConditions.Count;
+            CSharpConditionToFormula.TryCollectBranchAssumptions(
+                expression,
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                pathConditions,
+                getSymbolVersion);
+
+            if (pathConditions.Count != originalCount)
+            {
+                return;
+            }
+
+            if (CSharpConditionToFormula.TryTranslate(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var formula,
+                    getSymbolVersion) &&
+                formula != null)
+            {
+                pathConditions.Add(branchWhenTrue ? formula : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
+            }
+        }
+
+        private static void AddReferenceNullStateFact(
+            ExpressionSyntax expression,
+            bool equalToNull,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (CSharpConditionToFormula.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var referenceFormula,
+                    getSymbolVersion) &&
+                referenceFormula is { Kind: SmtValueKind.Reference })
+            {
+                pathConditions.Add(new SmtBinaryFormula(
+                    equalToNull ? SmtBinaryOperator.Equal : SmtBinaryOperator.NotEqual,
+                    referenceFormula,
+                    new SmtNullConstant()));
+            }
+        }
+
         private static bool IsProgramPointUnreachableUsingSharedFacts(
             SyntaxNode syntaxNode,
             SemanticModel semanticModel,

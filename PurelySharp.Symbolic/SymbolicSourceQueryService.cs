@@ -1377,7 +1377,8 @@ namespace PurelySharp.Symbolic
                 return new SymbolicConditionProofResult(
                     conditionText,
                     SymbolicTruthValue.ProvenTrue,
-                    trueProof.Reason);
+                    trueProof.Reason,
+                    conditionFormula);
             }
 
             var falseProof = smtAnalysis.ClassifyImplication(
@@ -1388,13 +1389,15 @@ namespace PurelySharp.Symbolic
                 return new SymbolicConditionProofResult(
                     conditionText,
                     SymbolicTruthValue.ProvenFalse,
-                    falseProof.Reason);
+                    falseProof.Reason,
+                    conditionFormula);
             }
 
             return new SymbolicConditionProofResult(
                 conditionText,
                 SymbolicTruthValue.Unknown,
-                falseProof.Reason);
+                falseProof.Reason,
+                conditionFormula);
         }
 
         public static ImmutableArray<MetadataReference> GetTrustedPlatformReferences()
@@ -4916,9 +4919,19 @@ namespace PurelySharp.Symbolic
             int provenFalseCount,
             int unreachableCount,
             int? totalCount = null,
-            IReadOnlyList<SymbolicConditionProofReasonSummary>? reasons = null)
+            IReadOnlyList<SymbolicConditionProofReasonSummary>? reasons = null,
+            string? target = null,
+            string? formulaKind = null,
+            string? valueKind = null,
+            string? formulaText = null,
+            bool hasSmtFormula = false)
         {
             Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+            Target = target ?? string.Empty;
+            FormulaKind = formulaKind ?? "Unknown";
+            ValueKind = valueKind ?? "Unknown";
+            FormulaText = string.IsNullOrWhiteSpace(formulaText) ? Condition : formulaText!;
+            HasSmtFormula = hasSmtFormula;
             UnknownCount = unknownCount;
             ProvenTrueCount = provenTrueCount;
             ProvenFalseCount = provenFalseCount;
@@ -4932,6 +4945,16 @@ namespace PurelySharp.Symbolic
         }
 
         public string Condition { get; }
+
+        public string Target { get; }
+
+        public string FormulaKind { get; }
+
+        public string ValueKind { get; }
+
+        public string FormulaText { get; }
+
+        public bool HasSmtFormula { get; }
 
         public int TotalCount { get; }
 
@@ -4979,11 +5002,12 @@ namespace PurelySharp.Symbolic
             string condition,
             IEnumerable<SymbolicConditionProofResult> proofs)
         {
+            var proofArray = proofs.ToArray();
             var unknownCount = 0;
             var provenTrueCount = 0;
             var provenFalseCount = 0;
             var unreachableCount = 0;
-            foreach (var proof in proofs)
+            foreach (var proof in proofArray)
             {
                 switch (proof.TruthValue)
                 {
@@ -5002,13 +5026,15 @@ namespace PurelySharp.Symbolic
                 }
             }
 
+            var metadataProof = proofArray.FirstOrDefault(static proof => proof.HasSmtFormula) ??
+                proofArray.FirstOrDefault();
             return new SymbolicConditionProofSummary(
                 condition,
                 unknownCount,
                 provenTrueCount,
                 provenFalseCount,
                 unreachableCount,
-                reasons: proofs
+                reasons: proofArray
                     .GroupBy(
                         static proof => new ProofReasonKey(proof.TruthValue, proof.Reason),
                         ProofReasonKeyComparer.Instance)
@@ -5018,7 +5044,12 @@ namespace PurelySharp.Symbolic
                         group.Key.TruthValue,
                         group.Key.Reason,
                         group.Count()))
-                    .ToArray());
+                    .ToArray(),
+                target: metadataProof?.Target,
+                formulaKind: metadataProof?.FormulaKind,
+                valueKind: metadataProof?.ValueKind,
+                formulaText: metadataProof?.FormulaText,
+                hasSmtFormula: metadataProof?.HasSmtFormula ?? false);
         }
 
         private static SymbolicConditionProofSummaryStatus ResolveStatus(
@@ -5500,7 +5531,7 @@ namespace PurelySharp.Symbolic
                 : SymbolicInvariantResult.FromPathConditions(pathConditions, MergedInvariantText);
             Reachability = reachability;
             ReachabilityReason = reachabilityReason;
-            ConditionProofs = conditionProofs ?? Array.Empty<SymbolicConditionProofResult>();
+            ConditionProofs = AttachProgramPointMetadata(conditionProofs ?? Array.Empty<SymbolicConditionProofResult>());
             ProofOutcomes = SymbolicProofOutcomeSummary.FromProofs(ConditionProofs);
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
             InvariantQuery = SymbolicInvariantQueryView.FromPoint(this);
@@ -5584,6 +5615,37 @@ namespace PurelySharp.Symbolic
             }
 
             return string.Join(" && ", facts.Select(static fact => "(" + fact + ")"));
+        }
+
+        private IReadOnlyList<SymbolicConditionProofResult> AttachProgramPointMetadata(
+            IReadOnlyList<SymbolicConditionProofResult> proofs)
+        {
+            if (proofs.Count == 0)
+            {
+                return proofs;
+            }
+
+            return proofs
+                .Select(proof => proof.WithProgramPointMetadata(
+                    FilePath,
+                    Line,
+                    Column,
+                    Position,
+                    NodeSpanStart,
+                    NodeSpanEnd,
+                    NodeStartLine,
+                    NodeStartColumn,
+                    NodeEndLine,
+                    NodeEndColumn,
+                    NodeKind,
+                    MethodName,
+                    ProgramPointKind,
+                    RequestedLine,
+                    RequestedColumn,
+                    RequestedPosition,
+                    RequestedPositionDistance,
+                    ContainsRequestedPosition))
+                .ToArray();
         }
     }
 
@@ -5842,18 +5904,189 @@ namespace PurelySharp.Symbolic
         public SymbolicConditionProofResult(
             string condition,
             SymbolicTruthValue truthValue,
-            string reason)
+            string reason,
+            SmtFormula? formula = null,
+            string? target = null,
+            string? formulaKind = null,
+            string? valueKind = null,
+            string? formulaText = null,
+            bool? hasSmtFormula = null,
+            string? filePath = null,
+            int? line = null,
+            int? column = null,
+            int? position = null,
+            int? nodeSpanStart = null,
+            int? nodeSpanEnd = null,
+            int? nodeStartLine = null,
+            int? nodeStartColumn = null,
+            int? nodeEndLine = null,
+            int? nodeEndColumn = null,
+            string? nodeKind = null,
+            string? methodName = null,
+            string? programPointKind = null,
+            int? requestedLine = null,
+            int? requestedColumn = null,
+            int? requestedPosition = null,
+            int? requestedPositionDistance = null,
+            bool? containsRequestedPosition = null)
         {
-            Condition = condition;
+            Condition = condition ?? string.Empty;
             TruthValue = truthValue;
-            Reason = reason;
+            Reason = reason ?? string.Empty;
+            HasSmtFormula = hasSmtFormula ?? formula != null;
+            FormulaText = string.IsNullOrWhiteSpace(formulaText)
+                ? formula == null
+                    ? Condition
+                    : SymbolicFormulaDisplay.Format(formula)
+                : formulaText!;
+            FormulaKind = string.IsNullOrWhiteSpace(formulaKind)
+                ? formula == null
+                    ? "Unknown"
+                    : GetFormulaKind(formula)
+                : formulaKind!;
+            ValueKind = string.IsNullOrWhiteSpace(valueKind)
+                ? formula == null
+                    ? "Unknown"
+                    : formula.Kind.ToString()
+                : valueKind!;
+            Target = string.IsNullOrWhiteSpace(target)
+                ? formula == null
+                    ? string.Empty
+                    : SymbolicFormulaDisplay.GetMergeTarget(formula)
+                : target!;
+            FilePath = string.IsNullOrWhiteSpace(filePath) ? null : filePath;
+            Line = line;
+            Column = column;
+            Position = position;
+            NodeSpanStart = nodeSpanStart;
+            NodeSpanEnd = nodeSpanEnd;
+            NodeSpanLength = nodeSpanStart.HasValue && nodeSpanEnd.HasValue
+                ? Math.Max(0, nodeSpanEnd.Value - nodeSpanStart.Value)
+                : null;
+            NodeStartLine = nodeStartLine;
+            NodeStartColumn = nodeStartColumn;
+            NodeEndLine = nodeEndLine;
+            NodeEndColumn = nodeEndColumn;
+            NodeKind = string.IsNullOrWhiteSpace(nodeKind) ? null : nodeKind;
+            MethodName = string.IsNullOrWhiteSpace(methodName) ? null : methodName;
+            ProgramPointKind = string.IsNullOrWhiteSpace(programPointKind) ? null : programPointKind;
+            RequestedLine = requestedLine;
+            RequestedColumn = requestedColumn;
+            RequestedPosition = requestedPosition;
+            RequestedPositionDistance = requestedPositionDistance;
+            ContainsRequestedPosition = containsRequestedPosition;
         }
 
         public string Condition { get; }
 
+        public string Target { get; }
+
+        public string FormulaKind { get; }
+
+        public string ValueKind { get; }
+
+        public string FormulaText { get; }
+
+        public bool HasSmtFormula { get; }
+
         public SymbolicTruthValue TruthValue { get; }
 
         public string Reason { get; }
+
+        public string? FilePath { get; }
+
+        public int? Line { get; }
+
+        public int? Column { get; }
+
+        public int? Position { get; }
+
+        public int? NodeSpanStart { get; }
+
+        public int? NodeSpanEnd { get; }
+
+        public int? NodeSpanLength { get; }
+
+        public int? NodeStartLine { get; }
+
+        public int? NodeStartColumn { get; }
+
+        public int? NodeEndLine { get; }
+
+        public int? NodeEndColumn { get; }
+
+        public string? NodeKind { get; }
+
+        public string? MethodName { get; }
+
+        public string? ProgramPointKind { get; }
+
+        public int? RequestedLine { get; }
+
+        public int? RequestedColumn { get; }
+
+        public int? RequestedPosition { get; }
+
+        public int? RequestedPositionDistance { get; }
+
+        public bool? ContainsRequestedPosition { get; }
+
+        internal SymbolicConditionProofResult WithProgramPointMetadata(
+            string filePath,
+            int line,
+            int column,
+            int position,
+            int nodeSpanStart,
+            int nodeSpanEnd,
+            int nodeStartLine,
+            int nodeStartColumn,
+            int nodeEndLine,
+            int nodeEndColumn,
+            string nodeKind,
+            string? methodName,
+            string programPointKind,
+            int? requestedLine,
+            int? requestedColumn,
+            int? requestedPosition,
+            int? requestedPositionDistance,
+            bool? containsRequestedPosition)
+        {
+            return new SymbolicConditionProofResult(
+                Condition,
+                TruthValue,
+                Reason,
+                target: Target,
+                formulaKind: FormulaKind,
+                valueKind: ValueKind,
+                formulaText: FormulaText,
+                hasSmtFormula: HasSmtFormula,
+                filePath: FilePath ?? filePath,
+                line: Line ?? line,
+                column: Column ?? column,
+                position: Position ?? position,
+                nodeSpanStart: NodeSpanStart ?? nodeSpanStart,
+                nodeSpanEnd: NodeSpanEnd ?? nodeSpanEnd,
+                nodeStartLine: NodeStartLine ?? nodeStartLine,
+                nodeStartColumn: NodeStartColumn ?? nodeStartColumn,
+                nodeEndLine: NodeEndLine ?? nodeEndLine,
+                nodeEndColumn: NodeEndColumn ?? nodeEndColumn,
+                nodeKind: NodeKind ?? nodeKind,
+                methodName: MethodName ?? methodName,
+                programPointKind: ProgramPointKind ?? programPointKind,
+                requestedLine: RequestedLine ?? requestedLine,
+                requestedColumn: RequestedColumn ?? requestedColumn,
+                requestedPosition: RequestedPosition ?? requestedPosition,
+                requestedPositionDistance: RequestedPositionDistance ?? requestedPositionDistance,
+                containsRequestedPosition: ContainsRequestedPosition ?? containsRequestedPosition);
+        }
+
+        private static string GetFormulaKind(SmtFormula formula)
+        {
+            var name = formula.GetType().Name;
+            return name.EndsWith("Formula", StringComparison.Ordinal)
+                ? name.Substring(0, name.Length - "Formula".Length)
+                : name;
+        }
     }
 
     public enum SymbolicTruthValue

@@ -3059,6 +3059,19 @@ namespace PurelySharp.Analyzer.Engine
                 return PurityAnalysisResult.Pure;
             }
 
+            if (currentState.PathConditions.Length > 0 &&
+                ExecutionVisibility.IsEvaluationPathUnsatisfiableUsingSmt(
+                    operation.Syntax,
+                    context.SemanticModel,
+                    CancellationToken.None,
+                    currentState.PathConditions,
+                    currentState.GetSmtSymbolVersion,
+                    context.SmtAnalysis))
+            {
+                LogDebug($"    [CSO] Operation evaluation path is SMT-unreachable in current state. Treating as Pure: {operation.Syntax}");
+                return PurityAnalysisResult.Pure;
+            }
+
             var canUseSyntaxOnlyReachability = currentState.SmtSymbolVersions.Count == 0;
             if (canUseSyntaxOnlyReachability &&
                 IsInStaticallyUnreachableBranch(operation.Syntax, context.SemanticModel, context.SmtAnalysis))

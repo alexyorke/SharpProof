@@ -44,7 +44,22 @@ public class TestClass
 
             Assert.That(result.ProgramPoints.Select(point => point.NodeKind), Does.Contain("IfStatement"));
             var returnPoint = result.ProgramPoints.Single(point => point.NodeKind == "ReturnStatement");
-            Assert.That(returnPoint.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+            var returnProof = returnPoint.ConditionProofs.Single();
+            Assert.That(returnProof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+            Assert.That(returnProof.HasSmtFormula, Is.True);
+            Assert.That(returnProof.Target, Is.EqualTo("value"));
+            Assert.That(returnProof.ValueKind, Is.EqualTo("Bool"));
+            Assert.That(returnProof.FormulaText, Is.EqualTo("value > 0"));
+            Assert.That(returnProof.FilePath, Does.EndWith("LineQuery.cs"));
+            Assert.That(returnProof.Line, Is.EqualTo(returnPoint.Line));
+            Assert.That(returnProof.Column, Is.EqualTo(returnPoint.Column));
+            Assert.That(returnProof.NodeSpanStart, Is.EqualTo(returnPoint.NodeSpanStart));
+            Assert.That(returnProof.NodeSpanEnd, Is.EqualTo(returnPoint.NodeSpanEnd));
+            var aggregateProof = result.ConditionProofs.Single(proof => proof.Condition == "value > 0");
+            Assert.That(aggregateProof.HasSmtFormula, Is.True);
+            Assert.That(aggregateProof.Target, Is.EqualTo("value"));
+            Assert.That(aggregateProof.ValueKind, Is.EqualTo("Bool"));
+            Assert.That(aggregateProof.FormulaText, Is.EqualTo("value > 0"));
             Assert.That(returnPoint.MergedInvariantText, Is.EqualTo("value > 0"));
             var summary = SymbolicInvariantService.MergeInvariantFacts(result.ProgramPoints.Select(point => point.Facts));
             Assert.That(summary.Facts, Is.EquivalentTo(result.ProgramPoints.SelectMany(point => point.Facts).Distinct()));

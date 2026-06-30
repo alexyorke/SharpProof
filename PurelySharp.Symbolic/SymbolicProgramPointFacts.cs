@@ -20,6 +20,8 @@ namespace PurelySharp.Symbolic
         private const int MaxStructuralNullStateDepth = 4;
         private const string DoesNotReturnAttributeName = "System.Diagnostics.CodeAnalysis.DoesNotReturnAttribute";
         private const string DoesNotReturnIfAttributeName = "System.Diagnostics.CodeAnalysis.DoesNotReturnIfAttribute";
+        private const string ImplicitThisVariableName = "this";
+        private const string MemberNotNullAttributeName = "System.Diagnostics.CodeAnalysis.MemberNotNullAttribute";
         private const string NotNullAttributeName = "System.Diagnostics.CodeAnalysis.NotNullAttribute";
         public static List<SmtFormula> CollectPriorAssignmentFacts(
             SyntaxNode site,
@@ -1752,6 +1754,11 @@ namespace PurelySharp.Symbolic
                 }
 
                 var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
+                if (assignedSymbol != null)
+                {
+                    assignedSymbol = NormalizeMutatedSymbol(assignedSymbol);
+                }
+
                 SmtFormula? previousAssignedValue = null;
                 if (assignedSymbol is ILocalSymbol or IParameterSymbol)
                 {
@@ -1760,6 +1767,11 @@ namespace PurelySharp.Symbolic
 
                 RemoveFactsInvalidatedByNestedMutations(assignment.Left, semanticModel, cancellationToken, facts);
                 RemoveFactsInvalidatedByNestedMutations(assignment.Right, semanticModel, cancellationToken, facts);
+                if (assignedSymbol is IFieldSymbol or IPropertySymbol &&
+                    IsCurrentInstanceMemberReference(assignment.Left, semanticModel, cancellationToken))
+                {
+                    RemoveFactsReferencingImplicitThisMember(facts, assignedSymbol.Name);
+                }
 
                 if (assignedSymbol is ILocalSymbol or IParameterSymbol)
                 {
@@ -1875,6 +1887,7 @@ namespace PurelySharp.Symbolic
 
             AddTopLevelNotNullParameterNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
             AddTopLevelDoesNotReturnIfNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
+            AddTopLevelMemberNotNullNormalCompletionFacts(expression, semanticModel, cancellationToken, facts);
             AddTopLevelArrayCreationNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
             AddTopLevelDereferenceNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
         }
@@ -1922,6 +1935,168 @@ namespace PurelySharp.Symbolic
                     GetFullMetadataName(attribute.AttributeClass),
                     NotNullAttributeName,
                     StringComparison.Ordinal));
+        }
+
+        private static void AddTopLevelMemberNotNullNormalCompletionFacts(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            expression = UnwrapAwaitedNormalCompletionExpression(expression);
+            if (expression is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod.IsStatic ||
+                !IsCurrentInstanceInvocation(invocation))
+            {
+                return;
+            }
+
+            var memberTargets = GetMemberNotNullTargets(invocationOperation.TargetMethod);
+            foreach (var memberTarget in memberTargets)
+            {
+                if (!TryResolveMemberNotNullTarget(invocationOperation.TargetMethod.ContainingType, memberTarget, out var member) ||
+                    !TryCreateImplicitThisMemberReferenceFormula(member, out var memberFormula))
+                {
+                    continue;
+                }
+
+                AddUniqueFact(
+                    facts,
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.NotEqual,
+                        memberFormula,
+                        new SmtNullConstant()));
+            }
+        }
+
+        private static bool IsCurrentInstanceInvocation(InvocationExpressionSyntax invocation)
+        {
+            var invokedExpression = UnwrapExpression(invocation.Expression);
+            return invokedExpression is IdentifierNameSyntax ||
+                invokedExpression is MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax };
+        }
+
+        private static IEnumerable<string> GetMemberNotNullTargets(IMethodSymbol method)
+        {
+            var targets = new List<string>();
+            AddMemberNotNullTargets(method, targets);
+            if (!SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition))
+            {
+                AddMemberNotNullTargets(method.OriginalDefinition, targets);
+            }
+
+            return targets.Distinct(StringComparer.Ordinal);
+        }
+
+        private static void AddMemberNotNullTargets(IMethodSymbol method, ICollection<string> targets)
+        {
+            foreach (var attribute in method.GetAttributes())
+            {
+                if (!string.Equals(
+                        GetFullMetadataName(attribute.AttributeClass),
+                        MemberNotNullAttributeName,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                foreach (var argument in attribute.ConstructorArguments)
+                {
+                    AddMemberNotNullTarget(argument, targets);
+                }
+            }
+        }
+
+        private static void AddMemberNotNullTarget(TypedConstant argument, ICollection<string> targets)
+        {
+            if (argument.Kind == TypedConstantKind.Array)
+            {
+                foreach (var item in argument.Values)
+                {
+                    AddMemberNotNullTarget(item, targets);
+                }
+
+                return;
+            }
+
+            if (argument.Value is string target &&
+                !string.IsNullOrWhiteSpace(target))
+            {
+                targets.Add(target);
+            }
+        }
+
+        private static bool TryResolveMemberNotNullTarget(
+            INamedTypeSymbol containingType,
+            string target,
+            out ISymbol member)
+        {
+            var memberName = NormalizeMemberNotNullTarget(target);
+            if (memberName == null)
+            {
+                member = null!;
+                return false;
+            }
+
+            var candidates = containingType.GetMembers(memberName)
+                .Where(candidate =>
+                    candidate is IFieldSymbol or IPropertySymbol &&
+                    !candidate.IsStatic &&
+                    TryGetMemberNotNullTargetType(candidate, out var type) &&
+                    IsReferenceLikeType(type))
+                .ToArray();
+            if (candidates.Length != 1)
+            {
+                member = null!;
+                return false;
+            }
+
+            member = candidates[0].OriginalDefinition;
+            return true;
+        }
+
+        private static string? NormalizeMemberNotNullTarget(string target)
+        {
+            target = target.Trim();
+            if (target.StartsWith("this.", StringComparison.Ordinal))
+            {
+                target = target.Substring("this.".Length);
+            }
+
+            return target.Length != 0 && !target.Contains(".", StringComparison.Ordinal)
+                ? target
+                : null;
+        }
+
+        private static bool TryGetMemberNotNullTargetType(ISymbol member, out ITypeSymbol type)
+        {
+            switch (member)
+            {
+                case IFieldSymbol fieldSymbol:
+                    type = fieldSymbol.Type;
+                    return true;
+                case IPropertySymbol propertySymbol:
+                    type = propertySymbol.Type;
+                    return true;
+                default:
+                    type = null!;
+                    return false;
+            }
+        }
+
+        private static bool TryCreateImplicitThisMemberReferenceFormula(ISymbol member, out SmtFormula formula)
+        {
+            if (!TryGetMemberNotNullTargetType(member, out var type) ||
+                !TryGetValueKind(type, out var kind) ||
+                kind != SmtValueKind.Reference)
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(ImplicitThisVariableName + "." + member.Name, kind);
+            return true;
         }
 
         private static void AddTopLevelDoesNotReturnIfNormalCompletionFacts(
@@ -4437,10 +4612,16 @@ namespace PurelySharp.Symbolic
 
                 if (mutatedExpression != null)
                 {
-                    var mutatedSymbol = semanticModel.GetSymbolInfo(mutatedExpression, cancellationToken).Symbol;
+                    var mutatedSymbol = GetMutatedSymbol(mutatedExpression, semanticModel, cancellationToken);
                     if (mutatedSymbol is ILocalSymbol or IParameterSymbol)
                     {
                         RemoveFactsReferencingSymbol(facts, mutatedSymbol.OriginalDefinition);
+                    }
+
+                    if (mutatedSymbol is IFieldSymbol or IPropertySymbol &&
+                        IsCurrentInstanceMemberReference(mutatedExpression, semanticModel, cancellationToken))
+                    {
+                        RemoveFactsReferencingImplicitThisMember(facts, mutatedSymbol.Name);
                     }
 
                     foreach (var receiverSymbol in GetMutatedReceiverSymbols(mutatedExpression, semanticModel, cancellationToken))
@@ -4454,6 +4635,47 @@ namespace PurelySharp.Symbolic
                     RemoveFactsReferencingSymbol(facts, receiverSymbol);
                 }
             }
+        }
+
+        private static ISymbol? GetMutatedSymbol(
+            ExpressionSyntax mutatedExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var symbol = semanticModel.GetSymbolInfo(mutatedExpression, cancellationToken).Symbol;
+            if (symbol != null)
+            {
+                return NormalizeMutatedSymbol(symbol);
+            }
+
+            return semanticModel.GetOperation(mutatedExpression, cancellationToken) switch
+            {
+                IFieldReferenceOperation fieldReference => fieldReference.Field,
+                IPropertyReferenceOperation propertyReference => propertyReference.Property,
+                _ => null,
+            };
+        }
+
+        private static ISymbol NormalizeMutatedSymbol(ISymbol symbol)
+        {
+            return symbol is IMethodSymbol { AssociatedSymbol: IPropertySymbol property }
+                ? property
+                : symbol;
+        }
+
+        private static bool IsCurrentInstanceMemberReference(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is IdentifierNameSyntax &&
+                GetMutatedSymbol(expression, semanticModel, cancellationToken) is { IsStatic: false } and (IFieldSymbol or IPropertySymbol))
+            {
+                return true;
+            }
+
+            return expression is MemberAccessExpressionSyntax { Expression: ThisExpressionSyntax };
         }
 
         private static IEnumerable<ISymbol> GetMutatedReceiverSymbols(
@@ -7677,6 +7899,62 @@ namespace PurelySharp.Symbolic
                 {
                     facts.RemoveAt(index);
                 }
+            }
+        }
+
+        private static void RemoveFactsReferencingImplicitThisMember(List<SmtFormula> facts, string memberName)
+        {
+            var variableName = ImplicitThisVariableName + "." + memberName;
+            for (var index = facts.Count - 1; index >= 0; index--)
+            {
+                if (ReferencesSmtVariableOrChild(facts[index], variableName))
+                {
+                    facts.RemoveAt(index);
+                }
+            }
+        }
+
+        private static bool ReferencesSmtVariableOrChild(SmtFormula formula, string variableName)
+        {
+            switch (formula)
+            {
+                case SmtVariable variable:
+                    return string.Equals(variable.Name, variableName, StringComparison.Ordinal) ||
+                        variable.Name.StartsWith(variableName + ".", StringComparison.Ordinal);
+                case SmtUnaryFormula unary:
+                    return ReferencesSmtVariableOrChild(unary.Operand, variableName);
+                case SmtBinaryFormula binary:
+                    return ReferencesSmtVariableOrChild(binary.Left, variableName) ||
+                        ReferencesSmtVariableOrChild(binary.Right, variableName);
+                case SmtIntegerUnaryTerm integerUnary:
+                    return ReferencesSmtVariableOrChild(integerUnary.Operand, variableName);
+                case SmtIntegerBinaryTerm integerBinary:
+                    return ReferencesSmtVariableOrChild(integerBinary.Left, variableName) ||
+                        ReferencesSmtVariableOrChild(integerBinary.Right, variableName);
+                case SmtStringLengthTerm stringLength:
+                    return ReferencesSmtVariableOrChild(stringLength.Value, variableName);
+                case SmtStringConcatTerm stringConcat:
+                    return ReferencesSmtVariableOrChild(stringConcat.Left, variableName) ||
+                        ReferencesSmtVariableOrChild(stringConcat.Right, variableName);
+                case SmtStringContainsFormula stringContains:
+                    return ReferencesSmtVariableOrChild(stringContains.Value, variableName) ||
+                        ReferencesSmtVariableOrChild(stringContains.Search, variableName);
+                case SmtStringStartsWithFormula stringStartsWith:
+                    return ReferencesSmtVariableOrChild(stringStartsWith.Value, variableName) ||
+                        ReferencesSmtVariableOrChild(stringStartsWith.Prefix, variableName);
+                case SmtStringEndsWithFormula stringEndsWith:
+                    return ReferencesSmtVariableOrChild(stringEndsWith.Value, variableName) ||
+                        ReferencesSmtVariableOrChild(stringEndsWith.Suffix, variableName);
+                case SmtRegexMatchFormula regexMatch:
+                    return ReferencesSmtVariableOrChild(regexMatch.Value, variableName);
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    return ReferencesSmtVariableOrChild(runtimeTypeTest.Value, variableName);
+                case SmtConditionalFormula conditional:
+                    return ReferencesSmtVariableOrChild(conditional.Condition, variableName) ||
+                        ReferencesSmtVariableOrChild(conditional.WhenTrue, variableName) ||
+                        ReferencesSmtVariableOrChild(conditional.WhenFalse, variableName);
+                default:
+                    return false;
             }
         }
 

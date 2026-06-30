@@ -681,6 +681,11 @@ namespace PurelySharp.Symbolic
                         yield return invocationDynamicCandidate;
                     }
 
+                    if (TryCreateArrayGetValueIndexOutOfRangeCandidate(invocation, semanticModel, cancellationToken, out var arrayGetValueCandidate))
+                    {
+                        yield return arrayGetValueCandidate;
+                    }
+
                     if (TryCreateSlicingArgumentOutOfRangeCandidate(invocation, semanticModel, cancellationToken, out var slicingCandidate))
                     {
                         yield return slicingCandidate;
@@ -1358,6 +1363,98 @@ namespace PurelySharp.Symbolic
                 "System.ArgumentOutOfRangeException",
                 category);
             return true;
+        }
+
+        private static bool TryCreateArrayGetValueIndexOutOfRangeCandidate(
+            InvocationExpressionSyntax invocation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
+                !IsArrayGetValueInvocation(invocationOperation.TargetMethod) ||
+                invocationOperation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
+                invocationOperation.Instance.Type is not IArrayTypeSymbol arrayType ||
+                invocationOperation.Arguments.Length != arrayType.Rank)
+            {
+                return false;
+            }
+
+            SmtFormula? inRange = null;
+            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+            {
+                if (!TryGetInvocationArgumentExpression(invocationOperation, dimension, out var indexExpression) ||
+                    !CSharpConditionToFormula.TryTranslateValue(
+                        indexExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var indexFormula,
+                        getSymbolVersion: null) ||
+                    indexFormula is not { Kind: SmtValueKind.Int } ||
+                    !TryTranslateArrayGetValueDimensionLength(
+                        receiverExpression,
+                        arrayType,
+                        dimension,
+                        semanticModel,
+                        cancellationToken,
+                        out var lengthFormula) ||
+                    lengthFormula is not { Kind: SmtValueKind.Int })
+                {
+                    return false;
+                }
+
+                var lowerBound = new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThanOrEqual,
+                    indexFormula,
+                    new SmtIntegerConstant(0));
+                var upperBound = new SmtBinaryFormula(
+                    SmtBinaryOperator.LessThan,
+                    indexFormula,
+                    lengthFormula);
+                var dimensionInRange = Conjoin(lowerBound, upperBound);
+                inRange = inRange == null ? dimensionInRange : Conjoin(inRange, dimensionInRange);
+            }
+
+            if (inRange == null)
+            {
+                return false;
+            }
+
+            candidate = new RuntimeHazardCandidate(
+                invocation,
+                SymbolicRuntimeHazardKind.IndexOutOfRange,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, inRange),
+                "System.IndexOutOfRangeException",
+                "definite_array_get_value_index_out_of_range");
+            return true;
+        }
+
+        private static bool TryTranslateArrayGetValueDimensionLength(
+            ExpressionSyntax receiverExpression,
+            IArrayTypeSymbol arrayType,
+            int dimension,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula)
+        {
+            if (arrayType.Rank == 1 &&
+                dimension == 0 &&
+                CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out lengthFormula))
+            {
+                return true;
+            }
+
+            return CSharpConditionToFormula.TryTranslateArrayDimensionLengthValue(
+                receiverExpression,
+                dimension,
+                semanticModel,
+                cancellationToken,
+                out lengthFormula);
         }
 
         private static bool TryCreateNegativeArrayLengthCandidate(
@@ -2492,6 +2589,16 @@ namespace PurelySharp.Symbolic
                 method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) &&
                 IsBuiltInSpanOrMemoryType(method.ContainingType) &&
                 IsBuiltInSpanOrMemoryType(method.ReturnType);
+        }
+
+        private static bool IsArrayGetValueInvocation(IMethodSymbol method)
+        {
+            return method.Name == "GetValue" &&
+                !method.IsStatic &&
+                method.ContainingType?.SpecialType == SpecialType.System_Array &&
+                method.ReturnType.SpecialType == SpecialType.System_Object &&
+                method.Parameters.Length > 0 &&
+                method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32);
         }
 
         private static bool IsCountBackedIntIndexerElementAccess(

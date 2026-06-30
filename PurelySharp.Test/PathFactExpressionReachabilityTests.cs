@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using System.Linq;
 using System.Threading.Tasks;
 using VerifyCS = PurelySharp.Test.CSharpAnalyzerVerifier<
     PurelySharp.Analyzer.PurelySharpAnalyzer>;
@@ -187,6 +188,73 @@ public sealed class Worker
 }";
 
             await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ReassignedLocal_ImpossibleConditionalArmWithImpureFieldRead_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    private static int s_state;
+
+    [EnforcePure]
+    public int TestMethod(int value)
+    {
+        value = 1;
+        return value == 0 ? s_state : 0;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ReassignedLocal_ImpossibleShortCircuitOperandWithImpureFieldRead_NoDiagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    private static int s_state;
+
+    [EnforcePure]
+    public bool TestMethod(int value)
+    {
+        value = 0;
+        return value != 0 && s_state == 1;
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task ReassignedLocal_ReachableConditionalArmWithImpureFieldRead_Diagnostic()
+        {
+            var test = @"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    private static int s_state;
+
+    [EnforcePure]
+    public int TestMethod(int value)
+    {
+        value = 0;
+        return value == 0 ? s_state : 0;
+    }
+}";
+
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(test);
+
+            Assert.That(
+                diagnostics.Any(diagnostic => diagnostic.Id == PurelySharp.Analyzer.PurelySharpDiagnostics.PurityNotVerifiedId),
+                Is.True);
         }
 
         [Test]

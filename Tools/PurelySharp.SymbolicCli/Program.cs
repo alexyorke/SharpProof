@@ -449,7 +449,31 @@ static void PrintPointResult(
 
     foreach (var proof in result.ConditionProofs)
     {
-        Console.WriteLine($"Implies '{proof.Condition}': {proof.TruthValue}");
+        Console.WriteLine(
+            $"Implies '{proof.Condition}' target={FormatProofTarget(proof.Target)} " +
+            $"kind={proof.FormulaKind}: {proof.TruthValue}");
+        Console.WriteLine($"Implication formula: {proof.FormulaText}");
+        if (proof.Line.HasValue && proof.Column.HasValue)
+        {
+            Console.WriteLine(
+                "Implication source: " +
+                $"{proof.FilePath}:{proof.Line}:{proof.Column} " +
+                $"position={proof.Position} " +
+                $"node={proof.NodeKind} " +
+                $"programPointKind={proof.ProgramPointKind} " +
+                $"span={proof.NodeSpanStart}-{proof.NodeSpanEnd}");
+        }
+
+        if (proof.RequestedPosition.HasValue)
+        {
+            Console.WriteLine(
+                "Implication requested location: " +
+                $"{proof.FilePath}:{proof.RequestedLine}:{proof.RequestedColumn} " +
+                $"position={proof.RequestedPosition} " +
+                $"distance={proof.RequestedPositionDistance} " +
+                $"contained={proof.ContainsRequestedPosition}");
+        }
+
         Console.WriteLine($"Implication reason: {proof.Reason}");
     }
 
@@ -516,7 +540,8 @@ static void PrintConditionProofSummaries(
     foreach (var proof in proofs)
     {
         Console.WriteLine(
-            $"Implies '{proof.Condition}' summary: " +
+            $"Implies '{proof.Condition}' target={FormatProofTarget(proof.Target)} " +
+            $"kind={proof.FormulaKind} summary: " +
             $"Status={proof.Status}, " +
             $"ProvenTrue={proof.ProvenTrueCount}, " +
             $"ProvenFalse={proof.ProvenFalseCount}, " +
@@ -527,6 +552,11 @@ static void PrintConditionProofSummaries(
         Console.WriteLine($"  Proof summary: {proof.Summary}");
         PrintProofReasonSummary(proof.Reasons, indent: "  ");
     }
+}
+
+static string FormatProofTarget(string? target)
+{
+    return string.IsNullOrWhiteSpace(target) ? "<unknown>" : target!;
 }
 
 static void PrintProofReasonSummary(

@@ -1137,6 +1137,65 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesArrayGetValueIndexOutOfRange()
+        {
+            const string source = @"
+public class TestClass
+{
+    public object TestMethod(int[] values)
+    {
+        return values.GetValue(values.Length);
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return values.GetValue(values.Length);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_array_get_value_index_out_of_range"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_GuardedMultidimensionalArrayGetValueIndexOutOfRangeIsPruned()
+        {
+            const string source = @"
+public class TestClass
+{
+    public object TestMethod(int[,] values, int row, int column)
+    {
+        if (row >= 0 && row < values.GetLength(0) && column >= 0 && column < values.GetLength(1))
+        {
+            return values.GetValue(row, column);
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return values.GetValue(row, column);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_array_get_value_index_out_of_range"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazards_AssignedModuloIndexUnderPositiveLengthGuardIsUnreachable()
         {
             const string source = @"

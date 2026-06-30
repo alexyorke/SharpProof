@@ -205,6 +205,22 @@ public sealed class ExtendedPatternChild
 }
 ";
 
+        private const string NotNullIfNotNullSource = @"
+using System.Diagnostics.CodeAnalysis;
+
+public static class NotNullIfNotNullPredicates
+{
+    [return: NotNullIfNotNull(nameof(value))]
+    public static string Echo(string value) => value;
+}
+
+public sealed class NotNullIfNotNullIndexer
+{
+    [NotNullIfNotNull(""key"")]
+    public string this[string key] => key;
+}
+";
+
         [Test]
         public void SymbolicSourceQueryService_QueryFile_RequestApiProvesImplication()
         {
@@ -6926,6 +6942,39 @@ public static class UnknownFallback
 {
     public static int Next() => 7;
 }"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NotNullIfNotNullMethodReturnContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string value",
+                    "value != null && NotNullIfNotNullPredicates.Echo(value: value) == null",
+                    NotNullIfNotNullSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NotNullIfNotNullIndexerReturnContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "NotNullIfNotNullIndexer box, string key",
+                    "box != null && key != null && box[key] == null",
+                    NotNullIfNotNullSource),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NotNullIfNotNullNullSourceReturn_RemainsUnknown()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string value",
+                    "value == null && NotNullIfNotNullPredicates.Echo(value) != null",
+                    NotNullIfNotNullSource),
                 Is.False);
         }
 

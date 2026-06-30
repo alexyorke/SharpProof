@@ -152,7 +152,8 @@ function Stop-NewPurelySharpTestWorkerProcesses
     }
 
     $stoppedCount = 0
-    foreach ($process in Get-PurelySharpTestWorkerProcesses -RepoRoot $RepoRoot)
+    $processes = Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe' OR Name = 'testhost.exe' OR Name = 'vstest.console.exe'" -ErrorAction SilentlyContinue
+    foreach ($process in $processes)
     {
         $processId = [int]$process.ProcessId
         if ($initialProcessIdSet.Contains($processId))
@@ -160,8 +161,35 @@ function Stop-NewPurelySharpTestWorkerProcesses
             continue
         }
 
-        $creationDate = [System.Management.ManagementDateTimeConverter]::ToDateTime($process.CreationDate)
-        if ($creationDate -lt $StartedAfter.AddSeconds(-2))
+        $creationDate = $null
+        if (-not [string]::IsNullOrWhiteSpace([string]$process.CreationDate))
+        {
+            try
+            {
+                $creationDate = [System.Management.ManagementDateTimeConverter]::ToDateTime($process.CreationDate)
+            }
+            catch
+            {
+                $creationDate = $null
+            }
+        }
+
+        if ($null -ne $creationDate -and $creationDate -lt $StartedAfter.AddSeconds(-2))
+        {
+            continue
+        }
+
+        $commandLine = [string]$process.CommandLine
+        $isKnownTestWorker = $process.Name -eq 'testhost.exe' -or
+            $process.Name -eq 'vstest.console.exe' -or
+            [string]::IsNullOrWhiteSpace($commandLine) -or
+            $commandLine.IndexOf($RepoRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            $commandLine.IndexOf('PurelySharp.Test', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            $commandLine.IndexOf('testhost.dll', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            $commandLine.IndexOf('Microsoft.TestPlatform', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            $commandLine.IndexOf('MSBuild.dll', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            $commandLine.IndexOf('VBCSCompiler.dll', [StringComparison]::OrdinalIgnoreCase) -ge 0
+        if (-not $isKnownTestWorker)
         {
             continue
         }
@@ -249,6 +277,8 @@ $testArgs.Add('--configuration')
 $testArgs.Add($Configuration)
 $testArgs.Add('--verbosity')
 $testArgs.Add('minimal')
+$testArgs.Add('/nodeReuse:false')
+$testArgs.Add('-p:UseSharedCompilation=false')
 
 if ($useGeneratedRunSettings)
 {
@@ -285,6 +315,7 @@ foreach ($argument in $DotnetTestArgs)
 }
 
 Push-Location $repoRoot
+$exitCode = 0
 try
 {
     & (Join-Path $PSScriptRoot 'Invoke-PurelySharpDotnet.ps1') -MemoryLimitMb $MemoryLimitMb -TimeoutSeconds $TimeoutSeconds @testArgs
@@ -304,8 +335,6 @@ try
             Write-Warning "TRX profile was requested, but no profile.trx file was produced in $effectiveResultsDirectory."
         }
     }
-
-    exit $exitCode
 }
 finally
 {
@@ -320,3 +349,5 @@ finally
         Remove-Item -LiteralPath $settingsPath -Force -ErrorAction SilentlyContinue
     }
 }
+
+exit $exitCode

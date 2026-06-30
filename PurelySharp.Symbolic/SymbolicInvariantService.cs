@@ -73,6 +73,111 @@ namespace PurelySharp.Symbolic
             return CreateAnalysis(forStatement.SpanStart, formulas, smtAnalysis);
         }
 
+        public SymbolicInvariantImplicationResult ProveImplicationAt(
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            SmtFormula condition,
+            SmtAnalysisService? smtAnalysis,
+            CancellationToken cancellationToken = default,
+            bool includeCurrentStatementCompletionFacts = false)
+        {
+            if (site == null)
+            {
+                throw new ArgumentNullException(nameof(site));
+            }
+
+            if (semanticModel == null)
+            {
+                throw new ArgumentNullException(nameof(semanticModel));
+            }
+
+            var analysis = AnalyzeAt(
+                site,
+                semanticModel,
+                smtAnalysis,
+                cancellationToken,
+                includeCurrentStatementCompletionFacts);
+            return ProveImplication(analysis, condition, smtAnalysis);
+        }
+
+        public static SymbolicInvariantImplicationResult ProveImplication(
+            SymbolicProgramPointAnalysis analysis,
+            SmtFormula condition,
+            SmtAnalysisService? smtAnalysis)
+        {
+            if (analysis == null)
+            {
+                throw new ArgumentNullException(nameof(analysis));
+            }
+
+            if (condition == null)
+            {
+                throw new ArgumentNullException(nameof(condition));
+            }
+
+            var conditionText = condition.ToString() ?? string.Empty;
+            if (smtAnalysis == null)
+            {
+                return new SymbolicInvariantImplicationResult(
+                    analysis.SpanStart,
+                    conditionText,
+                    SymbolicTruthValue.Unknown,
+                    "smt_required",
+                    analysis.Reachability,
+                    analysis.ReachabilityReason,
+                    analysis.SmtDiagnostics);
+            }
+
+            if (analysis.Reachability == SymbolicReachability.Unreachable)
+            {
+                return new SymbolicInvariantImplicationResult(
+                    analysis.SpanStart,
+                    conditionText,
+                    SymbolicTruthValue.Unreachable,
+                    analysis.ReachabilityReason,
+                    analysis.Reachability,
+                    analysis.ReachabilityReason,
+                    SymbolicSmtDiagnostics.FromService(smtAnalysis));
+            }
+
+            var trueProof = smtAnalysis.ClassifyImplication(analysis.PathConditions, condition);
+            if (trueProof.Outcome == PurityProofOutcome.ProvablyPure)
+            {
+                return new SymbolicInvariantImplicationResult(
+                    analysis.SpanStart,
+                    conditionText,
+                    SymbolicTruthValue.ProvenTrue,
+                    trueProof.Reason,
+                    analysis.Reachability,
+                    analysis.ReachabilityReason,
+                    SymbolicSmtDiagnostics.FromService(smtAnalysis));
+            }
+
+            var falseProof = smtAnalysis.ClassifyImplication(
+                analysis.PathConditions,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, condition));
+            if (falseProof.Outcome == PurityProofOutcome.ProvablyPure)
+            {
+                return new SymbolicInvariantImplicationResult(
+                    analysis.SpanStart,
+                    conditionText,
+                    SymbolicTruthValue.ProvenFalse,
+                    falseProof.Reason,
+                    analysis.Reachability,
+                    analysis.ReachabilityReason,
+                    SymbolicSmtDiagnostics.FromService(smtAnalysis));
+            }
+
+            return new SymbolicInvariantImplicationResult(
+                analysis.SpanStart,
+                conditionText,
+                SymbolicTruthValue.Unknown,
+                falseProof.Reason,
+                analysis.Reachability,
+                analysis.ReachabilityReason,
+                SymbolicSmtDiagnostics.FromService(smtAnalysis));
+        }
+
         public static SmtFormula ConjoinPathConditions(IReadOnlyList<SmtFormula> pathConditions)
         {
             if (pathConditions.Count == 0)
@@ -227,6 +332,41 @@ namespace PurelySharp.Symbolic
         public IReadOnlyList<string> Facts { get; }
 
         public string MergedInvariantText { get; }
+    }
+
+    public sealed class SymbolicInvariantImplicationResult
+    {
+        public SymbolicInvariantImplicationResult(
+            int spanStart,
+            string condition,
+            SymbolicTruthValue truthValue,
+            string reason,
+            SymbolicReachability reachability,
+            string reachabilityReason,
+            SymbolicSmtDiagnostics smtDiagnostics)
+        {
+            SpanStart = spanStart;
+            Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+            TruthValue = truthValue;
+            Reason = reason ?? string.Empty;
+            Reachability = reachability;
+            ReachabilityReason = reachabilityReason ?? string.Empty;
+            SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
+        }
+
+        public int SpanStart { get; }
+
+        public string Condition { get; }
+
+        public SymbolicTruthValue TruthValue { get; }
+
+        public string Reason { get; }
+
+        public SymbolicReachability Reachability { get; }
+
+        public string ReachabilityReason { get; }
+
+        public SymbolicSmtDiagnostics SmtDiagnostics { get; }
     }
 
     public sealed class SymbolicProgramPointAnalysis
