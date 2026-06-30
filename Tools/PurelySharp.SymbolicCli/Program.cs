@@ -87,6 +87,11 @@ try
                 smtAnalysis: smtAnalysis);
     }
 
+    if (options.HasRuntimeHazardStatusFilter && result is SymbolicRuntimeHazardQueryResult runtimeHazardResult)
+    {
+        result = options.FilterRuntimeHazards(runtimeHazardResult);
+    }
+
     if (options.HasResultFilter)
     {
         var filter = options.CreateResultFilter();
@@ -567,7 +572,8 @@ Options:
                       Use bounded SMT to classify whether the queried program point is reachable.
   --implies <expr>    Use bounded SMT to prove whether invariants at the queried point imply expr. Can be repeated.
   --runtime-hazards   Query proven runtime hazards instead of invariant program points.
-  --hazard-kind <k>   Keep only DirectThrow, Rethrow, DivideByZero, NullDereference, NullableValueWithoutValue, IndexOutOfRange, or ArgumentOutOfRange hazards. Can be repeated.
+  --hazard-kind <k>   Keep only DirectThrow, Rethrow, DivideByZero, NullDereference, NullableValueWithoutValue, IndexOutOfRange, ArgumentOutOfRange, CheckedIntegralOverflow, or ArrayTypeMismatch hazards. Can be repeated.
+  --hazard-status <s> Keep only Proven, Unreachable, Unknown, or Unsupported runtime hazards. Can be repeated.
   --include-unproven-hazards
                       Include unknown, unreachable, and unsupported hazard candidates in runtime hazard output.
   --smt-mode <mode>   SMT mode: off, bounded, or deep. Default: bounded.
@@ -659,6 +665,8 @@ Options:
 
     public List<SymbolicRuntimeHazardKind> HazardKinds { get; } = new();
 
+    public List<SymbolicRuntimeHazardStatus> HazardStatuses { get; } = new();
+
     public bool ShowHelp { get; private set; }
 
     public SmtAnalysisMode SmtMode { get; private set; } = SmtAnalysisOptions.Default.Mode;
@@ -692,6 +700,8 @@ Options:
     public bool RequiresSmt => CheckReachability || ImpliedConditions.Count != 0 || RuntimeHazards;
 
     public bool IsSpanQuery => SpanStart.HasValue || SpanEnd.HasValue;
+
+    public bool HasRuntimeHazardStatusFilter => HazardStatuses.Count != 0;
 
     public bool HasResultFilter =>
         NodeKinds.Count != 0 ||
@@ -859,6 +869,9 @@ Options:
                 case "--hazard-kind":
                     options.HazardKinds.Add(ReadHazardKind(args, ref index, arg));
                     break;
+                case "--hazard-status":
+                    options.HazardStatuses.Add(ReadHazardStatus(args, ref index, arg));
+                    break;
                 case "--include-unproven-hazards":
                     options.IncludeUnprovenHazards = true;
                     break;
@@ -906,9 +919,16 @@ Options:
                 throw new ArgumentException("--max-hazards requires --runtime-hazards.");
             }
 
-            if (!options.RuntimeHazards && (options.IncludeUnprovenHazards || options.HazardKinds.Count != 0))
+            if (!options.RuntimeHazards &&
+                (options.IncludeUnprovenHazards || options.HazardKinds.Count != 0 || options.HazardStatuses.Count != 0))
             {
-                throw new ArgumentException("--hazard-kind and --include-unproven-hazards require --runtime-hazards.");
+                throw new ArgumentException("--hazard-kind, --hazard-status, and --include-unproven-hazards require --runtime-hazards.");
+            }
+
+            if (options.HazardStatuses.Any(static status => status != SymbolicRuntimeHazardStatus.Proven) &&
+                !options.IncludeUnprovenHazards)
+            {
+                throw new ArgumentException("--hazard-status values other than Proven require --include-unproven-hazards.");
             }
 
             if (options.FilePath == null)
@@ -1078,6 +1098,27 @@ Options:
             HazardKinds);
     }
 
+    public SymbolicRuntimeHazardQueryResult FilterRuntimeHazards(SymbolicRuntimeHazardQueryResult result)
+    {
+        if (HazardStatuses.Count == 0)
+        {
+            return result;
+        }
+
+        var hazards = result.Hazards
+            .Where(hazard => HazardStatuses.Contains(hazard.Status))
+            .ToArray();
+
+        return new SymbolicRuntimeHazardQueryResult(
+            result.FilePath,
+            result.LineCount,
+            result.ScopeStart,
+            result.ScopeEnd,
+            result.Line,
+            hazards,
+            result.SmtDiagnostics);
+    }
+
     public IEnumerable<MetadataReference>? CreateReferences()
     {
         if (ReferencePaths.Count == 0)
@@ -1160,7 +1201,18 @@ Options:
             return kind;
         }
 
-        throw new ArgumentException(optionName + " must be DirectThrow, Rethrow, DivideByZero, NullDereference, NullableValueWithoutValue, IndexOutOfRange, or ArgumentOutOfRange.");
+        throw new ArgumentException(optionName + " must be one of: " + string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardKind>()) + ".");
+    }
+
+    private static SymbolicRuntimeHazardStatus ReadHazardStatus(string[] args, ref int index, string optionName)
+    {
+        var value = ReadString(args, ref index, optionName);
+        if (Enum.TryParse<SymbolicRuntimeHazardStatus>(value, ignoreCase: true, out var status))
+        {
+            return status;
+        }
+
+        throw new ArgumentException(optionName + " must be one of: " + string.Join(", ", Enum.GetNames<SymbolicRuntimeHazardStatus>()) + ".");
     }
 
     private static SymbolicReachability ReadReachability(string[] args, ref int index, string optionName)

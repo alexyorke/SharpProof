@@ -590,6 +590,125 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_CheckedIntPreIncrementOverflow_Reports()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value == int.MaxValue)
+        {
+            return checked(++value);
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.OverflowException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_checked_integral_overflow"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.OverflowException=definite_checked_integral_overflow:checked_operator"));
+        }
+
+        [Test]
+        public async Task Ps0010_CheckedLongPostDecrementOverflow_Reports()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public long TestMethod(long value)
+    {
+        if (value == long.MinValue)
+        {
+            return checked(value--);
+        }
+
+        return 0L;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.OverflowException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_checked_integral_overflow"));
+        }
+
+        [Test]
+        public async Task Ps0010_CheckedIntPostIncrementGuardedUnreachableOverflow_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value == int.MaxValue)
+        {
+            return 0;
+        }
+
+        if (value == int.MaxValue)
+        {
+            return checked(value++);
+        }
+
+        return 1;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_UncheckedIntPreIncrementOverflow_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value == int.MaxValue)
+        {
+            return unchecked(++value);
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_CheckedIntPreIncrementOverflowCaught_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        try
+        {
+            if (value == int.MaxValue)
+            {
+                return checked(++value);
+            }
+
+            return value;
+        }
+        catch (System.OverflowException)
+        {
+            return 0;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_CheckedExplicitNumericConversionOverflow_Reports()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"

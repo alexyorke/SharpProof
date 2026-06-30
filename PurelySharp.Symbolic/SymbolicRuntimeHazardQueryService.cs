@@ -422,6 +422,13 @@ namespace PurelySharp.Symbolic
                     }
 
                     break;
+                case CastExpressionSyntax castExpression:
+                    if (TryCreateCheckedExplicitNumericConversionOverflowCandidate(castExpression, semanticModel, cancellationToken, out var conversionOverflowCandidate))
+                    {
+                        yield return conversionOverflowCandidate;
+                    }
+
+                    break;
                 case MemberAccessExpressionSyntax memberAccess:
                     if (TryCreateNullableValueCandidate(memberAccess, semanticModel, cancellationToken, out var nullableCandidate))
                     {
@@ -623,6 +630,42 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
+        private static bool TryCreateCheckedExplicitNumericConversionOverflowCandidate(
+            CastExpressionSyntax castExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            if (!TryGetCheckedExplicitNumericConversionRange(
+                    castExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var minValue,
+                    out var maxValue))
+            {
+                return false;
+            }
+
+            var trigger = TryCreateCheckedExplicitNumericConversionOverflowTrigger(
+                castExpression,
+                minValue,
+                maxValue,
+                semanticModel,
+                cancellationToken,
+                out var overflowTrigger)
+                ? overflowTrigger
+                : CreateUnknownTrigger(castExpression, "checked_numeric_conversion_overflow");
+
+            candidate = new RuntimeHazardCandidate(
+                castExpression,
+                SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+                trigger,
+                "System.OverflowException",
+                "definite_checked_numeric_conversion_overflow");
+            return true;
+        }
+
         private static bool TryCreateNullDereferenceCandidate(
             SyntaxNode site,
             ExpressionSyntax receiver,
@@ -763,6 +806,30 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
+        private static bool TryCreateCheckedExplicitNumericConversionOverflowTrigger(
+            CastExpressionSyntax castExpression,
+            long minValue,
+            long maxValue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula trigger)
+        {
+            trigger = null!;
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    castExpression.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var operandFormula,
+                    getSymbolVersion: null) ||
+                operandFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            trigger = CreateIntegralOutOfRangeFormula(operandFormula, minValue, maxValue);
+            return true;
+        }
+
         private static bool TryGetCheckedIntegralBinaryOperator(
             BinaryExpressionSyntax binaryExpression,
             SemanticModel semanticModel,
@@ -819,6 +886,49 @@ namespace PurelySharp.Symbolic
                 };
         }
 
+        private static bool TryGetCheckedExplicitNumericConversionRange(
+            CastExpressionSyntax castExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out long minValue,
+            out long maxValue)
+        {
+            minValue = default;
+            maxValue = default;
+            if (semanticModel.GetOperation(castExpression, cancellationToken) is not IConversionOperation
+                {
+                    IsChecked: true,
+                    Conversion:
+                    {
+                        Exists: true,
+                        IsIdentity: false,
+                        IsImplicit: false,
+                        IsNumeric: true,
+                        IsUserDefined: false,
+                        MethodSymbol: null
+                    }
+                } ||
+                !TryGetCheckedNumericConversionRange(
+                    GetNaturalExpressionType(castExpression, semanticModel, cancellationToken),
+                    out minValue,
+                    out maxValue))
+            {
+                return false;
+            }
+
+            if (TryGetCheckedNumericConversionRange(
+                    GetNaturalExpressionType(castExpression.Expression, semanticModel, cancellationToken),
+                    out var sourceMinValue,
+                    out var sourceMaxValue) &&
+                sourceMinValue >= minValue &&
+                sourceMaxValue <= maxValue)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
         private static bool TryGetCheckedIntegralRange(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
@@ -837,6 +947,52 @@ namespace PurelySharp.Symbolic
         {
             switch (typeSymbol?.SpecialType)
             {
+                case SpecialType.System_Int32:
+                    minValue = int.MinValue;
+                    maxValue = int.MaxValue;
+                    return true;
+                case SpecialType.System_UInt32:
+                    minValue = uint.MinValue;
+                    maxValue = uint.MaxValue;
+                    return true;
+                case SpecialType.System_Int64:
+                    minValue = long.MinValue;
+                    maxValue = long.MaxValue;
+                    return true;
+                default:
+                    minValue = default;
+                    maxValue = default;
+                    return false;
+            }
+        }
+
+        private static bool TryGetCheckedNumericConversionRange(
+            ITypeSymbol? typeSymbol,
+            out long minValue,
+            out long maxValue)
+        {
+            switch (typeSymbol?.SpecialType)
+            {
+                case SpecialType.System_Char:
+                    minValue = char.MinValue;
+                    maxValue = char.MaxValue;
+                    return true;
+                case SpecialType.System_SByte:
+                    minValue = sbyte.MinValue;
+                    maxValue = sbyte.MaxValue;
+                    return true;
+                case SpecialType.System_Byte:
+                    minValue = byte.MinValue;
+                    maxValue = byte.MaxValue;
+                    return true;
+                case SpecialType.System_Int16:
+                    minValue = short.MinValue;
+                    maxValue = short.MaxValue;
+                    return true;
+                case SpecialType.System_UInt16:
+                    minValue = ushort.MinValue;
+                    maxValue = ushort.MaxValue;
+                    return true;
                 case SpecialType.System_Int32:
                     minValue = int.MinValue;
                     maxValue = int.MaxValue;

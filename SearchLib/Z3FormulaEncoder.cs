@@ -441,6 +441,7 @@ namespace SearchLib.Smt
             private readonly string _pattern;
             private readonly Dictionary<string, RegexClassTranslation> _characterClassCache = new(StringComparer.Ordinal);
             private bool _isExact = true;
+            private bool _ignorePatternWhitespace;
             private int _position;
 
             private Z3RegexTranslator(Context context, string pattern)
@@ -480,8 +481,13 @@ namespace SearchLib.Smt
                 }
 
                 var translator = new Z3RegexTranslator(context, pattern.Substring(bodyStart, bodyLength));
-                if (!translator.TryParseExpression(out var body) ||
-                    translator._position != translator._pattern.Length)
+                if (!translator.TryParseExpression(out var body))
+                {
+                    return false;
+                }
+
+                translator.SkipIgnoredPatternTrivia();
+                if (translator._position != translator._pattern.Length)
                 {
                     return false;
                 }
@@ -507,6 +513,7 @@ namespace SearchLib.Smt
 
             private bool TryParseExpression(out ReExpr regex)
             {
+                SkipIgnoredPatternTrivia();
                 var alternatives = new List<ReExpr>();
                 if (!TryParseConcat(out var first))
                 {
@@ -515,9 +522,11 @@ namespace SearchLib.Smt
                 }
 
                 alternatives.Add(first);
+                SkipIgnoredPatternTrivia();
                 while (Peek('|'))
                 {
                     _position++;
+                    SkipIgnoredPatternTrivia();
                     if (!TryParseConcat(out var alternative))
                     {
                         regex = null!;
@@ -525,6 +534,7 @@ namespace SearchLib.Smt
                     }
 
                     alternatives.Add(alternative);
+                    SkipIgnoredPatternTrivia();
                 }
 
                 regex = alternatives.Count == 1
@@ -536,10 +546,16 @@ namespace SearchLib.Smt
             private bool TryParseConcat(out ReExpr regex)
             {
                 var parts = new List<ReExpr>();
-                while (_position < _pattern.Length &&
-                       !Peek('|') &&
-                       !Peek(')'))
+                while (true)
                 {
+                    SkipIgnoredPatternTrivia();
+                    if (_position >= _pattern.Length ||
+                        Peek('|') ||
+                        Peek(')'))
+                    {
+                        break;
+                    }
+
                     if (!TryParseRepeat(out var part))
                     {
                         regex = null!;
@@ -560,11 +576,13 @@ namespace SearchLib.Smt
 
             private bool TryParseRepeat(out ReExpr regex)
             {
+                SkipIgnoredPatternTrivia();
                 if (!TryParseAtom(out regex))
                 {
                     return false;
                 }
 
+                SkipIgnoredPatternTrivia();
                 if (_position >= _pattern.Length)
                 {
                     return true;
@@ -638,6 +656,7 @@ namespace SearchLib.Smt
             private bool TryParseAtom(out ReExpr regex)
             {
                 regex = null!;
+                SkipIgnoredPatternTrivia();
                 if (_position >= _pattern.Length)
                 {
                     return false;
@@ -647,17 +666,21 @@ namespace SearchLib.Smt
                 switch (current)
                 {
                     case '(':
-                        if (!TryParseGroupPrefix())
+                        var outerIgnorePatternWhitespace = _ignorePatternWhitespace;
+                        if (!TryParseGroupPrefix(out var groupIgnorePatternWhitespace))
                         {
                             return false;
                         }
 
+                        _ignorePatternWhitespace = groupIgnorePatternWhitespace;
                         if (!TryParseExpression(out regex) || !Peek(')'))
                         {
+                            _ignorePatternWhitespace = outerIgnorePatternWhitespace;
                             return false;
                         }
 
                         _position++;
+                        _ignorePatternWhitespace = outerIgnorePatternWhitespace;
                         return true;
                     case '[':
                         return TryParseCharClass(out regex);
@@ -680,8 +703,9 @@ namespace SearchLib.Smt
                 }
             }
 
-            private bool TryParseGroupPrefix()
+            private bool TryParseGroupPrefix(out bool groupIgnorePatternWhitespace)
             {
+                groupIgnorePatternWhitespace = _ignorePatternWhitespace;
                 if (!Peek('?'))
                 {
                     return true;
@@ -702,13 +726,20 @@ namespace SearchLib.Smt
                     return true;
                 }
 
-                return TryParseExplicitCaptureOptionGroupPrefix() ||
-                    TryParseNamedCaptureGroupPrefix();
+                if (TryParseOptionGroupPrefix(out groupIgnorePatternWhitespace))
+                {
+                    return true;
+                }
+
+                groupIgnorePatternWhitespace = _ignorePatternWhitespace;
+                return TryParseNamedCaptureGroupPrefix();
             }
 
-            private bool TryParseExplicitCaptureOptionGroupPrefix()
+            private bool TryParseOptionGroupPrefix(out bool groupIgnorePatternWhitespace)
             {
+                groupIgnorePatternWhitespace = _ignorePatternWhitespace;
                 var savedPosition = _position;
+                var nextIgnorePatternWhitespace = _ignorePatternWhitespace;
                 var sawOption = false;
                 var sawDisableSeparator = false;
                 while (_position < _pattern.Length && !Peek(':'))
@@ -727,14 +758,23 @@ namespace SearchLib.Smt
                         continue;
                     }
 
-                    if (current != 'n')
+                    if (current is 'n')
                     {
-                        _position = savedPosition;
-                        return false;
+                        sawOption = true;
+                        _position++;
+                        continue;
                     }
 
-                    sawOption = true;
-                    _position++;
+                    if (current is 'x')
+                    {
+                        sawOption = true;
+                        nextIgnorePatternWhitespace = !sawDisableSeparator;
+                        _position++;
+                        continue;
+                    }
+
+                    _position = savedPosition;
+                    return false;
                 }
 
                 if (!sawOption || !Peek(':'))
@@ -744,6 +784,7 @@ namespace SearchLib.Smt
                 }
 
                 _position++;
+                groupIgnorePatternWhitespace = nextIgnorePatternWhitespace;
                 return true;
             }
 
@@ -872,7 +913,12 @@ namespace SearchLib.Smt
 
                 if (literal == null)
                 {
-                    return false;
+                    if (!IsEscapedLiteralCharacter(escaped))
+                    {
+                        return false;
+                    }
+
+                    literal = escaped.ToString();
                 }
 
                 regex = CreateLiteralRegex(literal);
@@ -1058,7 +1104,12 @@ namespace SearchLib.Smt
 
                 if (value == '\0')
                 {
-                    return false;
+                    if (!IsEscapedLiteralCharacter(escaped))
+                    {
+                        return false;
+                    }
+
+                    value = escaped;
                 }
 
                 part = CreateClassCharacterPart(value);
@@ -1449,9 +1500,43 @@ namespace SearchLib.Smt
 
             private void ConsumeNonGreedyMarker()
             {
+                SkipIgnoredPatternTrivia();
                 if (Peek('?'))
                 {
                     _position++;
+                }
+            }
+
+            private void SkipIgnoredPatternTrivia()
+            {
+                if (!_ignorePatternWhitespace)
+                {
+                    return;
+                }
+
+                while (_position < _pattern.Length)
+                {
+                    var current = _pattern[_position];
+                    if (char.IsWhiteSpace(current))
+                    {
+                        _position++;
+                        continue;
+                    }
+
+                    if (current == '#')
+                    {
+                        _position++;
+                        while (_position < _pattern.Length &&
+                               _pattern[_position] != '\r' &&
+                               _pattern[_position] != '\n')
+                        {
+                            _position++;
+                        }
+
+                        continue;
+                    }
+
+                    return;
                 }
             }
 
@@ -1528,6 +1613,11 @@ namespace SearchLib.Smt
             private static bool IsRegexMetaCharacter(char value)
             {
                 return value is '|' or '?' or '*' or '+' or ')' or '[' or ']' or '{' or '}';
+            }
+
+            private static bool IsEscapedLiteralCharacter(char value)
+            {
+                return !char.IsLetterOrDigit(value);
             }
 
             private static bool IsSupportedCaptureNameCharacter(char value)

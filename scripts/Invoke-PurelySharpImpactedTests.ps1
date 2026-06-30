@@ -194,6 +194,142 @@ function Add-TestClasses
     }
 }
 
+function Get-AddedTestClasses
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$Set,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [string[]]$Before
+    )
+
+    $beforeSet = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
+    foreach ($className in $Before)
+    {
+        [void]$beforeSet.Add($className)
+    }
+
+    return @($Set | Where-Object { -not $beforeSet.Contains($_) } | Sort-Object)
+}
+
+function Add-SelectionEvidence
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.List[object]]$Evidence,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Source,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Reason,
+
+        [Parameter()]
+        [AllowEmptyCollection()]
+        [string[]]$SelectedTestFixtures = @(),
+
+        [Parameter()]
+        [AllowEmptyCollection()]
+        [string[]]$Tokens = @(),
+
+        [Parameter()]
+        [AllowEmptyCollection()]
+        [string[]]$FullSuiteFallbackReasons = @()
+    )
+
+    if ($null -eq $Evidence)
+    {
+        return
+    }
+
+    $entry = [ordered]@{
+        changedFile = $Path
+        source = $Source
+        reason = $Reason
+        selectedTestFixtures = @($SelectedTestFixtures | Sort-Object -Unique)
+        tokens = @($Tokens | Sort-Object -Unique)
+        fullSuiteFallbackReasons = @($FullSuiteFallbackReasons)
+    }
+
+    [void]$Evidence.Add($entry)
+}
+
+function Add-SelectionEvidenceForAddedTests
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.List[object]]$Evidence,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Source,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Reason,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [string[]]$Before,
+
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$Set,
+
+        [Parameter()]
+        [AllowEmptyCollection()]
+        [string[]]$Tokens = @()
+    )
+
+    $added = @(Get-AddedTestClasses -Set $Set -Before $Before)
+    Add-SelectionEvidence `
+        -Evidence $Evidence `
+        -Path $Path `
+        -Source $Source `
+        -Reason $Reason `
+        -SelectedTestFixtures $added `
+        -Tokens $Tokens
+}
+
+function Add-FullSuiteFallbackReason
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.List[string]]$Reasons,
+
+        [Parameter(Mandatory = $true)]
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.List[object]]$Evidence,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Reason
+    )
+
+    $Reasons.Add($Reason)
+    Add-SelectionEvidence `
+        -Evidence $Evidence `
+        -Path $Path `
+        -Source 'full-suite-fallback' `
+        -Reason $Reason `
+        -FullSuiteFallbackReasons @($Reason)
+}
+
 function Add-SearchLibSmtTestClasses
 {
     param(
@@ -251,6 +387,19 @@ function Add-AnalyzerSmtTestClasses
         'ExceptionFlowPropagationRegressionTests',
         'ExceptionHandlingTests',
         'RecursiveExceptionFlowTests')
+}
+
+function Add-RuntimeHazardAnalyzerTestClasses
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$Set
+    )
+
+    Add-AnalyzerSmtTestClasses $Set
+    Add-TestClasses $Set @(
+        'DiagnosticEvidenceTests')
 }
 
 function Get-TestClassFromFile
@@ -347,70 +496,99 @@ function Add-PathMappedTests
         [System.Collections.Generic.HashSet[string]]$Set,
 
         [Parameter(Mandatory = $true)]
-        [string]$Path
+        [string]$Path,
+
+        [Parameter()]
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.List[object]]$Evidence = $null
     )
+
+    $before = @($Set | Sort-Object)
 
     switch -Regex ($Path)
     {
         '^SearchLib/' {
             Add-SearchLibSmtTestClasses $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SearchLib SMT solver and proof-search change' $before $Set
             break
         }
         '^PurelySharp\.Symbolic/' {
             Add-SymbolicSmtTestClasses $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Symbolic SMT query surface change' $before $Set
             break
         }
         '^Tools/PurelySharp\.SymbolicCli/' {
             Add-TestClasses $Set @('SymbolicSourceQueryLineTests', 'SymbolicRuntimeHazardQueryTests', 'AnalyzerPackagingTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Symbolic CLI query surface change' $before $Set
             break
         }
         '^Tools/PurelySharp\.Fuzz/' {
             Add-TestClasses $Set @('FuzzToolTests', 'RoslynShapeManifestCoverageTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Fuzz tool change' $before $Set
             break
         }
         '^Tools/PurelySharp\.CorpusReport/' {
             Add-TestClasses $Set @('RoslynConstructCoverageTests', 'RoslynShapeManifestCoverageTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Corpus report tool change' $before $Set
             break
         }
         '^Tools/PurelySharp\.EffectSummary/' {
             Add-TestClasses $Set @('EffectSummaryToolTests', 'ExceptionSummaryCatalogValidationTests', 'AnalyzerPackagingTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Effect summary tool change' $before $Set
             break
         }
         '^PurelySharp\.Package/' {
             Add-TestClasses $Set @('AnalyzerPackagingTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer package change' $before $Set
             break
         }
         '^PurelySharp\.Vsix/' {
             Add-TestClasses $Set @('AnalyzerPackagingTests', 'AssemblyLoadingTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'VSIX packaging change' $before $Set
             break
         }
         '^PurelySharp\.CodeFixes/' {
             Add-TestClasses $Set @('PurelySharpCodeFixTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Code fix change' $before $Set
             break
         }
         '^PurelySharp\.Attributes/' {
             Add-TestClasses $Set @('AttributeResolutionTests', 'AttributePlacementPurityTests', 'BoundaryAttributeTests', 'BasicPurityTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Public analyzer attributes change' $before $Set
             break
         }
         '^Shared/' {
             Add-TestClasses $Set @('AnalyzerPackagingTests', 'EffectSummaryToolTests', 'ExceptionSummaryCatalogValidationTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Shared build/runtime support change' $before $Set
             break
         }
-        '^PurelySharp\.Analyzer/ExceptionFlowAnalyzer\.(ExceptionSites|PathFacts)\.cs$' {
-            Add-AnalyzerSmtTestClasses $Set
+        '^PurelySharp\.Analyzer/ExceptionFlowAnalyzer(\.(ExceptionSites|PathFacts|PropertyFlow|ResourceCallSites|SpecialCases))?\.cs$' {
+            Add-RuntimeHazardAnalyzerTestClasses $Set
+            Add-TestClasses $Set @('ExceptionSummaryCatalogValidationTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Exception flow and runtime-hazard analyzer change' $before $Set
             break
         }
         '^PurelySharp\.Analyzer/Engine/ExecutionVisibility\.cs$' {
             Add-AnalyzerSmtTestClasses $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SMT execution-visibility change' $before $Set
+            break
+        }
+        '^PurelySharp\.Analyzer/Engine/Rules/(BinaryOperationPurityRule|CoalesceOperationPurityRule|ConditionalAccessPurityRule|ConditionalOperationPurityRule)\.cs$' {
+            Add-SymbolicSmtTestClasses $Set
+            Add-TestClasses $Set @('DiagnosticEvidenceTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SMT path-fact analyzer rule change' $before $Set
             break
         }
         '^PurelySharp\.Analyzer/.*(Exception|Throw|Catch|Finally)' {
             Add-AnalyzerSmtTestClasses $Set
-            Add-TestClasses $Set @('ExceptionSummaryCatalogValidationTests')
+            Add-TestClasses $Set @('ExceptionSummaryCatalogValidationTests', 'DiagnosticEvidenceTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Exception or runtime-hazard analyzer change' $before $Set
             break
         }
         '^PurelySharp\.Analyzer/.*(Smt|SemanticOracle|PathFact|Regex|String|Invariant)' {
             Add-SymbolicSmtTestClasses $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer SMT/path-fact change' $before $Set
             break
         }
         '^PurelySharp\.Analyzer/.*(EffectSummary|GeneratedPurity|Catalog|Summary)' {
@@ -419,6 +597,7 @@ function Add-PathMappedTests
                 'EffectSummaryToolTests',
                 'ExceptionSummaryCatalogValidationTests',
                 'DiagnosticEvidenceTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Generated effect-summary or catalog change' $before $Set
             break
         }
     }
@@ -526,6 +705,7 @@ try
                 testFilter = ''
                 requiresFullSuite = $false
                 fullSuiteFallbackReasons = @()
+                selectionEvidence = @()
                 suggestedAction = 'Skip'
                 suggestedCommand = ''
                 note = 'No changed files detected. No impacted tests to run.'
@@ -542,36 +722,46 @@ try
     $testClasses = New-Object System.Collections.Generic.HashSet[string]([StringComparer]::Ordinal)
     $fullReasons = New-Object System.Collections.Generic.List[string]
     $ignoredFiles = New-Object System.Collections.Generic.List[string]
+    $selectionEvidence = New-Object System.Collections.Generic.List[object]
 
     foreach ($path in $changedFiles)
     {
         if ($path -match '^(README\.md|REMAINING_ANALYZER_BACKLOG\.md)$|^docs/')
         {
             $ignoredFiles.Add($path)
+            Add-SelectionEvidence `
+                -Evidence $selectionEvidence `
+                -Path $path `
+                -Source 'ignored' `
+                -Reason 'Documentation-only change'
             continue
         }
 
         if ($path -match '^(Directory\.Build\.props|global\.json|PurelySharp\.sln|build.*\.ps1)$')
         {
-            $fullReasons.Add("$path changes build or solution shape")
+            Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path changes build or solution shape"
             continue
         }
 
         if ($path -match '^scripts/Invoke-PurelySharp(Tests|Dotnet|ImpactedTests)\.ps1$')
         {
+            $before = @($testClasses | Sort-Object)
             Add-TestClasses $testClasses @('SearchLibZ3SmokeTests')
+            Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'path-map' 'Test wrapper or impacted-test script change' $before $testClasses
             continue
         }
 
         if ($path -match '^\.github/workflows/')
         {
+            $before = @($testClasses | Sort-Object)
             Add-TestClasses $testClasses @('SearchLibZ3SmokeTests')
+            Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'path-map' 'CI workflow smoke-test change' $before $testClasses
             continue
         }
 
         if ($path -match '^PurelySharp\.Test/(Verifiers/|AnalyzerTestHost\.cs|AssemblyInfo\.cs|PurelySharp\.Test\.csproj)')
         {
-            $fullReasons.Add("$path changes shared test infrastructure")
+            Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path changes shared test infrastructure"
             continue
         }
 
@@ -580,11 +770,13 @@ try
             $className = Get-TestClassFromFile $path
             if ([string]::IsNullOrWhiteSpace($className))
             {
-                $fullReasons.Add("$path is a test helper without a single owning fixture")
+                Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path is a test helper without a single owning fixture"
             }
             else
             {
+                $before = @($testClasses | Sort-Object)
                 Add-TestClass $testClasses $className
+                Add-SelectionEvidenceForAddedTests $selectionEvidence $path 'changed-test-file' 'Changed test file maps to its owning fixture' $before $testClasses
             }
 
             continue
@@ -593,37 +785,64 @@ try
         if ($path -match '\.csproj$')
         {
             $beforeCount = $testClasses.Count
-            Add-PathMappedTests $testClasses $path
+            Add-PathMappedTests $testClasses $path $selectionEvidence
             if ($testClasses.Count -eq $beforeCount)
             {
-                $fullReasons.Add("$path changes project references or package graph")
+                Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path changes project references or package graph"
             }
 
             continue
         }
 
         $beforeMappedCount = $testClasses.Count
-        Add-PathMappedTests $testClasses $path
+        Add-PathMappedTests $testClasses $path $selectionEvidence
 
         if ($path -match '^PurelySharp\.Analyzer/')
         {
-            Add-TestFilesReferencingTokens $testClasses @(Get-TypeSearchTokens $path)
+            $tokens = @(Get-TypeSearchTokens $path)
+            $beforeTokenReferences = @($testClasses | Sort-Object)
+            Add-TestFilesReferencingTokens $testClasses $tokens
+            $tokenSelected = @(Get-AddedTestClasses -Set $testClasses -Before $beforeTokenReferences)
+            if ($tokenSelected.Count -gt 0)
+            {
+                Add-SelectionEvidence `
+                    -Evidence $selectionEvidence `
+                    -Path $path `
+                    -Source 'token-reference' `
+                    -Reason 'Test files reference production type tokens from the changed file' `
+                    -SelectedTestFixtures $tokenSelected `
+                    -Tokens $tokens
+            }
+
             if ($path -match '^PurelySharp\.Analyzer/Engine/(PurityAnalysisEngine|CompilationPurityService|Rules/RuleRegistry)\.cs$')
             {
-                $fullReasons.Add("$path is high-fanout analyzer core")
+                Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path is high-fanout analyzer core"
             }
             elseif ($path -match '\.cs$' -and $testClasses.Count -eq $beforeMappedCount)
             {
-                $fullReasons.Add("$path has no impacted-test mapping")
+                Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path has no impacted-test mapping"
             }
         }
         elseif ($path -match '^(PurelySharp\.Symbolic|SearchLib|Tools|PurelySharp\.CodeFixes|PurelySharp\.Attributes|PurelySharp\.Package|PurelySharp\.Vsix|Shared)/')
         {
-            Add-TestFilesReferencingTokens $testClasses @(Get-TypeSearchTokens $path)
+            $tokens = @(Get-TypeSearchTokens $path)
+            $beforeTokenReferences = @($testClasses | Sort-Object)
+            Add-TestFilesReferencingTokens $testClasses $tokens
+            $tokenSelected = @(Get-AddedTestClasses -Set $testClasses -Before $beforeTokenReferences)
+            if ($tokenSelected.Count -gt 0)
+            {
+                Add-SelectionEvidence `
+                    -Evidence $selectionEvidence `
+                    -Path $path `
+                    -Source 'token-reference' `
+                    -Reason 'Test files reference production type tokens from the changed file' `
+                    -SelectedTestFixtures $tokenSelected `
+                    -Tokens $tokens
+            }
         }
         elseif (-not ($path -match '^(PurelySharp\.Demo|PurelySharp\.Smoke\.Net472)/'))
         {
-            $fullReasons.Add("$path has no impacted-test mapping")
+            Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path has no impacted-test mapping"
         }
     }
 
@@ -666,6 +885,7 @@ try
         testFilter = $filter
         requiresFullSuite = $requiresFull
         fullSuiteFallbackReasons = @($fullReasons)
+        selectionEvidence = @($selectionEvidence.ToArray())
         filterTooLong = $filterTooLong
         forcePartial = [bool]$ForcePartial
         suggestedAction = $suggestedAction

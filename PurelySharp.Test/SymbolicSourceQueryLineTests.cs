@@ -1779,6 +1779,114 @@ public class TestClass
         }
 
         [Test]
+        public async Task SymbolicCli_RuntimeHazards_HazardStatusFilterNarrowsOutput()
+        {
+            var source = @"
+public class TestClass
+{
+    public int Unknown(int divisor)
+    {
+        return 10 / divisor;
+    }
+
+    public void Proven()
+    {
+        throw new System.InvalidOperationException(""proven"");
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliRuntimeHazardStatus-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var compactResult = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--runtime-hazards",
+                    "--all-lines",
+                    "--include-unproven-hazards",
+                    "--hazard-status",
+                    "Unknown",
+                    "--compact-json");
+
+                Assert.That(compactResult.ExitCode, Is.EqualTo(0), compactResult.StandardError);
+                using var compactDocument = JsonDocument.Parse(compactResult.StandardOutput);
+                var compactRoot = compactDocument.RootElement;
+                Assert.That(compactRoot.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(compactRoot.GetProperty("statusCounts").GetProperty("Unknown").GetInt32(), Is.EqualTo(1));
+                Assert.That(compactRoot.GetProperty("statusCounts").TryGetProperty("Proven", out _), Is.False);
+                Assert.That(compactRoot.GetProperty("kindCounts").GetProperty("DivideByZero").GetInt32(), Is.EqualTo(1));
+                var compactHazard = compactRoot.GetProperty("hazards")[0];
+                Assert.That(compactHazard.GetProperty("status").GetString(), Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown.ToString()));
+                Assert.That(compactHazard.GetProperty("kind").GetString(), Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero.ToString()));
+                Assert.That(compactHazard.GetProperty("operationText").GetString(), Does.Contain("/ divisor"));
+
+                var fullJsonResult = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--runtime-hazards",
+                    "--all-lines",
+                    "--include-unproven-hazards",
+                    "--hazard-status",
+                    "Unknown",
+                    "--json");
+
+                Assert.That(fullJsonResult.ExitCode, Is.EqualTo(0), fullJsonResult.StandardError);
+                using var fullJsonDocument = JsonDocument.Parse(fullJsonResult.StandardOutput);
+                var fullJsonRoot = fullJsonDocument.RootElement;
+                Assert.That(fullJsonRoot.GetProperty("HazardCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(fullJsonRoot.TryGetProperty("hazardCount", out _), Is.False);
+                Assert.That(
+                    fullJsonRoot.GetProperty("Hazards")[0].GetProperty("Status").GetString(),
+                    Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown.ToString()));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public async Task SymbolicCli_RuntimeHazards_RejectsInvalidHazardStatusCombinations()
+        {
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliInvalidHazardStatus-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, "public class C { public int M(int value) => value; }\n");
+            try
+            {
+                var statusWithoutRuntimeHazards = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--position",
+                    "0",
+                    "--hazard-status",
+                    "Unknown");
+                Assert.That(statusWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
+                Assert.That(statusWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-status"));
+                Assert.That(statusWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
+
+                var nonProvenStatusWithoutCandidates = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--runtime-hazards",
+                    "--all-lines",
+                    "--hazard-status",
+                    "Unknown");
+                Assert.That(nonProvenStatusWithoutCandidates.ExitCode, Is.EqualTo(64));
+                Assert.That(
+                    nonProvenStatusWithoutCandidates.StandardError,
+                    Does.Contain("--hazard-status values other than Proven require --include-unproven-hazards."));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
         public async Task SymbolicCli_RejectsInvalidCompactOptionCombinations()
         {
             var sourcePath = Path.Combine(

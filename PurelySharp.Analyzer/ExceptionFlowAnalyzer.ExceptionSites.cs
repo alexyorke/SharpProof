@@ -71,6 +71,15 @@ namespace PurelySharp.Analyzer
                 }
             }
 
+            foreach (var unaryExpression in GetRelevantDescendants<PostfixUnaryExpressionSyntax>(methodNode))
+            {
+                if (IsDefinitelyCheckedIntegralOverflow(unaryExpression, semanticModel, cancellationToken, smtAnalysis) &&
+                    IsExceptionPathReachable(unaryExpression, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    yield return unaryExpression;
+                }
+            }
+
             foreach (var castExpression in GetRelevantDescendants<CastExpressionSyntax>(methodNode))
             {
                 if (IsDefinitelyCheckedIntegralOverflow(castExpression, semanticModel, cancellationToken, smtAnalysis) &&
@@ -447,16 +456,65 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            if (!TryGetCheckedIntegralUnaryOperator(unaryExpression, semanticModel, cancellationToken, out var minValue, out var maxValue) ||
-                !CSharpConditionToFormula.TryTranslateValue(unaryExpression.Operand, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) ||
+            if (TryGetCheckedIntegralUnaryOperator(unaryExpression, semanticModel, cancellationToken, out var minValue, out var maxValue) &&
+                CSharpConditionToFormula.TryTranslateValue(unaryExpression.Operand, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) &&
+                operandFormula is { Kind: SmtValueKind.Int })
+            {
+                var resultFormula = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operandFormula);
+                return IsDefinitelyFalseAtUse(
+                    unaryExpression,
+                    CreateIntegralInRangeFormula(resultFormula, minValue, maxValue),
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis);
+            }
+
+            return IsDefinitelyCheckedIncrementOrDecrementOverflow(
+                unaryExpression,
+                unaryExpression.Operand,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis);
+        }
+
+        private static bool IsDefinitelyCheckedIntegralOverflow(
+            PostfixUnaryExpressionSyntax unaryExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            return IsDefinitelyCheckedIncrementOrDecrementOverflow(
+                unaryExpression,
+                unaryExpression.Operand,
+                semanticModel,
+                cancellationToken,
+                smtAnalysis);
+        }
+
+        private static bool IsDefinitelyCheckedIncrementOrDecrementOverflow(
+            ExpressionSyntax updateExpression,
+            ExpressionSyntax operand,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (!TryGetCheckedIntegralIncrementOrDecrementOperator(
+                    updateExpression,
+                    operand,
+                    semanticModel,
+                    cancellationToken,
+                    out var smtOperator,
+                    out var minValue,
+                    out var maxValue) ||
+                !CSharpConditionToFormula.TryTranslateValue(operand, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) ||
                 operandFormula is not { Kind: SmtValueKind.Int })
             {
                 return false;
             }
 
-            var resultFormula = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operandFormula);
+            var resultFormula = new SmtIntegerBinaryTerm(smtOperator, operandFormula, new SmtIntegerConstant(1));
             return IsDefinitelyFalseAtUse(
-                unaryExpression,
+                updateExpression,
                 CreateIntegralInRangeFormula(resultFormula, minValue, maxValue),
                 semanticModel,
                 cancellationToken,
@@ -538,6 +596,45 @@ namespace PurelySharp.Analyzer
                     IsChecked: true,
                     OperatorMethod: null
                 };
+        }
+
+        private static bool TryGetCheckedIntegralIncrementOrDecrementOperator(
+            ExpressionSyntax updateExpression,
+            ExpressionSyntax operand,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtIntegerBinaryOperator smtOperator,
+            out long minValue,
+            out long maxValue)
+        {
+            smtOperator = default;
+            minValue = default;
+            maxValue = default;
+
+            var operandType = semanticModel.GetTypeInfo(operand, cancellationToken).Type;
+            if (!TryGetBoundedIntegralRange(operandType, out minValue, out maxValue) ||
+                semanticModel.GetOperation(updateExpression, cancellationToken) is not IIncrementOrDecrementOperation
+                {
+                    IsChecked: true,
+                    OperatorMethod: null
+                })
+            {
+                return false;
+            }
+
+            switch (updateExpression.Kind())
+            {
+                case SyntaxKind.PreIncrementExpression:
+                case SyntaxKind.PostIncrementExpression:
+                    smtOperator = SmtIntegerBinaryOperator.Add;
+                    return true;
+                case SyntaxKind.PreDecrementExpression:
+                case SyntaxKind.PostDecrementExpression:
+                    smtOperator = SmtIntegerBinaryOperator.Subtract;
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private static bool TryGetCheckedIntegralConversionRange(

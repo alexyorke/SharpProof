@@ -5838,6 +5838,17 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (TryCreateStringCreationResultLengthFormula(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out lengthFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             if (TryCreateStringInvocationResultLengthFormula(
                     receiverExpression,
                     semanticModel,
@@ -5995,6 +6006,45 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             lengthFormula = resultLength;
+            return true;
+        }
+
+        private static bool TryCreateStringCreationResultLengthFormula(
+            ExpressionSyntax receiverExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            lengthFormula = null!;
+            if (receiverExpression is not ObjectCreationExpressionSyntax objectCreationExpression ||
+                semanticModel.GetOperation(objectCreationExpression, cancellationToken) is not IObjectCreationOperation objectCreationOperation)
+            {
+                return false;
+            }
+
+            var constructor = objectCreationOperation.Constructor;
+            if (constructor == null ||
+                constructor.ContainingType.SpecialType != SpecialType.System_String ||
+                constructor.Parameters.Length != 2 ||
+                constructor.Parameters[0].Type.SpecialType != SpecialType.System_Char ||
+                constructor.Parameters[1].Type.SpecialType != SpecialType.System_Int32 ||
+                objectCreationOperation.Arguments.Length != 2 ||
+                !TryGetObjectCreationArgumentExpression(objectCreationOperation, parameterIndex: 1, out var countExpression) ||
+                !TryTranslateValue(
+                    countExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var countFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                countFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            lengthFormula = countFormula;
             return true;
         }
 

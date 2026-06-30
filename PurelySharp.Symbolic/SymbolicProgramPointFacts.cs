@@ -2424,6 +2424,13 @@ namespace PurelySharp.Symbolic
                         cancellationToken,
                         facts);
                     break;
+                case LockStatementSyntax lockStatement:
+                    AddCompletedLockStatementFacts(
+                        lockStatement,
+                        semanticModel,
+                        cancellationToken,
+                        facts);
+                    break;
             }
         }
 
@@ -3009,6 +3016,25 @@ namespace PurelySharp.Symbolic
             }
 
             AddReferenceNullCondition(facts, expressionSyntax, isNull: false, semanticModel, cancellationToken);
+        }
+
+        private static void AddCompletedLockStatementFacts(
+            LockStatementSyntax lockStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (!IsLocalOrParameterReference(lockStatement.Expression, semanticModel, cancellationToken) ||
+                AnyConditionSymbolInvalidatedInStatement(
+                    lockStatement.Expression,
+                    lockStatement.Statement,
+                    semanticModel,
+                    cancellationToken))
+            {
+                return;
+            }
+
+            AddReferenceNullCondition(facts, lockStatement.Expression, isNull: false, semanticModel, cancellationToken);
         }
 
         private static void AddForeachBodyEntryFacts(

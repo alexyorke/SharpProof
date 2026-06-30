@@ -22,6 +22,9 @@ namespace PurelySharp.Test
             Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
             Assert.That(GetStringArray(root, "selectedTestFixtures"), Does.Contain("SymbolicProgramPointFactTests"));
             Assert.That(
+                GetStringArray(GetEvidenceEntry(root, "PurelySharp.Test/SymbolicProgramPointFactTests.cs", "changed-test-file"), "selectedTestFixtures"),
+                Does.Contain("SymbolicProgramPointFactTests"));
+            Assert.That(
                 root.GetProperty("testFilter").GetString(),
                 Does.Contain("FullyQualifiedName~PurelySharp.Test.SymbolicProgramPointFactTests"));
         }
@@ -75,6 +78,47 @@ namespace PurelySharp.Test
             Assert.That(fixtures, Does.Contain("PathFactExpressionReachabilityTests"));
             Assert.That(fixtures, Does.Contain("ReferenceReachabilitySmtTests"));
             Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
+            Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
+            Assert.That(
+                GetEvidenceReasons(root, "path-map"),
+                Has.Some.Contains("Exception flow and runtime-hazard analyzer change"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_SelectsAnalyzerSmtFixturesForPathFactRule()
+        {
+            const string changedFile = "PurelySharp.Analyzer/Engine/Rules/BinaryOperationPurityRule.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+            var evidence = GetEvidenceEntry(root, changedFile, "path-map");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(fixtures, Does.Contain("PathFactExpressionReachabilityTests"));
+            Assert.That(fixtures, Does.Contain("ReferenceReachabilitySmtTests"));
+            Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
+            Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("SMT path-fact analyzer rule change"));
+            Assert.That(GetStringArray(evidence, "selectedTestFixtures"), Does.Contain("DiagnosticEvidenceTests"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_PreservesFullSuiteFallbackForAnalyzerCore()
+        {
+            const string changedFile = "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var evidence = GetEvidenceEntry(root, changedFile, "full-suite-fallback");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.True);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunFullSuite"));
+            Assert.That(
+                GetStringArray(root, "fullSuiteFallbackReasons"),
+                Does.Contain(changedFile + " is high-fanout analyzer core"));
+            Assert.That(
+                GetStringArray(evidence, "fullSuiteFallbackReasons"),
+                Does.Contain(changedFile + " is high-fanout analyzer core"));
         }
 
         [Test]
@@ -103,6 +147,9 @@ namespace PurelySharp.Test
             Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
             Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("Skip"));
             Assert.That(GetStringArray(root, "ignoredFiles"), Does.Contain("docs/symbolic-invariants.md"));
+            Assert.That(
+                GetEvidenceEntry(root, "docs/symbolic-invariants.md", "ignored").GetProperty("reason").GetString(),
+                Is.EqualTo("Documentation-only change"));
             Assert.That(root.GetProperty("testFilter").GetString(), Is.Empty);
         }
 
@@ -172,6 +219,24 @@ namespace PurelySharp.Test
             return root.GetProperty(propertyName)
                 .EnumerateArray()
                 .Select(static element => element.GetString() ?? string.Empty)
+                .ToArray();
+        }
+
+        private static JsonElement GetEvidenceEntry(JsonElement root, string changedFile, string source)
+        {
+            return root.GetProperty("selectionEvidence")
+                .EnumerateArray()
+                .Single(entry =>
+                    entry.GetProperty("changedFile").GetString() == changedFile &&
+                    entry.GetProperty("source").GetString() == source);
+        }
+
+        private static string[] GetEvidenceReasons(JsonElement root, string source)
+        {
+            return root.GetProperty("selectionEvidence")
+                .EnumerateArray()
+                .Where(entry => entry.GetProperty("source").GetString() == source)
+                .Select(entry => entry.GetProperty("reason").GetString() ?? string.Empty)
                 .ToArray();
         }
 

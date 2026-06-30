@@ -249,6 +249,67 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedExplicitNumericConversionOverflow()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(long value)
+    {
+        if (value > int.MaxValue)
+        {
+            return checked((int)value);
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(source, "return checked((int)value);", smtAnalysis);
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_checked_numeric_conversion_overflow"));
+            Assert.That(hazard.OperationText, Is.EqualTo("(int)value"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedExplicitNumericConversionOverflowCandidate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(long value)
+    {
+        return checked((int)value);
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var defaultResult = QueryLine(
+                source,
+                "return checked((int)value);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+            Assert.That(defaultResult.Hazards, Is.Empty);
+
+            var candidateResult = QueryLine(
+                source,
+                "return checked((int)value);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+            var hazard = AssertSingleHazard(candidateResult);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
+            Assert.That(hazard.OperationText, Is.EqualTo("(int)value"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesArrayCovarianceStoreMismatch()
         {
             const string source = @"

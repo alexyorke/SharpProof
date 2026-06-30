@@ -269,6 +269,29 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesStringRepeatCreationResultLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int count)
+    {
+        if (count >= 0)
+        {
+            return new string('x', count).Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return new string('x', count).Length;",
+                "new string('x', count).Length == count");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_UnsupportedStringTransformLengthsRemainUnknown()
         {
             const string source = @"
