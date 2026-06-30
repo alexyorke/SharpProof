@@ -55,12 +55,14 @@ namespace PurelySharp.Analyzer
             foreach (var node in GetRelevantDescendants<SyntaxNode>(methodNode))
             {
                 if (node is MemberAccessExpressionSyntax memberAccess &&
+                    IsReferenceDereferenceReceiver(memberAccess.Expression, semanticModel, cancellationToken) &&
                     IsDefinitelyNullExpression(memberAccess.Expression, memberAccess, semanticModel, cancellationToken, smtAnalysis) &&
                     IsExceptionPathReachable(memberAccess, semanticModel, cancellationToken, smtAnalysis))
                 {
                     yield return memberAccess;
                 }
                 else if (node is ElementAccessExpressionSyntax elementAccess &&
+                    IsReferenceDereferenceReceiver(elementAccess.Expression, semanticModel, cancellationToken) &&
                     IsDefinitelyNullExpression(elementAccess.Expression, elementAccess, semanticModel, cancellationToken, smtAnalysis) &&
                     IsExceptionPathReachable(elementAccess, semanticModel, cancellationToken, smtAnalysis))
                 {
@@ -71,6 +73,30 @@ namespace PurelySharp.Analyzer
                     IsExceptionPathReachable(invocation, semanticModel, cancellationToken, smtAnalysis))
                 {
                     yield return invocation;
+                }
+            }
+        }
+
+        private static bool IsReferenceDereferenceReceiver(
+            ExpressionSyntax receiver,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            return IsReferenceType(GetExpressionType(receiver, semanticModel, cancellationToken));
+        }
+
+        internal static IEnumerable<MemberAccessExpressionSyntax> GetDefiniteNullableValueAccessNodes(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            foreach (var memberAccess in GetRelevantDescendants<MemberAccessExpressionSyntax>(methodNode))
+            {
+                if (IsNullableValueAccess(memberAccess, semanticModel, cancellationToken) &&
+                    IsDefinitelyMissingNullableValue(memberAccess, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    yield return memberAccess;
                 }
             }
         }
@@ -271,6 +297,157 @@ namespace PurelySharp.Analyzer
 
             return IsKnownByPriorAssignment(expression, useNode, semanticModel, cancellationToken, PathFactKind.Null) ||
                 IsKnownByDominatingIf(expression, useNode, semanticModel, cancellationToken, PathFactKind.Null, smtAnalysis);
+        }
+
+        private static bool IsDefinitelyMissingNullableValue(
+            MemberAccessExpressionSyntax memberAccess,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (IsKnownMissingNullableValueByPriorAssignment(
+                    memberAccess.Expression,
+                    memberAccess,
+                    semanticModel,
+                    cancellationToken))
+            {
+                return true;
+            }
+
+            if (!CSharpConditionToFormula.TryTranslateNullableHasValue(
+                    memberAccess.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var hasValueFormula))
+            {
+                return false;
+            }
+
+            return IsDefinitelyFalseAtUse(memberAccess, hasValueFormula, semanticModel, cancellationToken, smtAnalysis);
+        }
+
+        private static bool IsKnownMissingNullableValueByPriorAssignment(
+            ExpressionSyntax nullableExpression,
+            SyntaxNode useNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            nullableExpression = UnwrapFactExpression(nullableExpression);
+            if (IsMissingNullableValueExpression(nullableExpression, semanticModel, cancellationToken))
+            {
+                return true;
+            }
+
+            var symbol = GetLocalOrParameterSymbol(nullableExpression, semanticModel, cancellationToken);
+            if (symbol == null ||
+                !IsNullableType(GetTrackedSymbolType(symbol)) ||
+                !TryResolveCurrentNullableValueExpression(
+                    symbol,
+                    useNode,
+                    semanticModel,
+                    cancellationToken,
+                    out var currentValueExpression))
+            {
+                return false;
+            }
+
+            return IsMissingNullableValueExpression(currentValueExpression, semanticModel, cancellationToken);
+        }
+
+        private static bool TryResolveCurrentNullableValueExpression(
+            ISymbol symbol,
+            SyntaxNode useNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out ExpressionSyntax valueExpression)
+        {
+            valueExpression = null!;
+            ExpressionSyntax? currentValue = null;
+            foreach (var (block, containingStatement) in EnumerateContainingBlocks(useNode).Reverse())
+            {
+                foreach (var statement in block.Statements)
+                {
+                    if (ReferenceEquals(statement, containingStatement))
+                    {
+                        break;
+                    }
+
+                    if (statement is LocalDeclarationStatementSyntax localDeclaration)
+                    {
+                        foreach (var declarator in localDeclaration.Declaration.Variables)
+                        {
+                            if (semanticModel.GetDeclaredSymbol(declarator, cancellationToken) is ILocalSymbol localSymbol &&
+                                SymbolEqualityComparer.Default.Equals(localSymbol.OriginalDefinition, symbol))
+                            {
+                                currentValue = declarator.Initializer?.Value;
+                            }
+                        }
+
+                        if (StatementMutatesSymbolExceptLinearAssignment(statement, symbol, semanticModel, cancellationToken))
+                        {
+                            currentValue = null;
+                        }
+
+                        continue;
+                    }
+
+                    if (statement is ExpressionStatementSyntax
+                        {
+                            Expression: AssignmentExpressionSyntax assignment
+                        } &&
+                        ExpressionMatchesSymbol(assignment.Left, symbol, semanticModel, cancellationToken))
+                    {
+                        if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                            ExpressionReferencesSymbol(assignment.Right, symbol, semanticModel, cancellationToken))
+                        {
+                            currentValue = null;
+                            continue;
+                        }
+
+                        currentValue = assignment.Right;
+                        continue;
+                    }
+
+                    if (StatementMutatesSymbolExceptLinearAssignment(statement, symbol, semanticModel, cancellationToken))
+                    {
+                        currentValue = null;
+                    }
+                }
+            }
+
+            if (currentValue == null)
+            {
+                return false;
+            }
+
+            valueExpression = currentValue;
+            return true;
+        }
+
+        private static bool IsMissingNullableValueExpression(
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            valueExpression = UnwrapFactExpression(valueExpression);
+            var expressionType = GetExpressionType(valueExpression, semanticModel, cancellationToken);
+            if (!IsNullableType(expressionType))
+            {
+                return false;
+            }
+
+            if (semanticModel.GetConstantValue(valueExpression, cancellationToken) is { HasValue: true, Value: null })
+            {
+                return true;
+            }
+
+            if (IsDefaultExpressionSyntax(valueExpression))
+            {
+                return true;
+            }
+
+            return valueExpression is ObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: 0 } ||
+                valueExpression is ImplicitObjectCreationExpressionSyntax { ArgumentList.Arguments.Count: 0 };
         }
 
         private static bool IsDefinitelyOutOfRangeBuiltInIndexAccess(
@@ -817,6 +994,32 @@ namespace PurelySharp.Analyzer
                 ContainingNamespace: { } containingNamespace
             } &&
             containingNamespace.ToDisplayString() == "System";
+        }
+
+        private static bool IsNullableValueAccess(
+            MemberAccessExpressionSyntax memberAccess,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            if (memberAccess.Name.Identifier.ValueText != "Value" ||
+                semanticModel.GetSymbolInfo(memberAccess, cancellationToken).Symbol is not IPropertySymbol
+                {
+                    Name: "Value",
+                    ContainingType.OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
+                })
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool IsNullableType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol
+            {
+                OriginalDefinition.SpecialType: SpecialType.System_Nullable_T
+            };
         }
 
         private static bool IsReferenceType(ITypeSymbol? typeSymbol)

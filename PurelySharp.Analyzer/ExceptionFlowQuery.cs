@@ -195,6 +195,34 @@ namespace PurelySharp.Analyzer
                         "null_receiver"));
             }
 
+            foreach (var nullableValueAccessNode in ExceptionFlowAnalyzer.GetDefiniteNullableValueAccessNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                if (IsInStaticallyUnreachableBranch(nullableValueAccessNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByThrowingFinally(nullableValueAccessNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.InvalidOperationException");
+                if (IsCaughtWithinMethod(nullableValueAccessNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    nullableValueAccessNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        "System.InvalidOperationException",
+                        "definite_nullable_value_without_value",
+                        "nullable_value"));
+            }
+
             foreach (var indexOutOfRangeNode in ExceptionFlowAnalyzer.GetDefiniteIndexOutOfRangeNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
                 if (IsInStaticallyUnreachableBranch(indexOutOfRangeNode, semanticModel, cancellationToken, smtAnalysis))
@@ -577,6 +605,7 @@ namespace PurelySharp.Analyzer
                 string.Equals(category, "effect_summary", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_divide_by_zero", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_null_dereference", StringComparison.Ordinal) ||
+                string.Equals(category, "definite_nullable_value_without_value", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_index_out_of_range", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_range_out_of_range", StringComparison.Ordinal);
         }

@@ -3185,6 +3185,30 @@ namespace PurelySharp.Symbolic.Smt
                 inlineDepth);
         }
 
+        public static bool TryTranslateNullableHasValue(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            if (TryTranslateNullableValueParts(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    out _,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
         public static bool TryCollectDomainFacts(
             ExpressionSyntax expression,
             SemanticModel semanticModel,

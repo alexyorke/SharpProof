@@ -92,6 +92,145 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_NullableValueNullLocal_ReportsInvalidOperationException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int? value = null;
+        return value.Value;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_nullable_value_without_value"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.InvalidOperationException=definite_nullable_value_without_value:nullable_value"));
+        }
+
+        [Test]
+        public async Task Ps0010_NullableValueDefaultLocal_ReportsInvalidOperationException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int? value = default;
+        return value.Value;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_nullable_value_without_value"));
+        }
+
+        [Test]
+        public async Task Ps0010_NullableValueReassignedPresentLocal_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        int? value = null;
+        value = 42;
+        return value.Value;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_NullableValueReassignedUnknownLocal_DoesNotReportDefiniteException()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int? input)
+    {
+        int? value = null;
+        value = input;
+        return value.Value;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_NullableValueFalseHasValueBranch_ReportsInvalidOperationException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (!value.HasValue)
+        {
+            return value.Value;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_nullable_value_without_value"));
+        }
+
+        [Test]
+        public async Task Ps0010_NullableValueTrueHasValueBranch_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (value.HasValue)
+        {
+            return value.Value;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_NullableValueCaughtInvalidOperationException_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        try
+        {
+            if (!value.HasValue)
+            {
+                return value.Value;
+            }
+
+            return value.Value;
+        }
+        catch (InvalidOperationException)
+        {
+            return 0;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_OrFalseBranchZeroDivisor_ReportsDivideByZeroException()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"
@@ -2775,6 +2914,55 @@ public class TestClass
             var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId);
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
+        public async Task Ps0011_NullableValueFalseHasValueBranch_ReportsExceptionSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (!value.HasValue)
+        {
+            return value.Value;
+        }
+
+        return 0;
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_nullable_value_without_value"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.InvalidOperationException=definite_nullable_value_without_value:nullable_value"));
+        }
+
+        [Test]
+        public async Task Ps0011_NullableValueTrueHasValueBranch_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+public class TestClass
+{
+    public int TestMethod(int? value)
+    {
+        if (value.HasValue)
+        {
+            return value.Value;
+        }
+
+        return 0;
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
         }
 
         [Test]
