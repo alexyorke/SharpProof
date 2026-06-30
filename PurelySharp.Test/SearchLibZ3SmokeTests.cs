@@ -146,6 +146,61 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_CultureInvariantIgnoreCaseRegexImpliesLiteralLength()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+            var lengthIsTwo = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtStringLengthTerm(text),
+                new SmtIntegerConstant(2));
+
+            var result = solver.Implies(
+                new[]
+                {
+                    new SmtRegexMatchFormula(text, @"\Aab\z", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase),
+                },
+                lengthIsTwo,
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_CultureInvariantIgnoreCaseRegexAcceptsCaseVariantLiteral()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\Aab\z", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("AB")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_CultureInvariantIgnoreCaseCharClassAcceptsUppercaseVariant()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A[a-c]\z", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("B")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+        }
+
+        [Test]
         public void SmtSolver_InvalidRegexCategoryWithoutConcreteInput_ReturnsUnknown()
         {
             using var solver = new SmtSolver();

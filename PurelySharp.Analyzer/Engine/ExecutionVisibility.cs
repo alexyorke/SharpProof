@@ -308,6 +308,55 @@ namespace PurelySharp.Analyzer.Engine
                     cancellationToken,
                     pathConditions,
                     getSymbolVersion);
+
+                return;
+            }
+
+            if (ancestor is SwitchStatementSyntax switchStatement)
+            {
+                var section = switchStatement.Sections.FirstOrDefault(candidate =>
+                    candidate.Statements.Any(statement => statement.Span.Contains(syntaxNode.SpanStart)));
+                if (section != null &&
+                    !IsReachableConstantSwitchGotoTarget(section, switchStatement, semanticModel) &&
+                    SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
+                        switchStatement.Expression,
+                        section,
+                        semanticModel,
+                        cancellationToken,
+                        out var sectionCondition))
+                {
+                    AddArrayLengthCountAliasFact(
+                        switchStatement.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        pathConditions,
+                        getSymbolVersion);
+                    pathConditions.Add(sectionCondition);
+                }
+
+                return;
+            }
+
+            if (ancestor is SwitchExpressionSyntax switchExpression)
+            {
+                var arm = switchExpression.Arms.FirstOrDefault(candidate =>
+                    candidate.Expression.Span.Contains(syntaxNode.SpanStart));
+                if (arm != null &&
+                    SwitchPathConditionBuilder.TryCreateSwitchExpressionArmCondition(
+                        switchExpression.GoverningExpression,
+                        arm,
+                        semanticModel,
+                        cancellationToken,
+                        out var armCondition))
+                {
+                    AddArrayLengthCountAliasFact(
+                        switchExpression.GoverningExpression,
+                        semanticModel,
+                        cancellationToken,
+                        pathConditions,
+                        getSymbolVersion);
+                    pathConditions.Add(armCondition);
+                }
             }
         }
 
@@ -1034,8 +1083,63 @@ namespace PurelySharp.Analyzer.Engine
             var pathConditions = SymbolicProgramPointFacts
                 .CollectAncestorReachabilityConditions(site, semanticModel, cancellationToken)
                 .ToList();
+            AddAncestorSwitchArrayLengthCountAliasFacts(site, semanticModel, cancellationToken, pathConditions);
             pathConditions.AddRange(SymbolicProgramPointFacts.CollectPriorAssignmentFacts(site, semanticModel, cancellationToken));
             return pathConditions;
+        }
+
+        private static void AddAncestorSwitchArrayLengthCountAliasFacts(
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions)
+        {
+            foreach (var ancestor in site.Ancestors())
+            {
+                if (ancestor is SwitchStatementSyntax switchStatement)
+                {
+                    AddArrayLengthCountAliasFact(
+                        switchStatement.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        pathConditions,
+                        getSymbolVersion: null);
+                }
+                else if (ancestor is SwitchExpressionSyntax switchExpression)
+                {
+                    AddArrayLengthCountAliasFact(
+                        switchExpression.GoverningExpression,
+                        semanticModel,
+                        cancellationToken,
+                        pathConditions,
+                        getSymbolVersion: null);
+                }
+            }
+        }
+
+        private static void AddArrayLengthCountAliasFact(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> pathConditions,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (semanticModel.GetTypeInfo(expression, cancellationToken).Type is not IArrayTypeSymbol ||
+                !CSharpConditionToFormula.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverFormula,
+                    getSymbolVersion) ||
+                receiverFormula is not SmtVariable { Kind: SmtValueKind.Reference } receiverVariable)
+            {
+                return;
+            }
+
+            pathConditions.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtVariable(receiverVariable.Name + ".Length", SmtValueKind.Int),
+                new SmtVariable(receiverVariable.Name + ".Count", SmtValueKind.Int)));
         }
 
         private static bool PathConditionsAreUnsatisfiable(

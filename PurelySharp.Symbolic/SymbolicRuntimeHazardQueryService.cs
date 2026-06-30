@@ -640,6 +640,11 @@ namespace PurelySharp.Symbolic
                         yield return arrayTypeMismatchCandidate;
                     }
 
+                    if (TryCreateCheckedIntegralCompoundAssignmentOverflowCandidate(assignment, semanticModel, cancellationToken, out var compoundOverflowCandidate))
+                    {
+                        yield return compoundOverflowCandidate;
+                    }
+
                     break;
                 case ArrayCreationExpressionSyntax arrayCreation:
                     if (TryCreateNegativeArrayLengthCandidate(arrayCreation, semanticModel, cancellationToken, out var negativeLengthCandidate))
@@ -897,6 +902,44 @@ namespace PurelySharp.Symbolic
 
             candidate = new RuntimeHazardCandidate(
                 updateExpression,
+                SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+                trigger,
+                "System.OverflowException",
+                "definite_checked_integral_overflow");
+            return true;
+        }
+
+        private static bool TryCreateCheckedIntegralCompoundAssignmentOverflowCandidate(
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            if (!TryGetCheckedIntegralCompoundAssignmentOperator(
+                    assignment,
+                    semanticModel,
+                    cancellationToken,
+                    out var smtOperator,
+                    out var minValue,
+                    out var maxValue))
+            {
+                return false;
+            }
+
+            var trigger = TryCreateCheckedIntegralCompoundAssignmentOverflowTrigger(
+                assignment,
+                smtOperator,
+                minValue,
+                maxValue,
+                semanticModel,
+                cancellationToken,
+                out var overflowTrigger)
+                ? overflowTrigger
+                : CreateUnknownTrigger(assignment, "checked_integral_overflow");
+
+            candidate = new RuntimeHazardCandidate(
+                assignment,
                 SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
                 trigger,
                 "System.OverflowException",
@@ -1575,6 +1618,39 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
+        private static bool TryCreateCheckedIntegralCompoundAssignmentOverflowTrigger(
+            AssignmentExpressionSyntax assignment,
+            SmtIntegerBinaryOperator smtOperator,
+            long minValue,
+            long maxValue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula trigger)
+        {
+            trigger = null!;
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    assignment.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out var leftFormula,
+                    getSymbolVersion: null) ||
+                leftFormula is not { Kind: SmtValueKind.Int } ||
+                !CSharpConditionToFormula.TryTranslateValue(
+                    assignment.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var rightFormula,
+                    getSymbolVersion: null) ||
+                rightFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            var resultFormula = new SmtIntegerBinaryTerm(smtOperator, leftFormula, rightFormula);
+            trigger = CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue);
+            return true;
+        }
+
         private static bool TryCreateCheckedExplicitNumericConversionOverflowTrigger(
             CastExpressionSyntax castExpression,
             long minValue,
@@ -1692,6 +1768,49 @@ namespace PurelySharp.Symbolic
                 case SyntaxKind.PreDecrementExpression:
                 case SyntaxKind.PostDecrementExpression:
                     smtOperator = SmtIntegerBinaryOperator.Subtract;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool TryGetCheckedIntegralCompoundAssignmentOperator(
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtIntegerBinaryOperator smtOperator,
+            out long minValue,
+            out long maxValue)
+        {
+            smtOperator = default;
+            minValue = default;
+            maxValue = default;
+
+            if (semanticModel.GetOperation(assignment, cancellationToken) is not ICompoundAssignmentOperation
+                {
+                    IsChecked: true,
+                    OperatorMethod: null
+                } operation)
+            {
+                return false;
+            }
+
+            var targetType = operation.Target.Type ?? semanticModel.GetTypeInfo(assignment.Left, cancellationToken).Type;
+            if (!TryGetBoundedIntegralRange(targetType, out minValue, out maxValue))
+            {
+                return false;
+            }
+
+            switch (assignment.Kind())
+            {
+                case SyntaxKind.AddAssignmentExpression:
+                    smtOperator = SmtIntegerBinaryOperator.Add;
+                    return true;
+                case SyntaxKind.SubtractAssignmentExpression:
+                    smtOperator = SmtIntegerBinaryOperator.Subtract;
+                    return true;
+                case SyntaxKind.MultiplyAssignmentExpression:
+                    smtOperator = SmtIntegerBinaryOperator.Multiply;
                     return true;
                 default:
                     return false;

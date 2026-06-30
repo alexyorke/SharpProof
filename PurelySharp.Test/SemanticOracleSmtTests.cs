@@ -6931,6 +6931,30 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_NullableBoolGetValueOrDefaultAbsentContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("bool? maybe", "!maybe.HasValue && maybe.GetValueOrDefault()"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NullableBoolGetValueOrDefaultPresentContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("bool? maybe", "maybe.HasValue && maybe.GetValueOrDefault() && maybe.Value == false"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NullableBoolGetValueOrDefaultFallbackContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("bool? maybe", "!maybe.HasValue && maybe.GetValueOrDefault(true) == false"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_NullableGetValueOrDefaultUnknownFallback_RemainsUnknown()
         {
             Assert.That(

@@ -1030,6 +1030,78 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ClassifyPathFeasibility_AliasInsideIntegerExpressionIntervalContradiction_BypassesSolver()
+        {
+            var x = new SmtVariable("expr_alias_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var y = new SmtVariable("expr_alias_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var xPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, new SmtIntegerConstant(1));
+            var yPlusOne = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, y, new SmtIntegerConstant(1));
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, x, y),
+                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, xPlusOne, new SmtIntegerConstant(5)),
+                new SmtBinaryFormula(SmtBinaryOperator.LessThan, yPlusOne, new SmtIntegerConstant(5)),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyImplication_AliasInsideStringLengthEntailment_BypassesSolver()
+        {
+            var left = new SmtVariable("length_alias_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+            var right = new SmtVariable("length_alias_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+            var leftLength = new SmtStringLengthTerm(left);
+            var rightLength = new SmtStringLengthTerm(right);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right),
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, leftLength, new SmtIntegerConstant(3)),
+            };
+            var fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, rightLength, new SmtIntegerConstant(3));
+
+            var result = service.ClassifyImplication(pathConditions, fact);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_AliasInsideStringConcatContradiction_BypassesSolver()
+        {
+            var left = new SmtVariable("concat_alias_left_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+            var right = new SmtVariable("concat_alias_right_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+            var leftConcat = new SmtStringConcatTerm(left, new SmtStringConstant("!"));
+            var rightConcat = new SmtStringConcatTerm(right, new SmtStringConstant("!"));
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, left, right),
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, leftConcat, new SmtStringConstant("A!")),
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, rightConcat, new SmtStringConstant("A!")),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void ClassifyImplication_RuntimeTypeTestPredicateIsCongruentUnderReferenceEquality()
         {
             var x = new SmtVariable("runtime_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);

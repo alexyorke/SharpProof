@@ -2799,6 +2799,46 @@ namespace PurelySharp.Symbolic
                     } when target.Kind == right.Kind:
                         targetKey = GetFormulaKey(target);
                         return true;
+                    case SmtBinaryFormula
+                    {
+                        Operator: SmtBinaryOperator.NotEqual,
+                        Left: SmtVariable { Kind: SmtValueKind.Reference } target,
+                        Right: SmtNullConstant
+                    }:
+                        targetKey = GetFormulaKey(target);
+                        return true;
+                    case SmtBinaryFormula
+                    {
+                        Operator: SmtBinaryOperator.NotEqual,
+                        Left: SmtNullConstant,
+                        Right: SmtVariable { Kind: SmtValueKind.Reference } target
+                    }:
+                        targetKey = GetFormulaKey(target);
+                        return true;
+                    case SmtUnaryFormula
+                    {
+                        Operator: SmtUnaryOperator.Not,
+                        Operand: SmtBinaryFormula
+                        {
+                            Operator: SmtBinaryOperator.Equal,
+                            Left: SmtVariable { Kind: SmtValueKind.Reference } target,
+                            Right: SmtNullConstant
+                        }
+                    }:
+                        targetKey = GetFormulaKey(target);
+                        return true;
+                    case SmtUnaryFormula
+                    {
+                        Operator: SmtUnaryOperator.Not,
+                        Operand: SmtBinaryFormula
+                        {
+                            Operator: SmtBinaryOperator.Equal,
+                            Left: SmtNullConstant,
+                            Right: SmtVariable { Kind: SmtValueKind.Reference } target
+                        }
+                    }:
+                        targetKey = GetFormulaKey(target);
+                        return true;
                     case SmtVariable { Kind: SmtValueKind.Bool } target:
                         targetKey = GetFormulaKey(target);
                         return true;

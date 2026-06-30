@@ -6951,8 +6951,10 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
-            if (IsSupportedBuiltInElementAccessReceiver(valueType) &&
-                !HasCountBackedIntIndexer(valueType))
+            if (valueType is IArrayTypeSymbol { Rank: 1 } ||
+                valueType?.SpecialType == SpecialType.System_String ||
+                IsBuiltInSpanType(valueType) ||
+                IsBuiltInMemoryType(valueType))
             {
                 return TryCreateMemberFormula(value, "Length", intType, out lengthFormula) &&
                     lengthFormula != null;
@@ -11721,7 +11723,7 @@ namespace PurelySharp.Symbolic.Smt
                 invocationOperation.TargetMethod.ContainingType is not INamedTypeSymbol containingType ||
                 containingType.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T ||
                 containingType.TypeArguments.Length != 1 ||
-                !IsIntegralOrEnumType(containingType.TypeArguments[0]) ||
+                !TryGetValueKind(containingType.TypeArguments[0], out var underlyingKind) ||
                 !TryTranslateNullableValueParts(
                     memberAccess.Expression,
                     semanticModel,
@@ -11730,7 +11732,8 @@ namespace PurelySharp.Symbolic.Smt
                     out var nullableValueFormula,
                     getSymbolVersion,
                     inlineDepth) ||
-                nullableValueFormula is not { Kind: SmtValueKind.Int })
+                nullableValueFormula is not { } ||
+                nullableValueFormula.Kind != underlyingKind)
             {
                 return false;
             }
@@ -11739,7 +11742,8 @@ namespace PurelySharp.Symbolic.Smt
             if (invocationOperation.TargetMethod.Parameters.Length == 0)
             {
                 if (!TryCreateDefaultValueFormula(containingType.TypeArguments[0], out fallbackFormula) ||
-                    fallbackFormula is not { Kind: SmtValueKind.Int })
+                    fallbackFormula is not { } ||
+                    fallbackFormula.Kind != underlyingKind)
                 {
                     return false;
                 }
@@ -11754,7 +11758,8 @@ namespace PurelySharp.Symbolic.Smt
                         out fallbackFormula,
                         getSymbolVersion,
                         inlineDepth) ||
-                    fallbackFormula is not { Kind: SmtValueKind.Int })
+                    fallbackFormula is not { } ||
+                    fallbackFormula.Kind != underlyingKind)
                 {
                     return false;
                 }
@@ -11768,7 +11773,7 @@ namespace PurelySharp.Symbolic.Smt
                 hasValueFormula,
                 nullableValueFormula,
                 fallbackFormula,
-                SmtValueKind.Int);
+                underlyingKind);
             return true;
         }
 

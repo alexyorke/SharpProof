@@ -851,5 +851,54 @@ public sealed class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task SwitchStatementGuardContradictsTrackedAssignment_PrunesSection()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int[] values)
+    {
+        var gate = 0;
+        switch (values)
+        {
+            case [_, ..] when gate != 0:
+                Console.WriteLine(gate);
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchExpressionGuardContradictsTrackedAssignment_PrunesArm()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public string TestMethod(int[] values)
+    {
+        var gate = 0;
+        return values switch
+        {
+            [_, ..] when gate != 0 => Console.ReadLine(),
+            _ => string.Empty
+        };
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

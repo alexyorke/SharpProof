@@ -11,13 +11,14 @@ namespace SearchLib.Smt
         private readonly Expr _nullReference;
         private readonly Dictionary<(string Name, SmtValueKind Kind), Expr> _variables = new();
         private readonly Dictionary<string, FuncDecl> _runtimeTypeTests = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, RegexTranslationPrecision> _regexPrecisionCache = new(StringComparer.Ordinal);
+        private readonly Dictionary<(string Pattern, RegexOptions Options), RegexTranslationPrecision> _regexPrecisionCache = new();
         private const RegexOptions Z3SupportedRegexOptions =
             RegexOptions.ExplicitCapture |
             RegexOptions.Compiled |
             RegexOptions.CultureInvariant |
             RegexOptions.Singleline |
-            RegexOptions.IgnorePatternWhitespace;
+            RegexOptions.IgnorePatternWhitespace |
+            RegexOptions.IgnoreCase;
 
         public Z3FormulaEncoder()
         {
@@ -54,7 +55,7 @@ namespace SearchLib.Smt
         {
             return formula switch
             {
-                SmtRegexMatchFormula regexMatch => GetRegexTranslationPrecision(regexMatch.Pattern) == RegexTranslationPrecision.Approximate ||
+                SmtRegexMatchFormula regexMatch => GetRegexTranslationPrecision(regexMatch.Pattern, regexMatch.Options) == RegexTranslationPrecision.Approximate ||
                     ContainsApproximateRegex(regexMatch.Value),
                 SmtRuntimeTypeTestFormula runtimeTypeTestFormula => ContainsApproximateRegex(runtimeTypeTestFormula.Value),
                 SmtUnaryFormula unaryFormula => ContainsApproximateRegex(unaryFormula.Operand),
@@ -199,7 +200,7 @@ namespace SearchLib.Smt
                 throw new InvalidOperationException("Unsupported SMT regex options.");
             }
 
-            if (!Z3RegexTranslator.TryTranslate(_context, formula.Pattern, out var regex, out _))
+            if (!Z3RegexTranslator.TryTranslate(_context, formula.Pattern, formula.Options, out var regex, out _))
             {
                 throw new InvalidOperationException("Unsupported SMT regex pattern.");
             }
@@ -246,7 +247,7 @@ namespace SearchLib.Smt
                         throw new InvalidOperationException("Unsupported SMT regex options.");
                     }
 
-                    if (isNegativeContext && IsApproximateRegexPattern(regexMatch.Pattern))
+                    if (isNegativeContext && IsApproximateRegexPattern(regexMatch.Pattern, regexMatch.Options))
                     {
                         throw new InvalidOperationException("Approximate SMT regex patterns cannot be safely negated.");
                     }
@@ -366,7 +367,7 @@ namespace SearchLib.Smt
                         throw new InvalidOperationException("Unsupported SMT regex options.");
                     }
 
-                    if (IsApproximateRegexPattern(regexMatch.Pattern))
+                    if (IsApproximateRegexPattern(regexMatch.Pattern, regexMatch.Options))
                     {
                         throw new InvalidOperationException("Approximate SMT regex patterns require positive polarity.");
                     }
@@ -417,30 +418,37 @@ namespace SearchLib.Smt
             }
         }
 
-        private bool IsApproximateRegexPattern(string pattern)
+        private bool IsApproximateRegexPattern(string pattern, RegexOptions options)
         {
-            return GetRegexTranslationPrecision(pattern) == RegexTranslationPrecision.Approximate;
+            return GetRegexTranslationPrecision(pattern, options) == RegexTranslationPrecision.Approximate;
         }
 
-        private RegexTranslationPrecision GetRegexTranslationPrecision(string pattern)
+        private RegexTranslationPrecision GetRegexTranslationPrecision(string pattern, RegexOptions options)
         {
-            if (_regexPrecisionCache.TryGetValue(pattern, out var cached))
+            var key = (pattern, options);
+            if (_regexPrecisionCache.TryGetValue(key, out var cached))
             {
                 return cached;
             }
 
-            var precision = Z3RegexTranslator.TryTranslate(_context, pattern, out _, out var isExact)
+            var precision = Z3RegexTranslator.TryTranslate(_context, pattern, options, out _, out var isExact)
                 ? isExact
                     ? RegexTranslationPrecision.Exact
                     : RegexTranslationPrecision.Approximate
                 : RegexTranslationPrecision.Unsupported;
-            _regexPrecisionCache.Add(pattern, precision);
+            _regexPrecisionCache.Add(key, precision);
             return precision;
         }
 
         private static bool CanEncodeRegexOptions(RegexOptions options)
         {
-            return (options & ~Z3SupportedRegexOptions) == 0;
+            if ((options & ~Z3SupportedRegexOptions) != 0)
+            {
+                return false;
+            }
+
+            return (options & RegexOptions.IgnoreCase) == 0 ||
+                (options & RegexOptions.CultureInvariant) != 0;
         }
 
         private static bool GetBooleanComparisonOperandPolarity(
@@ -519,25 +527,36 @@ namespace SearchLib.Smt
             // and smaller shorthand/category classes cover the common analyzer facts precisely.
             private const int MaxCharacterClassRangeCount = 512;
             private static readonly TimeSpan RegexSyntaxValidationTimeout = TimeSpan.FromMilliseconds(50);
-            private static readonly ConcurrentDictionary<string, CharacterRange[]> RegexCharacterRangeCache = new(StringComparer.Ordinal);
-            private static readonly Lazy<CharacterRange[]> DecimalDigitRanges = new(() => CreateRegexCharacterRanges(@"\d"));
-            private static readonly Lazy<CharacterRange[]> WhitespaceRanges = new(() => CreateRegexCharacterRanges(@"\s"));
-            private static readonly Lazy<CharacterRange[]> WordRanges = new(() => CreateRegexCharacterRanges(@"\w"));
+            private static readonly ConcurrentDictionary<(string Pattern, RegexOptions Options), CharacterRange[]> RegexCharacterRangeCache = new();
+            private static readonly Lazy<CharacterRange[]> DecimalDigitRanges = new(() => CreateRegexCharacterRanges((@"\d", RegexOptions.None)));
+            private static readonly Lazy<CharacterRange[]> WhitespaceRanges = new(() => CreateRegexCharacterRanges((@"\s", RegexOptions.None)));
+            private static readonly Lazy<CharacterRange[]> WordRanges = new(() => CreateRegexCharacterRanges((@"\w", RegexOptions.None)));
             private readonly Context _context;
             private readonly string _pattern;
             private readonly Dictionary<string, RegexClassTranslation> _characterClassCache = new(StringComparer.Ordinal);
             private bool _isExact = true;
             private bool _ignorePatternWhitespace;
+            private bool _ignoreCase;
+            private readonly bool _canUseIgnoreCase;
             private bool _singleline;
             private int _position;
 
-            private Z3RegexTranslator(Context context, string pattern)
+            private Z3RegexTranslator(Context context, string pattern, RegexOptions options)
             {
                 _context = context;
                 _pattern = pattern;
+                _ignorePatternWhitespace = (options & RegexOptions.IgnorePatternWhitespace) != 0;
+                _ignoreCase = (options & RegexOptions.IgnoreCase) != 0;
+                _canUseIgnoreCase = (options & RegexOptions.CultureInvariant) != 0;
+                _singleline = (options & RegexOptions.Singleline) != 0;
             }
 
             public static bool TryTranslate(Context context, string pattern, out ReExpr regex, out bool isExact)
+            {
+                return TryTranslate(context, pattern, RegexOptions.None, out regex, out isExact);
+            }
+
+            public static bool TryTranslate(Context context, string pattern, RegexOptions options, out ReExpr regex, out bool isExact)
             {
                 regex = null!;
                 isExact = true;
@@ -546,7 +565,7 @@ namespace SearchLib.Smt
                     return false;
                 }
 
-                if (!IsValidDotNetRegexPattern(pattern))
+                if (!IsValidDotNetRegexPattern(pattern, options))
                 {
                     return false;
                 }
@@ -567,7 +586,7 @@ namespace SearchLib.Smt
                     return false;
                 }
 
-                var translator = new Z3RegexTranslator(context, pattern.Substring(bodyStart, bodyLength));
+                var translator = new Z3RegexTranslator(context, pattern.Substring(bodyStart, bodyLength), options);
                 if (!translator.TryParseExpression(out var body))
                 {
                     return false;
@@ -792,13 +811,14 @@ namespace SearchLib.Smt
 
             private RegexOptionScope CaptureOptions()
             {
-                return new RegexOptionScope(_ignorePatternWhitespace, _singleline);
+                return new RegexOptionScope(_ignorePatternWhitespace, _singleline, _ignoreCase);
             }
 
             private void ApplyOptions(RegexOptionScope options)
             {
                 _ignorePatternWhitespace = options.IgnorePatternWhitespace;
                 _singleline = options.Singleline;
+                _ignoreCase = options.IgnoreCase;
             }
 
             private bool TryParseGroupPrefix(out RegexOptionScope groupOptions)
@@ -839,6 +859,7 @@ namespace SearchLib.Smt
                 var savedPosition = _position;
                 var nextIgnorePatternWhitespace = groupOptions.IgnorePatternWhitespace;
                 var nextSingleline = groupOptions.Singleline;
+                var nextIgnoreCase = groupOptions.IgnoreCase;
                 var sawOption = false;
                 var sawDisableSeparator = false;
                 while (_position < _pattern.Length && !Peek(':'))
@@ -880,6 +901,14 @@ namespace SearchLib.Smt
                         continue;
                     }
 
+                    if (current == 'i' && _canUseIgnoreCase)
+                    {
+                        sawOption = true;
+                        nextIgnoreCase = !sawDisableSeparator;
+                        _position++;
+                        continue;
+                    }
+
                     _position = savedPosition;
                     return false;
                 }
@@ -891,7 +920,7 @@ namespace SearchLib.Smt
                 }
 
                 _position++;
-                groupOptions = new RegexOptionScope(nextIgnorePatternWhitespace, nextSingleline);
+                groupOptions = new RegexOptionScope(nextIgnorePatternWhitespace, nextSingleline, nextIgnoreCase);
                 return true;
             }
 
@@ -1066,6 +1095,11 @@ namespace SearchLib.Smt
             private bool TryParseCharClass(out ReExpr regex)
             {
                 regex = null!;
+                if (_ignoreCase)
+                {
+                    return TryParseWholeCharacterClassWithDotNet(out regex);
+                }
+
                 var negate = false;
                 if (Peek('^'))
                 {
@@ -1136,6 +1170,70 @@ namespace SearchLib.Smt
                 }
 
                 return true;
+            }
+
+            private bool TryParseWholeCharacterClassWithDotNet(out ReExpr regex)
+            {
+                regex = null!;
+                if (!TryReadWholeCharacterClassPattern(out var atomPattern))
+                {
+                    return false;
+                }
+
+                if (!TryCreateCharacterRangesRegex(atomPattern, RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, out regex))
+                {
+                    _isExact = false;
+                    regex = CreateAnyCharRegex();
+                }
+
+                return true;
+            }
+
+            private bool TryReadWholeCharacterClassPattern(out string atomPattern)
+            {
+                atomPattern = string.Empty;
+                var start = _position - 1;
+                if (start < 0 || start >= _pattern.Length || _pattern[start] != '[')
+                {
+                    return false;
+                }
+
+                var index = _position;
+                if (index < _pattern.Length && _pattern[index] == '^')
+                {
+                    index++;
+                }
+
+                if (index < _pattern.Length && _pattern[index] == ']')
+                {
+                    index++;
+                }
+
+                var escaped = false;
+                for (; index < _pattern.Length; index++)
+                {
+                    var current = _pattern[index];
+                    if (escaped)
+                    {
+                        escaped = false;
+                        continue;
+                    }
+
+                    if (current == '\\')
+                    {
+                        escaped = true;
+                        continue;
+                    }
+
+                    if (current == ']')
+                    {
+                        _position = index + 1;
+                        atomPattern = _pattern.Substring(start, index - start + 1);
+                        return true;
+                    }
+                }
+
+                return false;
             }
 
             private bool TryReadClassPart(out CharacterClassPart part)
@@ -1376,10 +1474,15 @@ namespace SearchLib.Smt
 
             private bool TryCreateCharacterRangesRegex(string atomPattern, out ReExpr regex)
             {
+                return TryCreateCharacterRangesRegex(atomPattern, RegexOptions.None, out regex);
+            }
+
+            private bool TryCreateCharacterRangesRegex(string atomPattern, RegexOptions options, out ReExpr regex)
+            {
                 regex = null!;
                 try
                 {
-                    if (!TryGetCharacterRanges(atomPattern, out var ranges))
+                    if (!TryGetCharacterRanges(atomPattern, options, out var ranges))
                     {
                         return false;
                     }
@@ -1403,10 +1506,15 @@ namespace SearchLib.Smt
 
             private static bool TryGetCharacterRanges(string atomPattern, out CharacterRange[] ranges)
             {
+                return TryGetCharacterRanges(atomPattern, RegexOptions.None, out ranges);
+            }
+
+            private static bool TryGetCharacterRanges(string atomPattern, RegexOptions options, out CharacterRange[] ranges)
+            {
                 ranges = Array.Empty<CharacterRange>();
                 try
                 {
-                    ranges = RegexCharacterRangeCache.GetOrAdd(atomPattern, CreateRegexCharacterRanges);
+                    ranges = RegexCharacterRangeCache.GetOrAdd((atomPattern, options), CreateRegexCharacterRanges);
                     return ranges.Length is > 0 and <= MaxCharacterClassRangeCount;
                 }
                 catch (ArgumentException)
@@ -1423,12 +1531,12 @@ namespace SearchLib.Smt
                 }
             }
 
-            private static CharacterRange[] CreateRegexCharacterRanges(string atomPattern)
+            private static CharacterRange[] CreateRegexCharacterRanges((string Pattern, RegexOptions Options) key)
             {
                 var ranges = new List<CharacterRange>();
                 char? rangeStart = null;
                 var previous = '\0';
-                var regex = new Regex(@"\A(?:" + atomPattern + @")\z", RegexOptions.None, RegexSyntaxValidationTimeout);
+                var regex = new Regex(@"\A(?:" + key.Pattern + @")\z", key.Options, RegexSyntaxValidationTimeout);
                 for (var codePoint = 0; codePoint <= char.MaxValue; codePoint++)
                 {
                     var current = (char)codePoint;
@@ -1731,7 +1839,29 @@ namespace SearchLib.Smt
 
             private ReExpr CreateLiteralRegex(string value)
             {
+                if (_ignoreCase && value.Length != 0)
+                {
+                    var regexes = new ReExpr[value.Length];
+                    for (var index = 0; index < value.Length; index++)
+                    {
+                        regexes[index] = CreateIgnoreCaseLiteralCharacterRegex(value[index]);
+                    }
+
+                    return regexes.Length == 1 ? regexes[0] : _context.MkConcat(regexes);
+                }
+
                 return _context.MkToRe(_context.MkString(value));
+            }
+
+            private ReExpr CreateIgnoreCaseLiteralCharacterRegex(char value)
+            {
+                if (TryCreateCharacterRangesRegex(Regex.Escape(value.ToString()), RegexOptions.CultureInvariant | RegexOptions.IgnoreCase, out var regex))
+                {
+                    return regex;
+                }
+
+                _isExact = false;
+                return CreateAnyCharRegex();
             }
 
             private bool Peek(char value)
@@ -1741,15 +1871,18 @@ namespace SearchLib.Smt
 
             private readonly struct RegexOptionScope
             {
-                public RegexOptionScope(bool ignorePatternWhitespace, bool singleline)
+                public RegexOptionScope(bool ignorePatternWhitespace, bool singleline, bool ignoreCase)
                 {
                     IgnorePatternWhitespace = ignorePatternWhitespace;
                     Singleline = singleline;
+                    IgnoreCase = ignoreCase;
                 }
 
                 public bool IgnorePatternWhitespace { get; }
 
                 public bool Singleline { get; }
+
+                public bool IgnoreCase { get; }
             }
 
             private static bool IsEscaped(string value, int index)
@@ -1769,11 +1902,11 @@ namespace SearchLib.Smt
                     !IsEscaped(value, value.Length - anchor.Length);
             }
 
-            private static bool IsValidDotNetRegexPattern(string pattern)
+            private static bool IsValidDotNetRegexPattern(string pattern, RegexOptions options)
             {
                 try
                 {
-                    _ = new Regex(pattern, RegexOptions.None, RegexSyntaxValidationTimeout);
+                    _ = new Regex(pattern, options, RegexSyntaxValidationTimeout);
                     return true;
                 }
                 catch (ArgumentException)

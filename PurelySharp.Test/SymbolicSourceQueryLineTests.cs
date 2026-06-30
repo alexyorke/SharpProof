@@ -1364,6 +1364,66 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSpanQueryResult_ToInvariantQueryResult_EmitsBoundedQueryAnswer()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        var copy = value;
+        if (copy > 0)
+        {
+            return copy;
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "InvariantQueryProjection.cs");
+            var compilation = CSharpCompilation.Create(
+                "InvariantQueryProjection",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var spanStart = FindPosition(source, "if (copy > 0)");
+            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+                syntaxTree,
+                compilation,
+                spanStart,
+                spanEnd,
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "copy > 0" });
+            var invariantResult = result.ToInvariantQueryResult(new SymbolicCompactQueryOptions(maxConditions: 1));
+
+            Assert.That(invariantResult.Kind, Is.EqualTo("invariantQuery"));
+            Assert.That(invariantResult.SchemaVersion, Is.EqualTo(1));
+            Assert.That(invariantResult.ScopeKind, Is.EqualTo("span"));
+            Assert.That(invariantResult.FilePath, Does.EndWith("InvariantQueryProjection.cs"));
+            Assert.That(invariantResult.QueryDescriptor.Kind, Is.EqualTo("span"));
+            Assert.That(invariantResult.QueryDescriptor.SpanStart, Is.EqualTo(spanStart));
+            Assert.That(invariantResult.QueryDescriptor.SpanEnd, Is.EqualTo(spanEnd));
+            Assert.That(invariantResult.QueryDescriptor.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
+            Assert.That(invariantResult.QueryDescriptor.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
+            Assert.That(invariantResult.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+            Assert.That(invariantResult.LinesWithProgramPoints, Is.EqualTo(result.LinesWithProgramPoints));
+            Assert.That(invariantResult.MergedInvariantText, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(invariantResult.InvariantQuery.Text, Is.EqualTo(result.InvariantQuery.Text));
+            Assert.That(invariantResult.InvariantQuery.MaybeFactCount, Is.EqualTo(result.InvariantQuery.MaybeFactCount));
+            Assert.That(invariantResult.InvariantQuery.MaybeFacts, Has.Count.LessThanOrEqualTo(1));
+            Assert.That(invariantResult.InvariantQuery.MaybeFactsTruncated, Is.EqualTo(result.InvariantQuery.MaybeFactCount > 1));
+            Assert.That(invariantResult.AnalysisSummary.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
+            Assert.That(invariantResult.AnalysisSummary.InvariantStatus, Is.EqualTo(invariantResult.InvariantQuery.Status));
+            Assert.That(invariantResult.SmtDiagnostics.IsConfigured, Is.True);
+        }
+
+        [Test]
         public void SymbolicConditionProofSummary_DescribesReachableProofOutcomes()
         {
             var points = new[]
@@ -1832,6 +1892,89 @@ public class TestClass
                         .SelectMany(static point => point.GetProperty("conditionProofs").EnumerateArray())
                         .Any(static proof => proof.GetProperty("truthValue").GetString() == SymbolicTruthValue.ProvenTrue.ToString()),
                     Is.True);
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public async Task SymbolicCli_InvariantJson_LineColumnSpanEmitsOnlyInvariantAnswer()
+        {
+            var source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        var copy = value;
+        if (copy > 0)
+        {
+            return copy;
+        }
+
+        return 0;
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliInvariantJsonLineSpan-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var spanStart = FindPosition(source, "if (copy > 0)");
+                var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--span-start-line",
+                    FindLine(source, "if (copy > 0)").ToString(),
+                    "--span-start-column",
+                    FindColumn(source, "if (copy > 0)").ToString(),
+                    "--span-end-line",
+                    FindLine(source, "return 0;").ToString(),
+                    "--span-end-column",
+                    (FindColumn(source, "return 0;") + "return 0;".Length).ToString(),
+                    "--check-reachability",
+                    "--implies",
+                    "copy > 0",
+                    "--invariant-json",
+                    "--max-conditions",
+                    "1");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("invariantQuery"));
+                Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+                Assert.That(root.GetProperty("scopeKind").GetString(), Is.EqualTo("span"));
+                Assert.That(root.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
+                Assert.That(root.TryGetProperty("programPoints", out _), Is.False);
+                Assert.That(root.TryGetProperty("lines", out _), Is.False);
+
+                var queryDescriptor = root.GetProperty("queryDescriptor");
+                Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("span"));
+                Assert.That(queryDescriptor.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
+                Assert.That(queryDescriptor.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
+                Assert.That(queryDescriptor.GetProperty("startLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
+                Assert.That(queryDescriptor.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
+
+                var invariantQuery = root.GetProperty("invariantQuery");
+                Assert.That(invariantQuery.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+                Assert.That(invariantQuery.GetProperty("maybeFacts").GetArrayLength(), Is.EqualTo(1));
+                Assert.That(invariantQuery.GetProperty("maybeFactsTruncated").GetBoolean(), Is.True);
+                Assert.That(invariantQuery.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
+                Assert.That(invariantQuery.GetProperty("status").GetString(), Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved.ToString()));
+
+                var analysisSummary = root.GetProperty("analysisSummary");
+                Assert.That(
+                    analysisSummary.GetProperty("programPointCount").GetInt32(),
+                    Is.EqualTo(root.GetProperty("programPointCount").GetInt32()));
+                Assert.That(
+                    analysisSummary.GetProperty("invariantStatus").GetString(),
+                    Is.EqualTo(invariantQuery.GetProperty("status").GetString()));
+                Assert.That(root.GetProperty("smtDiagnostics").GetProperty("isConfigured").GetBoolean(), Is.True);
             }
             finally
             {

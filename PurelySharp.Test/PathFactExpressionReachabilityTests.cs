@@ -1,4 +1,7 @@
 using NUnit.Framework;
+using PurelySharp.Symbolic;
+using PurelySharp.Symbolic.Smt;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using VerifyCS = PurelySharp.Test.CSharpAnalyzerVerifier<
@@ -290,6 +293,42 @@ public class TestClass
         }
 
         [Test]
+        public void IfElseMerge_NonNullGuardAndNullAssignmentProvesContradictoryPathFalse()
+        {
+            var source = @"
+public class TestClass
+{
+    public string TestMethod(bool flag, string result)
+    {
+        if (flag)
+        {
+            if (result is null)
+            {
+                return string.Empty;
+            }
+        }
+        else
+        {
+            result = null;
+        }
+
+        return flag && result is null ? Impure() : string.Empty;
+    }
+
+    private static string Impure() => string.Empty;
+}";
+            var marker = FindLineColumn(source, "Impure()");
+            var query = new SymbolicSourceQueryService().AnalyzeSourceAtPosition(
+                source,
+                "PathFactExpressionReachabilityTests.cs",
+                marker.Position,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(query.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+        }
+
+        [Test]
         public async Task ImpossibleBranchWithImpureForeachEnumeratorRuntime_NoDiagnostic()
         {
             var test = @"
@@ -382,6 +421,32 @@ public class TestClass
 }";
 
             await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        private static (int Line, int Column, int Position) FindLineColumn(string source, string marker)
+        {
+            var position = source.IndexOf(marker, StringComparison.Ordinal);
+            if (position < 0)
+            {
+                throw new InvalidOperationException("Marker was not found in source.");
+            }
+
+            var line = 1;
+            var column = 1;
+            for (var index = 0; index < position; index++)
+            {
+                if (source[index] == '\n')
+                {
+                    line++;
+                    column = 1;
+                }
+                else
+                {
+                    column++;
+                }
+            }
+
+            return (line, column, position);
         }
 
     }

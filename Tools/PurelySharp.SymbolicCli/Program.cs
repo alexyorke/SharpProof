@@ -129,7 +129,21 @@ try
         };
     }
 
-    if (options.CompactJson)
+    if (options.InvariantJson)
+    {
+        object invariantResult = result switch
+        {
+            SymbolicFileQueryResult fileResult => (object)fileResult.ToInvariantQueryResult(options.CreateCompactOptions()),
+            SymbolicLineQueryResult lineResult => (object)lineResult.ToInvariantQueryResult(options.CreateCompactOptions()),
+            SymbolicSpanQueryResult spanResult => (object)spanResult.ToInvariantQueryResult(options.CreateCompactOptions()),
+            SymbolicSourceQueryResult pointResult => (object)pointResult.ToInvariantQueryResult(options.CreateCompactOptions()),
+            _ => throw new InvalidOperationException("Unexpected query result type."),
+        };
+        Console.WriteLine(JsonSerializer.Serialize(
+            invariantResult,
+            CreateCompactJsonOptions()));
+    }
+    else if (options.CompactJson)
     {
         object compactResult = result switch
         {
@@ -621,7 +635,7 @@ static JsonSerializerOptions CreateFullJsonOptions()
 internal sealed class SymbolicCliOptions
 {
     public const string Usage = """
-Usage: PurelySharp.SymbolicCli --file <path> (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json|--compact-json]
+Usage: PurelySharp.SymbolicCli --file <path> (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n> | --all-lines) [--json|--compact-json|--invariant-json]
 
 Options:
   --file <path>       C# source file to query.
@@ -690,6 +704,7 @@ Options:
                       Maximum formula nodes before conservative fallback.
   --json              Emit JSON instead of text.
   --compact-json      Emit compact bounded JSON for invariants or runtime hazards.
+  --invariant-json    Emit only the compact invariant query answer, query descriptor, and analysis summary.
   --max-lines <n>     Maximum lines included in --compact-json output. Default: 100.
   --max-points <n>    Maximum program points included in --compact-json output. Default: 250.
   --max-hazards <n>   Maximum runtime hazards included in --runtime-hazards --compact-json output. Default: 250.
@@ -707,6 +722,7 @@ Runtime hazard notes:
 
 Examples:
   PurelySharp.SymbolicCli --file Example.cs --line 42 --line-invariants --check-reachability --implies "index >= 0"
+  PurelySharp.SymbolicCli --file Example.cs --line 42 --line-invariants --invariant-json
   PurelySharp.SymbolicCli --file Example.cs --line 42 --runtime-hazards
   PurelySharp.SymbolicCli --file Example.cs --all-lines --runtime-hazards --hazard-kind NullDereference --compact-json
   PurelySharp.SymbolicCli --file Example.cs --all-lines --runtime-hazards --include-unproven-hazards --hazard-status Unknown --compact-json
@@ -781,6 +797,8 @@ Examples:
     public bool Json { get; private set; }
 
     public bool CompactJson { get; private set; }
+
+    public bool InvariantJson { get; private set; }
 
     public bool CheckReachability { get; private set; }
 
@@ -988,6 +1006,10 @@ Examples:
                 case "--compact":
                     options.CompactJson = true;
                     break;
+                case "--invariant-json":
+                case "--invariant-query-json":
+                    options.InvariantJson = true;
+                    break;
                 case "--max-lines":
                     options.CompactMaxLines = ReadNonNegativeInt(args, ref index, arg);
                     options.HasCompactOutputLimit = true;
@@ -1079,9 +1101,19 @@ Examples:
                 throw new ArgumentException("--json cannot be combined with --compact-json.");
             }
 
-            if (options.HasCompactOutputLimit && !options.CompactJson)
+            if (options.Json && options.InvariantJson)
             {
-                throw new ArgumentException("--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs require --compact-json.");
+                throw new ArgumentException("--json cannot be combined with --invariant-json.");
+            }
+
+            if (options.CompactJson && options.InvariantJson)
+            {
+                throw new ArgumentException("--compact-json cannot be combined with --invariant-json.");
+            }
+
+            if (options.HasCompactOutputLimit && !options.CompactJson && !options.InvariantJson)
+            {
+                throw new ArgumentException("--max-lines, --max-points, --max-hazards, --max-facts, --max-conditions, and --max-proofs require --compact-json or --invariant-json.");
             }
 
             if (options.HasCompactHazardOutputLimit && !options.RuntimeHazards)
@@ -1190,6 +1222,11 @@ Examples:
             if (options.RuntimeHazards && options.Position.HasValue)
             {
                 throw new ArgumentException("--runtime-hazards supports --line, --span-start/--span-end, or --all-lines, not --position.");
+            }
+
+            if (options.RuntimeHazards && options.InvariantJson)
+            {
+                throw new ArgumentException("--invariant-json cannot be combined with --runtime-hazards.");
             }
 
             if (options.RuntimeHazards && (options.LineInvariants || options.LineExpressions || options.PostLineInvariants || options.Column != 1 || options.IsLineColumnSpanQuery))

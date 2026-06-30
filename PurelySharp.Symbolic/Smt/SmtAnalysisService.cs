@@ -772,6 +772,7 @@ namespace PurelySharp.Symbolic.Smt
             public bool Add(SmtFormula formula, out bool hasContradiction)
             {
                 hasContradiction = false;
+                formula = NormalizeAliases(formula);
                 var added = false;
                 if (TryAddAliasFact(formula, out var aliasContradiction))
                 {
@@ -955,6 +956,7 @@ namespace PurelySharp.Symbolic.Smt
 
             public bool TryEvaluateBoolean(SmtFormula formula, out bool value)
             {
+                formula = NormalizeAliases(formula);
                 if (_exactBooleans.TryGetValue(formula, out var exactValue))
                 {
                     value = exactValue;
@@ -1226,7 +1228,7 @@ namespace PurelySharp.Symbolic.Smt
                     return false;
                 }
 
-                term = FindCanonical(term);
+                term = NormalizeAliases(term);
                 if (op == SmtBinaryOperator.NotEqual)
                 {
                     if (_exactStrings.TryGetValue(term, out var exactValue) &&
@@ -1264,6 +1266,7 @@ namespace PurelySharp.Symbolic.Smt
                 int length,
                 out bool hasContradiction)
             {
+                stringFormula = NormalizeAliases(stringFormula);
                 var lengthFormula = new SmtStringLengthTerm(stringFormula);
                 var interval = _integerIntervals.TryGetValue(lengthFormula, out var existing)
                     ? existing
@@ -1273,9 +1276,192 @@ namespace PurelySharp.Symbolic.Smt
                 _integerIntervals[lengthFormula] = interval;
             }
 
+            private SmtFormula NormalizeAliases(SmtFormula formula)
+            {
+                return NormalizeAliases(formula, new HashSet<SmtFormula>());
+            }
+
+            private SmtFormula NormalizeAliases(SmtFormula formula, HashSet<SmtFormula> visiting)
+            {
+                var directCanonical = FindCanonical(formula);
+                if (!directCanonical.Equals(formula) &&
+                    !ReferencesFormula(directCanonical, formula))
+                {
+                    return directCanonical;
+                }
+
+                if (!visiting.Add(formula))
+                {
+                    return formula;
+                }
+
+                var normalized = formula switch
+                {
+                    SmtUnaryFormula unary => NormalizeUnaryFormula(unary, visiting),
+                    SmtBinaryFormula binary => NormalizeBinaryFormula(binary, visiting),
+                    SmtIntegerUnaryTerm unary => NormalizeIntegerUnaryTerm(unary, visiting),
+                    SmtIntegerBinaryTerm binary => NormalizeIntegerBinaryTerm(binary, visiting),
+                    SmtStringLengthTerm stringLength => NormalizeStringLengthTerm(stringLength, visiting),
+                    SmtStringConcatTerm stringConcat => NormalizeStringConcatTerm(stringConcat, visiting),
+                    SmtStringContainsFormula stringContains => NormalizeStringContainsFormula(stringContains, visiting),
+                    SmtStringStartsWithFormula stringStartsWith => NormalizeStringStartsWithFormula(stringStartsWith, visiting),
+                    SmtStringEndsWithFormula stringEndsWith => NormalizeStringEndsWithFormula(stringEndsWith, visiting),
+                    SmtRegexMatchFormula regexMatch => NormalizeRegexMatchFormula(regexMatch, visiting),
+                    SmtRuntimeTypeTestFormula runtimeTypeTest => NormalizeRuntimeTypeTestFormula(runtimeTypeTest, visiting),
+                    SmtConditionalFormula conditional => NormalizeConditionalFormula(conditional, visiting),
+                    _ => formula,
+                };
+
+                visiting.Remove(formula);
+                var normalizedCanonical = FindCanonical(normalized);
+                return !normalizedCanonical.Equals(normalized) &&
+                    !ReferencesFormula(normalizedCanonical, normalized)
+                    ? normalizedCanonical
+                    : normalized;
+            }
+
+            private SmtFormula NormalizeUnaryFormula(SmtUnaryFormula formula, HashSet<SmtFormula> visiting)
+            {
+                var operand = NormalizeAliases(formula.Operand, visiting);
+                return operand.Equals(formula.Operand)
+                    ? formula
+                    : new SmtUnaryFormula(formula.Operator, operand);
+            }
+
+            private SmtFormula NormalizeBinaryFormula(SmtBinaryFormula formula, HashSet<SmtFormula> visiting)
+            {
+                var left = NormalizeAliases(formula.Left, visiting);
+                var right = NormalizeAliases(formula.Right, visiting);
+                return left.Equals(formula.Left) && right.Equals(formula.Right)
+                    ? formula
+                    : new SmtBinaryFormula(formula.Operator, left, right);
+            }
+
+            private SmtFormula NormalizeIntegerUnaryTerm(SmtIntegerUnaryTerm formula, HashSet<SmtFormula> visiting)
+            {
+                var operand = NormalizeAliases(formula.Operand, visiting);
+                return operand.Equals(formula.Operand)
+                    ? formula
+                    : new SmtIntegerUnaryTerm(formula.Operator, operand);
+            }
+
+            private SmtFormula NormalizeIntegerBinaryTerm(SmtIntegerBinaryTerm formula, HashSet<SmtFormula> visiting)
+            {
+                var left = NormalizeAliases(formula.Left, visiting);
+                var right = NormalizeAliases(formula.Right, visiting);
+                return left.Equals(formula.Left) && right.Equals(formula.Right)
+                    ? formula
+                    : new SmtIntegerBinaryTerm(formula.Operator, left, right);
+            }
+
+            private SmtFormula NormalizeStringLengthTerm(SmtStringLengthTerm formula, HashSet<SmtFormula> visiting)
+            {
+                var value = NormalizeAliases(formula.Value, visiting);
+                return value.Equals(formula.Value)
+                    ? formula
+                    : new SmtStringLengthTerm(value);
+            }
+
+            private SmtFormula NormalizeStringConcatTerm(SmtStringConcatTerm formula, HashSet<SmtFormula> visiting)
+            {
+                var left = NormalizeAliases(formula.Left, visiting);
+                var right = NormalizeAliases(formula.Right, visiting);
+                return left.Equals(formula.Left) && right.Equals(formula.Right)
+                    ? formula
+                    : new SmtStringConcatTerm(left, right);
+            }
+
+            private SmtFormula NormalizeStringContainsFormula(SmtStringContainsFormula formula, HashSet<SmtFormula> visiting)
+            {
+                var value = NormalizeAliases(formula.Value, visiting);
+                var search = NormalizeAliases(formula.Search, visiting);
+                return value.Equals(formula.Value) && search.Equals(formula.Search)
+                    ? formula
+                    : new SmtStringContainsFormula(value, search);
+            }
+
+            private SmtFormula NormalizeStringStartsWithFormula(SmtStringStartsWithFormula formula, HashSet<SmtFormula> visiting)
+            {
+                var value = NormalizeAliases(formula.Value, visiting);
+                var prefix = NormalizeAliases(formula.Prefix, visiting);
+                return value.Equals(formula.Value) && prefix.Equals(formula.Prefix)
+                    ? formula
+                    : new SmtStringStartsWithFormula(value, prefix);
+            }
+
+            private SmtFormula NormalizeStringEndsWithFormula(SmtStringEndsWithFormula formula, HashSet<SmtFormula> visiting)
+            {
+                var value = NormalizeAliases(formula.Value, visiting);
+                var suffix = NormalizeAliases(formula.Suffix, visiting);
+                return value.Equals(formula.Value) && suffix.Equals(formula.Suffix)
+                    ? formula
+                    : new SmtStringEndsWithFormula(value, suffix);
+            }
+
+            private SmtFormula NormalizeRegexMatchFormula(SmtRegexMatchFormula formula, HashSet<SmtFormula> visiting)
+            {
+                var value = NormalizeAliases(formula.Value, visiting);
+                return value.Equals(formula.Value)
+                    ? formula
+                    : new SmtRegexMatchFormula(value, formula.Pattern, formula.Options);
+            }
+
+            private SmtFormula NormalizeRuntimeTypeTestFormula(SmtRuntimeTypeTestFormula formula, HashSet<SmtFormula> visiting)
+            {
+                var value = NormalizeAliases(formula.Value, visiting);
+                return value.Equals(formula.Value)
+                    ? formula
+                    : new SmtRuntimeTypeTestFormula(value, formula.TypeKey);
+            }
+
+            private SmtFormula NormalizeConditionalFormula(SmtConditionalFormula formula, HashSet<SmtFormula> visiting)
+            {
+                var condition = NormalizeAliases(formula.Condition, visiting);
+                var whenTrue = NormalizeAliases(formula.WhenTrue, visiting);
+                var whenFalse = NormalizeAliases(formula.WhenFalse, visiting);
+                return condition.Equals(formula.Condition) &&
+                    whenTrue.Equals(formula.WhenTrue) &&
+                    whenFalse.Equals(formula.WhenFalse)
+                    ? formula
+                    : new SmtConditionalFormula(condition, whenTrue, whenFalse, formula.ResultKind);
+            }
+
+            private static bool ReferencesFormula(SmtFormula formula, SmtFormula candidate)
+            {
+                if (formula.Equals(candidate))
+                {
+                    return true;
+                }
+
+                return formula switch
+                {
+                    SmtUnaryFormula unary => ReferencesFormula(unary.Operand, candidate),
+                    SmtBinaryFormula binary => ReferencesFormula(binary.Left, candidate) ||
+                        ReferencesFormula(binary.Right, candidate),
+                    SmtIntegerUnaryTerm unary => ReferencesFormula(unary.Operand, candidate),
+                    SmtIntegerBinaryTerm binary => ReferencesFormula(binary.Left, candidate) ||
+                        ReferencesFormula(binary.Right, candidate),
+                    SmtStringLengthTerm stringLength => ReferencesFormula(stringLength.Value, candidate),
+                    SmtStringConcatTerm stringConcat => ReferencesFormula(stringConcat.Left, candidate) ||
+                        ReferencesFormula(stringConcat.Right, candidate),
+                    SmtStringContainsFormula stringContains => ReferencesFormula(stringContains.Value, candidate) ||
+                        ReferencesFormula(stringContains.Search, candidate),
+                    SmtStringStartsWithFormula stringStartsWith => ReferencesFormula(stringStartsWith.Value, candidate) ||
+                        ReferencesFormula(stringStartsWith.Prefix, candidate),
+                    SmtStringEndsWithFormula stringEndsWith => ReferencesFormula(stringEndsWith.Value, candidate) ||
+                        ReferencesFormula(stringEndsWith.Suffix, candidate),
+                    SmtRegexMatchFormula regexMatch => ReferencesFormula(regexMatch.Value, candidate),
+                    SmtRuntimeTypeTestFormula runtimeTypeTest => ReferencesFormula(runtimeTypeTest.Value, candidate),
+                    SmtConditionalFormula conditional => ReferencesFormula(conditional.Condition, candidate) ||
+                        ReferencesFormula(conditional.WhenTrue, candidate) ||
+                        ReferencesFormula(conditional.WhenFalse, candidate),
+                    _ => false,
+                };
+            }
+
             private bool TryGetKnownString(SmtFormula formula, out string value)
             {
-                formula = FindCanonical(formula);
+                formula = NormalizeAliases(formula);
                 if (_exactStrings.TryGetValue(formula, out var exactValue))
                 {
                     value = exactValue;
@@ -1304,7 +1490,7 @@ namespace PurelySharp.Symbolic.Smt
 
             private bool TryGetKnownInteger(SmtFormula formula, out long value)
             {
-                formula = FindCanonical(formula);
+                formula = NormalizeAliases(formula);
                 if (_integerIntervals.TryGetValue(formula, out var interval) &&
                     interval.ExactValue.HasValue)
                 {
@@ -1387,7 +1573,7 @@ namespace PurelySharp.Symbolic.Smt
                     return false;
                 }
 
-                term = FindCanonical(term);
+                term = NormalizeAliases(term);
                 var interval = _integerIntervals.TryGetValue(term, out var existing)
                     ? existing
                     : IntegerInterval.Unbounded;

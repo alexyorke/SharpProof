@@ -2004,6 +2004,11 @@ namespace PurelySharp.Symbolic
             return SymbolicCompactQueryResult.FromLine(this, options);
         }
 
+        public SymbolicInvariantQueryResult ToInvariantQueryResult(SymbolicCompactQueryOptions? options = null)
+        {
+            return SymbolicInvariantQueryResult.FromLine(this, options);
+        }
+
         public SymbolicLineQueryResult Filter(SymbolicSourceQueryFilter filter)
         {
             if (filter == null)
@@ -2127,6 +2132,11 @@ namespace PurelySharp.Symbolic
             return SymbolicCompactQueryResult.FromSpan(this, options);
         }
 
+        public SymbolicInvariantQueryResult ToInvariantQueryResult(SymbolicCompactQueryOptions? options = null)
+        {
+            return SymbolicInvariantQueryResult.FromSpan(this, options);
+        }
+
         public SymbolicSpanQueryResult Filter(SymbolicSourceQueryFilter filter)
         {
             if (filter == null)
@@ -2223,6 +2233,11 @@ namespace PurelySharp.Symbolic
         public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
         {
             return SymbolicCompactQueryResult.FromFile(this, options);
+        }
+
+        public SymbolicInvariantQueryResult ToInvariantQueryResult(SymbolicCompactQueryOptions? options = null)
+        {
+            return SymbolicInvariantQueryResult.FromFile(this, options);
         }
 
         public SymbolicFileQueryResult Filter(SymbolicSourceQueryFilter filter)
@@ -3190,6 +3205,124 @@ namespace PurelySharp.Symbolic
                 Array.Empty<SymbolicCompactProgramPointResult>(),
                 SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
                 truncation);
+        }
+    }
+
+    public sealed class SymbolicInvariantQueryResult
+    {
+        private SymbolicInvariantQueryResult(
+            string scopeKind,
+            string filePath,
+            SymbolicCompactSourceQueryDescriptor queryDescriptor,
+            string mergedInvariantText,
+            SymbolicCompactInvariantQueryView invariantQuery,
+            SymbolicCompactAnalysisSummary analysisSummary,
+            SymbolicReachabilitySummary reachability,
+            SymbolicProgramPointSummary programPointSummary,
+            SymbolicCompactSmtDiagnostics smtDiagnostics,
+            int? lineCount,
+            int linesWithProgramPoints,
+            int programPointCount)
+        {
+            ScopeKind = scopeKind ?? string.Empty;
+            FilePath = filePath ?? string.Empty;
+            QueryDescriptor = queryDescriptor ?? throw new ArgumentNullException(nameof(queryDescriptor));
+            MergedInvariantText = mergedInvariantText ?? string.Empty;
+            InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
+            AnalysisSummary = analysisSummary ?? throw new ArgumentNullException(nameof(analysisSummary));
+            Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
+            ProgramPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
+            ProofOutcomes = ProgramPointSummary.ProofOutcomes;
+            SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
+            LineCount = lineCount;
+            LinesWithProgramPoints = linesWithProgramPoints;
+            ProgramPointCount = programPointCount;
+        }
+
+        public string Kind => "invariantQuery";
+
+        public int SchemaVersion => 1;
+
+        public string ScopeKind { get; }
+
+        public string FilePath { get; }
+
+        public SymbolicCompactSourceQueryDescriptor QueryDescriptor { get; }
+
+        public string MergedInvariantText { get; }
+
+        public SymbolicCompactInvariantQueryView InvariantQuery { get; }
+
+        public SymbolicCompactAnalysisSummary AnalysisSummary { get; }
+
+        public SymbolicReachabilitySummary Reachability { get; }
+
+        public SymbolicProgramPointSummary ProgramPointSummary { get; }
+
+        public SymbolicProofOutcomeSummary ProofOutcomes { get; }
+
+        public SymbolicCompactSmtDiagnostics SmtDiagnostics { get; }
+
+        public int? LineCount { get; }
+
+        public int LinesWithProgramPoints { get; }
+
+        public int ProgramPointCount { get; }
+
+        public static SymbolicInvariantQueryResult FromPoint(
+            SymbolicSourceQueryResult result,
+            SymbolicCompactQueryOptions? options = null)
+        {
+            return FromCompactResult(SymbolicCompactQueryResult.FromPoint(result, NormalizeOptions(options)));
+        }
+
+        public static SymbolicInvariantQueryResult FromLine(
+            SymbolicLineQueryResult result,
+            SymbolicCompactQueryOptions? options = null)
+        {
+            return FromCompactResult(SymbolicCompactQueryResult.FromLine(result, NormalizeOptions(options)));
+        }
+
+        public static SymbolicInvariantQueryResult FromSpan(
+            SymbolicSpanQueryResult result,
+            SymbolicCompactQueryOptions? options = null)
+        {
+            return FromCompactResult(SymbolicCompactQueryResult.FromSpan(result, NormalizeOptions(options)));
+        }
+
+        public static SymbolicInvariantQueryResult FromFile(
+            SymbolicFileQueryResult result,
+            SymbolicCompactQueryOptions? options = null)
+        {
+            return FromCompactResult(SymbolicCompactQueryResult.FromFile(result, NormalizeOptions(options)));
+        }
+
+        private static SymbolicInvariantQueryResult FromCompactResult(SymbolicCompactQueryResult result)
+        {
+            return new SymbolicInvariantQueryResult(
+                result.Kind,
+                result.FilePath,
+                result.QueryDescriptor,
+                result.MergedInvariantText,
+                result.InvariantQuery,
+                result.AnalysisSummary,
+                result.Reachability,
+                result.ProgramPointSummary,
+                result.SmtDiagnostics,
+                result.LineCount,
+                result.LinesWithProgramPoints,
+                result.ProgramPointCount);
+        }
+
+        private static SymbolicCompactQueryOptions NormalizeOptions(SymbolicCompactQueryOptions? options)
+        {
+            var normalizedOptions = options ?? SymbolicCompactQueryOptions.Default;
+            return new SymbolicCompactQueryOptions(
+                maxLines: 0,
+                maxProgramPoints: 0,
+                maxFacts: normalizedOptions.MaxFacts,
+                maxConditions: normalizedOptions.MaxConditions,
+                maxProofs: normalizedOptions.MaxProofs);
         }
     }
 
@@ -5719,6 +5852,11 @@ namespace PurelySharp.Symbolic
         public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
         {
             return SymbolicCompactQueryResult.FromPoint(this, options);
+        }
+
+        public SymbolicInvariantQueryResult ToInvariantQueryResult(SymbolicCompactQueryOptions? options = null)
+        {
+            return SymbolicInvariantQueryResult.FromPoint(this, options);
         }
 
         private static string FormatMergedInvariantText(IReadOnlyList<string> facts)
