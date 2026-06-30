@@ -50,6 +50,11 @@ namespace PurelySharp.Symbolic
                 RemoveTemporaryFacts(facts, temporaryEntryFacts);
             }
 
+            if (site is BlockSyntax siteBlock)
+            {
+                AddContainingBlockEntryFacts(siteBlock, semanticModel, cancellationToken, facts);
+            }
+
             return facts;
         }
 
@@ -1176,14 +1181,32 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             List<SmtFormula> facts)
         {
+            RemoveFactsInvalidatedByContainingBlockEntry(block, semanticModel, cancellationToken, facts);
             var entryFacts = CollectContainingBlockEntryFacts(block, semanticModel, cancellationToken);
             if (entryFacts.Length == 0)
             {
                 return Array.Empty<SmtFormula>();
             }
 
+            return AddUniqueFacts(facts, entryFacts);
+        }
+
+        private static void AddContainingBlockEntryFacts(
+            BlockSyntax block,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            RemoveFactsInvalidatedByContainingBlockEntry(block, semanticModel, cancellationToken, facts);
+            AddUniqueFacts(facts, CollectContainingBlockEntryFacts(block, semanticModel, cancellationToken));
+        }
+
+        private static IReadOnlyList<SmtFormula> AddUniqueFacts(
+            List<SmtFormula> facts,
+            IReadOnlyList<SmtFormula> entryFacts)
+        {
             var existingKeys = new HashSet<string>(facts.Select(GetFormulaKey), StringComparer.Ordinal);
-            var addedFacts = new List<SmtFormula>(entryFacts.Length);
+            var addedFacts = new List<SmtFormula>(entryFacts.Count);
             foreach (var entryFact in entryFacts)
             {
                 if (!existingKeys.Add(GetFormulaKey(entryFact)))
@@ -1196,6 +1219,63 @@ namespace PurelySharp.Symbolic
             }
 
             return addedFacts;
+        }
+
+        private static void RemoveFactsInvalidatedByContainingBlockEntry(
+            BlockSyntax block,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            foreach (var symbol in GetContainingBlockEntryAssignedSymbols(block, semanticModel, cancellationToken))
+            {
+                RemoveFactsReferencingSymbol(facts, symbol);
+            }
+        }
+
+        private static IEnumerable<ISymbol> GetContainingBlockEntryAssignedSymbols(
+            BlockSyntax block,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            ExpressionSyntax? condition = null;
+            switch (block.Parent)
+            {
+                case IfStatementSyntax ifStatement when ReferenceEquals(ifStatement.Statement, block):
+                    condition = ifStatement.Condition;
+                    break;
+                case ElseClauseSyntax { Parent: IfStatementSyntax ifStatement, Statement: var statement }
+                    when ReferenceEquals(statement, block):
+                    condition = ifStatement.Condition;
+                    break;
+                case WhileStatementSyntax whileStatement when ReferenceEquals(whileStatement.Statement, block):
+                    condition = whileStatement.Condition;
+                    break;
+                case ForStatementSyntax forStatement when ReferenceEquals(forStatement.Statement, block):
+                    condition = forStatement.Condition;
+                    break;
+            }
+
+            if (condition == null)
+            {
+                yield break;
+            }
+
+            foreach (var assignment in condition.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate))
+                         .OfType<AssignmentExpressionSyntax>())
+            {
+                if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression))
+                {
+                    continue;
+                }
+
+                var assignedSymbol = semanticModel.GetSymbolInfo(assignment.Left, cancellationToken).Symbol;
+                if (assignedSymbol is ILocalSymbol or IParameterSymbol)
+                {
+                    yield return assignedSymbol.OriginalDefinition;
+                }
+            }
         }
 
         private static ImmutableArray<SmtFormula> CollectContainingBlockEntryFacts(

@@ -432,6 +432,72 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_InlineAssignmentZeroDivisorBranch_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int input)
+    {
+        var divisor = input;
+        if ((divisor = 0) == 0)
+        {
+            return 10 / divisor;
+        }
+
+        return 1;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_InlineAssignmentNonZeroDivisorBranch_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int input)
+    {
+        var divisor = input;
+        if ((divisor = 1) > 0)
+        {
+            return 10 / divisor;
+        }
+
+        return 1;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_InlineAssignmentShortCircuitTrueBranch_RemainsConservative()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        var divisor = 1;
+        if (flag || (divisor = 0) == 0)
+        {
+            return 10 / divisor;
+        }
+
+        return 1;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_ConditionalExpressionUnreachableNullDerefArm_DoesNotReport()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"

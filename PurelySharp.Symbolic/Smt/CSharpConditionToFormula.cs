@@ -3400,6 +3400,10 @@ namespace PurelySharp.Symbolic.Smt
 
             AddNullComparisonOperandImplications(expression, branchWhenTrue, semanticModel, cancellationToken, formulas, getSymbolVersion);
             AddConditionalAccessStringEqualityBranchFacts(expression, branchWhenTrue, semanticModel, cancellationToken, formulas, getSymbolVersion);
+            if (TryAddInlineAssignmentBranchFacts(expression, branchWhenTrue, semanticModel, cancellationToken, formulas, getSymbolVersion))
+            {
+                return;
+            }
 
             if (!TryTranslate(expression, semanticModel, cancellationToken, out var formula, getSymbolVersion) ||
                 formula == null)
@@ -3410,6 +3414,278 @@ namespace PurelySharp.Symbolic.Smt
             formulas.Add(branchWhenTrue
                 ? formula
                 : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
+        }
+
+        private static bool TryAddInlineAssignmentBranchFacts(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is AssignmentExpressionSyntax directAssignment)
+            {
+                return TryAddDirectBooleanAssignmentBranchFacts(
+                    directAssignment,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion);
+            }
+
+            if (expression is not BinaryExpressionSyntax binaryExpression ||
+                !IsSupportedInlineAssignmentComparison(binaryExpression.Kind()))
+            {
+                return false;
+            }
+
+            if (TryAddInlineAssignmentComparisonBranchFacts(
+                    binaryExpression.Left,
+                    binaryExpression.Right,
+                    binaryExpression.Kind(),
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion,
+                    rejectOtherReferencesAssignedSymbol: false))
+            {
+                return true;
+            }
+
+            return TryAddInlineAssignmentComparisonBranchFacts(
+                binaryExpression.Right,
+                binaryExpression.Left,
+                ReverseComparisonKind(binaryExpression.Kind()),
+                branchWhenTrue,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion,
+                rejectOtherReferencesAssignedSymbol: true);
+        }
+
+        private static bool TryAddDirectBooleanAssignmentBranchFacts(
+            AssignmentExpressionSyntax assignment,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            var candidateFormulas = formulas.ToList();
+            if (!TryCreateSimpleInlineAssignmentFact(
+                    assignment,
+                    semanticModel,
+                    cancellationToken,
+                    candidateFormulas,
+                    getSymbolVersion,
+                    out var targetFormula,
+                    out _) ||
+                targetFormula is not { Kind: SmtValueKind.Bool })
+            {
+                return false;
+            }
+
+            candidateFormulas.Add(branchWhenTrue
+                ? targetFormula
+                : new SmtUnaryFormula(SmtUnaryOperator.Not, targetFormula));
+            ReplaceFormulas(formulas, candidateFormulas);
+            return true;
+        }
+
+        private static bool TryAddInlineAssignmentComparisonBranchFacts(
+            ExpressionSyntax assignmentCandidate,
+            ExpressionSyntax otherExpression,
+            SyntaxKind comparisonKind,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion,
+            bool rejectOtherReferencesAssignedSymbol)
+        {
+            assignmentCandidate = UnwrapExpression(assignmentCandidate);
+            otherExpression = UnwrapExpression(otherExpression);
+            var candidateFormulas = formulas.ToList();
+            if (assignmentCandidate is not AssignmentExpressionSyntax assignment ||
+                UnwrapExpression(otherExpression) is AssignmentExpressionSyntax ||
+                !TryCreateSimpleInlineAssignmentFact(
+                    assignment,
+                    semanticModel,
+                    cancellationToken,
+                    candidateFormulas,
+                    getSymbolVersion,
+                    out var targetFormula,
+                    out var assignedSymbol) ||
+                (rejectOtherReferencesAssignedSymbol &&
+                 ExpressionReferencesSymbol(otherExpression, assignedSymbol, semanticModel, cancellationToken)) ||
+                !TryTranslateValue(otherExpression, semanticModel, cancellationToken, out var otherFormula, getSymbolVersion) ||
+                otherFormula == null ||
+                !TryTranslateComparison(comparisonKind, targetFormula, otherFormula, out var comparisonFormula) ||
+                comparisonFormula == null)
+            {
+                return false;
+            }
+
+            candidateFormulas.Add(branchWhenTrue
+                ? comparisonFormula
+                : new SmtUnaryFormula(SmtUnaryOperator.Not, comparisonFormula));
+            ReplaceFormulas(formulas, candidateFormulas);
+            return true;
+        }
+
+        private static bool TryCreateSimpleInlineAssignmentFact(
+            AssignmentExpressionSyntax assignment,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion,
+            out SmtFormula targetFormula,
+            out ISymbol assignedSymbol)
+        {
+            targetFormula = null!;
+            assignedSymbol = null!;
+            if (!assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) ||
+                ContainsNestedAssignment(assignment.Right) ||
+                semanticModel.GetSymbolInfo(UnwrapExpression(assignment.Left), cancellationToken).Symbol is not ISymbol assignmentTarget ||
+                assignmentTarget is not ILocalSymbol and not IParameterSymbol ||
+                ExpressionReferencesSymbol(assignment.Right, assignmentTarget.OriginalDefinition, semanticModel, cancellationToken) ||
+                !TryCreateSymbolFormula(assignmentTarget.OriginalDefinition, getSymbolVersion, out targetFormula) ||
+                !TryTranslateValue(assignment.Right, semanticModel, cancellationToken, out var assignedValue, getSymbolVersion) ||
+                assignedValue == null ||
+                !AreComparable(targetFormula, assignedValue))
+            {
+                targetFormula = null!;
+                return false;
+            }
+
+            assignedSymbol = assignmentTarget.OriginalDefinition;
+            RemoveFactsReferencingSymbol(formulas, assignedSymbol, getSymbolVersion);
+            formulas.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, assignedValue));
+            return true;
+        }
+
+        private static bool IsSupportedInlineAssignmentComparison(SyntaxKind kind)
+        {
+            return kind is
+                SyntaxKind.EqualsExpression or
+                SyntaxKind.NotEqualsExpression or
+                SyntaxKind.LessThanExpression or
+                SyntaxKind.LessThanOrEqualExpression or
+                SyntaxKind.GreaterThanExpression or
+                SyntaxKind.GreaterThanOrEqualExpression;
+        }
+
+        private static SyntaxKind ReverseComparisonKind(SyntaxKind kind)
+        {
+            return kind switch
+            {
+                SyntaxKind.LessThanExpression => SyntaxKind.GreaterThanExpression,
+                SyntaxKind.LessThanOrEqualExpression => SyntaxKind.GreaterThanOrEqualExpression,
+                SyntaxKind.GreaterThanExpression => SyntaxKind.LessThanExpression,
+                SyntaxKind.GreaterThanOrEqualExpression => SyntaxKind.LessThanOrEqualExpression,
+                _ => kind,
+            };
+        }
+
+        private static void ReplaceFormulas(ICollection<SmtFormula> formulas, IEnumerable<SmtFormula> replacement)
+        {
+            formulas.Clear();
+            foreach (var formula in replacement)
+            {
+                formulas.Add(formula);
+            }
+        }
+
+        private static bool ContainsNestedAssignment(SyntaxNode node)
+        {
+            return node.DescendantNodesAndSelf().OfType<AssignmentExpressionSyntax>().Any();
+        }
+
+        private static bool ExpressionReferencesSymbol(
+            SyntaxNode node,
+            ISymbol symbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            foreach (var expression in node.DescendantNodesAndSelf().OfType<ExpressionSyntax>())
+            {
+                var expressionSymbol = semanticModel.GetSymbolInfo(UnwrapExpression(expression), cancellationToken).Symbol;
+                if (expressionSymbol != null &&
+                    SymbolEqualityComparer.Default.Equals(expressionSymbol.OriginalDefinition, symbol))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void RemoveFactsReferencingSymbol(
+            ICollection<SmtFormula> formulas,
+            ISymbol symbol,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            var variableName = GetVariableName(symbol.OriginalDefinition, getSymbolVersion);
+            foreach (var formula in formulas.ToArray())
+            {
+                if (ReferencesVariable(formula, variableName))
+                {
+                    formulas.Remove(formula);
+                }
+            }
+        }
+
+        private static bool ReferencesVariable(SmtFormula formula, string variableName)
+        {
+            switch (formula)
+            {
+                case SmtVariable variable:
+                    return IsVariableOrMemberOf(variable.Name, variableName);
+                case SmtUnaryFormula unary:
+                    return ReferencesVariable(unary.Operand, variableName);
+                case SmtBinaryFormula binary:
+                    return ReferencesVariable(binary.Left, variableName) ||
+                        ReferencesVariable(binary.Right, variableName);
+                case SmtIntegerUnaryTerm unary:
+                    return ReferencesVariable(unary.Operand, variableName);
+                case SmtIntegerBinaryTerm binary:
+                    return ReferencesVariable(binary.Left, variableName) ||
+                        ReferencesVariable(binary.Right, variableName);
+                case SmtStringLengthTerm stringLength:
+                    return ReferencesVariable(stringLength.Value, variableName);
+                case SmtStringConcatTerm stringConcat:
+                    return ReferencesVariable(stringConcat.Left, variableName) ||
+                        ReferencesVariable(stringConcat.Right, variableName);
+                case SmtStringContainsFormula stringContains:
+                    return ReferencesVariable(stringContains.Value, variableName) ||
+                        ReferencesVariable(stringContains.Search, variableName);
+                case SmtStringStartsWithFormula stringStartsWith:
+                    return ReferencesVariable(stringStartsWith.Value, variableName) ||
+                        ReferencesVariable(stringStartsWith.Prefix, variableName);
+                case SmtStringEndsWithFormula stringEndsWith:
+                    return ReferencesVariable(stringEndsWith.Value, variableName) ||
+                        ReferencesVariable(stringEndsWith.Suffix, variableName);
+                case SmtRegexMatchFormula regexMatch:
+                    return ReferencesVariable(regexMatch.Value, variableName);
+                case SmtConditionalFormula conditional:
+                    return ReferencesVariable(conditional.Condition, variableName) ||
+                        ReferencesVariable(conditional.WhenTrue, variableName) ||
+                        ReferencesVariable(conditional.WhenFalse, variableName);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IsVariableOrMemberOf(string candidateName, string variableName)
+        {
+            return string.Equals(candidateName, variableName, StringComparison.Ordinal) ||
+                candidateName.StartsWith(variableName + ".", StringComparison.Ordinal) ||
+                candidateName.StartsWith(variableName + "[", StringComparison.Ordinal);
         }
 
         private static void AddConditionalAccessStringEqualityBranchFacts(

@@ -126,6 +126,150 @@ public class TestClass
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
         }
 
+        [Test]
+        public void ProgramPointFacts_InlineAssignmentComparisonProvesAssignedValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = 5;
+        if ((divisor = 0) == 0)
+        {
+            return 10 / divisor;
+        }
+
+        return 1;
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / divisor;");
+            var proof = ProveAtMarker(source, marker, "divisor == 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_InlineAssignmentComparisonInvalidatesPriorValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = 5;
+        if ((divisor = 0) == 0)
+        {
+            return 10 / divisor;
+        }
+
+        return 1;
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / divisor;");
+            var proof = ProveAtMarker(source, marker, "divisor == 5");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_RightHandInlineAssignmentComparisonPreservesDirection()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = 5;
+        if (0 < (divisor = 1))
+        {
+            return 10 / divisor;
+        }
+
+        return 1;
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / divisor;");
+            var proof = ProveAtMarker(source, marker, "divisor > 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_RightHandInlineAssignmentReferencingAssignedSymbolRemainsConservative()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = 5;
+        if (divisor == (divisor = 0))
+        {
+            return divisor;
+        }
+
+        return 1;
+    }
+}";
+
+            var marker = FindMarker(source, "return divisor;");
+            var proof = ProveAtMarker(source, marker, "divisor == 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_InlineAssignmentBranchBlockInvalidatesPriorValue()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var divisor = 5;
+        if ((divisor = 0) == 0)
+        {
+            return 10 / divisor;
+        }
+
+        return 1;
+    }
+}";
+
+            var snapshot = GetSnapshotAtBlockContainingStatement(source, "return 10 / divisor;");
+
+            Assert.That(snapshot.Facts.Any(fact => fact.Contains("Value = 5", StringComparison.Ordinal)), Is.False);
+            Assert.That(snapshot.Facts.Count(fact => fact.Contains("Value = 0", StringComparison.Ordinal)), Is.GreaterThanOrEqualTo(1));
+        }
+
+        [Test]
+        public void ProgramPointFacts_SelfReferentialInlineAssignmentRemainsConservative()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int input)
+    {
+        var divisor = input;
+        if ((divisor = divisor + 1) == 0)
+        {
+            return divisor;
+        }
+
+        return 1;
+    }
+}";
+
+            var marker = FindMarker(source, "return divisor;");
+            var proof = ProveAtMarker(source, marker, "divisor == 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
         private static SymbolicInvariantSnapshot GetSnapshotAtStatement(string source, string statementPrefix)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(
@@ -144,6 +288,27 @@ public class TestClass
                 .Single(node => node.ToString().StartsWith(statementPrefix, StringComparison.Ordinal));
 
             return new SymbolicInvariantService().GetInvariantsAt(statement, semanticModel);
+        }
+
+        private static SymbolicInvariantSnapshot GetSnapshotAtBlockContainingStatement(string source, string statementPrefix)
+        {
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "SymbolicProgramPointFactTests.cs");
+            var compilation = CSharpCompilation.Create(
+                "SymbolicProgramPointFactTests",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var block = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<BlockSyntax>()
+                .Single(node => node.Statements.Any(statement =>
+                    statement.ToString().StartsWith(statementPrefix, StringComparison.Ordinal)));
+
+            return new SymbolicInvariantService().GetInvariantsAt(block, semanticModel);
         }
 
         private static SymbolicConditionProofResult ProveAtMarker(
