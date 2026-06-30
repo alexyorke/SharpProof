@@ -223,6 +223,62 @@ namespace PurelySharp.Analyzer
                         "nullable_value"));
             }
 
+            foreach (var unboxNullCastNode in ExceptionFlowAnalyzer.GetDefiniteUnboxNullCastNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                if (IsInStaticallyUnreachableBranch(unboxNullCastNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByThrowingFinally(unboxNullCastNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.NullReferenceException");
+                if (IsCaughtWithinMethod(unboxNullCastNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    unboxNullCastNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        "System.NullReferenceException",
+                        "definite_unbox_null",
+                        "cast"));
+            }
+
+            foreach (var invalidCastNode in ExceptionFlowAnalyzer.GetDefiniteInvalidCastNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                if (IsInStaticallyUnreachableBranch(invalidCastNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByThrowingFinally(invalidCastNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.InvalidCastException");
+                if (IsCaughtWithinMethod(invalidCastNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    invalidCastNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        "System.InvalidCastException",
+                        "definite_invalid_cast",
+                        "cast"));
+            }
+
             foreach (var indexOutOfRangeNode in ExceptionFlowAnalyzer.GetDefiniteIndexOutOfRangeNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
                 if (IsInStaticallyUnreachableBranch(indexOutOfRangeNode, semanticModel, cancellationToken, smtAnalysis))
@@ -606,6 +662,8 @@ namespace PurelySharp.Analyzer
                 string.Equals(category, "definite_divide_by_zero", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_null_dereference", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_nullable_value_without_value", StringComparison.Ordinal) ||
+                string.Equals(category, "definite_unbox_null", StringComparison.Ordinal) ||
+                string.Equals(category, "definite_invalid_cast", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_index_out_of_range", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_range_out_of_range", StringComparison.Ordinal);
         }

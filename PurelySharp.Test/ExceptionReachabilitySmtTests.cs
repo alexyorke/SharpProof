@@ -617,6 +617,173 @@ public class TestClass
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_range_out_of_range"));
         }
 
+        [Test]
+        public async Task Ps0010_UnboxNullCast_ReportsNullReferenceException()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        object value = null;
+        return (int)value;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_unbox_null"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.NullReferenceException=definite_unbox_null:cast"));
+        }
+
+        [Test]
+        public async Task Ps0010_UnboxNullCastCaught_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        try
+        {
+            object value = null;
+            return (int)value;
+        }
+        catch (NullReferenceException)
+        {
+            return 0;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_InvalidReferenceCast_ReportsInvalidCastException()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        object value = 42;
+        return ((string)value).Length;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidCastException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_invalid_cast"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.InvalidCastException=definite_invalid_cast:cast"));
+        }
+
+        [Test]
+        public async Task Ps0010_InvalidUnboxCast_ReportsInvalidCastException()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        object value = ""text"";
+        return (int)value;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidCastException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_invalid_cast"));
+        }
+
+        [Test]
+        public async Task Ps0010_UnknownObjectReferenceCast_DoesNotReportDefiniteInvalidCast()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(object value)
+    {
+        return ((string)value).Length;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_NullableUnboxNull_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        object value = null;
+        int? result = (int?)value;
+        return result.GetValueOrDefault();
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_InvalidReferenceCastInUnreachableBranch_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int flag)
+    {
+        object value = 42;
+        if (flag == 0)
+        {
+            return 0;
+        }
+
+        if (flag == 0)
+        {
+            return ((string)value).Length;
+        }
+
+        return 1;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_InvalidCastCaught_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        try
+        {
+            object value = 42;
+            return ((string)value).Length;
+        }
+        catch (InvalidCastException)
+        {
+            return 0;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
         private static Task<ImmutableArray<Diagnostic>> GetExceptionDiagnosticsAsync(string source)
         {
             return AnalyzerTestHost.GetDiagnosticsAsync(

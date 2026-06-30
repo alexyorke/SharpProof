@@ -2966,6 +2966,50 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0011_UnboxNullCast_ReportsExceptionSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        object value = null;
+        return (int)value;
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_unbox_null"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.NullReferenceException=definite_unbox_null:cast"));
+        }
+
+        [Test]
+        public async Task Ps0011_InvalidReferenceCast_ReportsExceptionSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        object value = 42;
+        return ((string)value).Length;
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidCastException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_invalid_cast"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.InvalidCastException=definite_invalid_cast:cast"));
+        }
+
+        [Test]
         public async Task Ps0011_SystemIndexVariableFromEndZeroGuard_ReportsExceptionSite()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(
