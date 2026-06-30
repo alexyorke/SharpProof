@@ -223,6 +223,34 @@ namespace PurelySharp.Analyzer
                         "null_receiver"));
             }
 
+            foreach (var dynamicNullBindingSite in ExceptionFlowAnalyzer.GetDefiniteDynamicNullBindingSites(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                if (IsInStaticallyUnreachableBranch(dynamicNullBindingSite.Site, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByThrowingFinally(dynamicNullBindingSite.Site, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException");
+                if (IsCaughtWithinMethod(dynamicNullBindingSite.Site, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    dynamicNullBindingSite.Site,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException",
+                        dynamicNullBindingSite.Category,
+                        dynamicNullBindingSite.Source));
+            }
+
             foreach (var nullableValueAccessNode in ExceptionFlowAnalyzer.GetDefiniteNullableValueAccessNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
                 if (IsInStaticallyUnreachableBranch(nullableValueAccessNode, semanticModel, cancellationToken, smtAnalysis))
@@ -717,6 +745,9 @@ namespace PurelySharp.Analyzer
                 string.Equals(category, "effect_summary", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_divide_by_zero", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_null_dereference", StringComparison.Ordinal) ||
+                string.Equals(category, "definite_dynamic_member_null_binding", StringComparison.Ordinal) ||
+                string.Equals(category, "definite_dynamic_invocation_null_binding", StringComparison.Ordinal) ||
+                string.Equals(category, "definite_dynamic_index_null_binding", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_nullable_value_without_value", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_unbox_null", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_invalid_cast", StringComparison.Ordinal) ||

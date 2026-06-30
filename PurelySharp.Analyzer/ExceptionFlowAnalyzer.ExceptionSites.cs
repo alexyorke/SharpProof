@@ -121,12 +121,78 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        internal static IEnumerable<DynamicNullBindingSite> GetDefiniteDynamicNullBindingSites(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            foreach (var node in GetRelevantDescendants<SyntaxNode>(methodNode))
+            {
+                if (node is MemberAccessExpressionSyntax memberAccess)
+                {
+                    if ((memberAccess.Parent is InvocationExpressionSyntax { Expression: var invocationExpression } &&
+                         ReferenceEquals(invocationExpression, memberAccess)) ||
+                        !IsDefiniteDynamicNullReceiver(memberAccess.Expression, memberAccess, semanticModel, cancellationToken, smtAnalysis))
+                    {
+                        continue;
+                    }
+
+                    yield return new DynamicNullBindingSite(
+                        memberAccess,
+                        "definite_dynamic_member_null_binding",
+                        "dynamic_member");
+                }
+                else if (node is ElementAccessExpressionSyntax elementAccess)
+                {
+                    if (!IsDefiniteDynamicNullReceiver(elementAccess.Expression, elementAccess, semanticModel, cancellationToken, smtAnalysis))
+                    {
+                        continue;
+                    }
+
+                    yield return new DynamicNullBindingSite(
+                        elementAccess,
+                        "definite_dynamic_index_null_binding",
+                        "dynamic_index");
+                }
+                else if (node is InvocationExpressionSyntax invocation)
+                {
+                    var invocationExpression = UnwrapFactExpression(invocation.Expression);
+                    var receiver = invocationExpression is MemberAccessExpressionSyntax invocationMemberAccess
+                        ? invocationMemberAccess.Expression
+                        : invocation.Expression;
+                    if (!IsDefiniteDynamicNullReceiver(receiver, invocation, semanticModel, cancellationToken, smtAnalysis))
+                    {
+                        continue;
+                    }
+
+                    yield return new DynamicNullBindingSite(
+                        invocation,
+                        "definite_dynamic_invocation_null_binding",
+                        "dynamic_invocation");
+                }
+            }
+        }
+
+        private static bool IsDefiniteDynamicNullReceiver(
+            ExpressionSyntax receiver,
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            return IsDynamicExpression(receiver, semanticModel, cancellationToken) &&
+                IsDefinitelyNullExpression(receiver, site, semanticModel, cancellationToken, smtAnalysis) &&
+                IsExceptionPathReachable(site, semanticModel, cancellationToken, smtAnalysis);
+        }
+
         private static bool IsReferenceDereferenceReceiver(
             ExpressionSyntax receiver,
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken)
         {
-            return IsReferenceType(GetExpressionType(receiver, semanticModel, cancellationToken));
+            return !IsDynamicExpression(receiver, semanticModel, cancellationToken) &&
+                IsReferenceType(GetExpressionType(receiver, semanticModel, cancellationToken));
         }
 
         internal static IEnumerable<MemberAccessExpressionSyntax> GetDefiniteNullableValueAccessNodes(
@@ -368,7 +434,7 @@ namespace PurelySharp.Analyzer
                     if (IsDefinitelyNullExpression(castExpression.Expression, useNode, semanticModel, cancellationToken, smtAnalysis))
                     {
                         var castType = semanticModel.GetTypeInfo(castExpression, cancellationToken).Type;
-                        return IsReferenceType(castType);
+                        return IsReferenceLikeType(castType);
                     }
 
                     return false;
@@ -392,7 +458,7 @@ namespace PurelySharp.Analyzer
             if (expression is DefaultExpressionSyntax defaultExpression)
             {
                 var defaultType = semanticModel.GetTypeInfo(defaultExpression, cancellationToken).Type;
-                return IsReferenceType(defaultType);
+                return IsReferenceLikeType(defaultType);
             }
 
             return IsKnownByPriorAssignment(expression, useNode, semanticModel, cancellationToken, PathFactKind.Null) ||
@@ -2121,6 +2187,23 @@ namespace PurelySharp.Analyzer
             return typeSymbol.IsReferenceType;
         }
 
+        private static bool IsReferenceLikeType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol?.TypeKind == TypeKind.Dynamic ||
+                IsReferenceType(typeSymbol);
+        }
+
+        private static bool IsDynamicExpression(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            expression = UnwrapFactExpression(expression);
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            return typeInfo.Type?.TypeKind == TypeKind.Dynamic ||
+                typeInfo.ConvertedType?.TypeKind == TypeKind.Dynamic;
+        }
+
         private static bool IsKnownReferenceTypeParameter(
             ITypeParameterSymbol typeParameter,
             HashSet<ITypeParameterSymbol> visited)
@@ -2139,6 +2222,22 @@ namespace PurelySharp.Analyzer
                 constraint.IsReferenceType ||
                 constraint is ITypeParameterSymbol nestedTypeParameter &&
                 IsKnownReferenceTypeParameter(nestedTypeParameter, visited));
+        }
+
+        internal readonly struct DynamicNullBindingSite
+        {
+            public DynamicNullBindingSite(SyntaxNode site, string category, string source)
+            {
+                Site = site;
+                Category = category;
+                Source = source;
+            }
+
+            public SyntaxNode Site { get; }
+
+            public string Category { get; }
+
+            public string Source { get; }
         }
 
         private static ITypeSymbol? GetRethrownExceptionType(

@@ -6385,7 +6385,7 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (type.IsReferenceType)
+            if (IsReferenceLikeType(type))
             {
                 formula = new SmtVariable(variableName, SmtValueKind.Reference);
                 return true;
@@ -6419,7 +6419,7 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (type.IsReferenceType)
+            if (IsReferenceLikeType(type))
             {
                 kind = SmtValueKind.Reference;
                 return true;
@@ -6427,6 +6427,12 @@ namespace PurelySharp.Symbolic
 
             kind = default;
             return false;
+        }
+
+        private static bool IsReferenceLikeType(ITypeSymbol type)
+        {
+            return type.TypeKind == TypeKind.Dynamic ||
+                type.IsReferenceType;
         }
 
         private static bool TryGetNullableUnderlyingType(ITypeSymbol? type, out ITypeSymbol underlyingType)

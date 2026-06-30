@@ -1110,6 +1110,107 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_DynamicMemberNullBinding_ReportsRuntimeBinderException()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        dynamic value = null;
+        return value.Missing;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_dynamic_member_null_binding"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException=definite_dynamic_member_null_binding:dynamic_member"));
+        }
+
+        [Test]
+        public async Task Ps0010_CastedDynamicNullBinding_ReportsRuntimeBinderException()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        return ((dynamic)null).Missing;
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_dynamic_member_null_binding"));
+        }
+
+        [Test]
+        public async Task Ps0011_DynamicInvocationNullBinding_ReportsRuntimeBinderExceptionAtSite()
+        {
+            var diagnostics = await GetCheckedExceptionSiteDiagnosticsAsync(@"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        dynamic value = null;
+        return value.Missing();
+    }
+}");
+
+            var diagnostic = SingleUncaughtExceptionSiteDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("value.Missing()"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_dynamic_invocation_null_binding"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException=definite_dynamic_invocation_null_binding:dynamic_invocation"));
+        }
+
+        [Test]
+        public async Task Ps0010_DynamicIndexerNullBindingCaught_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        try
+        {
+            dynamic value = null;
+            return value[0];
+        }
+        catch (Microsoft.CSharp.RuntimeBinder.RuntimeBinderException)
+        {
+            return null;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_UnknownDynamicReceiver_DoesNotReportRuntimeBinderException()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public object TestMethod(dynamic value)
+    {
+        return value.Missing;
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId &&
+                    diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty] == "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"),
+                Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_SwitchArmContradictedByOuterGuard_DoesNotReport()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"

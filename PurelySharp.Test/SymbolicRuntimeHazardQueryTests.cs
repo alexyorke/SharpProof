@@ -116,6 +116,146 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesDynamicMemberNullBinding()
+        {
+            const string source = @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        dynamic value = null;
+        return value.Missing;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return value.Missing;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_member_null_binding"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesDynamicInvocationNullBinding()
+        {
+            const string source = @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        dynamic value = null;
+        return value.Missing();
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return value.Missing();",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_invocation_null_binding"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesDynamicIndexerNullBinding()
+        {
+            const string source = @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        dynamic value = null;
+        return value[0];
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return value[0];",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_dynamic_index_null_binding"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownDynamicNullBindingCandidate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public object TestMethod(dynamic value)
+    {
+        return value.Missing;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var defaultResult = QueryLine(
+                source,
+                "return value.Missing;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
+            Assert.That(defaultResult.Hazards, Is.Empty);
+
+            var candidateResult = QueryLine(
+                source,
+                "return value.Missing;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
+            var hazard = AssertSingleHazard(candidateResult);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_NonNullDynamicReceiverPrunesNullBindingCandidate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        dynamic value = new object();
+        return value.ToString();
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return value.ToString();",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.DynamicNullBinding }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesNullableValueWithoutValue()
         {
             const string source = @"
@@ -723,6 +863,50 @@ public class TestClass
                 Assert.That(hazard.GetProperty("Kind").GetString(), Is.EqualTo(SymbolicRuntimeHazardKind.DivideByZero.ToString()));
                 Assert.That(hazard.GetProperty("Status").GetString(), Is.EqualTo(SymbolicRuntimeHazardStatus.Proven.ToString()));
                 Assert.That(hazard.GetProperty("ExceptionType").GetString(), Is.EqualTo("System.DivideByZeroException"));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public async Task SymbolicCli_RuntimeHazardsJson_EmitsDynamicNullBindingHazard()
+        {
+            const string source = @"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        dynamic value = null;
+        return value.Missing;
+    }
+}";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicRuntimeDynamicHazards-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--line",
+                    FindLine(source, "return value.Missing;").ToString(),
+                    "--runtime-hazards",
+                    "--hazard-kind",
+                    "DynamicNullBinding",
+                    "--json");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("HazardCount").GetInt32(), Is.EqualTo(1));
+                var hazard = root.GetProperty("Hazards")[0];
+                Assert.That(hazard.GetProperty("Kind").GetString(), Is.EqualTo(SymbolicRuntimeHazardKind.DynamicNullBinding.ToString()));
+                Assert.That(hazard.GetProperty("Status").GetString(), Is.EqualTo(SymbolicRuntimeHazardStatus.Proven.ToString()));
+                Assert.That(hazard.GetProperty("ExceptionType").GetString(), Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
+                Assert.That(hazard.GetProperty("Category").GetString(), Is.EqualTo("definite_dynamic_member_null_binding"));
             }
             finally
             {

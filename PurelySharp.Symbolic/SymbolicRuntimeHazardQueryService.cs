@@ -452,6 +452,21 @@ namespace PurelySharp.Symbolic
                         yield return nullableCandidate;
                     }
 
+                    if (memberAccess.Parent is not InvocationExpressionSyntax { Expression: var invocationExpression } ||
+                        !ReferenceEquals(invocationExpression, memberAccess))
+                    {
+                        if (TryCreateDynamicNullBindingCandidate(
+                                memberAccess,
+                                memberAccess.Expression,
+                                "definite_dynamic_member_null_binding",
+                                semanticModel,
+                                cancellationToken,
+                                out var memberDynamicCandidate))
+                        {
+                            yield return memberDynamicCandidate;
+                        }
+                    }
+
                     if (TryCreateNullDereferenceCandidate(memberAccess, memberAccess.Expression, semanticModel, cancellationToken, out var memberNullCandidate))
                     {
                         yield return memberNullCandidate;
@@ -459,6 +474,17 @@ namespace PurelySharp.Symbolic
 
                     break;
                 case ElementAccessExpressionSyntax elementAccess:
+                    if (TryCreateDynamicNullBindingCandidate(
+                            elementAccess,
+                            elementAccess.Expression,
+                            "definite_dynamic_index_null_binding",
+                            semanticModel,
+                            cancellationToken,
+                            out var elementDynamicCandidate))
+                    {
+                        yield return elementDynamicCandidate;
+                    }
+
                     if (TryCreateNullDereferenceCandidate(elementAccess, elementAccess.Expression, semanticModel, cancellationToken, out var elementNullCandidate))
                     {
                         yield return elementNullCandidate;
@@ -478,6 +504,11 @@ namespace PurelySharp.Symbolic
 
                     break;
                 case InvocationExpressionSyntax invocation:
+                    if (TryCreateDynamicInvocationNullBindingCandidate(invocation, semanticModel, cancellationToken, out var invocationDynamicCandidate))
+                    {
+                        yield return invocationDynamicCandidate;
+                    }
+
                     if (invocation.Expression is not MemberAccessExpressionSyntax &&
                         TryCreateNullDereferenceCandidate(invocation, invocation.Expression, semanticModel, cancellationToken, out var invocationNullCandidate))
                     {
@@ -880,7 +911,8 @@ namespace PurelySharp.Symbolic
         {
             candidate = default;
             var receiverType = GetExpressionType(receiver, semanticModel, cancellationToken);
-            if (!IsReferenceType(receiverType) ||
+            if (IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
+                !IsReferenceType(receiverType) ||
                 !TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var trigger))
             {
                 return false;
@@ -892,6 +924,51 @@ namespace PurelySharp.Symbolic
                 trigger,
                 "System.NullReferenceException",
                 "definite_null_dereference");
+            return true;
+        }
+
+        private static bool TryCreateDynamicInvocationNullBindingCandidate(
+            InvocationExpressionSyntax invocation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            var expression = UnwrapExpression(invocation.Expression);
+            var receiver = expression is MemberAccessExpressionSyntax memberAccess
+                ? memberAccess.Expression
+                : invocation.Expression;
+
+            return TryCreateDynamicNullBindingCandidate(
+                invocation,
+                receiver,
+                "definite_dynamic_invocation_null_binding",
+                semanticModel,
+                cancellationToken,
+                out candidate);
+        }
+
+        private static bool TryCreateDynamicNullBindingCandidate(
+            SyntaxNode site,
+            ExpressionSyntax receiver,
+            string category,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            if (!IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
+                !TryTranslateNullCondition(receiver, semanticModel, cancellationToken, out var trigger))
+            {
+                return false;
+            }
+
+            candidate = new RuntimeHazardCandidate(
+                site,
+                SymbolicRuntimeHazardKind.DynamicNullBinding,
+                trigger,
+                "Microsoft.CSharp.RuntimeBinder.RuntimeBinderException",
+                category);
             return true;
         }
 
@@ -1793,7 +1870,7 @@ namespace PurelySharp.Symbolic
             }
 
             if (expression is DefaultExpressionSyntax defaultExpression &&
-                IsReferenceType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)))
+                IsReferenceLikeType(GetExpressionType(defaultExpression, semanticModel, cancellationToken)))
             {
                 trigger = new SmtBooleanConstant(true);
                 return true;
@@ -1974,6 +2051,23 @@ namespace PurelySharp.Symbolic
             }
 
             return typeSymbol.IsReferenceType;
+        }
+
+        private static bool IsReferenceLikeType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol?.TypeKind == TypeKind.Dynamic ||
+                IsReferenceType(typeSymbol);
+        }
+
+        private static bool IsDynamicExpression(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapExpression(expression);
+            var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
+            return typeInfo.Type?.TypeKind == TypeKind.Dynamic ||
+                typeInfo.ConvertedType?.TypeKind == TypeKind.Dynamic;
         }
 
         private static bool IsNonNullableValueType(ITypeSymbol? typeSymbol)
@@ -2406,6 +2500,7 @@ namespace PurelySharp.Symbolic
         ArrayTypeMismatch,
         UnboxNull,
         InvalidCast,
+        DynamicNullBinding,
     }
 
     public enum SymbolicRuntimeHazardStatus

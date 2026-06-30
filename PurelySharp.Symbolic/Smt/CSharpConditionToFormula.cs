@@ -8824,7 +8824,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (type.IsReferenceType)
+            if (IsReferenceLikeType(type))
             {
                 formula = new SmtVariable(GetVariableName(symbol, getSymbolVersion), SmtValueKind.Reference);
                 return true;
@@ -8967,7 +8967,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (type.IsReferenceType)
+            if (IsReferenceLikeType(type))
             {
                 formula = new SmtNullConstant();
                 return true;
@@ -8990,7 +8990,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (type.IsReferenceType)
+            if (IsReferenceLikeType(type))
             {
                 formula = new SmtNullConstant();
                 return true;
@@ -10465,7 +10465,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (type.IsReferenceType)
+            if (IsReferenceLikeType(type))
             {
                 kind = SmtValueKind.Reference;
                 return true;
@@ -10473,6 +10473,12 @@ namespace PurelySharp.Symbolic.Smt
 
             kind = default;
             return false;
+        }
+
+        private static bool IsReferenceLikeType(ITypeSymbol type)
+        {
+            return type.TypeKind == TypeKind.Dynamic ||
+                type.IsReferenceType;
         }
 
         private static bool TryGetTupleCarrierKind(ITypeSymbol type, out SmtValueKind kind)
