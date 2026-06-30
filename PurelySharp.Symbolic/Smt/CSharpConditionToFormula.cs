@@ -423,8 +423,24 @@ namespace PurelySharp.Symbolic.Smt
                     return true;
                 }
 
-                if (TryTranslateValueWithSafeDivisors(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue, getSymbolVersion, inlineDepth, nonZeroDivisors) &&
-                    TryTranslateValueWithSafeDivisors(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue, getSymbolVersion, inlineDepth, nonZeroDivisors) &&
+                if (TryTranslateValueWithSafeDivisors(
+                        binaryExpression.Left,
+                        semanticModel,
+                        cancellationToken,
+                        out var leftValue,
+                        getSymbolVersion,
+                        inlineDepth,
+                        Array.Empty<SmtFormula>(),
+                        nonZeroDivisors) &&
+                    TryTranslateValueWithSafeDivisors(
+                        binaryExpression.Right,
+                        semanticModel,
+                        cancellationToken,
+                        out var rightValue,
+                        getSymbolVersion,
+                        inlineDepth,
+                        Array.Empty<SmtFormula>(),
+                        nonZeroDivisors) &&
                     leftValue != null &&
                     rightValue != null &&
                     TryTranslateComparison(binaryExpression.Kind(), leftValue, rightValue, out var comparison))
@@ -1159,14 +1175,23 @@ namespace PurelySharp.Symbolic.Smt
             }
             else
             {
-                if (invocationOperation.Arguments.Length != 1 ||
-                    invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax instanceInputExpression)
+                if (!TryGetRegexInstanceInputExpression(
+                        invocationOperation,
+                        semanticModel,
+                        cancellationToken,
+                        out var instanceInputExpression,
+                        out var requiresEncodableOptions))
                 {
                     return false;
                 }
 
                 inputExpression = instanceInputExpression;
                 if (!TryGetRegexPatternFromReceiver(invocationExpression, semanticModel, cancellationToken, out pattern, out options))
+                {
+                    return false;
+                }
+
+                if (requiresEncodableOptions && !CanEncodeRegexOptions(options))
                 {
                     return false;
                 }
@@ -1182,6 +1207,45 @@ namespace PurelySharp.Symbolic.Smt
 
             formula = new SmtRegexMatchFormula(inputFormula, pattern, options);
             return true;
+        }
+
+        private static bool TryGetRegexInstanceInputExpression(
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax inputExpression,
+            out bool requiresEncodableOptions)
+        {
+            inputExpression = null!;
+            requiresEncodableOptions = false;
+            var method = invocationOperation.TargetMethod;
+            if (method.IsStatic ||
+                method.Parameters.Length < 1 ||
+                !IsStringParameter(method.Parameters[0]) ||
+                invocationOperation.Arguments.Length < 1 ||
+                invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax candidateInputExpression)
+            {
+                return false;
+            }
+
+            inputExpression = candidateInputExpression;
+            if (invocationOperation.Arguments.Length == 1)
+            {
+                return true;
+            }
+
+            if (invocationOperation.Arguments.Length == 2 &&
+                method.Parameters.Length == 2 &&
+                method.Parameters[1].Type.SpecialType == SpecialType.System_Int32 &&
+                TryGetIntegralConstantValue(invocationOperation.Arguments[1].Value.Syntax as ExpressionSyntax, semanticModel, cancellationToken, out var startAt) &&
+                startAt == 0)
+            {
+                requiresEncodableOptions = true;
+                return true;
+            }
+
+            inputExpression = null!;
+            return false;
         }
 
         private static bool TryTranslateStringPredicateInvocation(
@@ -3413,6 +3477,7 @@ namespace PurelySharp.Symbolic.Smt
                     out var leftValues,
                     getSymbolVersion,
                     inlineDepth,
+                    Array.Empty<SmtFormula>(),
                     nonZeroDivisors) ||
                 !TryTranslateTupleElementValues(
                     binaryExpression.Right,
@@ -3422,6 +3487,7 @@ namespace PurelySharp.Symbolic.Smt
                     out var rightValues,
                     getSymbolVersion,
                     inlineDepth,
+                    Array.Empty<SmtFormula>(),
                     nonZeroDivisors) ||
                 leftValues.Length != rightValues.Length)
             {
@@ -3550,6 +3616,7 @@ namespace PurelySharp.Symbolic.Smt
             out ImmutableArray<SmtFormula> values,
             Func<ISymbol, int>? getSymbolVersion,
             int inlineDepth,
+            IReadOnlyCollection<SmtFormula> pathFacts,
             ISet<string>? nonZeroDivisors)
         {
             expression = UnwrapExpression(expression);
@@ -3572,6 +3639,7 @@ namespace PurelySharp.Symbolic.Smt
                             out var elementValue,
                             getSymbolVersion,
                             inlineDepth,
+                            pathFacts,
                             nonZeroDivisors) ||
                         elementValue == null)
                     {
@@ -3617,6 +3685,7 @@ namespace PurelySharp.Symbolic.Smt
             out SmtFormula? value,
             Func<ISymbol, int>? getSymbolVersion,
             int inlineDepth,
+            IReadOnlyCollection<SmtFormula> pathFacts,
             ISet<string>? nonZeroDivisors)
         {
             value = null;
@@ -3629,6 +3698,7 @@ namespace PurelySharp.Symbolic.Smt
                     out value,
                     getSymbolVersion,
                     inlineDepth,
+                    pathFacts,
                     nonZeroDivisors) ||
                 value == null)
             {
@@ -9342,6 +9412,10 @@ namespace PurelySharp.Symbolic.Smt
             Func<ISymbol, int>? getSymbolVersion = null,
             int inlineDepth = 0)
         {
+            var pathFactArray = pathFacts == null
+                ? Array.Empty<SmtFormula>()
+                : pathFacts as SmtFormula[] ?? pathFacts.ToArray();
+
             return TryTranslateValueWithSafeDivisors(
                 expression,
                 semanticModel,
@@ -9349,7 +9423,8 @@ namespace PurelySharp.Symbolic.Smt
                 out formula,
                 getSymbolVersion,
                 inlineDepth,
-                CollectNonZeroDivisorFacts(pathFacts));
+                pathFactArray,
+                CollectNonZeroDivisorFacts(pathFactArray));
         }
 
         private static bool TryTranslateValueWithSafeDivisors(
@@ -9359,6 +9434,7 @@ namespace PurelySharp.Symbolic.Smt
             out SmtFormula? formula,
             Func<ISymbol, int>? getSymbolVersion,
             int inlineDepth,
+            IReadOnlyCollection<SmtFormula> pathFacts,
             ISet<string>? nonZeroDivisors)
         {
             if (TryTranslateValue(expression, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth))
@@ -9366,8 +9442,8 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (nonZeroDivisors == null ||
-                nonZeroDivisors.Count == 0)
+            if ((nonZeroDivisors == null || nonZeroDivisors.Count == 0) &&
+                pathFacts.Count == 0)
             {
                 return false;
             }
@@ -9379,7 +9455,8 @@ namespace PurelySharp.Symbolic.Smt
                 out formula,
                 getSymbolVersion,
                 inlineDepth,
-                nonZeroDivisors);
+                nonZeroDivisors ?? new HashSet<string>(StringComparer.Ordinal),
+                pathFacts);
         }
 
         private static ISet<string>? CollectNonZeroDivisorFacts(IEnumerable<SmtFormula>? pathFacts)
@@ -10127,6 +10204,20 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (expression is InvocationExpressionSyntax mathInvocationExpression &&
+                TryTranslateIntegralMathInvocation(
+                    mathInvocationExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth,
+                    nonZeroDivisors: null,
+                    pathFacts: null))
+            {
+                return true;
+            }
+
             if (expression is PrefixUnaryExpressionSyntax prefixUnary)
             {
                 if (prefixUnary.IsKind(SyntaxKind.UnaryPlusExpression))
@@ -10246,13 +10337,28 @@ namespace PurelySharp.Symbolic.Smt
             out SmtFormula? formula,
             Func<ISymbol, int>? getSymbolVersion,
             int inlineDepth,
-            ISet<string> nonZeroDivisors)
+            ISet<string> nonZeroDivisors,
+            IReadOnlyCollection<SmtFormula> pathFacts)
         {
             formula = null;
             expression = UnwrapExpression(expression);
             if (!HasSupportedIntegralType(expression, semanticModel, cancellationToken))
             {
                 return false;
+            }
+
+            if (expression is InvocationExpressionSyntax invocationExpression &&
+                TryTranslateIntegralMathInvocation(
+                    invocationExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth,
+                    nonZeroDivisors,
+                    pathFacts))
+            {
+                return true;
             }
 
             if (expression is InvocationExpressionSyntax mathAbsInvocation &&
@@ -10263,7 +10369,8 @@ namespace PurelySharp.Symbolic.Smt
                     out formula,
                     getSymbolVersion,
                     inlineDepth,
-                    nonZeroDivisors))
+                    nonZeroDivisors,
+                    pathFacts))
             {
                 return true;
             }
@@ -10279,7 +10386,8 @@ namespace PurelySharp.Symbolic.Smt
                             out formula,
                             getSymbolVersion,
                             inlineDepth,
-                            nonZeroDivisors) &&
+                            nonZeroDivisors,
+                            pathFacts) &&
                         formula is { Kind: SmtValueKind.Int };
                 }
 
@@ -10291,7 +10399,8 @@ namespace PurelySharp.Symbolic.Smt
                         out var operand,
                         getSymbolVersion,
                         inlineDepth,
-                        nonZeroDivisors) &&
+                        nonZeroDivisors,
+                        pathFacts) &&
                     operand is { Kind: SmtValueKind.Int })
                 {
                     formula = new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, operand);
@@ -10308,7 +10417,8 @@ namespace PurelySharp.Symbolic.Smt
                     out var castOperand,
                     getSymbolVersion,
                     inlineDepth,
-                    nonZeroDivisors) &&
+                    nonZeroDivisors,
+                    pathFacts) &&
                 castOperand is { Kind: SmtValueKind.Int })
             {
                 formula = castOperand;
@@ -10327,7 +10437,8 @@ namespace PurelySharp.Symbolic.Smt
                     out var left,
                     getSymbolVersion,
                     inlineDepth,
-                    nonZeroDivisors) ||
+                    nonZeroDivisors,
+                    pathFacts) ||
                 left is not { Kind: SmtValueKind.Int } ||
                 !TryTranslateIntegralOperandWithSafeDivisors(
                     binaryExpression.Right,
@@ -10336,7 +10447,8 @@ namespace PurelySharp.Symbolic.Smt
                     out var right,
                     getSymbolVersion,
                     inlineDepth,
-                    nonZeroDivisors) ||
+                    nonZeroDivisors,
+                    pathFacts) ||
                 right is not { Kind: SmtValueKind.Int })
             {
                 return false;
@@ -10377,6 +10489,305 @@ namespace PurelySharp.Symbolic.Smt
             return false;
         }
 
+        private static bool TryTranslateIntegralMathInvocation(
+            InvocationExpressionSyntax invocationExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            ISet<string>? nonZeroDivisors,
+            IReadOnlyCollection<SmtFormula>? pathFacts)
+        {
+            formula = null;
+            if (semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod.ContainingType?.ToDisplayString() != "System.Math" ||
+                !invocationOperation.TargetMethod.IsStatic ||
+                !IsIntegralOrEnumType(invocationOperation.TargetMethod.ReturnType))
+            {
+                return false;
+            }
+
+            var facts = pathFacts ?? Array.Empty<SmtFormula>();
+            var safeDivisors = nonZeroDivisors ?? new HashSet<string>(StringComparer.Ordinal);
+            var method = invocationOperation.TargetMethod;
+
+            if ((method.Name == "Min" || method.Name == "Max") &&
+                method.Parameters.Length == 2 &&
+                TryTranslateIntegralMathArgument(
+                    invocationOperation,
+                    parameterIndex: 0,
+                    semanticModel,
+                    cancellationToken,
+                    out var left,
+                    getSymbolVersion,
+                    inlineDepth,
+                    safeDivisors,
+                    facts) &&
+                TryTranslateIntegralMathArgument(
+                    invocationOperation,
+                    parameterIndex: 1,
+                    semanticModel,
+                    cancellationToken,
+                    out var right,
+                    getSymbolVersion,
+                    inlineDepth,
+                    safeDivisors,
+                    facts))
+            {
+                var comparison = method.Name == "Min"
+                    ? new SmtBinaryFormula(SmtBinaryOperator.LessThanOrEqual, left, right)
+                    : new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, left, right);
+                formula = new SmtConditionalFormula(comparison, left, right, SmtValueKind.Int);
+                return true;
+            }
+
+            if (method.Name == "Clamp" &&
+                method.Parameters.Length == 3 &&
+                TryTranslateIntegralMathArgument(
+                    invocationOperation,
+                    parameterIndex: 0,
+                    semanticModel,
+                    cancellationToken,
+                    out var value,
+                    getSymbolVersion,
+                    inlineDepth,
+                    safeDivisors,
+                    facts) &&
+                TryTranslateIntegralMathArgument(
+                    invocationOperation,
+                    parameterIndex: 1,
+                    semanticModel,
+                    cancellationToken,
+                    out var min,
+                    getSymbolVersion,
+                    inlineDepth,
+                    safeDivisors,
+                    facts) &&
+                TryTranslateIntegralMathArgument(
+                    invocationOperation,
+                    parameterIndex: 2,
+                    semanticModel,
+                    cancellationToken,
+                    out var max,
+                    getSymbolVersion,
+                    inlineDepth,
+                    safeDivisors,
+                    facts) &&
+                IsKnownLessThanOrEqual(min, max, facts))
+            {
+                var belowMin = new SmtBinaryFormula(SmtBinaryOperator.LessThan, value, min);
+                var aboveMax = new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, value, max);
+                formula = new SmtConditionalFormula(
+                    belowMin,
+                    min,
+                    new SmtConditionalFormula(aboveMax, max, value, SmtValueKind.Int),
+                    SmtValueKind.Int);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryTranslateIntegralMathArgument(
+            IInvocationOperation invocationOperation,
+            int parameterIndex,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula argument,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            ISet<string> nonZeroDivisors,
+            IReadOnlyCollection<SmtFormula> pathFacts)
+        {
+            argument = null!;
+            if (parameterIndex < 0 ||
+                parameterIndex >= invocationOperation.TargetMethod.Parameters.Length ||
+                !IsIntegralOrEnumType(invocationOperation.TargetMethod.Parameters[parameterIndex].Type) ||
+                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex, out var argumentExpression) ||
+                !TryTranslateIntegralOperandWithSafeDivisors(
+                    argumentExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var candidate,
+                    getSymbolVersion,
+                    inlineDepth,
+                    nonZeroDivisors,
+                    pathFacts) ||
+                candidate is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            argument = candidate;
+            return true;
+        }
+
+        private static bool IsKnownLessThanOrEqual(
+            SmtFormula left,
+            SmtFormula right,
+            IReadOnlyCollection<SmtFormula> pathFacts)
+        {
+            if (Equals(left, right))
+            {
+                return true;
+            }
+
+            if (left is SmtIntegerConstant leftConstant &&
+                right is SmtIntegerConstant rightConstant)
+            {
+                return leftConstant.Value <= rightConstant.Value;
+            }
+
+            if (left is SmtIntegerConstant requiredLowerBound &&
+                IsKnownAtLeast(right, requiredLowerBound.Value, pathFacts))
+            {
+                return true;
+            }
+
+            foreach (var fact in pathFacts)
+            {
+                if (fact is not SmtBinaryFormula comparison)
+                {
+                    continue;
+                }
+
+                if (Equals(comparison.Left, left) &&
+                    Equals(comparison.Right, right) &&
+                    comparison.Operator is SmtBinaryOperator.LessThan or SmtBinaryOperator.LessThanOrEqual or SmtBinaryOperator.Equal)
+                {
+                    return true;
+                }
+
+                if (Equals(comparison.Left, right) &&
+                    Equals(comparison.Right, left) &&
+                    comparison.Operator is SmtBinaryOperator.GreaterThan or SmtBinaryOperator.GreaterThanOrEqual or SmtBinaryOperator.Equal)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsKnownAtLeast(
+            SmtFormula value,
+            long lowerBound,
+            IReadOnlyCollection<SmtFormula> pathFacts)
+        {
+            if (value is SmtIntegerConstant constant)
+            {
+                return constant.Value >= lowerBound;
+            }
+
+            if (PathFactsProveLowerBound(value, lowerBound, pathFacts))
+            {
+                return true;
+            }
+
+            if (value is SmtIntegerBinaryTerm
+                {
+                    Operator: SmtIntegerBinaryOperator.Add,
+                    Left: var addLeft,
+                    Right: SmtIntegerConstant addRight
+                })
+            {
+                return TrySubtract(lowerBound, addRight.Value, out var adjustedLowerBound) &&
+                    IsKnownAtLeast(addLeft, adjustedLowerBound, pathFacts);
+            }
+
+            if (value is SmtIntegerBinaryTerm
+                {
+                    Operator: SmtIntegerBinaryOperator.Subtract,
+                    Left: var subtractLeft,
+                    Right: SmtIntegerConstant subtractRight
+                })
+            {
+                return TryAdd(lowerBound, subtractRight.Value, out var adjustedLowerBound) &&
+                    IsKnownAtLeast(subtractLeft, adjustedLowerBound, pathFacts);
+            }
+
+            return false;
+        }
+
+        private static bool PathFactsProveLowerBound(
+            SmtFormula value,
+            long lowerBound,
+            IReadOnlyCollection<SmtFormula> pathFacts)
+        {
+            foreach (var fact in pathFacts)
+            {
+                if (fact is not SmtBinaryFormula comparison)
+                {
+                    continue;
+                }
+
+                if (Equals(comparison.Left, value) &&
+                    comparison.Right is SmtIntegerConstant rightConstant)
+                {
+                    if (comparison.Operator == SmtBinaryOperator.GreaterThanOrEqual &&
+                        rightConstant.Value >= lowerBound)
+                    {
+                        return true;
+                    }
+
+                    if (comparison.Operator == SmtBinaryOperator.GreaterThan &&
+                        TryAdd(rightConstant.Value, 1, out var exclusiveLowerBound) &&
+                        exclusiveLowerBound >= lowerBound)
+                    {
+                        return true;
+                    }
+                }
+
+                if (Equals(comparison.Right, value) &&
+                    comparison.Left is SmtIntegerConstant leftConstant)
+                {
+                    if (comparison.Operator == SmtBinaryOperator.LessThanOrEqual &&
+                        leftConstant.Value >= lowerBound)
+                    {
+                        return true;
+                    }
+
+                    if (comparison.Operator == SmtBinaryOperator.LessThan &&
+                        TryAdd(leftConstant.Value, 1, out var exclusiveLowerBound) &&
+                        exclusiveLowerBound >= lowerBound)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryAdd(long left, long right, out long result)
+        {
+            try
+            {
+                result = checked(left + right);
+                return true;
+            }
+            catch (OverflowException)
+            {
+                result = default;
+                return false;
+            }
+        }
+
+        private static bool TrySubtract(long left, long right, out long result)
+        {
+            try
+            {
+                result = checked(left - right);
+                return true;
+            }
+            catch (OverflowException)
+            {
+                result = default;
+                return false;
+            }
+        }
+
         private static bool TryTranslateSafeMathAbsRemainder(
             InvocationExpressionSyntax invocationExpression,
             SemanticModel semanticModel,
@@ -10384,7 +10795,8 @@ namespace PurelySharp.Symbolic.Smt
             out SmtFormula? formula,
             Func<ISymbol, int>? getSymbolVersion,
             int inlineDepth,
-            ISet<string> nonZeroDivisors)
+            ISet<string> nonZeroDivisors,
+            IReadOnlyCollection<SmtFormula> pathFacts)
         {
             formula = null;
             if (!TryGetMathAbsRemainderOperands(
@@ -10400,7 +10812,8 @@ namespace PurelySharp.Symbolic.Smt
                     out var dividend,
                     getSymbolVersion,
                     inlineDepth,
-                    nonZeroDivisors) ||
+                    nonZeroDivisors,
+                    pathFacts) ||
                 dividend is not { Kind: SmtValueKind.Int } ||
                 !TryTranslateIntegralOperandWithSafeDivisors(
                     divisorExpression,
@@ -10409,7 +10822,8 @@ namespace PurelySharp.Symbolic.Smt
                     out var divisor,
                     getSymbolVersion,
                     inlineDepth,
-                    nonZeroDivisors) ||
+                    nonZeroDivisors,
+                    pathFacts) ||
                 divisor is not { Kind: SmtValueKind.Int } ||
                 !IsSafeIntegerDivisor(divisor, nonZeroDivisors))
             {
@@ -10470,7 +10884,8 @@ namespace PurelySharp.Symbolic.Smt
             out SmtFormula? formula,
             Func<ISymbol, int>? getSymbolVersion,
             int inlineDepth,
-            ISet<string> nonZeroDivisors)
+            ISet<string> nonZeroDivisors,
+            IReadOnlyCollection<SmtFormula> pathFacts)
         {
             if (TryTranslateValue(expression, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth) &&
                 formula is { Kind: SmtValueKind.Int })
@@ -10485,7 +10900,8 @@ namespace PurelySharp.Symbolic.Smt
                 out formula,
                 getSymbolVersion,
                 inlineDepth,
-                nonZeroDivisors) &&
+                nonZeroDivisors,
+                pathFacts) &&
                 formula is { Kind: SmtValueKind.Int };
         }
 
@@ -11355,6 +11771,7 @@ namespace PurelySharp.Symbolic.Smt
                     out formula,
                     getSymbolVersion,
                     inlineDepth,
+                    Array.Empty<SmtFormula>(),
                     nonZeroDivisors: null) &&
                 formula is { } &&
                 formula.Kind == kind)

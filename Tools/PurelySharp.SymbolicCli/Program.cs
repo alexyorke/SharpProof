@@ -55,7 +55,17 @@ try
                 includeExpressionProgramPoints: options.LineExpressions,
                 includeCurrentStatementCompletionFacts: options.PostLineInvariants)
             : options.LineInvariants
-            ? queryService.QueryFileLine(
+            ? options.HasColumn
+            ? queryService.QueryFileLinePoint(
+                options.FilePath,
+                options.Line,
+                options.Column,
+                options.CreateReferences(),
+                smtAnalysis: smtAnalysis,
+                impliedConditions: options.ImpliedConditions,
+                includeExpressionProgramPoints: options.LineExpressions,
+                includeCurrentStatementCompletionFacts: options.PostLineInvariants)
+            : queryService.QueryFileLine(
                 options.FilePath,
                 options.Line,
                 options.CreateReferences(),
@@ -564,8 +574,8 @@ Usage: PurelySharp.SymbolicCli --file <path> (--line <n> [--column <n>] [--line-
 Options:
   --file <path>       C# source file to query.
   --line <n>          1-based source line to query.
-  --column <n>        1-based source column to query. Default: 1.
-  --line-invariants   Query every statement/expression program point on the line.
+  --column <n>        1-based source column to query. With --line-invariants, selects the nearest program point on the line.
+  --line-invariants   Query every statement/expression program point on the line, or the nearest point when --column is supplied.
   --span-start <n>    0-based inclusive source span start to query.
   --span-end <n>      0-based exclusive source span end to query.
   --all-lines         Query every line that contains statement/expression program points.
@@ -648,6 +658,8 @@ Examples:
     public int Line { get; private set; }
 
     public int Column { get; private set; } = 1;
+
+    public bool HasColumn { get; private set; }
 
     public int? Position { get; private set; }
 
@@ -799,6 +811,7 @@ Examples:
                     break;
                 case "--column":
                     options.Column = ReadInt(args, ref index, arg);
+                    options.HasColumn = true;
                     break;
                 case "--position":
                     options.Position = ReadNonNegativeInt(args, ref index, arg);
@@ -1077,11 +1090,6 @@ Examples:
             if (options.RuntimeHazards && (options.ImpliedConditions.Count != 0 || options.CheckReachability || options.HasResultFilter))
             {
                 throw new ArgumentException("--runtime-hazards cannot be combined with invariant proof, reachability, or program-point filters.");
-            }
-
-            if (options.LineInvariants && options.Column != 1)
-            {
-                throw new ArgumentException("--line-invariants cannot be combined with --column.");
             }
 
             if (options.LineExpressions && !options.LineInvariants && !options.AllLines && !options.IsSpanQuery)

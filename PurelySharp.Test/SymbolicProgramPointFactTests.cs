@@ -517,6 +517,65 @@ public class TestClass
         }
 
         [Test]
+        public void ProgramPointFacts_NotNullParameterNormalCompletionProvesArgumentNonNull()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static void Require([NotNull] object? value)
+    {
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        Guard.Require(value);
+        return value.Length;
+    }
+}";
+
+            var marker = FindMarker(source, "return value.Length;");
+            var proof = ProveAtMarker(source, marker, "value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_NotNullParameterNormalCompletionDoesNotSurviveArgumentReassignment()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static void Require([NotNull] object? value)
+    {
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        Guard.Require(value);
+        value = null;
+        return value.Length;
+    }
+}";
+
+            var marker = FindMarker(source, "return value.Length;");
+            var proof = ProveAtMarker(source, marker, "value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+        }
+
+        [Test]
         public void ProgramPointFacts_MultidimensionalArrayCreationAssignsDimensionLengths()
         {
             const string source = @"

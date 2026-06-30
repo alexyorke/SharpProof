@@ -513,6 +513,42 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void Classify_CacheHitsBypassExhaustedMethodBudget()
+        {
+            var variableName = "budget_cache_" + Guid.NewGuid().ToString("N");
+            var x = new SmtVariable(variableName, SmtValueKind.Int);
+            var y = new SmtVariable(variableName + "_other", SmtValueKind.Int);
+            var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
+            var yIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, y, new SmtIntegerConstant(0));
+            var options = new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.FromMilliseconds(250),
+                TimeSpan.FromTicks(1),
+                maxPathConditions: 4,
+                maxExpressionNodes: 32,
+                useSharedResultCache: true);
+            var cachedQuery = CreateQuery(new[] { xIsZero }, xIsZero);
+            var budgetBurnQuery = CreateQuery(new[] { yIsZero }, yIsZero);
+            using var firstService = new SmtAnalysisService(options);
+            using var secondService = new SmtAnalysisService(options);
+
+            var first = firstService.Classify(cachedQuery);
+            var localCached = firstService.Classify(cachedQuery);
+            _ = secondService.Classify(budgetBurnQuery);
+            var sharedCached = secondService.Classify(cachedQuery);
+
+            Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyImpure));
+            Assert.That(localCached.Outcome, Is.EqualTo(first.Outcome));
+            Assert.That(sharedCached.Outcome, Is.EqualTo(first.Outcome));
+            Assert.That(localCached.Reason, Is.Not.EqualTo("smt_method_budget_exceeded"));
+            Assert.That(sharedCached.Reason, Is.Not.EqualTo("smt_method_budget_exceeded"));
+            Assert.That(firstService.ExecutedQueryCount, Is.EqualTo(1));
+            Assert.That(secondService.ExecutedQueryCount, Is.EqualTo(1));
+            Assert.That(firstService.CacheEntryCount, Is.EqualTo(1));
+            Assert.That(secondService.CacheEntryCount, Is.EqualTo(2));
+        }
+
+        [Test]
         public void Classify_SharedResultCacheEnabled_ReusesResultAcrossServices()
         {
             var variableName = "shared_" + Guid.NewGuid().ToString("N");

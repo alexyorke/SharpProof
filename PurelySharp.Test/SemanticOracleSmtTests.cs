@@ -699,6 +699,134 @@ public class TestClass
         }
 
         [Test]
+        public void CSharpConditionToFormula_MathMin_ProvesUpperBound()
+        {
+            var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
+                @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return System.Math.Min(value, 10);
+    }
+}",
+                "MathMinFormulaHost");
+            var invocation = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
+
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslateValueWithPathFacts(
+                    invocation,
+                    semanticModel,
+                    CancellationToken.None,
+                    Array.Empty<SmtFormula>(),
+                    out var minFormula),
+                Is.True);
+            Assert.That(minFormula, Is.Not.Null);
+
+            var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
+                .ClassifyImplication(
+                    Array.Empty<SmtFormula>(),
+                    new SmtBinaryFormula(SmtBinaryOperator.LessThanOrEqual, minFormula!, new SmtIntegerConstant(10)));
+
+            Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        }
+
+        [Test]
+        public void CSharpConditionToFormula_MathMax_ProvesLowerBound()
+        {
+            var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
+                @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return System.Math.Max(value, 0);
+    }
+}",
+                "MathMaxFormulaHost");
+            var invocation = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
+
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslateValueWithPathFacts(
+                    invocation,
+                    semanticModel,
+                    CancellationToken.None,
+                    Array.Empty<SmtFormula>(),
+                    out var maxFormula),
+                Is.True);
+            Assert.That(maxFormula, Is.Not.Null);
+
+            var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
+                .ClassifyImplication(
+                    Array.Empty<SmtFormula>(),
+                    new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, maxFormula!, new SmtIntegerConstant(0)));
+
+            Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        }
+
+        [Test]
+        public void CSharpConditionToFormula_MathClamp_UsesLengthGuardForIndexBounds()
+        {
+            var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
+                @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        if (values.Length > 0)
+        {
+            return System.Math.Clamp(index, 0, values.Length - 1);
+        }
+
+        return 0;
+    }
+}",
+                "MathClampFormulaHost");
+            var guard = root.DescendantNodes().OfType<IfStatementSyntax>().Single().Condition;
+            var invocation = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Single();
+            var lengthExpression = root.DescendantNodes()
+                .OfType<MemberAccessExpressionSyntax>()
+                .First(memberAccess => string.Equals(memberAccess.ToString(), "values.Length", StringComparison.Ordinal));
+
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslate(
+                    guard,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var guardFormula),
+                Is.True);
+            Assert.That(guardFormula, Is.Not.Null);
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslateValueWithPathFacts(
+                    invocation,
+                    semanticModel,
+                    CancellationToken.None,
+                    new SmtFormula[] { guardFormula! },
+                    out var clampedFormula),
+                Is.True);
+            Assert.That(clampedFormula, Is.Not.Null);
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslateValue(
+                    lengthExpression,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var lengthFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0),
+                Is.True);
+            Assert.That(lengthFormula, Is.Not.Null);
+
+            var inRangeFormula = new SmtBinaryFormula(
+                SmtBinaryOperator.And,
+                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, clampedFormula!, new SmtIntegerConstant(0)),
+                new SmtBinaryFormula(SmtBinaryOperator.LessThan, clampedFormula!, lengthFormula!));
+            var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
+                .ClassifyImplication(new SmtFormula[] { guardFormula! }, inRangeFormula);
+
+            Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        }
+
+        [Test]
         public void ExecutionVisibility_TautologicalCondition_IsAlwaysTrue()
         {
             Assert.That(
@@ -7070,6 +7198,28 @@ public class TestClass
                     @"new Regex(@""\AAB\z"").IsMatch(text) && text != ""AB""",
                     "using System.Text.RegularExpressions;"),
                 Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceRegexStartAtZeroContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"new Regex(@""\AAB\z"").IsMatch(text, 0) && text != ""AB""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceRegexNonZeroStartAtRemainsConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"!new Regex(""AB"").IsMatch(text, 1) && text == ""AB""",
+                    "using System.Text.RegularExpressions;"),
+                Is.False);
         }
 
         [Test]

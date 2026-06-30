@@ -3,6 +3,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Analyzer.Engine;
 using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
@@ -915,6 +916,12 @@ namespace PurelySharp.Analyzer
                     }
 
                     AddAssignedValueFacts(localSymbol, declarator.Initializer.Value, semanticModel, cancellationToken, facts);
+                    AddNotNullParameterNormalCompletionFacts(
+                        declarator.Initializer.Value,
+                        localDeclaration,
+                        semanticModel,
+                        cancellationToken,
+                        facts);
                     AddArrayCreationNormalCompletionFacts(
                         declarator.Initializer.Value,
                         localDeclaration,
@@ -974,6 +981,12 @@ namespace PurelySharp.Analyzer
                     semanticModel,
                     cancellationToken,
                     facts);
+                AddNotNullParameterNormalCompletionFacts(
+                    assignment.Right,
+                    expressionStatement,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
                 return;
             }
 
@@ -1010,6 +1023,12 @@ namespace PurelySharp.Analyzer
             }
             else if (statement is ExpressionStatementSyntax completedExpressionStatement)
             {
+                AddNotNullParameterNormalCompletionFacts(
+                    completedExpressionStatement.Expression,
+                    completedExpressionStatement,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
                 AddArrayCreationNormalCompletionFacts(
                     completedExpressionStatement.Expression,
                     completedExpressionStatement,
@@ -1024,6 +1043,76 @@ namespace PurelySharp.Analyzer
                     facts.Add(loopFact);
                 }
             }
+        }
+
+        private static void AddNotNullParameterNormalCompletionFacts(
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            expression = UnwrapAwaitedFactExpression(expression);
+            if (expression is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation)
+            {
+                return;
+            }
+
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (argument.ArgumentKind != ArgumentKind.Explicit ||
+                    argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
+                    !ParameterHasNotNullAttribute(parameter) ||
+                    argument.Syntax is not ArgumentSyntax argumentSyntax ||
+                    !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None) ||
+                    GetLocalOrParameterSymbol(argumentSyntax.Expression, semanticModel, cancellationToken) is not { } argumentSymbol ||
+                    AnyConditionSymbolMutatedInStatement(argumentSyntax.Expression, statement, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddSymbolNonNullFact(argumentSymbol, facts);
+            }
+        }
+
+        private static bool ParameterHasNotNullAttribute(IParameterSymbol parameter)
+        {
+            return SymbolHasNotNullAttribute(parameter) ||
+                (!SymbolEqualityComparer.Default.Equals(parameter, parameter.OriginalDefinition) &&
+                 SymbolHasNotNullAttribute(parameter.OriginalDefinition));
+        }
+
+        private static bool SymbolHasNotNullAttribute(IParameterSymbol parameter)
+        {
+            return parameter.GetAttributes().Any(attribute =>
+                string.Equals(
+                    GetFullMetadataName(attribute.AttributeClass),
+                    "System.Diagnostics.CodeAnalysis.NotNullAttribute",
+                    System.StringComparison.Ordinal));
+        }
+
+        private static string? GetFullMetadataName(INamedTypeSymbol? type)
+        {
+            if (type == null)
+            {
+                return null;
+            }
+
+            var namespaceName = type.ContainingNamespace?.IsGlobalNamespace == false
+                ? type.ContainingNamespace.ToDisplayString()
+                : string.Empty;
+            return string.IsNullOrEmpty(namespaceName)
+                ? type.MetadataName
+                : namespaceName + "." + type.MetadataName;
+        }
+
+        private static ExpressionSyntax UnwrapAwaitedFactExpression(ExpressionSyntax expression)
+        {
+            expression = UnwrapFactExpression(expression);
+            return expression is AwaitExpressionSyntax awaitExpression
+                ? UnwrapFactExpression(awaitExpression.Expression)
+                : expression;
         }
 
         private static void AddArrayCreationNormalCompletionFacts(

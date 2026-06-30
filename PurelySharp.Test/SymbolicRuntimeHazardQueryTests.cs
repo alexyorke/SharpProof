@@ -1308,6 +1308,103 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesListIndexerArgumentOutOfRange()
+        {
+            const string source = @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(List<int> values)
+    {
+        if (values.Count == 0)
+        {
+            return values[0];
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(source, "return values[0];", smtAnalysis);
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_count_index_out_of_range"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesReadOnlyListIndexerArgumentOutOfRange()
+        {
+            const string source = @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(IReadOnlyList<int> values)
+    {
+        if (values.Count == 0)
+        {
+            return values[0];
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(source, "return values[0];", smtAnalysis);
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_count_index_out_of_range"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_GuardedReadOnlyListIndexerArgumentOutOfRangeIsPruned()
+        {
+            const string source = @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(IReadOnlyList<int> values, int index)
+    {
+        if (index >= 0 && index < values.Count)
+        {
+            return values[index];
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(source, "return values[index];", smtAnalysis);
+
+            Assert.That(result.Hazards, Is.Empty);
+
+            var allCandidates = QueryLine(
+                source,
+                "return values[index];",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.ArgumentOutOfRange }));
+
+            var hazard = AssertSingleHazard(allCandidates);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.ArgumentOutOfRange));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.ArgumentOutOfRangeException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_count_index_out_of_range"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedIntegralOverflow()
         {
             const string source = @"

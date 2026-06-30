@@ -1249,7 +1249,13 @@ namespace PurelySharp.Symbolic
             out RuntimeHazardCandidate candidate)
         {
             candidate = default;
-            if (!IsBuiltInSequenceElementAccess(elementAccess, semanticModel, cancellationToken) ||
+            if (!TryGetIndexOrRangeHazardMetadata(
+                    elementAccess,
+                    semanticModel,
+                    cancellationToken,
+                    out var kind,
+                    out var exceptionType,
+                    out var category) ||
                 !CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
                     elementAccess,
                     semanticModel,
@@ -1259,18 +1265,12 @@ namespace PurelySharp.Symbolic
                 return false;
             }
 
-            var isRange = elementAccess.ArgumentList.Arguments.Count == 1 &&
-                IsBuiltInRangeAccessArgument(
-                    elementAccess.ArgumentList.Arguments[0].Expression,
-                    semanticModel,
-                    cancellationToken);
-
             candidate = new RuntimeHazardCandidate(
                 elementAccess,
-                isRange ? SymbolicRuntimeHazardKind.ArgumentOutOfRange : SymbolicRuntimeHazardKind.IndexOutOfRange,
+                kind,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
-                isRange ? "System.ArgumentOutOfRangeException" : "System.IndexOutOfRangeException",
-                isRange ? "definite_range_out_of_range" : "definite_index_out_of_range");
+                exceptionType,
+                category);
             return true;
         }
 
@@ -2236,6 +2236,160 @@ namespace PurelySharp.Symbolic
             return argumentCount == 1 &&
                 (receiverType?.SpecialType == SpecialType.System_String ||
                  IsBuiltInSpanType(receiverType));
+        }
+
+        private static bool TryGetIndexOrRangeHazardMetadata(
+            ElementAccessExpressionSyntax elementAccess,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SymbolicRuntimeHazardKind kind,
+            out string exceptionType,
+            out string category)
+        {
+            kind = default;
+            exceptionType = string.Empty;
+            category = string.Empty;
+
+            if (IsBuiltInSequenceElementAccess(elementAccess, semanticModel, cancellationToken))
+            {
+                var isRange = elementAccess.ArgumentList.Arguments.Count == 1 &&
+                    IsBuiltInRangeAccessArgument(
+                        elementAccess.ArgumentList.Arguments[0].Expression,
+                        semanticModel,
+                        cancellationToken);
+                if (isRange)
+                {
+                    kind = SymbolicRuntimeHazardKind.ArgumentOutOfRange;
+                    exceptionType = "System.ArgumentOutOfRangeException";
+                    category = "definite_range_out_of_range";
+                    return true;
+                }
+
+                kind = SymbolicRuntimeHazardKind.IndexOutOfRange;
+                exceptionType = "System.IndexOutOfRangeException";
+                category = "definite_index_out_of_range";
+                return true;
+            }
+
+            if (IsCountBackedIntIndexerElementAccess(elementAccess, semanticModel, cancellationToken))
+            {
+                kind = SymbolicRuntimeHazardKind.ArgumentOutOfRange;
+                exceptionType = "System.ArgumentOutOfRangeException";
+                category = "definite_count_index_out_of_range";
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsCountBackedIntIndexerElementAccess(
+            ElementAccessExpressionSyntax elementAccess,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (elementAccess.ArgumentList.Arguments.Count != 1)
+            {
+                return false;
+            }
+
+            var argumentType = GetExpressionType(
+                elementAccess.ArgumentList.Arguments[0].Expression,
+                semanticModel,
+                cancellationToken);
+            if (argumentType?.SpecialType != SpecialType.System_Int32)
+            {
+                return false;
+            }
+
+            var receiverType = GetExpressionType(elementAccess.Expression, semanticModel, cancellationToken);
+            return HasInstanceInt32Member(receiverType, "Count") &&
+                HasInt32Indexer(receiverType);
+        }
+
+        private static bool HasInstanceInt32Member(ITypeSymbol? typeSymbol, string memberName)
+        {
+            if (typeSymbol == null)
+            {
+                return false;
+            }
+
+            for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
+            {
+                if (HasDeclaredInstanceInt32Member(current, memberName))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var interfaceType in typeSymbol.AllInterfaces)
+            {
+                if (HasDeclaredInstanceInt32Member(interfaceType, memberName))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasDeclaredInstanceInt32Member(ITypeSymbol typeSymbol, string memberName)
+        {
+            foreach (var member in typeSymbol.GetMembers(memberName))
+            {
+                if (member.IsStatic)
+                {
+                    continue;
+                }
+
+                switch (member)
+                {
+                    case IPropertySymbol { Parameters.Length: 0, Type.SpecialType: SpecialType.System_Int32 }:
+                    case IFieldSymbol { Type.SpecialType: SpecialType.System_Int32 }:
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasInt32Indexer(ITypeSymbol? typeSymbol)
+        {
+            if (typeSymbol == null)
+            {
+                return false;
+            }
+
+            for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
+            {
+                if (HasDeclaredInt32Indexer(current))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var interfaceType in typeSymbol.AllInterfaces)
+            {
+                if (HasDeclaredInt32Indexer(interfaceType))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasDeclaredInt32Indexer(ITypeSymbol typeSymbol)
+        {
+            foreach (var property in typeSymbol.GetMembers().OfType<IPropertySymbol>())
+            {
+                if (property is { IsIndexer: true, IsStatic: false, Parameters.Length: 1 } &&
+                    property.Parameters[0].Type.SpecialType == SpecialType.System_Int32)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool IsBuiltInRangeAccessArgument(

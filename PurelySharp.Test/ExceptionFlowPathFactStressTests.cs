@@ -92,6 +92,70 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_NotNullParameterGuardNormalCompletionSuppressesNullDereference()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static void Require([NotNull] object? value)
+    {
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        if (value == null)
+        {
+            Guard.Require(value);
+            return value.Length;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_NotNullParameterGuardNormalCompletionDoesNotSurviveReassignment()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static void Require([NotNull] object? value)
+    {
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        if (value == null)
+        {
+            Guard.Require(value);
+            value = null;
+            return value.Length;
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.NullReferenceException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_null_dereference"));
+        }
+
+        [Test]
         public async Task Ps0010_NullableValueNullLocal_ReportsInvalidOperationException()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"

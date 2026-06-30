@@ -101,11 +101,6 @@ namespace PurelySharp.Symbolic.Smt
                 return Unknown("smt_expression_budget_exceeded");
             }
 
-            if (IsMethodBudgetExceeded())
-            {
-                return Unknown("smt_method_budget_exceeded");
-            }
-
             var normalizedQuery = new PurityProofQuery(pathConditions, query.Hazard);
             var key = CreateQueryKey(normalizedQuery);
             if (_queryCache.TryGetValue(key, out var cached))
@@ -117,6 +112,11 @@ namespace PurelySharp.Symbolic.Smt
             {
                 _queryCache.TryAdd(key, sharedResult);
                 return sharedResult;
+            }
+
+            if (IsMethodBudgetExceeded())
+            {
+                return Unknown("smt_method_budget_exceeded");
             }
 
             var result = ClassifyCore(normalizedQuery);

@@ -1871,8 +1871,69 @@ namespace PurelySharp.Symbolic
                 AddTopLevelThrowGuardNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
             }
 
+            AddTopLevelNotNullParameterNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
             AddTopLevelArrayCreationNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
             AddTopLevelDereferenceNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
+        }
+
+        private static void AddTopLevelNotNullParameterNormalCompletionFacts(
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            expression = UnwrapAwaitedNormalCompletionExpression(expression);
+            if (expression is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation)
+            {
+                return;
+            }
+
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (argument.ArgumentKind != ArgumentKind.Explicit ||
+                    argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
+                    !ParameterHasNotNullAttribute(parameter) ||
+                    argument.Syntax is not ArgumentSyntax argumentSyntax ||
+                    !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None))
+                {
+                    continue;
+                }
+
+                AddStableReferenceNonNullFact(argumentSyntax.Expression, statement, semanticModel, cancellationToken, facts);
+            }
+        }
+
+        private static bool ParameterHasNotNullAttribute(IParameterSymbol parameter)
+        {
+            return SymbolHasNotNullAttribute(parameter) ||
+                (!SymbolEqualityComparer.Default.Equals(parameter, parameter.OriginalDefinition) &&
+                 SymbolHasNotNullAttribute(parameter.OriginalDefinition));
+        }
+
+        private static bool SymbolHasNotNullAttribute(IParameterSymbol parameter)
+        {
+            return parameter.GetAttributes().Any(attribute =>
+                string.Equals(
+                    GetFullMetadataName(attribute.AttributeClass),
+                    "System.Diagnostics.CodeAnalysis.NotNullAttribute",
+                    StringComparison.Ordinal));
+        }
+
+        private static string? GetFullMetadataName(INamedTypeSymbol? type)
+        {
+            if (type == null)
+            {
+                return null;
+            }
+
+            var namespaceName = type.ContainingNamespace?.IsGlobalNamespace == false
+                ? type.ContainingNamespace.ToDisplayString()
+                : string.Empty;
+            return string.IsNullOrEmpty(namespaceName)
+                ? type.MetadataName
+                : namespaceName + "." + type.MetadataName;
         }
 
         private static void AddTopLevelArrayCreationNormalCompletionFacts(

@@ -133,6 +133,49 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySyntaxTreeLinePoint_WithExpressionProgramPoints_SelectsNearestExpressionNode()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value + 1;
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "LinePointExpressionQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "LinePointExpressionQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLinePoint(
+                syntaxTree,
+                compilation,
+                FindLine(source, "return value + 1;"),
+                FindColumn(source, "value + 1"),
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "value > 0" },
+                includeExpressionProgramPoints: true);
+
+            Assert.That(result.NodeKind, Is.EqualTo("AddExpression"));
+            Assert.That(result.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Expression));
+            Assert.That(result.Column, Is.EqualTo(FindColumn(source, "value + 1")));
+            Assert.That(result.MergedInvariantText, Is.EqualTo("value > 0"));
+            Assert.That(result.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void QuerySyntaxTreeLine_PostLineInvariants_ProvesCurrentAssignmentCompletionFact()
         {
             const string source = @"
