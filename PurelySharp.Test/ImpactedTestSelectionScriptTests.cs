@@ -197,6 +197,28 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public async Task ListOnlyJson_DoesNotFallbackWhenMappedAnalyzerFilesShareFixtures()
+        {
+            const string exceptionSitesFile = "PurelySharp.Analyzer/ExceptionFlowAnalyzer.ExceptionSites.cs";
+            const string exceptionQueryFile = "PurelySharp.Analyzer/ExceptionFlowQuery.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(exceptionSitesFile + "," + exceptionQueryFile);
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(GetStringArray(root, "fullSuiteFallbackReasons"), Is.Empty);
+            Assert.That(fixtures, Does.Contain("ExceptionReachabilitySmtTests"));
+            Assert.That(fixtures, Does.Contain("AuthoringRuntimeHazardDiagnosticTests"));
+            Assert.That(
+                GetEvidenceEntry(root, exceptionSitesFile, "path-map").GetProperty("reason").GetString(),
+                Is.EqualTo("Exception site reachability and runtime-hazard analyzer change"));
+            Assert.That(
+                GetEvidenceEntry(root, exceptionQueryFile, "path-map").GetProperty("reason").GetString(),
+                Is.EqualTo("Exception flow query reachability and runtime-hazard change"));
+        }
+
+        [Test]
         public async Task ListOnlyJson_SelectsSymbolicFactsForAnalyzerStateMerge()
         {
             const string changedFile = "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs";

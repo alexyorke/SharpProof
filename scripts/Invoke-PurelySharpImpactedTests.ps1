@@ -110,7 +110,11 @@ function Get-ChangedRepoFiles
 
     if ($ExplicitChangedFiles.Count -gt 0)
     {
-        return $ExplicitChangedFiles | ForEach-Object { Convert-ToRepoPath $_ } | Sort-Object -Unique
+        return $ExplicitChangedFiles |
+            ForEach-Object { $_ -split ',' } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { Convert-ToRepoPath $_ } |
+            Sort-Object -Unique
     }
 
     $base = Resolve-BaseRef $RequestedBaseRef
@@ -927,7 +931,9 @@ try
         }
 
         $beforeMappedCount = $testClasses.Count
+        $beforeMappedEvidenceCount = $selectionEvidence.Count
         Add-PathMappedTests $testClasses $path $selectionEvidence
+        $hasPathMapEvidence = $selectionEvidence.Count -gt $beforeMappedEvidenceCount
 
         if ($path -match '^PurelySharp\.Analyzer/')
         {
@@ -950,7 +956,7 @@ try
             {
                 Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path is high-fanout analyzer core"
             }
-            elseif ($path -match '\.cs$' -and $testClasses.Count -eq $beforeMappedCount)
+            elseif ($path -match '\.cs$' -and -not $hasPathMapEvidence -and $testClasses.Count -eq $beforeMappedCount)
             {
                 Add-FullSuiteFallbackReason $fullReasons $selectionEvidence $path "$path has no impacted-test mapping"
             }

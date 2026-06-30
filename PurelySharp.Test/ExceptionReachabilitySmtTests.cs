@@ -1218,6 +1218,99 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_NullGuardedLockReceiver_ReportsArgumentNullException()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public void TestMethod(object gate)
+    {
+        if (gate is null)
+        {
+            lock (gate)
+            {
+            }
+        }
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentNullException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_lock_null"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.ArgumentNullException=definite_lock_null:lock_receiver"));
+        }
+
+        [Test]
+        public async Task Ps0010_NonNullGuardedLockReceiver_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public void TestMethod(object gate)
+    {
+        if (gate is not null)
+        {
+            lock (gate)
+            {
+            }
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_NullGuardedLockReceiverCaught_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(object gate)
+    {
+        try
+        {
+            if (gate is null)
+            {
+                lock (gate)
+                {
+                }
+            }
+        }
+        catch (ArgumentNullException)
+        {
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_LockReceiverReassignedToNull_ReportsArgumentNullException()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public void TestMethod(object gate)
+    {
+        gate = null;
+        lock (gate)
+        {
+        }
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentNullException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_lock_null"));
+        }
+
+        [Test]
         public async Task Ps0010_DynamicMemberNullBinding_ReportsRuntimeBinderException()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"

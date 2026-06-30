@@ -262,6 +262,34 @@ namespace PurelySharp.Analyzer
                         "null_receiver"));
             }
 
+            foreach (var lockNullNode in ExceptionFlowAnalyzer.GetDefiniteLockNullNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                if (IsInStaticallyUnreachableBranch(lockNullNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByThrowingFinally(lockNullNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.ArgumentNullException");
+                if (IsCaughtWithinMethod(lockNullNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    lockNullNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        "System.ArgumentNullException",
+                        "definite_lock_null",
+                        "lock_receiver"));
+            }
+
             foreach (var dynamicNullBindingSite in ExceptionFlowAnalyzer.GetDefiniteDynamicNullBindingSites(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
                 if (IsInStaticallyUnreachableBranch(dynamicNullBindingSite.Site, semanticModel, cancellationToken, smtAnalysis))
@@ -784,6 +812,7 @@ namespace PurelySharp.Analyzer
                 string.Equals(category, "effect_summary", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_divide_by_zero", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_null_dereference", StringComparison.Ordinal) ||
+                string.Equals(category, "definite_lock_null", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_throw_null", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_dynamic_member_null_binding", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_dynamic_invocation_null_binding", StringComparison.Ordinal) ||

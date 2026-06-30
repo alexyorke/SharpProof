@@ -138,6 +138,23 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        internal static IEnumerable<LockStatementSyntax> GetDefiniteLockNullNodes(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            foreach (var lockStatement in GetRelevantDescendants<LockStatementSyntax>(methodNode))
+            {
+                if (IsReferenceDereferenceReceiver(lockStatement.Expression, semanticModel, cancellationToken) &&
+                    IsDefinitelyNullExpression(lockStatement.Expression, lockStatement, semanticModel, cancellationToken, smtAnalysis) &&
+                    IsExceptionPathReachable(lockStatement, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    yield return lockStatement;
+                }
+            }
+        }
+
         internal static IEnumerable<DynamicNullBindingSite> GetDefiniteDynamicNullBindingSites(
             SyntaxNode methodNode,
             SemanticModel semanticModel,

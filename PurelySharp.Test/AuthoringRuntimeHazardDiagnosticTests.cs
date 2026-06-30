@@ -56,6 +56,25 @@ public class TestClass
 
             yield return new TestCaseData(
                 @"
+public class TestClass
+{
+    public void LockNullReceiver(object gate)
+    {
+        if (gate is null)
+        {
+            lock (gate)
+            {
+            }
+        }
+    }
+}",
+                "lock (gate)",
+                "System.ArgumentNullException",
+                "definite_lock_null")
+                .SetName("Ps0011_AuthoringRuntimeHazards_ReportLockNullWithoutEnforcePure");
+
+            yield return new TestCaseData(
+                @"
 using System;
 
 public class TestClass
@@ -158,6 +177,46 @@ public class TestClass
     }
 }")
                 .SetName("Ps0011_AuthoringRuntimeHazards_SuppressGuardedNullDereference");
+
+            yield return new TestCaseData(
+                @"
+public class TestClass
+{
+    public void GuardedLockNullReceiver(object gate)
+    {
+        if (gate is not null)
+        {
+            lock (gate)
+            {
+            }
+        }
+    }
+}")
+                .SetName("Ps0011_AuthoringRuntimeHazards_SuppressGuardedLockNullReceiver");
+
+            yield return new TestCaseData(
+                @"
+using System;
+
+public class TestClass
+{
+    public void CaughtLockNullReceiver(object gate)
+    {
+        try
+        {
+            if (gate is null)
+            {
+                lock (gate)
+                {
+                }
+            }
+        }
+        catch (ArgumentNullException)
+        {
+        }
+    }
+}")
+                .SetName("Ps0011_AuthoringRuntimeHazards_SuppressCaughtLockNullReceiver");
 
             yield return new TestCaseData(
                 @"
