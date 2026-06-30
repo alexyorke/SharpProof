@@ -648,6 +648,20 @@ namespace PurelySharp.Symbolic
                     }
 
                     break;
+                case ForEachStatementSyntax forEachStatement:
+                    if (TryCreateNullDereferenceCandidate(forEachStatement, forEachStatement.Expression, semanticModel, cancellationToken, out var foreachNullCandidate))
+                    {
+                        yield return foreachNullCandidate;
+                    }
+
+                    break;
+                case ForEachVariableStatementSyntax forEachVariableStatement:
+                    if (TryCreateNullDereferenceCandidate(forEachVariableStatement, forEachVariableStatement.Expression, semanticModel, cancellationToken, out var foreachVariableNullCandidate))
+                    {
+                        yield return foreachVariableNullCandidate;
+                    }
+
+                    break;
                 case InvocationExpressionSyntax invocation:
                     if (TryCreateDynamicInvocationNullBindingCandidate(invocation, semanticModel, cancellationToken, out var invocationDynamicCandidate))
                     {

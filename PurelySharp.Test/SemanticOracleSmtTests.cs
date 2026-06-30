@@ -6186,6 +6186,64 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesInlineAsAssignmentNonNullResultImpliesRuntimeTypePredicate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public string TestMethod(object value)
+    {
+        string text;
+        if ((text = value as string) != null)
+        {
+            return text;
+        }
+
+        return string.Empty;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "InlineAsAssignmentNonNullResultImpliesRuntimeTypePredicate.cs",
+                FindLine(source, "return text;"),
+                20,
+                "value is string",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesInlineAsAssignmentNullResultAndSourceNonNullImpliesNegativeRuntimeTypePredicate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public string TestMethod(object value)
+    {
+        string text;
+        if ((text = value as string) == null && value != null)
+        {
+            return string.Empty;
+        }
+
+        return text;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "InlineAsAssignmentNullResultAndSourceNonNullImpliesNegativeRuntimeTypePredicate.cs",
+                FindLine(source, "return string.Empty;"),
+                20,
+                "value is not string",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessNullSourceNullableResultHasNoValue()
         {
             const string source = @"
@@ -10256,6 +10314,34 @@ public class TestClass
                     diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
                     symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
                 Is.True);
+        }
+
+        [Test]
+        public async Task Ps0002_InlineAsAssignmentContradictoryRuntimeTypeGuard_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(object value)
+    {
+        string text;
+        if ((text = value as string) == null && value is string)
+        {
+            Console.WriteLine(text);
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
         }
 
         [Test]

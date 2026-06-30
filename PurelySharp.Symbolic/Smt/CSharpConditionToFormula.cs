@@ -4156,10 +4156,7 @@ namespace PurelySharp.Symbolic.Smt
                 semanticModel.GetSymbolInfo(UnwrapExpression(assignment.Left), cancellationToken).Symbol is not ISymbol assignmentTarget ||
                 assignmentTarget is not ILocalSymbol and not IParameterSymbol ||
                 ExpressionReferencesSymbol(assignment.Right, assignmentTarget.OriginalDefinition, semanticModel, cancellationToken) ||
-                !TryCreateSymbolFormula(assignmentTarget.OriginalDefinition, getSymbolVersion, out targetFormula) ||
-                !TryTranslateValue(assignment.Right, semanticModel, cancellationToken, out var assignedValue, getSymbolVersion) ||
-                assignedValue == null ||
-                !AreComparable(targetFormula, assignedValue))
+                !TryCreateSymbolFormula(assignmentTarget.OriginalDefinition, getSymbolVersion, out targetFormula))
             {
                 targetFormula = null!;
                 return false;
@@ -4167,6 +4164,32 @@ namespace PurelySharp.Symbolic.Smt
 
             assignedSymbol = assignmentTarget.OriginalDefinition;
             RemoveFactsReferencingSymbol(formulas, assignedSymbol, getSymbolVersion);
+
+            if (targetFormula is { Kind: SmtValueKind.Reference } &&
+                TryCreateAsExpressionAssignmentFacts(
+                    assignment.Right,
+                    targetFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out var asFacts,
+                    getSymbolVersion))
+            {
+                foreach (var fact in asFacts)
+                {
+                    formulas.Add(fact);
+                }
+
+                return true;
+            }
+
+            if (!TryTranslateValue(assignment.Right, semanticModel, cancellationToken, out var assignedValue, getSymbolVersion) ||
+                assignedValue == null ||
+                !AreComparable(targetFormula, assignedValue))
+            {
+                targetFormula = null!;
+                return false;
+            }
+
             formulas.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, assignedValue));
             return true;
         }
