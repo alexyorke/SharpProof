@@ -6511,6 +6511,17 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_StaticCompiledRegexOptionContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\AAB\z"", RegexOptions.Compiled) && text != ""AB""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_StaticSinglelineRegexOptionAllowsNewlineDot()
         {
             Assert.That(
@@ -6539,6 +6550,17 @@ public class TestClass
                 IsConditionAlwaysFalse(
                     "string text",
                     @"!Regex.IsMatch(text, @""\A . \z"", RegexOptions.Singleline | RegexOptions.IgnorePatternWhitespace | RegexOptions.ExplicitCapture) && text == ""\n""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StaticCompiledCombinedWithSinglelineRegexOptionAllowsNewlineDot()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"!Regex.IsMatch(text, @""\A.\z"", RegexOptions.Compiled | RegexOptions.Singleline) && text == ""\n""",
                     "using System.Text.RegularExpressions;"),
                 Is.True);
         }
@@ -6594,6 +6616,17 @@ public class TestClass
                 IsConditionAlwaysFalse(
                     "string text",
                     @"new Regex(@""\AAB\z"").IsMatch(text) && text != ""AB""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceCompiledRegexOptionContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"new Regex(@""\AAB\z"", RegexOptions.Compiled).IsMatch(text) && text != ""AB""",
                     "using System.Text.RegularExpressions;"),
                 Is.True);
         }

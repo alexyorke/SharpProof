@@ -1403,6 +1403,7 @@ namespace PurelySharp.Symbolic.Smt
         {
             const long supportedOptions =
                 (long)RegexOptions.ExplicitCapture |
+                (long)RegexOptions.Compiled |
                 (long)RegexOptions.Singleline |
                 (long)RegexOptions.IgnorePatternWhitespace;
 
