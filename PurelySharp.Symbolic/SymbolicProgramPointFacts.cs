@@ -6320,7 +6320,8 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (type is IArrayTypeSymbol { Rank: 1 })
+            if (type is IArrayTypeSymbol { Rank: 1 } ||
+                IsBuiltInSpanOrMemoryType(type))
             {
                 var receiverFormula = new SmtVariable(GetSmtVariableName(symbol), SmtValueKind.Reference);
                 formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
@@ -6329,6 +6330,16 @@ namespace PurelySharp.Symbolic
 
             formula = null!;
             return false;
+        }
+
+        private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.ToDisplayString() is
+                    "System.Span<T>" or
+                    "System.ReadOnlySpan<T>" or
+                    "System.Memory<T>" or
+                    "System.ReadOnlyMemory<T>";
         }
 
         private static bool TryCreateBuiltInLengthValueFormula(

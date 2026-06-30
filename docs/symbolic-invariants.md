@@ -33,6 +33,8 @@ The primary entrypoint is `SymbolicSourceQueryService`:
 Pass a bounded `SmtAnalysisService` to classify reachability or prove `--implies` conditions.
 If SMT is disabled, times out, exceeds budget, or cannot load its native solver, callers should treat the result as unknown rather than proven.
 
+Length and index facts include arrays, strings, `Span<T>`, `ReadOnlySpan<T>`, `Memory<T>`, and `ReadOnlyMemory<T>` when Roslyn syntax and semantic-model lowering can prove them. Direct local and parameter copies preserve known length facts, and supported span/memory `Slice` results expose derived `Length` invariants.
+
 The CLI mirrors the same API:
 
 ```powershell

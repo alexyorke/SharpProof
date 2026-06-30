@@ -1299,7 +1299,8 @@ namespace PurelySharp.Analyzer
                 return true;
             }
 
-            if (type is IArrayTypeSymbol { Rank: 1 })
+            if (type is IArrayTypeSymbol { Rank: 1 } ||
+                IsBuiltInSpanOrMemoryType(type))
             {
                 var receiverFormula = new SmtVariable(GetSmtVariableName(symbol), SmtValueKind.Reference);
                 formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);

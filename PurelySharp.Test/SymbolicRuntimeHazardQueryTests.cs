@@ -300,6 +300,30 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesAssignedSpanSliceIndexOutOfRange()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(ReadOnlySpan<int> values)
+    {
+        var tail = values.Slice(values.Length);
+        return tail[0];
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(source, "return tail[0];", smtAnalysis);
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesBuiltInRangeOutOfRange()
         {
             const string source = @"

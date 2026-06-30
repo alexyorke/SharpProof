@@ -980,6 +980,49 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_AssignedReadOnlySpanSliceIndexOutOfRange_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(ReadOnlySpan<int> values)
+    {
+        var tail = values.Slice(values.Length);
+        return tail[0];
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
+        public async Task Ps0010_MemorySliceAliasLengthOutOfRange_ReportsArgumentOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public Memory<int> TestMethod(Memory<int> values, int start)
+    {
+        var copy = values;
+        if (start > copy.Length)
+        {
+            return values.Slice(start);
+        }
+
+        return values.Slice(0, 0);
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ArgumentOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_range_out_of_range"));
+        }
+
+        [Test]
         public async Task Ps0010_ReadOnlySpanSliceGuardedInRange_DoesNotReport()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

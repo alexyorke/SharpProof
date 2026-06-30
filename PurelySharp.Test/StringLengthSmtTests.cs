@@ -218,6 +218,88 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesAssignedSpanLengthSnapshot()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(System.Span<int> span)
+    {
+        System.Span<int> copy = span;
+        return copy.Length;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return copy.Length;",
+                "copy.Length == span.Length");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesAssignedReadOnlySpanSliceLengthSnapshot()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(System.ReadOnlySpan<int> span, int start, int length)
+    {
+        if (start >= 0 && length >= 0 && start + length <= span.Length)
+        {
+            System.ReadOnlySpan<int> window = span.Slice(start, length);
+            return window.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return window.Length;",
+                "window.Length == length");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesAssignedMemorySliceLengthSnapshots()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int Tail(System.Memory<int> memory, int start)
+    {
+        if (start >= 0 && start <= memory.Length)
+        {
+            System.Memory<int> tail = memory.Slice(start);
+            return tail.Length;
+        }
+
+        return 0;
+    }
+
+    public int Window(System.ReadOnlyMemory<int> memory, int start, int length)
+    {
+        if (start >= 0 && length >= 0 && start + length <= memory.Length)
+        {
+            System.ReadOnlyMemory<int> window = memory.Slice(start, length);
+            return window.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return tail.Length;",
+                "tail.Length == memory.Length - start");
+            AssertConditionProven(
+                source,
+                "return window.Length;",
+                "window.Length == length");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_UnsupportedSliceStartRemainsUnknown()
         {
             const string source = @"

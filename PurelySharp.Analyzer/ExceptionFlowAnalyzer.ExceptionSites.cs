@@ -1453,6 +1453,16 @@ namespace PurelySharp.Analyzer
                 namedType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>";
         }
 
+        private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.ToDisplayString() is
+                    "System.Span<T>" or
+                    "System.ReadOnlySpan<T>" or
+                    "System.Memory<T>" or
+                    "System.ReadOnlyMemory<T>";
+        }
+
         private static bool TryTranslateBuiltInSliceCallInRangeForExceptionFlow(
             InvocationExpressionSyntax invocation,
             SemanticModel semanticModel,
@@ -1535,7 +1545,7 @@ namespace PurelySharp.Analyzer
                     IsStatic: false,
                     Parameters.Length: >= 1 and <= 2
                 } method ||
-                !IsBuiltInSpanType(method.ContainingType) ||
+                !IsBuiltInSpanOrMemoryType(method.ContainingType) ||
                 !method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) ||
                 invocation.Expression is not MemberAccessExpressionSyntax memberAccess ||
                 !TryMapInvocationArguments(invocation, method, out var arguments) ||
