@@ -5266,11 +5266,6 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth)
         {
             formula = null;
-            if (elementAccess.ArgumentList.Arguments.Count != 1)
-            {
-                return false;
-            }
-
             var receiverType = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).ConvertedType ??
                 semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).Type;
             if (!TryGetBuiltInElementAccessElementType(receiverType, semanticModel.Compilation, out var elementType) ||
@@ -5283,8 +5278,9 @@ namespace PurelySharp.Symbolic.Smt
                     getSymbolVersion,
                     inlineDepth) ||
                 receiverFormula is not { Kind: SmtValueKind.Reference } ||
-                !TryCreateElementAccessIndexText(
-                    elementAccess.ArgumentList.Arguments[0].Expression,
+                !TryCreateElementAccessIndexVectorText(
+                    elementAccess,
+                    receiverType,
                     semanticModel,
                     cancellationToken,
                     out var indexText,
@@ -5296,6 +5292,86 @@ namespace PurelySharp.Symbolic.Smt
 
             formula = new SmtVariable(receiverFormula + "[" + indexText + "]", elementKind);
             return true;
+        }
+
+        private static bool TryCreateElementAccessIndexVectorText(
+            ElementAccessExpressionSyntax elementAccess,
+            ITypeSymbol? receiverType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out string indexText,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            if (receiverType is IArrayTypeSymbol { Rank: > 1 } arrayType)
+            {
+                if (elementAccess.ArgumentList.Arguments.Count != arrayType.Rank)
+                {
+                    indexText = string.Empty;
+                    return false;
+                }
+
+                var indexTexts = new List<string>(arrayType.Rank);
+                foreach (var argument in elementAccess.ArgumentList.Arguments)
+                {
+                    if (!TryCreateOrdinaryElementAccessIndexText(
+                            argument.Expression,
+                            semanticModel,
+                            cancellationToken,
+                            out var dimensionIndexText,
+                            getSymbolVersion,
+                            inlineDepth))
+                    {
+                        indexText = string.Empty;
+                        return false;
+                    }
+
+                    indexTexts.Add(dimensionIndexText);
+                }
+
+                indexText = string.Join(",", indexTexts);
+                return indexTexts.Count != 0;
+            }
+
+            if (elementAccess.ArgumentList.Arguments.Count != 1)
+            {
+                indexText = string.Empty;
+                return false;
+            }
+
+            return TryCreateElementAccessIndexText(
+                elementAccess.ArgumentList.Arguments[0].Expression,
+                semanticModel,
+                cancellationToken,
+                out indexText,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
+        private static bool TryCreateOrdinaryElementAccessIndexText(
+            ExpressionSyntax indexExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out string indexText,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            indexExpression = UnwrapElementAccessIndexExpression(indexExpression);
+            if (!TryTranslateValue(
+                    indexExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var indexFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                indexFormula is not { Kind: SmtValueKind.Int })
+            {
+                indexText = string.Empty;
+                return false;
+            }
+
+            indexText = CreateElementAccessIndexText(indexFormula);
+            return indexText.Length > 0;
         }
 
         private static bool TryCreateElementAccessIndexText(
@@ -6382,7 +6458,7 @@ namespace PurelySharp.Symbolic.Smt
             Compilation compilation,
             out ITypeSymbol elementType)
         {
-            if (receiverType is IArrayTypeSymbol { Rank: 1 } arrayType)
+            if (receiverType is IArrayTypeSymbol arrayType)
             {
                 elementType = arrayType.ElementType;
                 return true;

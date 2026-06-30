@@ -36,6 +36,44 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesMultidimensionalArrayElementAccess()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[,] values)
+    {
+        var result = values[0, 1];
+        return result;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return result;",
+                "result == values[0, 1]");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_DifferentMultidimensionalArrayElementRemainsUnknown()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[,] values)
+    {
+        var result = values[0, 1];
+        return result;
+    }
+}";
+
+            AssertConditionUnknown(
+                source,
+                "return result;",
+                "result == values[1, 0]");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ReassignedIndexRemainsUnknown()
         {
             const string source = @"

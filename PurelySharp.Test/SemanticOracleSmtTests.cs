@@ -10634,6 +10634,28 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_MultidimensionalArrayElementWriteThenReadZeroDivisor_ReportsDivideByZero()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[,] values)
+    {
+        values[0, 1] = 0;
+        var divisor = values[0, 1];
+        return 10 / divisor;
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
         public async Task Ps0010_EmptyListPatternIndex_ReportsIndexOutOfRange()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"
