@@ -6040,7 +6040,8 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
-            if (IsSupportedBuiltInElementAccessReceiver(valueType))
+            if (IsSupportedBuiltInElementAccessReceiver(valueType) &&
+                !HasCountBackedIntIndexer(valueType))
             {
                 return TryCreateMemberFormula(value, "Length", intType, out lengthFormula) &&
                     lengthFormula != null;
@@ -6647,6 +6648,24 @@ namespace PurelySharp.Symbolic.Smt
                     receiverLength is { Kind: SmtValueKind.Int })
                 {
                     lengthFormula = receiverLength;
+                    return true;
+                }
+            }
+
+            if (HasCountBackedIntIndexer(receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type) &&
+                TryCreateBuiltInLengthReceiverFormula(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var countReceiverFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+                if (TryCreateMemberFormula(countReceiverFormula, "Count", intType, out var receiverCount) &&
+                    receiverCount is { Kind: SmtValueKind.Int })
+                {
+                    lengthFormula = receiverCount;
                     return true;
                 }
             }
@@ -7713,13 +7732,69 @@ namespace PurelySharp.Symbolic.Smt
         {
             return typeSymbol is IArrayTypeSymbol { Rank: 1 } ||
                 typeSymbol?.SpecialType == SpecialType.System_String ||
-                IsBuiltInSpanType(typeSymbol);
+                IsBuiltInSpanType(typeSymbol) ||
+                HasCountBackedIntIndexer(typeSymbol);
         }
 
         private static bool IsSupportedBuiltInLengthReceiver(ITypeSymbol? typeSymbol)
         {
             return IsSupportedBuiltInElementAccessReceiver(typeSymbol) ||
                 IsBuiltInMemoryType(typeSymbol);
+        }
+
+        private static bool HasCountBackedIntIndexer(ITypeSymbol? typeSymbol)
+        {
+            return TryGetCountBackedIndexerElementType(typeSymbol, out _);
+        }
+
+        private static bool TryGetCountBackedIndexerElementType(ITypeSymbol? typeSymbol, out ITypeSymbol elementType)
+        {
+            elementType = null!;
+            if (typeSymbol == null ||
+                !HasInstanceInt32Member(typeSymbol, "Count"))
+            {
+                return false;
+            }
+
+            return TryGetIntIndexerElementType(typeSymbol, out elementType);
+        }
+
+        private static bool TryGetIntIndexerElementType(ITypeSymbol typeSymbol, out ITypeSymbol elementType)
+        {
+            for (var current = typeSymbol; current != null; current = (current as INamedTypeSymbol)?.BaseType)
+            {
+                if (TryGetDeclaredIntIndexerElementType(current, out elementType))
+                {
+                    return true;
+                }
+            }
+
+            foreach (var interfaceType in typeSymbol.AllInterfaces)
+            {
+                if (TryGetDeclaredIntIndexerElementType(interfaceType, out elementType))
+                {
+                    return true;
+                }
+            }
+
+            elementType = null!;
+            return false;
+        }
+
+        private static bool TryGetDeclaredIntIndexerElementType(ITypeSymbol typeSymbol, out ITypeSymbol elementType)
+        {
+            foreach (var property in typeSymbol.GetMembers().OfType<IPropertySymbol>())
+            {
+                if (property is { IsIndexer: true, IsStatic: false, Parameters.Length: 1 } &&
+                    property.Parameters[0].Type.SpecialType == SpecialType.System_Int32)
+                {
+                    elementType = property.Type;
+                    return true;
+                }
+            }
+
+            elementType = null!;
+            return false;
         }
 
         private static bool TryGetBuiltInElementAccessElementType(
@@ -7744,6 +7819,11 @@ namespace PurelySharp.Symbolic.Smt
                 namedType.TypeArguments.Length == 1)
             {
                 elementType = namedType.TypeArguments[0];
+                return true;
+            }
+
+            if (TryGetCountBackedIndexerElementType(receiverType, out elementType))
+            {
                 return true;
             }
 

@@ -231,7 +231,7 @@ public class TestClass
         }
 
         [Test]
-        public void SymbolicSourceQueryService_ListIndexerRemainsUnknown()
+        public void SymbolicSourceQueryService_ProvesListIndexerRangeThroughCountGuard()
         {
             const string source = @"
 using System.Collections.Generic;
@@ -242,17 +242,70 @@ public class TestClass
     {
         if (values.Count > 0)
         {
-            return values[0];
+            var result = values[0];
+            return result;
         }
 
         return 0;
     }
 }";
 
-            AssertConditionUnknown(
+            AssertConditionProven(
                 source,
-                "return values[0];",
-                "values[0] >= 0");
+                "return result;",
+                "0 >= 0 && 0 < values.Count");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesIReadOnlyListIndexerRangeThroughAssignedIndex()
+        {
+            const string source = @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(IReadOnlyList<int> values, int hash)
+    {
+        if (values != null && values.Count > 0 && hash >= 0)
+        {
+            var index = hash % values.Count;
+            return values[index];
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return values[index];",
+                "index >= 0 && index < values.Count");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesIListElementAccessThroughAssignedIndex()
+        {
+            const string source = @"
+using System.Collections.Generic;
+
+public class TestClass
+{
+    public int TestMethod(IList<int> values)
+    {
+        if (values.Count > 0)
+        {
+            var result = values[0];
+            return result;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return result;",
+                "result == values[0]");
         }
 
         [Test]
