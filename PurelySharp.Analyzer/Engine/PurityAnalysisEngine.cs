@@ -399,7 +399,8 @@ namespace PurelySharp.Analyzer.Engine
                 var mergedOwnedLocalArrays = IntersectOwnedLocalArraySymbolsAcrossAll(stateList.Select(s => s.OwnedLocalArraySymbols));
                 var mergedDefinitelyNullLocals = IntersectOwnedLocalArraySymbolsAcrossAll(stateList.Select(s => s.DefinitelyNullLocalSymbols));
                 var mergedLocalConcreteTypes = IntersectLocalConcreteTypesAcrossAll(stateList.Select(s => s.LocalConcreteTypes));
-                return new PurityAnalysisState(mergedImpurity, firstImpureNode, mergedTargets, mergedCaptures, mergedCaptureTargets, mergedOwnedLocalArrays, mergedDefinitelyNullLocals, firstEvidence, localConcreteTypes: mergedLocalConcreteTypes, smtSymbolVersions: MergeSmtSymbolVersionsAcrossAll(stateList.Select(s => s.SmtSymbolVersions)), flowCaptureConcreteTypes: mergedCaptureConcreteTypes, pathConditions: MergePathConditionsAcrossAll(stateList.Select(s => s.PathConditions)), flowCaptureSymbols: mergedCaptureSymbols, ownedArrayFlowCaptures: mergedOwnedArrayFlowCaptures);
+                var mergedSmtSymbolVersions = MergeSmtSymbolVersionsAcrossAll(stateList.Select(s => s.SmtSymbolVersions));
+                return new PurityAnalysisState(mergedImpurity, firstImpureNode, mergedTargets, mergedCaptures, mergedCaptureTargets, mergedOwnedLocalArrays, mergedDefinitelyNullLocals, firstEvidence, localConcreteTypes: mergedLocalConcreteTypes, smtSymbolVersions: mergedSmtSymbolVersions, flowCaptureConcreteTypes: mergedCaptureConcreteTypes, pathConditions: MergePathConditionsAcrossAll(stateList, mergedSmtSymbolVersions), flowCaptureSymbols: mergedCaptureSymbols, ownedArrayFlowCaptures: mergedOwnedArrayFlowCaptures);
             }
 
 

@@ -164,6 +164,9 @@ public sealed class Bag
 
     [Pure]
     public int this[int index] => index;
+
+    [Pure]
+    public Bag this[Range range] => this;
 }
 
 public sealed class TestClass
@@ -201,6 +204,9 @@ public sealed class Bag
 
     [Pure]
     public int this[int index] => index;
+
+    [Pure]
+    public Bag this[Range range] => this;
 }
 
 public sealed class TestClass
@@ -238,6 +244,9 @@ public sealed class Bag
 
     [Pure]
     public int this[int index] => index;
+
+    [Pure]
+    public Bag this[Range range] => this;
 }
 
 public sealed class TestClass
@@ -277,6 +286,9 @@ public sealed class Bag
 
     [Pure]
     public int this[int index] => index;
+
+    [Pure]
+    public Bag this[Range range] => this;
 }
 
 public sealed class TestClass
@@ -389,6 +401,9 @@ public sealed class Bag
 
     [Pure]
     public int this[int index] => index;
+
+    [Pure]
+    public Bag this[Range range] => this;
 }
 
 public sealed class TestClass
@@ -487,6 +502,146 @@ public sealed class TestClass
                 }
 
                 return;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchStatementNestedSliceExactLength_PrunesContradictoryLengthGuard()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int[][] values)
+    {
+        switch (values)
+        {
+            case [_, .. [_, _], _]:
+                if (values.Length != 4)
+                {
+                    Console.WriteLine(values.Length);
+                }
+
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchStatementDefaultExcludesNestedSliceExactLength()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int[][] values)
+    {
+        switch (values)
+        {
+            case [_, .. [_, _], _]:
+                return;
+            default:
+                if (values != null && values.Length == 4)
+                {
+                    Console.WriteLine(values.Length);
+                }
+
+                return;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchStatementNestedSlicePrefixElementFact_PrunesContradictoryGuard()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int[] values)
+    {
+        switch (values)
+        {
+            case [_, .. [> 0, ..], _]:
+                if (values[1] <= 0)
+                {
+                    Console.WriteLine(values[1]);
+                }
+
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchStatementNestedSliceSuffixElementFact_PrunesContradictoryGuard()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int[] values)
+    {
+        switch (values)
+        {
+            case [_, .. [.., > 0], _]:
+                if (values[^2] <= 0)
+                {
+                    Console.WriteLine(values[^2]);
+                }
+
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchStatementPriorNestedSlicePatternExcludesLaterArm()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int[] values)
+    {
+        switch (values)
+        {
+            case [_, .. [> 0], _]:
+                return;
+            case [_, _, _] when values[1] > 0:
+                Console.WriteLine(values[1]);
+                break;
         }
     }
 }";

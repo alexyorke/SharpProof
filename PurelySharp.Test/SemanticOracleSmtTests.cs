@@ -6951,6 +6951,24 @@ public class TestClass
         [Test]
         public async Task Ps0002_BooleanPredicateAliasContradictoryGuardedImpureCall_DoesNotReport()
         {
+            Assert.That(
+                IsStatementUnreachable(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(int value)
+    {
+        var isZero = value == 0;
+        if (isZero && value != 0)
+        {
+            Console.WriteLine(value);
+        }
+    }
+}",
+                    "Console.WriteLine(value);"),
+                Is.True);
+
             var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
 using System;
 using PurelySharp.Attributes;

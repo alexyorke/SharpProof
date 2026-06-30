@@ -1918,6 +1918,133 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_PathSensitiveFinallyThrow_ShadowsGuardedDirectThrow()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(int divisor)
+    {
+        if (divisor == 0)
+        {
+            try
+            {
+                throw new InvalidOperationException();
+            }
+            finally
+            {
+                if (divisor == 0)
+                {
+                    throw new ApplicationException();
+                }
+            }
+        }
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ApplicationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
+        public async Task Ps0010_PathSensitiveFinallyThrow_ShadowsGuardedDivideByZero()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (divisor == 0)
+        {
+            try
+            {
+                return 10 / divisor;
+            }
+            finally
+            {
+                if (divisor == 0)
+                {
+                    throw new ApplicationException();
+                }
+            }
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ApplicationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
+        public async Task Ps0010_FinallyUnknownThrowCondition_DoesNotShadowTryThrow()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(bool enabled)
+    {
+        try
+        {
+            throw new InvalidOperationException();
+        }
+        finally
+        {
+            if (enabled)
+            {
+                throw new ApplicationException();
+            }
+        }
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Does.Contain("System.ApplicationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Does.Contain("System.InvalidOperationException"));
+        }
+
+        [Test]
+        public async Task Ps0011_PathSensitiveFinallyThrow_ShadowsCheckedDirectThrowSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+using System;
+
+public class TestClass
+{
+    public void TestMethod(int divisor)
+    {
+        if (divisor == 0)
+        {
+            try
+            {
+                throw new InvalidOperationException();
+            }
+            finally
+            {
+                if (divisor == 0)
+                {
+                    throw new ApplicationException();
+                }
+            }
+        }
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ApplicationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
         public async Task Ps0010_CatchFilterTrueFromThrowSiteBranch_SuppressesException()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

@@ -2191,6 +2191,26 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (expression is CastExpressionSyntax stringCastExpression &&
+                IsIdentityPreservingReferenceCast(stringCastExpression, semanticModel, cancellationToken) &&
+                TryTranslateValue(stringCastExpression.Expression, semanticModel, cancellationToken, out var castReference, getSymbolVersion, inlineDepth) &&
+                castReference is { Kind: SmtValueKind.Reference })
+            {
+                formula = CreateStringValueFormulaForReference(castReference);
+                return true;
+            }
+
+            if (expression is BinaryExpressionSyntax stringAsExpression &&
+                stringAsExpression.IsKind(SyntaxKind.AsExpression) &&
+                stringAsExpression.Right is TypeSyntax stringAsType &&
+                IsIdentityPreservingReferenceConversion(stringAsExpression.Left, stringAsType, semanticModel, cancellationToken) &&
+                TryTranslateValue(stringAsExpression.Left, semanticModel, cancellationToken, out var asReference, getSymbolVersion, inlineDepth) &&
+                asReference is { Kind: SmtValueKind.Reference })
+            {
+                formula = CreateStringValueFormulaForReference(asReference);
+                return true;
+            }
+
             if (expression is ConditionalAccessExpressionSyntax conditionalAccessExpression &&
                 TryTranslateConditionalAccessStringValue(
                     conditionalAccessExpression,
@@ -7084,7 +7104,7 @@ namespace PurelySharp.Symbolic.Smt
                         semanticModel,
                         cancellationToken,
                         out var translatedFormula,
-                        getSymbolVersion: null,
+                        getSymbolVersion,
                         inlineDepth);
                     return new SourceBooleanFormulaCacheEntry(success, translatedFormula);
                 });
@@ -7289,6 +7309,14 @@ namespace PurelySharp.Symbolic.Smt
                 operand != null)
             {
                 formula = new SmtUnaryFormula(SmtUnaryOperator.Not, operand);
+                return true;
+            }
+
+            if (expression is CastExpressionSyntax booleanCastExpression &&
+                IsIdentityPreservingBooleanCast(booleanCastExpression, semanticModel, cancellationToken) &&
+                TryTranslate(booleanCastExpression.Expression, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth) &&
+                formula is { Kind: SmtValueKind.Bool })
+            {
                 return true;
             }
 
@@ -7760,6 +7788,17 @@ namespace PurelySharp.Symbolic.Smt
                 cancellationToken);
         }
 
+        private static bool IsIdentityPreservingBooleanCast(
+            CastExpressionSyntax castExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var sourceType = semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken).Type;
+            var targetType = semanticModel.GetTypeInfo(castExpression.Type, cancellationToken).Type;
+            return sourceType?.SpecialType == SpecialType.System_Boolean &&
+                targetType?.SpecialType == SpecialType.System_Boolean;
+        }
+
         private static bool IsIdentityPreservingReferenceConversion(
             ExpressionSyntax expression,
             TypeSyntax targetTypeSyntax,
@@ -8210,7 +8249,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (TryTranslateTupleElementValue(memberAccess, memberSymbol, semanticModel, cancellationToken, out formula, getSymbolVersion))
+            if (TryTranslateTupleElementValue(memberAccess, memberSymbol, semanticModel, cancellationToken, out formula, getSymbolVersion, inlineDepth))
             {
                 return true;
             }
@@ -8423,20 +8462,101 @@ namespace PurelySharp.Symbolic.Smt
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             out SmtFormula? formula,
-            Func<ISymbol, int>? getSymbolVersion)
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
         {
             formula = null;
             if (memberSymbol is not IFieldSymbol fieldSymbol ||
                 !TryGetTupleElementStorageName(fieldSymbol, out var storageName) ||
-                semanticModel.GetSymbolInfo(memberAccess.Expression, cancellationToken).Symbol is not { } receiverSymbol ||
-                receiverSymbol is not ILocalSymbol and not IParameterSymbol ||
                 !TryGetValueKind(fieldSymbol.Type, out var kind))
             {
                 return false;
             }
 
-            formula = new SmtVariable(GetVariableName(receiverSymbol.OriginalDefinition, getSymbolVersion) + "." + storageName, kind);
-            return true;
+            return TryTranslateTupleElementReceiverValue(
+                memberAccess.Expression,
+                fieldSymbol,
+                storageName,
+                kind,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
+        private static bool TryTranslateTupleElementReceiverValue(
+            ExpressionSyntax receiverExpression,
+            IFieldSymbol fieldSymbol,
+            string storageName,
+            SmtValueKind kind,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            receiverExpression = UnwrapExpression(receiverExpression);
+
+            if (semanticModel.GetSymbolInfo(receiverExpression, cancellationToken).Symbol is { } receiverSymbol &&
+                receiverSymbol is ILocalSymbol or IParameterSymbol)
+            {
+                formula = new SmtVariable(GetVariableName(receiverSymbol.OriginalDefinition, getSymbolVersion) + "." + storageName, kind);
+                return true;
+            }
+
+            if (receiverExpression is TupleExpressionSyntax tupleExpression &&
+                TryGetTupleElementIndex(storageName, out var elementIndex) &&
+                elementIndex <= tupleExpression.Arguments.Count &&
+                TryTranslateTupleElementExpressionValue(
+                    tupleExpression.Arguments[elementIndex - 1].Expression,
+                    fieldSymbol.Type,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth,
+                    nonZeroDivisors: null) &&
+                formula is { } &&
+                formula.Kind == kind)
+            {
+                return true;
+            }
+
+            if (receiverExpression is ConditionalExpressionSyntax conditionalExpression &&
+                TryTranslate(conditionalExpression.Condition, semanticModel, cancellationToken, out var conditionFormula, getSymbolVersion, inlineDepth) &&
+                conditionFormula != null &&
+                TryTranslateTupleElementReceiverValue(
+                    conditionalExpression.WhenTrue,
+                    fieldSymbol,
+                    storageName,
+                    kind,
+                    semanticModel,
+                    cancellationToken,
+                    out var whenTrue,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                whenTrue is { Kind: var whenTrueKind } &&
+                whenTrueKind == kind &&
+                TryTranslateTupleElementReceiverValue(
+                    conditionalExpression.WhenFalse,
+                    fieldSymbol,
+                    storageName,
+                    kind,
+                    semanticModel,
+                    cancellationToken,
+                    out var whenFalse,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                whenFalse is { Kind: var whenFalseKind } &&
+                whenFalseKind == kind)
+            {
+                formula = new SmtConditionalFormula(conditionFormula, whenTrue, whenFalse, kind);
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryGetTupleElementStorageName(IFieldSymbol fieldSymbol, out string storageName)

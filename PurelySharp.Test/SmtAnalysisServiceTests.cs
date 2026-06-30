@@ -85,23 +85,31 @@ namespace PurelySharp.Test
         [Test]
         public void Classify_DuplicateAndTruePathConditions_AreNormalizedBeforeBudgetAndCache()
         {
-            var text = new SmtVariable("normalized_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
-            var textIsA = new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("A"));
+            var x = new SmtVariable("normalized_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var y = new SmtVariable("normalized_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var xAtLeastZero = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                x,
+                new SmtIntegerConstant(0));
+            var yAtLeastZero = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                y,
+                new SmtIntegerConstant(0));
             var fact = new SmtBinaryFormula(
-                SmtBinaryOperator.Equal,
-                new SmtStringLengthTerm(text),
-                new SmtIntegerConstant(1));
+                SmtBinaryOperator.GreaterThanOrEqual,
+                new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, y),
+                new SmtIntegerConstant(0));
             var service = new SmtAnalysisService(new SmtAnalysisOptions(
                 SmtAnalysisMode.Bounded,
                 TimeSpan.FromMilliseconds(250),
                 TimeSpan.FromMilliseconds(1000),
-                maxPathConditions: 1,
-                maxExpressionNodes: 32));
+                maxPathConditions: 2,
+                maxExpressionNodes: 64));
 
             var first = service.ClassifyImplication(
-                new SmtFormula[] { textIsA, new SmtBooleanConstant(true), textIsA },
+                new SmtFormula[] { xAtLeastZero, yAtLeastZero, new SmtBooleanConstant(true), xAtLeastZero },
                 fact);
-            var second = service.ClassifyImplication(new[] { textIsA }, fact);
+            var second = service.ClassifyImplication(new[] { yAtLeastZero, xAtLeastZero }, fact);
 
             Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
             Assert.That(second.Outcome, Is.EqualTo(first.Outcome));
@@ -255,6 +263,92 @@ namespace PurelySharp.Test
             Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unknown));
             Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
             Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyImplication_ExactStringLengthEntailment_BypassesSolver()
+        {
+            var text = new SmtVariable("exact_string_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+            var textIsAbc = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                text,
+                new SmtStringConstant("ABC"));
+            var lengthAtLeastThree = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                new SmtStringLengthTerm(text),
+                new SmtIntegerConstant(3));
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = service.ClassifyImplication(new[] { textIsAbc }, lengthAtLeastThree);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyImplication_ExactStringPredicateEntailment_BypassesSolver()
+        {
+            var text = new SmtVariable("exact_predicate_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+            var textIsAbc = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                text,
+                new SmtStringConstant("ABC"));
+            var startsWithA = new SmtStringStartsWithFormula(text, new SmtStringConstant("A"));
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = service.ClassifyImplication(new[] { textIsAbc }, startsWithA);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyImplication_ExactStringNegatedPredicateEntailment_BypassesSolver()
+        {
+            var text = new SmtVariable("exact_negated_predicate_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+            var textIsAbc = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                text,
+                new SmtStringConstant("ABC"));
+            var doesNotEndWithZ = new SmtUnaryFormula(
+                SmtUnaryOperator.Not,
+                new SmtStringEndsWithFormula(text, new SmtStringConstant("Z")));
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = service.ClassifyImplication(new[] { textIsAbc }, doesNotEndWithZ);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_ContradictoryExactStringValues_BypassesSolver()
+        {
+            var text = new SmtVariable("exact_contradiction_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+            var service = new SmtAnalysisService(new SmtAnalysisOptions(
+                SmtAnalysisMode.Bounded,
+                TimeSpan.FromMilliseconds(50),
+                TimeSpan.FromMilliseconds(500),
+                maxPathConditions: 1,
+                maxExpressionNodes: 3));
+
+            var result = service.ClassifyPathFeasibility(new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("ABC")),
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("XYZ")),
+            });
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
             Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
             Assert.That(service.CacheEntryCount, Is.EqualTo(0));
         }
@@ -798,6 +892,29 @@ namespace PurelySharp.Test
             {
                 new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(0)),
                 new SmtBinaryFormula(SmtBinaryOperator.LessThan, x, new SmtIntegerConstant(0)),
+            };
+
+            var result = service.ClassifyPathFeasibility(pathConditions);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_BooleanAliasComparisonContradiction_IsUnsatisfiable()
+        {
+            var value = new SmtVariable("value", SmtValueKind.Int);
+            var isZero = new SmtVariable("isZero", SmtValueKind.Bool);
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var pathConditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    isZero,
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, value, new SmtIntegerConstant(0))),
+                isZero,
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtIntegerConstant(0)),
             };
 
             var result = service.ClassifyPathFeasibility(pathConditions);

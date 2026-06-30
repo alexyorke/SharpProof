@@ -116,7 +116,7 @@ namespace PurelySharp.Analyzer.Engine
                 localConcreteTypes: mergedLocalConcreteTypes,
                 smtSymbolVersions: mergedSmtSymbolVersions,
                 flowCaptureConcreteTypes: mergedCaptureConcreteTypes,
-                pathConditions: MergePathConditions(state1.PathConditions, state2.PathConditions),
+                pathConditions: MergePathConditionsAcrossAll(new[] { state1, state2 }, mergedSmtSymbolVersions),
                 flowCaptureSymbols: mergedCaptureSymbols,
                 ownedArrayFlowCaptures: mergedOwnedArrayFlowCaptures);
         }
@@ -168,9 +168,12 @@ namespace PurelySharp.Analyzer.Engine
         }
 
         private static ImmutableArray<SmtFormula> MergePathConditionsAcrossAll(
-            IEnumerable<ImmutableArray<SmtFormula>> pathConditionSets)
+            IReadOnlyList<PurityAnalysisState> states,
+            ImmutableDictionary<ISymbol, int> mergedSmtSymbolVersions)
         {
-            var sets = pathConditionSets.ToArray();
+            var sets = states
+                .Select(state => NormalizePathConditionsForMergedState(state, mergedSmtSymbolVersions))
+                .ToArray();
             if (sets.Length == 0)
             {
                 return ImmutableArray<SmtFormula>.Empty;
@@ -180,6 +183,198 @@ namespace PurelySharp.Analyzer.Engine
             var builder = common.ToBuilder();
             AddConditionalMergedPathConditions(sets, common, builder);
             return builder.ToImmutable();
+        }
+
+        private static ImmutableArray<SmtFormula> NormalizePathConditionsForMergedState(
+            PurityAnalysisState state,
+            ImmutableDictionary<ISymbol, int> mergedSmtSymbolVersions)
+        {
+            if (state.PathConditions.IsDefaultOrEmpty ||
+                state.SmtSymbolVersions.Count == 0 && mergedSmtSymbolVersions.Count == 0)
+            {
+                return state.PathConditions;
+            }
+
+            var rewrites = CreateSmtVersionRewrites(state.SmtSymbolVersions, mergedSmtSymbolVersions);
+            if (rewrites.Length == 0)
+            {
+                return state.PathConditions;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<SmtFormula>(state.PathConditions.Length);
+            foreach (var condition in state.PathConditions)
+            {
+                builder.Add(RewriteSmtSymbolVersions(condition, rewrites));
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private static ImmutableArray<SmtVersionRewrite> CreateSmtVersionRewrites(
+            ImmutableDictionary<ISymbol, int> stateSmtSymbolVersions,
+            ImmutableDictionary<ISymbol, int> mergedSmtSymbolVersions)
+        {
+            var symbols = ImmutableHashSet.CreateBuilder<ISymbol>(SymbolEqualityComparer.Default);
+            symbols.UnionWith(stateSmtSymbolVersions.Keys);
+            symbols.UnionWith(mergedSmtSymbolVersions.Keys);
+
+            var builder = ImmutableArray.CreateBuilder<SmtVersionRewrite>();
+            foreach (var symbol in symbols)
+            {
+                var originalDefinition = symbol.OriginalDefinition;
+                var stateVersion = stateSmtSymbolVersions.TryGetValue(originalDefinition, out var currentVersion)
+                    ? currentVersion
+                    : 0;
+                var mergedVersion = mergedSmtSymbolVersions.TryGetValue(originalDefinition, out var targetVersion)
+                    ? targetVersion
+                    : 0;
+                if (stateVersion == mergedVersion)
+                {
+                    continue;
+                }
+
+                builder.Add(new SmtVersionRewrite(
+                    GetSmtVariableName(originalDefinition),
+                    stateVersion,
+                    mergedVersion));
+            }
+
+            return builder.ToImmutable();
+        }
+
+        private static SmtFormula RewriteSmtSymbolVersions(
+            SmtFormula formula,
+            ImmutableArray<SmtVersionRewrite> rewrites)
+        {
+            switch (formula)
+            {
+                case SmtVariable variable:
+                    var rewrittenName = RewriteSmtVariableName(variable.Name, rewrites);
+                    return string.Equals(rewrittenName, variable.Name, StringComparison.Ordinal)
+                        ? formula
+                        : new SmtVariable(rewrittenName, variable.Kind);
+                case SmtUnaryFormula unary:
+                    return new SmtUnaryFormula(
+                        unary.Operator,
+                        RewriteSmtSymbolVersions(unary.Operand, rewrites));
+                case SmtBinaryFormula binary:
+                    return new SmtBinaryFormula(
+                        binary.Operator,
+                        RewriteSmtSymbolVersions(binary.Left, rewrites),
+                        RewriteSmtSymbolVersions(binary.Right, rewrites));
+                case SmtIntegerUnaryTerm unaryTerm:
+                    return new SmtIntegerUnaryTerm(
+                        unaryTerm.Operator,
+                        RewriteSmtSymbolVersions(unaryTerm.Operand, rewrites));
+                case SmtIntegerBinaryTerm binaryTerm:
+                    return new SmtIntegerBinaryTerm(
+                        binaryTerm.Operator,
+                        RewriteSmtSymbolVersions(binaryTerm.Left, rewrites),
+                        RewriteSmtSymbolVersions(binaryTerm.Right, rewrites));
+                case SmtStringLengthTerm stringLength:
+                    return new SmtStringLengthTerm(
+                        RewriteSmtSymbolVersions(stringLength.Value, rewrites));
+                case SmtStringConcatTerm stringConcat:
+                    return new SmtStringConcatTerm(
+                        RewriteSmtSymbolVersions(stringConcat.Left, rewrites),
+                        RewriteSmtSymbolVersions(stringConcat.Right, rewrites));
+                case SmtStringContainsFormula stringContains:
+                    return new SmtStringContainsFormula(
+                        RewriteSmtSymbolVersions(stringContains.Value, rewrites),
+                        RewriteSmtSymbolVersions(stringContains.Search, rewrites));
+                case SmtStringStartsWithFormula stringStartsWith:
+                    return new SmtStringStartsWithFormula(
+                        RewriteSmtSymbolVersions(stringStartsWith.Value, rewrites),
+                        RewriteSmtSymbolVersions(stringStartsWith.Prefix, rewrites));
+                case SmtStringEndsWithFormula stringEndsWith:
+                    return new SmtStringEndsWithFormula(
+                        RewriteSmtSymbolVersions(stringEndsWith.Value, rewrites),
+                        RewriteSmtSymbolVersions(stringEndsWith.Suffix, rewrites));
+                case SmtRegexMatchFormula regexMatch:
+                    return new SmtRegexMatchFormula(
+                        RewriteSmtSymbolVersions(regexMatch.Value, rewrites),
+                        regexMatch.Pattern);
+                case SmtConditionalFormula conditional:
+                    return new SmtConditionalFormula(
+                        RewriteSmtSymbolVersions(conditional.Condition, rewrites),
+                        RewriteSmtSymbolVersions(conditional.WhenTrue, rewrites),
+                        RewriteSmtSymbolVersions(conditional.WhenFalse, rewrites),
+                        conditional.ResultKind);
+                default:
+                    return formula;
+            }
+        }
+
+        private static string RewriteSmtVariableName(
+            string name,
+            ImmutableArray<SmtVersionRewrite> rewrites)
+        {
+            var rewritten = name;
+            foreach (var rewrite in rewrites)
+            {
+                rewritten = RewriteSmtVariableName(rewritten, rewrite);
+            }
+
+            return rewritten;
+        }
+
+        private static string RewriteSmtVariableName(string name, SmtVersionRewrite rewrite)
+        {
+            var fromBase = CreateSmtVersionedBaseName(rewrite.Prefix, rewrite.FromVersion);
+            var toBase = CreateSmtVersionedBaseName(rewrite.Prefix, rewrite.ToVersion);
+            if (string.Equals(fromBase, toBase, StringComparison.Ordinal))
+            {
+                return name;
+            }
+
+            var searchIndex = 0;
+            while (searchIndex < name.Length)
+            {
+                var matchIndex = name.IndexOf(fromBase, searchIndex, StringComparison.Ordinal);
+                if (matchIndex < 0)
+                {
+                    return name;
+                }
+
+                var endIndex = matchIndex + fromBase.Length;
+                if (IsSmtVariableNameBoundary(name, endIndex))
+                {
+                    return name.Substring(0, matchIndex) + toBase + name.Substring(endIndex);
+                }
+
+                searchIndex = endIndex;
+            }
+
+            return name;
+        }
+
+        private static string CreateSmtVersionedBaseName(string prefix, int version)
+        {
+            return version > 0
+                ? prefix + "@v" + version.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                : prefix;
+        }
+
+        private static bool IsSmtVariableNameBoundary(string name, int index)
+        {
+            return index >= name.Length ||
+                !char.IsDigit(name[index]) && name[index] != '@';
+        }
+
+        private readonly struct SmtVersionRewrite
+        {
+            public SmtVersionRewrite(string prefix, int fromVersion, int toVersion)
+            {
+                Prefix = prefix;
+                FromVersion = fromVersion;
+                ToVersion = toVersion;
+            }
+
+            public string Prefix { get; }
+
+            public int FromVersion { get; }
+
+            public int ToVersion { get; }
         }
 
         private static ImmutableArray<SmtFormula> GetCommonPathConditions(

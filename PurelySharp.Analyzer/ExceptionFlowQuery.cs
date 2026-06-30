@@ -88,7 +88,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                if (ExceptionFlowAnalyzer.IsShadowedByDefinitelyThrowingFinally(throwNode))
+                if (IsShadowedByThrowingFinally(throwNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
                 }
@@ -116,7 +116,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                if (ExceptionFlowAnalyzer.IsShadowedByDefinitelyThrowingFinally(calleeCallSite.CallSite))
+                if (IsShadowedByThrowingFinally(calleeCallSite.CallSite, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
                 }
@@ -146,7 +146,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                if (ExceptionFlowAnalyzer.IsShadowedByDefinitelyThrowingFinally(divideByZeroNode))
+                if (IsShadowedByThrowingFinally(divideByZeroNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
                 }
@@ -174,7 +174,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                if (ExceptionFlowAnalyzer.IsShadowedByDefinitelyThrowingFinally(nullDereferenceNode))
+                if (IsShadowedByThrowingFinally(nullDereferenceNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
                 }
@@ -202,7 +202,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                if (ExceptionFlowAnalyzer.IsShadowedByDefinitelyThrowingFinally(indexOutOfRangeNode))
+                if (IsShadowedByThrowingFinally(indexOutOfRangeNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
                 }
@@ -230,7 +230,7 @@ namespace PurelySharp.Analyzer
                     continue;
                 }
 
-                if (ExceptionFlowAnalyzer.IsShadowedByDefinitelyThrowingFinally(argumentOutOfRangeNode))
+                if (IsShadowedByThrowingFinally(argumentOutOfRangeNode, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
                 }
@@ -629,6 +629,20 @@ namespace PurelySharp.Analyzer
             SmtAnalysisService smtAnalysis)
         {
             return !ExceptionFlowAnalyzer.IsExceptionPathReachable(node, semanticModel, cancellationToken, smtAnalysis);
+        }
+
+        private static bool IsShadowedByThrowingFinally(
+            SyntaxNode node,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            return ExceptionFlowAnalyzer.IsShadowedByDefinitelyThrowingFinally(node) ||
+                ExceptionFlowAnalyzer.IsShadowedByPathSensitiveThrowingFinally(
+                    node,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis);
         }
 
         private static bool CatchesException(

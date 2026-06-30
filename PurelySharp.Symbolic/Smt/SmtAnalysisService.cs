@@ -324,11 +324,13 @@ namespace PurelySharp.Symbolic.Smt
         private static bool ContainsSyntacticContradiction(ImmutableArray<SmtFormula> pathConditions)
         {
             var seen = new List<SmtFormula>(pathConditions.Length);
-            var integerIntervals = new Dictionary<SmtFormula, IntegerInterval>();
+            var facts = new SyntacticFactSet();
+            var conjuncts = ImmutableArray.CreateBuilder<SmtFormula>();
             foreach (var pathCondition in pathConditions)
             {
                 foreach (var conjunct in EnumerateConjuncts(pathCondition))
                 {
+                    conjuncts.Add(conjunct);
                     if (conjunct is SmtBooleanConstant { Value: false })
                     {
                         return true;
@@ -342,13 +344,28 @@ namespace PurelySharp.Symbolic.Smt
                         }
                     }
 
-                    if (TryAddIntegerIntervalFact(conjunct, integerIntervals, out var hasContradiction) &&
+                    if (facts.Add(conjunct, out var hasContradiction) &&
                         hasContradiction)
                     {
                         return true;
                     }
 
                     seen.Add(conjunct);
+                }
+            }
+
+            facts.AddAll(conjuncts, out var inferredContradiction);
+            if (inferredContradiction)
+            {
+                return true;
+            }
+
+            foreach (var conjunct in conjuncts)
+            {
+                if (facts.TryEvaluateBoolean(conjunct, out var value) &&
+                    !value)
+                {
+                    return true;
                 }
             }
 
@@ -518,6 +535,14 @@ namespace PurelySharp.Symbolic.Smt
                 LowerBound.Value == UpperBound.Value &&
                 ExcludedValues.Contains(LowerBound.Value);
 
+            public long? ExactValue =>
+                !IsContradictory &&
+                LowerBound.HasValue &&
+                UpperBound.HasValue &&
+                LowerBound.Value == UpperBound.Value
+                    ? LowerBound.Value
+                    : null;
+
             public IntegerInterval Apply(SmtBinaryOperator op, long constant)
             {
                 return op switch
@@ -633,9 +658,15 @@ namespace PurelySharp.Symbolic.Smt
             ImmutableArray<SmtFormula> pathConditions,
             ImmutableArray<SmtFormula> pathConjuncts)
         {
+            var facts = SyntacticFactSet.Create(pathConjuncts);
             if (formula is SmtBooleanConstant booleanConstant)
             {
                 return booleanConstant.Value;
+            }
+
+            if (facts.TryEvaluateBoolean(formula, out var value))
+            {
+                return value;
             }
 
             foreach (var pathConjunct in pathConjuncts)
@@ -667,6 +698,544 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return ContainsSyntacticContradiction(pathConditions.Add(new SmtUnaryFormula(SmtUnaryOperator.Not, formula)));
+        }
+
+        private sealed class SyntacticFactSet
+        {
+            private readonly Dictionary<SmtFormula, IntegerInterval> _integerIntervals = new();
+            private readonly Dictionary<SmtFormula, string> _exactStrings = new();
+            private readonly Dictionary<SmtFormula, ImmutableHashSet<string>> _excludedStrings = new();
+            private readonly Dictionary<SmtFormula, bool> _exactBooleans = new();
+
+            public static SyntacticFactSet Create(IEnumerable<SmtFormula> formulas)
+            {
+                var facts = new SyntacticFactSet();
+                facts.AddAll(formulas, out _);
+                return facts;
+            }
+
+            public bool AddAll(IEnumerable<SmtFormula> formulas, out bool hasContradiction)
+            {
+                hasContradiction = false;
+                var formulaArray = formulas as SmtFormula[] ?? formulas.ToArray();
+                var anyAdded = false;
+                for (var pass = 0; pass < 4; pass++)
+                {
+                    var addedThisPass = false;
+                    foreach (var formula in formulaArray)
+                    {
+                        if (Add(formula, out var formulaContradiction))
+                        {
+                            addedThisPass = true;
+                            anyAdded = true;
+                        }
+
+                        hasContradiction |= formulaContradiction;
+                    }
+
+                    if (hasContradiction || !addedThisPass)
+                    {
+                        break;
+                    }
+                }
+
+                return anyAdded;
+            }
+
+            public bool Add(SmtFormula formula, out bool hasContradiction)
+            {
+                hasContradiction = false;
+                var added = false;
+                if (TryAddIntegerIntervalFact(formula, _integerIntervals, out var integerContradiction))
+                {
+                    added = true;
+                    hasContradiction |= integerContradiction;
+                }
+
+                if (TryAddBooleanFact(formula, out var booleanContradiction))
+                {
+                    added = true;
+                    hasContradiction |= booleanContradiction;
+                }
+
+                if (TryAddStringValueFact(formula, out var stringContradiction))
+                {
+                    added = true;
+                    hasContradiction |= stringContradiction;
+                }
+
+                if (TryEvaluateBoolean(formula, out var value) &&
+                    !value)
+                {
+                    hasContradiction = true;
+                }
+
+                return added || hasContradiction;
+            }
+
+            public bool TryEvaluateBoolean(SmtFormula formula, out bool value)
+            {
+                if (_exactBooleans.TryGetValue(formula, out var exactValue))
+                {
+                    value = exactValue;
+                    return true;
+                }
+
+                switch (formula)
+                {
+                    case SmtBooleanConstant booleanConstant:
+                        value = booleanConstant.Value;
+                        return true;
+                    case SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated
+                        when TryEvaluateBoolean(negated.Operand, out var operandValue):
+                        value = !operandValue;
+                        return true;
+                    case SmtBinaryFormula { Operator: SmtBinaryOperator.And } binary:
+                        {
+                            var hasLeft = TryEvaluateBoolean(binary.Left, out var left);
+                            var hasRight = TryEvaluateBoolean(binary.Right, out var right);
+                            if (hasLeft && !left || hasRight && !right)
+                            {
+                                value = false;
+                                return true;
+                            }
+
+                            if (hasLeft && hasRight)
+                            {
+                                value = left && right;
+                                return true;
+                            }
+
+                            break;
+                        }
+                    case SmtBinaryFormula { Operator: SmtBinaryOperator.Or } binary:
+                        {
+                            var hasLeft = TryEvaluateBoolean(binary.Left, out var left);
+                            var hasRight = TryEvaluateBoolean(binary.Right, out var right);
+                            if (hasLeft && left || hasRight && right)
+                            {
+                                value = true;
+                                return true;
+                            }
+
+                            if (hasLeft && hasRight)
+                            {
+                                value = left || right;
+                                return true;
+                            }
+
+                            break;
+                        }
+                    case SmtBinaryFormula binary:
+                        return TryEvaluateComparison(binary, out value);
+                    case SmtConditionalFormula conditional
+                        when conditional.Kind == SmtValueKind.Bool &&
+                             TryEvaluateBoolean(conditional.Condition, out var conditionValue):
+                        return TryEvaluateBoolean(conditionValue ? conditional.WhenTrue : conditional.WhenFalse, out value);
+                    case SmtStringContainsFormula contains
+                        when TryGetKnownString(contains.Value, out var containsValue) &&
+                             TryGetKnownString(contains.Search, out var containsSearch):
+                        value = containsValue.Contains(containsSearch, StringComparison.Ordinal);
+                        return true;
+                    case SmtStringStartsWithFormula startsWith
+                        when TryGetKnownString(startsWith.Value, out var startsWithValue) &&
+                             TryGetKnownString(startsWith.Prefix, out var prefix):
+                        value = startsWithValue.StartsWith(prefix, StringComparison.Ordinal);
+                        return true;
+                    case SmtStringEndsWithFormula endsWith
+                        when TryGetKnownString(endsWith.Value, out var endsWithValue) &&
+                             TryGetKnownString(endsWith.Suffix, out var suffix):
+                        value = endsWithValue.EndsWith(suffix, StringComparison.Ordinal);
+                        return true;
+                }
+
+                value = false;
+                return false;
+            }
+
+            private bool TryAddBooleanFact(SmtFormula formula, out bool hasContradiction)
+            {
+                return TryAddBooleanFact(formula, value: true, out hasContradiction);
+            }
+
+            private bool TryAddBooleanFact(
+                SmtFormula formula,
+                bool value,
+                out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (formula.Kind != SmtValueKind.Bool ||
+                    formula is SmtBooleanConstant)
+                {
+                    return false;
+                }
+
+                if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated)
+                {
+                    return TryAddBooleanFact(negated.Operand, !value, out hasContradiction);
+                }
+
+                if (formula is SmtBinaryFormula binary)
+                {
+                    if (binary.Operator == SmtBinaryOperator.And)
+                    {
+                        if (value)
+                        {
+                            var addedLeft = TryAddBooleanFact(binary.Left, value: true, out var leftContradiction);
+                            var addedRight = TryAddBooleanFact(binary.Right, value: true, out var rightContradiction);
+                            hasContradiction = leftContradiction || rightContradiction;
+                            return addedLeft || addedRight;
+                        }
+
+                        if (TryEvaluateBoolean(binary.Left, out var left) && left)
+                        {
+                            return TryAddBooleanFact(binary.Right, value: false, out hasContradiction);
+                        }
+
+                        if (TryEvaluateBoolean(binary.Right, out var right) && right)
+                        {
+                            return TryAddBooleanFact(binary.Left, value: false, out hasContradiction);
+                        }
+                    }
+                    else if (binary.Operator == SmtBinaryOperator.Or)
+                    {
+                        if (!value)
+                        {
+                            var addedLeft = TryAddBooleanFact(binary.Left, value: false, out var leftContradiction);
+                            var addedRight = TryAddBooleanFact(binary.Right, value: false, out var rightContradiction);
+                            hasContradiction = leftContradiction || rightContradiction;
+                            return addedLeft || addedRight;
+                        }
+
+                        if (TryEvaluateBoolean(binary.Left, out var left) && !left)
+                        {
+                            return TryAddBooleanFact(binary.Right, value: true, out hasContradiction);
+                        }
+
+                        if (TryEvaluateBoolean(binary.Right, out var right) && !right)
+                        {
+                            return TryAddBooleanFact(binary.Left, value: true, out hasContradiction);
+                        }
+                    }
+                    else if (binary.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual &&
+                        binary.Left.Kind == SmtValueKind.Bool &&
+                        binary.Right.Kind == SmtValueKind.Bool)
+                    {
+                        if (TryEvaluateBoolean(binary.Left, out var left))
+                        {
+                            var expectedRight = binary.Operator == SmtBinaryOperator.Equal == value
+                                ? left
+                                : !left;
+                            return TryAddBooleanFact(binary.Right, expectedRight, out hasContradiction);
+                        }
+
+                        if (TryEvaluateBoolean(binary.Right, out var right))
+                        {
+                            var expectedLeft = binary.Operator == SmtBinaryOperator.Equal == value
+                                ? right
+                                : !right;
+                            return TryAddBooleanFact(binary.Left, expectedLeft, out hasContradiction);
+                        }
+                    }
+                }
+
+                var addedComparisonFact = TryAddKnownBooleanComparisonFact(formula, value, out var comparisonContradiction);
+                var addedExactBoolean = AddExactBoolean(formula, value, out var exactBooleanContradiction);
+                hasContradiction = comparisonContradiction || exactBooleanContradiction;
+                return addedComparisonFact || addedExactBoolean;
+            }
+
+            private bool TryAddKnownBooleanComparisonFact(
+                SmtFormula formula,
+                bool value,
+                out bool hasContradiction)
+            {
+                hasContradiction = false;
+                var effectiveFormula = value
+                    ? formula
+                    : new SmtUnaryFormula(SmtUnaryOperator.Not, formula);
+                var added = false;
+
+                if (TryAddIntegerIntervalFact(effectiveFormula, _integerIntervals, out var integerContradiction))
+                {
+                    added = true;
+                    hasContradiction |= integerContradiction;
+                }
+
+                if (TryAddStringValueFact(effectiveFormula, out var stringContradiction))
+                {
+                    added = true;
+                    hasContradiction |= stringContradiction;
+                }
+
+                return added;
+            }
+
+            private bool AddExactBoolean(
+                SmtFormula formula,
+                bool value,
+                out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (_exactBooleans.TryGetValue(formula, out var existing) &&
+                    existing != value)
+                {
+                    hasContradiction = true;
+                }
+
+                _exactBooleans[formula] = value;
+                return true;
+            }
+
+            private bool TryEvaluateComparison(SmtBinaryFormula binary, out bool value)
+            {
+                if (TryGetKnownInteger(binary.Left, out var leftInteger) &&
+                    TryGetKnownInteger(binary.Right, out var rightInteger))
+                {
+                    value = binary.Operator switch
+                    {
+                        SmtBinaryOperator.Equal => leftInteger == rightInteger,
+                        SmtBinaryOperator.NotEqual => leftInteger != rightInteger,
+                        SmtBinaryOperator.LessThan => leftInteger < rightInteger,
+                        SmtBinaryOperator.LessThanOrEqual => leftInteger <= rightInteger,
+                        SmtBinaryOperator.GreaterThan => leftInteger > rightInteger,
+                        SmtBinaryOperator.GreaterThanOrEqual => leftInteger >= rightInteger,
+                        _ => false,
+                    };
+                    return binary.Operator is SmtBinaryOperator.Equal or
+                        SmtBinaryOperator.NotEqual or
+                        SmtBinaryOperator.LessThan or
+                        SmtBinaryOperator.LessThanOrEqual or
+                        SmtBinaryOperator.GreaterThan or
+                        SmtBinaryOperator.GreaterThanOrEqual;
+                }
+
+                if (TryGetKnownString(binary.Left, out var leftString) &&
+                    TryGetKnownString(binary.Right, out var rightString))
+                {
+                    value = binary.Operator switch
+                    {
+                        SmtBinaryOperator.Equal => string.Equals(leftString, rightString, StringComparison.Ordinal),
+                        SmtBinaryOperator.NotEqual => !string.Equals(leftString, rightString, StringComparison.Ordinal),
+                        _ => false,
+                    };
+                    return binary.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual;
+                }
+
+                if (TryEvaluateBoolean(binary.Left, out var leftBoolean) &&
+                    TryEvaluateBoolean(binary.Right, out var rightBoolean))
+                {
+                    value = binary.Operator switch
+                    {
+                        SmtBinaryOperator.Equal => leftBoolean == rightBoolean,
+                        SmtBinaryOperator.NotEqual => leftBoolean != rightBoolean,
+                        _ => false,
+                    };
+                    return binary.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual;
+                }
+
+                value = false;
+                return false;
+            }
+
+            private bool TryAddStringValueFact(SmtFormula formula, out bool hasContradiction)
+            {
+                hasContradiction = false;
+                if (!TryGetStringComparison(formula, out var term, out var op, out var value))
+                {
+                    return false;
+                }
+
+                if (op == SmtBinaryOperator.NotEqual)
+                {
+                    if (_exactStrings.TryGetValue(term, out var exactValue) &&
+                        string.Equals(exactValue, value, StringComparison.Ordinal))
+                    {
+                        hasContradiction = true;
+                    }
+
+                    _excludedStrings[term] = _excludedStrings.TryGetValue(term, out var excluded)
+                        ? excluded.Add(value)
+                        : ImmutableHashSet.Create(StringComparer.Ordinal, value);
+                    return true;
+                }
+
+                if (_exactStrings.TryGetValue(term, out var existing) &&
+                    !string.Equals(existing, value, StringComparison.Ordinal))
+                {
+                    hasContradiction = true;
+                }
+
+                if (_excludedStrings.TryGetValue(term, out var excludedValues) &&
+                    excludedValues.Contains(value))
+                {
+                    hasContradiction = true;
+                }
+
+                _exactStrings[term] = value;
+                AddStringLengthFact(term, value.Length, out var lengthContradiction);
+                hasContradiction |= lengthContradiction;
+                return true;
+            }
+
+            private void AddStringLengthFact(
+                SmtFormula stringFormula,
+                int length,
+                out bool hasContradiction)
+            {
+                var lengthFormula = new SmtStringLengthTerm(stringFormula);
+                var interval = _integerIntervals.TryGetValue(lengthFormula, out var existing)
+                    ? existing
+                    : IntegerInterval.Unbounded;
+                interval = interval.Apply(SmtBinaryOperator.Equal, length);
+                hasContradiction = interval.IsContradictory;
+                _integerIntervals[lengthFormula] = interval;
+            }
+
+            private bool TryGetKnownString(SmtFormula formula, out string value)
+            {
+                if (_exactStrings.TryGetValue(formula, out var exactValue))
+                {
+                    value = exactValue;
+                    return true;
+                }
+
+                switch (formula)
+                {
+                    case SmtStringConstant stringConstant:
+                        value = stringConstant.Value;
+                        return true;
+                    case SmtStringConcatTerm concat
+                        when TryGetKnownString(concat.Left, out var left) &&
+                             TryGetKnownString(concat.Right, out var right):
+                        value = left + right;
+                        return true;
+                    case SmtConditionalFormula conditional
+                        when conditional.Kind == SmtValueKind.String &&
+                             TryEvaluateBoolean(conditional.Condition, out var conditionValue):
+                        return TryGetKnownString(conditionValue ? conditional.WhenTrue : conditional.WhenFalse, out value);
+                    default:
+                        value = string.Empty;
+                        return false;
+                }
+            }
+
+            private bool TryGetKnownInteger(SmtFormula formula, out long value)
+            {
+                if (_integerIntervals.TryGetValue(formula, out var interval) &&
+                    interval.ExactValue.HasValue)
+                {
+                    value = interval.ExactValue.Value;
+                    return true;
+                }
+
+                switch (formula)
+                {
+                    case SmtIntegerConstant integerConstant:
+                        value = integerConstant.Value;
+                        return true;
+                    case SmtStringLengthTerm stringLength
+                        when TryGetKnownString(stringLength.Value, out var stringValue):
+                        value = stringValue.Length;
+                        return true;
+                    case SmtConditionalFormula conditional
+                        when conditional.Kind == SmtValueKind.Int &&
+                             TryEvaluateBoolean(conditional.Condition, out var conditionValue):
+                        return TryGetKnownInteger(conditionValue ? conditional.WhenTrue : conditional.WhenFalse, out value);
+                    case SmtIntegerUnaryTerm { Operator: SmtIntegerUnaryOperator.Negate } unary
+                        when TryGetKnownInteger(unary.Operand, out var operand):
+                        value = -operand;
+                        return true;
+                    case SmtIntegerBinaryTerm binary
+                        when TryGetKnownInteger(binary.Left, out var left) &&
+                             TryGetKnownInteger(binary.Right, out var right):
+                        return TryEvaluateIntegerBinaryTerm(binary.Operator, left, right, out value);
+                    default:
+                        value = 0;
+                        return false;
+                }
+            }
+
+            private static bool TryEvaluateIntegerBinaryTerm(
+                SmtIntegerBinaryOperator op,
+                long left,
+                long right,
+                out long value)
+            {
+                try
+                {
+                    checked
+                    {
+                        switch (op)
+                        {
+                            case SmtIntegerBinaryOperator.Add:
+                                value = left + right;
+                                return true;
+                            case SmtIntegerBinaryOperator.Subtract:
+                                value = left - right;
+                                return true;
+                            case SmtIntegerBinaryOperator.Multiply:
+                                value = left * right;
+                                return true;
+                            case SmtIntegerBinaryOperator.Divide when right != 0:
+                                value = left / right;
+                                return true;
+                            case SmtIntegerBinaryOperator.Remainder when right != 0:
+                                value = left % right;
+                                return true;
+                        }
+                    }
+                }
+                catch (OverflowException)
+                {
+                }
+
+                value = 0;
+                return false;
+            }
+
+            private static bool TryGetStringComparison(
+                SmtFormula formula,
+                out SmtFormula term,
+                out SmtBinaryOperator op,
+                out string value)
+            {
+                term = null!;
+                op = default;
+                value = string.Empty;
+                if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated &&
+                    TryGetStringComparison(negated.Operand, out term, out op, out value))
+                {
+                    op = NegateComparison(op);
+                    return op is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual;
+                }
+
+                if (formula is not SmtBinaryFormula binary ||
+                    binary.Operator is not (SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual))
+                {
+                    return false;
+                }
+
+                if (binary.Left.Kind == SmtValueKind.String &&
+                    binary.Right is SmtStringConstant rightConstant)
+                {
+                    term = binary.Left;
+                    op = binary.Operator;
+                    value = rightConstant.Value;
+                    return true;
+                }
+
+                if (binary.Left is SmtStringConstant leftConstant &&
+                    binary.Right.Kind == SmtValueKind.String)
+                {
+                    term = binary.Right;
+                    op = binary.Operator;
+                    value = leftConstant.Value;
+                    return true;
+                }
+
+                return false;
+            }
         }
 
         private static bool TryGetTriggerBasedPureReason(PurityHazard hazard, out string reason)

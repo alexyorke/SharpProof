@@ -157,6 +157,7 @@ static void PrintFileResult(
             $"ProvenFalse={proof.ProvenFalseCount}, " +
             $"Unreachable={proof.UnreachableCount}, " +
             $"Unknown={proof.UnknownCount}");
+        PrintProofReasonSummary(proof.Reasons, indent: "  ");
     }
 
     foreach (var lineResult in result.Lines)
@@ -253,6 +254,8 @@ static void PrintInvariantQuery(
         $"Unknown={query.UnknownFactCount}, " +
         $"CandidatePoints={query.CandidateProgramPointCount}, " +
         $"UnreachablePoints={query.UnreachableProgramPointCount}");
+    Console.WriteLine(label + " status: " + query.Status);
+    Console.WriteLine(label + " summary: " + query.Summary);
     if (query.MustFacts.Count != 0)
     {
         Console.WriteLine(label + " must facts: " + string.Join("; ", query.MustFacts));
@@ -266,6 +269,22 @@ static void PrintInvariantQuery(
     if (query.UnknownFacts.Count != 0)
     {
         Console.WriteLine(label + " unknowns: " + string.Join("; ", query.UnknownFacts));
+    }
+
+    foreach (var diagnostic in query.Diagnostics)
+    {
+        Console.WriteLine(
+            label + " diagnostic: " +
+            $"{diagnostic.Code} {diagnostic.Severity} count={diagnostic.Count} " +
+            diagnostic.Message);
+        if (diagnostic.Evidence.Count != 0)
+        {
+            var suffix = diagnostic.EvidenceTruncated ? " ..." : string.Empty;
+            Console.WriteLine(
+                label + " diagnostic evidence: " +
+                string.Join("; ", diagnostic.Evidence) +
+                suffix);
+        }
     }
 }
 
@@ -370,6 +389,19 @@ static void PrintProofOutcomeSummary(
         $"ProvenFalse={summary.ProvenFalseCount}, " +
         $"Unreachable={summary.UnreachableCount}, " +
         $"Unknown={summary.UnknownCount}");
+}
+
+static void PrintProofReasonSummary(
+    IReadOnlyList<SymbolicConditionProofReasonSummary> reasons,
+    string indent)
+{
+    foreach (var reason in reasons)
+    {
+        Console.WriteLine(
+            indent +
+            "Proof reason: " +
+            $"{reason.TruthValue} count={reason.Count} reason={reason.Reason}");
+    }
 }
 
 static void PrintSmtDiagnostics(SymbolicSmtDiagnostics diagnostics)

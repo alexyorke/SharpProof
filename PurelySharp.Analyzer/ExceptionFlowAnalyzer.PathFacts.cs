@@ -575,6 +575,124 @@ namespace PurelySharp.Analyzer
                 cancellationToken);
         }
 
+        internal static bool IsShadowedByPathSensitiveThrowingFinally(
+            SyntaxNode site,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            foreach (var tryStatement in site.Ancestors().OfType<TryStatementSyntax>())
+            {
+                if (!tryStatement.Span.Contains(site.SpanStart) ||
+                    tryStatement.Finally?.Block is not { } finallyBlock ||
+                    finallyBlock.Span.Contains(site.SpanStart))
+                {
+                    continue;
+                }
+
+                if (!tryStatement.Block.Span.Contains(site.SpanStart) &&
+                    !tryStatement.Catches.Any(catchClause => catchClause.Block.Span.Contains(site.SpanStart)))
+                {
+                    continue;
+                }
+
+                if (FinallyBlockIsProvenToExit(site, finallyBlock, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool FinallyBlockIsProvenToExit(
+            SyntaxNode site,
+            BlockSyntax finallyBlock,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            var pathConditions = CollectExceptionSitePathConditions(
+                site,
+                finallyBlock,
+                semanticModel,
+                cancellationToken);
+            if (!PathConditionsAreSatisfiable(pathConditions, smtAnalysis))
+            {
+                return false;
+            }
+
+            foreach (var statement in finallyBlock.Statements)
+            {
+                if (StatementDefinitelyExits(statement) ||
+                    IfStatementExitIsProven(statement, pathConditions, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    return true;
+                }
+
+                AddPriorStatementFacts(statement, semanticModel, cancellationToken, pathConditions);
+                if (!PathConditionsAreSatisfiable(pathConditions, smtAnalysis))
+                {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IfStatementExitIsProven(
+            StatementSyntax statement,
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            if (statement is not IfStatementSyntax ifStatement)
+            {
+                return false;
+            }
+
+            if (StatementDefinitelyExits(ifStatement.Statement) &&
+                PathConditionsImplyBranch(
+                    pathConditions,
+                    ifStatement.Condition,
+                    branchWhenTrue: true,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis))
+            {
+                return true;
+            }
+
+            return ifStatement.Else?.Statement is { } elseStatement &&
+                StatementDefinitelyExits(elseStatement) &&
+                PathConditionsImplyBranch(
+                    pathConditions,
+                    ifStatement.Condition,
+                    branchWhenTrue: false,
+                    semanticModel,
+                    cancellationToken,
+                    smtAnalysis);
+        }
+
+        private static bool PathConditionsImplyBranch(
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            var oppositeConditions = pathConditions.ToList();
+            return CSharpConditionToFormula.TryCollectBranchAssumptions(
+                    condition,
+                    !branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    oppositeConditions) &&
+                !PathConditionsAreSatisfiable(oppositeConditions, smtAnalysis);
+        }
+
         private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(SyntaxNode useNode)
         {
             for (SyntaxNode? current = useNode; current != null; current = current.Parent)

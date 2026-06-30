@@ -724,33 +724,7 @@ namespace PurelySharp.Symbolic.Smt
             var conditions = new List<SmtFormula>();
             AddReferenceNonNullFact(value, conditions);
 
-            var hasSlice = false;
-            var minimumLength = 0;
-            foreach (var subpattern in listPattern.Patterns)
-            {
-                if (subpattern is SlicePatternSyntax slicePattern)
-                {
-                    if (!IsSelectionNeutralSlicePattern(slicePattern.Pattern))
-                    {
-                        return false;
-                    }
-
-                    hasSlice = true;
-                    continue;
-                }
-
-                minimumLength++;
-            }
-
-            conditions.Add(hasSlice
-                ? new SmtBinaryFormula(
-                    SmtBinaryOperator.GreaterThanOrEqual,
-                    lengthFormula,
-                    new SmtIntegerConstant(minimumLength))
-                : new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    lengthFormula,
-                    new SmtIntegerConstant(minimumLength)));
+            conditions.Add(CreateListPatternLengthCondition(listPattern, lengthFormula));
 
             if (!TryAddListPatternElementSelectionConditions(
                     value,
@@ -779,16 +753,28 @@ namespace PurelySharp.Symbolic.Smt
             if (!TryGetListPatternElementType(valueType, out var elementType) ||
                 !TryGetValueKind(elementType, out var elementKind))
             {
-                return listPattern.Patterns.All(static pattern =>
-                    pattern is SlicePatternSyntax ||
-                    IsSelectionNeutralPattern(pattern));
+                return ListPatternHasOnlySelectionNeutralElements(listPattern);
             }
 
             for (var patternIndex = 0; patternIndex < listPattern.Patterns.Count; patternIndex++)
             {
                 var subpattern = listPattern.Patterns[patternIndex];
-                if (subpattern is SlicePatternSyntax)
+                if (subpattern is SlicePatternSyntax slicePattern)
                 {
+                    if (!TryAddListPatternSliceSelectionConditions(
+                            value,
+                            valueType,
+                            listPattern,
+                            patternIndex,
+                            slicePattern,
+                            semanticModel,
+                            cancellationToken,
+                            conditions,
+                            getSymbolVersion))
+                    {
+                        return false;
+                    }
+
                     continue;
                 }
 
@@ -798,6 +784,127 @@ namespace PurelySharp.Symbolic.Smt
                 }
 
                 if (!TryGetListPatternElementPosition(listPattern, patternIndex, out var elementIndex, out var fromEnd))
+                {
+                    return false;
+                }
+
+                var elementValue = CreateListPatternElementFormula(value, elementIndex, fromEnd, elementKind);
+                if (!TryCreatePatternSelectionCondition(
+                        elementValue,
+                        elementType,
+                        subpattern,
+                        semanticModel,
+                        cancellationToken,
+                        out var elementCondition,
+                        getSymbolVersion) ||
+                    elementCondition == null)
+                {
+                    return false;
+                }
+
+                conditions.Add(elementCondition);
+            }
+
+            return true;
+        }
+
+        private static bool TryAddListPatternSliceSelectionConditions(
+            SmtFormula value,
+            ITypeSymbol? valueType,
+            ListPatternSyntax containingPattern,
+            int sliceIndex,
+            SlicePatternSyntax slicePattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> conditions,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (IsSelectionNeutralSlicePattern(slicePattern.Pattern))
+            {
+                return true;
+            }
+
+            if (!TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
+            {
+                return false;
+            }
+
+            if (!TryGetListPatternElementType(valueType, out var elementType) ||
+                !TryGetValueKind(elementType, out var elementKind))
+            {
+                return ListPatternHasOnlySelectionNeutralElements(nestedListPattern);
+            }
+
+            return TryAddProjectedListPatternSelectionConditions(
+                value,
+                elementType,
+                elementKind,
+                nestedListPattern,
+                GetListPatternPrefixElementCount(containingPattern, sliceIndex),
+                GetListPatternSuffixElementCount(containingPattern, sliceIndex),
+                semanticModel,
+                cancellationToken,
+                conditions,
+                getSymbolVersion);
+        }
+
+        private static bool TryAddProjectedListPatternSelectionConditions(
+            SmtFormula value,
+            ITypeSymbol elementType,
+            SmtValueKind elementKind,
+            ListPatternSyntax listPattern,
+            int prefixOffset,
+            int suffixOffset,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> conditions,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            for (var patternIndex = 0; patternIndex < listPattern.Patterns.Count; patternIndex++)
+            {
+                var subpattern = listPattern.Patterns[patternIndex];
+                if (subpattern is SlicePatternSyntax slicePattern)
+                {
+                    if (IsSelectionNeutralSlicePattern(slicePattern.Pattern))
+                    {
+                        continue;
+                    }
+
+                    if (!TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
+                    {
+                        return false;
+                    }
+
+                    if (!TryAddProjectedListPatternSelectionConditions(
+                            value,
+                            elementType,
+                            elementKind,
+                            nestedListPattern,
+                            prefixOffset + GetListPatternPrefixElementCount(listPattern, patternIndex),
+                            suffixOffset + GetListPatternSuffixElementCount(listPattern, patternIndex),
+                            semanticModel,
+                            cancellationToken,
+                            conditions,
+                            getSymbolVersion))
+                    {
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                if (IsSelectionNeutralPattern(subpattern))
+                {
+                    continue;
+                }
+
+                if (!TryGetProjectedListPatternElementPosition(
+                        listPattern,
+                        patternIndex,
+                        prefixOffset,
+                        suffixOffset,
+                        out var elementIndex,
+                        out var fromEnd))
                 {
                     return false;
                 }
@@ -1173,33 +1280,7 @@ namespace PurelySharp.Symbolic.Smt
 
             AddReferenceNonNullFact(value, conditions);
 
-            var hasSlice = false;
-            var minimumLength = 0;
-            foreach (var subpattern in listPattern.Patterns)
-            {
-                if (subpattern is SlicePatternSyntax slicePattern)
-                {
-                    if (TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
-                    {
-                        minimumLength += GetListPatternMinimumLength(nestedListPattern);
-                    }
-
-                    hasSlice = true;
-                    continue;
-                }
-
-                minimumLength++;
-            }
-
-            conditions.Add(hasSlice
-                ? new SmtBinaryFormula(
-                    SmtBinaryOperator.GreaterThanOrEqual,
-                    lengthFormula,
-                    new SmtIntegerConstant(minimumLength))
-                : new SmtBinaryFormula(
-                    SmtBinaryOperator.Equal,
-                    lengthFormula,
-                    new SmtIntegerConstant(minimumLength)));
+            conditions.Add(CreateListPatternLengthCondition(listPattern, lengthFormula));
 
             if (!TryGetListPatternElementType(valueType, out var elementType) ||
                 !TryGetValueKind(elementType, out var elementKind))
@@ -1210,12 +1291,112 @@ namespace PurelySharp.Symbolic.Smt
             for (var patternIndex = 0; patternIndex < listPattern.Patterns.Count; patternIndex++)
             {
                 var subpattern = listPattern.Patterns[patternIndex];
-                if (subpattern is SlicePatternSyntax)
+                if (subpattern is SlicePatternSyntax slicePattern)
                 {
+                    AddListPatternSliceStructuralFacts(
+                        value,
+                        elementType,
+                        elementKind,
+                        listPattern,
+                        patternIndex,
+                        slicePattern,
+                        semanticModel,
+                        cancellationToken,
+                        conditions,
+                        getSymbolVersion);
+
                     continue;
                 }
 
                 if (!TryGetListPatternElementPosition(listPattern, patternIndex, out var elementIndex, out var fromEnd))
+                {
+                    continue;
+                }
+
+                var elementValue = CreateListPatternElementFormula(value, elementIndex, fromEnd, elementKind);
+                AddStructuralPatternFacts(
+                    elementValue,
+                    elementType,
+                    subpattern,
+                    semanticModel,
+                    cancellationToken,
+                    conditions,
+                    getSymbolVersion);
+            }
+        }
+
+        private static void AddListPatternSliceStructuralFacts(
+            SmtFormula value,
+            ITypeSymbol elementType,
+            SmtValueKind elementKind,
+            ListPatternSyntax containingPattern,
+            int sliceIndex,
+            SlicePatternSyntax slicePattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> conditions,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (!TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
+            {
+                return;
+            }
+
+            AddProjectedListPatternStructuralFacts(
+                value,
+                elementType,
+                elementKind,
+                nestedListPattern,
+                GetListPatternPrefixElementCount(containingPattern, sliceIndex),
+                GetListPatternSuffixElementCount(containingPattern, sliceIndex),
+                semanticModel,
+                cancellationToken,
+                conditions,
+                getSymbolVersion);
+        }
+
+        private static void AddProjectedListPatternStructuralFacts(
+            SmtFormula value,
+            ITypeSymbol elementType,
+            SmtValueKind elementKind,
+            ListPatternSyntax listPattern,
+            int prefixOffset,
+            int suffixOffset,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> conditions,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            for (var patternIndex = 0; patternIndex < listPattern.Patterns.Count; patternIndex++)
+            {
+                var subpattern = listPattern.Patterns[patternIndex];
+                if (subpattern is SlicePatternSyntax slicePattern)
+                {
+                    if (TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
+                    {
+                        AddProjectedListPatternStructuralFacts(
+                            value,
+                            elementType,
+                            elementKind,
+                            nestedListPattern,
+                            prefixOffset + GetListPatternPrefixElementCount(listPattern, patternIndex),
+                            suffixOffset + GetListPatternSuffixElementCount(listPattern, patternIndex),
+                            semanticModel,
+                            cancellationToken,
+                            conditions,
+                            getSymbolVersion);
+                    }
+
+                    continue;
+                }
+
+                if (!TryGetProjectedListPatternElementPosition(
+                        listPattern,
+                        patternIndex,
+                        prefixOffset,
+                        suffixOffset,
+                        out var elementIndex,
+                        out var fromEnd))
                 {
                     continue;
                 }
@@ -1439,6 +1620,137 @@ namespace PurelySharp.Symbolic.Smt
             return true;
         }
 
+        private static SmtFormula CreateListPatternLengthCondition(
+            ListPatternSyntax listPattern,
+            SmtFormula lengthFormula)
+        {
+            GetListPatternLengthShape(listPattern, out var minimumLength, out var exactLength);
+            return exactLength
+                ? new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    lengthFormula,
+                    new SmtIntegerConstant(minimumLength))
+                : new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThanOrEqual,
+                    lengthFormula,
+                    new SmtIntegerConstant(minimumLength));
+        }
+
+        private static void GetListPatternLengthShape(
+            ListPatternSyntax listPattern,
+            out int minimumLength,
+            out bool exactLength)
+        {
+            minimumLength = 0;
+            exactLength = true;
+            foreach (var subpattern in listPattern.Patterns)
+            {
+                if (subpattern is SlicePatternSyntax slicePattern)
+                {
+                    if (TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
+                    {
+                        GetListPatternLengthShape(nestedListPattern, out var nestedMinimumLength, out var nestedExactLength);
+                        minimumLength += nestedMinimumLength;
+                        exactLength &= nestedExactLength;
+                    }
+                    else
+                    {
+                        exactLength = false;
+                    }
+
+                    continue;
+                }
+
+                minimumLength++;
+            }
+        }
+
+        private static bool TryGetProjectedListPatternElementPosition(
+            ListPatternSyntax listPattern,
+            int patternIndex,
+            int prefixOffset,
+            int suffixOffset,
+            out int elementIndex,
+            out bool fromEnd)
+        {
+            if (!TryGetListPatternElementPosition(listPattern, patternIndex, out elementIndex, out fromEnd))
+            {
+                return false;
+            }
+
+            if (fromEnd)
+            {
+                elementIndex += suffixOffset;
+            }
+            else
+            {
+                elementIndex += prefixOffset;
+            }
+
+            return true;
+        }
+
+        private static int GetListPatternPrefixElementCount(
+            ListPatternSyntax listPattern,
+            int sliceIndex)
+        {
+            var count = 0;
+            for (var index = 0; index < sliceIndex; index++)
+            {
+                if (listPattern.Patterns[index] is not SlicePatternSyntax)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static int GetListPatternSuffixElementCount(
+            ListPatternSyntax listPattern,
+            int sliceIndex)
+        {
+            var count = 0;
+            for (var index = sliceIndex + 1; index < listPattern.Patterns.Count; index++)
+            {
+                if (listPattern.Patterns[index] is not SlicePatternSyntax)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static bool ListPatternHasOnlySelectionNeutralElements(ListPatternSyntax listPattern)
+        {
+            foreach (var subpattern in listPattern.Patterns)
+            {
+                if (subpattern is SlicePatternSyntax slicePattern)
+                {
+                    if (IsSelectionNeutralSlicePattern(slicePattern.Pattern))
+                    {
+                        continue;
+                    }
+
+                    if (!TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern) ||
+                        !ListPatternHasOnlySelectionNeutralElements(nestedListPattern))
+                    {
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                if (!IsSelectionNeutralPattern(subpattern))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         private static SmtFormula CreateListPatternElementFormula(
             SmtFormula receiver,
             int elementIndex,
@@ -1453,22 +1765,7 @@ namespace PurelySharp.Symbolic.Smt
 
         private static int GetListPatternMinimumLength(ListPatternSyntax listPattern)
         {
-            var minimumLength = 0;
-            foreach (var subpattern in listPattern.Patterns)
-            {
-                if (subpattern is SlicePatternSyntax slicePattern)
-                {
-                    if (TryGetNestedListPattern(slicePattern.Pattern, out var nestedListPattern))
-                    {
-                        minimumLength += GetListPatternMinimumLength(nestedListPattern);
-                    }
-
-                    continue;
-                }
-
-                minimumLength++;
-            }
-
+            GetListPatternLengthShape(listPattern, out var minimumLength, out _);
             return minimumLength;
         }
 

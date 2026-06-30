@@ -271,11 +271,27 @@ public class TestClass
             Assert.That(result.InvariantQuery.HasMaybeFacts, Is.True);
             Assert.That(result.InvariantQuery.HasUnknowns, Is.True);
             Assert.That(result.InvariantQuery.HasUnresolvedAnalysis, Is.True);
+            Assert.That(result.InvariantQuery.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved));
+            Assert.That(result.InvariantQuery.Summary, Does.Contain("unresolved"));
+            Assert.That(
+                result.InvariantQuery.Diagnostics.Select(static diagnostic => diagnostic.Code),
+                Is.EquivalentTo(new[] { "PS-SYM-MAYBE-FACTS", "PS-SYM-CONSERVATIVE-UNKNOWN", "PS-SYM-PROOF-UNKNOWN" }));
+            Assert.That(
+                result.InvariantQuery.Diagnostics.Single(static diagnostic => diagnostic.Code == "PS-SYM-MAYBE-FACTS").Evidence,
+                Is.EquivalentTo(new[] { "value > 0", "!(value > 0)" }));
             Assert.That(result.InvariantQuery.CandidateProgramPointCount, Is.EqualTo(result.MergedPathFacts.CandidateProgramPointCount));
             Assert.That(result.InvariantQuery.SmtDiagnostics.QueryTimeoutMs, Is.EqualTo(321));
             Assert.That(result.InvariantQuery.SmtDiagnostics.MethodBudgetMs, Is.EqualTo(2345));
             Assert.That(result.InvariantQuery.SmtDiagnostics.MaxPathConditions, Is.EqualTo(17));
             Assert.That(result.InvariantQuery.SmtDiagnostics.MaxExpressionNodes, Is.EqualTo(99));
+            var aggregateProof = result.ConditionProofs.Single(static proof => proof.Condition == "value > 0");
+            Assert.That(aggregateProof.Reasons, Is.Not.Empty);
+            Assert.That(
+                aggregateProof.Reasons.Sum(static reason => reason.Count),
+                Is.EqualTo(aggregateProof.TotalCount));
+            Assert.That(
+                aggregateProof.Reasons.Select(static reason => reason.TruthValue),
+                Does.Contain(SymbolicTruthValue.ProvenTrue));
 
             var positiveReturn = result.ProgramPoints
                 .Where(static point => point.NodeKind == "ReturnStatement")
@@ -284,7 +300,45 @@ public class TestClass
             Assert.That(positiveReturn.InvariantQuery.MaybeFacts, Is.Empty);
             Assert.That(positiveReturn.InvariantQuery.UnknownFacts, Is.Empty);
             Assert.That(positiveReturn.InvariantQuery.HasUnresolvedAnalysis, Is.False);
+            Assert.That(positiveReturn.InvariantQuery.Status, Is.EqualTo(SymbolicInvariantQueryStatus.Exact));
+            Assert.That(positiveReturn.InvariantQuery.Diagnostics, Is.Empty);
             Assert.That(positiveReturn.InvariantQuery.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void QuerySyntaxTreeLine_InvariantDiagnosticsBoundLargeEvidenceLists()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value == 0) { return 0; } if (value == 1) { return 1; } if (value == 2) { return 2; } if (value == 3) { return 3; } if (value == 4) { return 4; } if (value == 5) { return 5; } if (value == 6) { return 6; } if (value == 7) { return 7; } if (value == 8) { return 8; }
+        return 9;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "BoundedInvariantDiagnostics.cs");
+            var compilation = CSharpCompilation.Create(
+                "BoundedInvariantDiagnostics",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "if (value == 0)"),
+                smtAnalysis: smtAnalysis);
+
+            var maybeDiagnostic = result.InvariantQuery.Diagnostics
+                .Single(static diagnostic => diagnostic.Code == "PS-SYM-MAYBE-FACTS");
+            Assert.That(maybeDiagnostic.EvidenceTotalCount, Is.GreaterThan(SymbolicInvariantQueryDiagnostic.DefaultMaxEvidence));
+            Assert.That(maybeDiagnostic.Evidence.Count, Is.EqualTo(SymbolicInvariantQueryDiagnostic.DefaultMaxEvidence));
+            Assert.That(maybeDiagnostic.EvidenceTruncated, Is.True);
         }
 
         [Test]
@@ -1296,10 +1350,18 @@ public class TestClass
                     invariantQuery.GetProperty("unknownFacts").EnumerateArray().Select(static fact => fact.GetString()),
                     Does.Contain("unknown(copy)"));
                 Assert.That(invariantQuery.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
+                Assert.That(invariantQuery.GetProperty("status").GetString(), Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved.ToString()));
+                Assert.That(invariantQuery.GetProperty("summary").GetString(), Does.Contain("unresolved"));
+                Assert.That(invariantQuery.GetProperty("diagnosticCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+                Assert.That(
+                    invariantQuery.GetProperty("diagnostics").EnumerateArray().Select(static diagnostic => diagnostic.GetProperty("code").GetString()),
+                    Does.Contain("PS-SYM-CONSERVATIVE-UNKNOWN"));
 
                 var analysisSummary = root.GetProperty("analysisSummary");
                 Assert.That(analysisSummary.GetProperty("maybeFactCount").GetInt32(), Is.EqualTo(invariantQuery.GetProperty("maybeFactCount").GetInt32()));
                 Assert.That(analysisSummary.GetProperty("unknownFactCount").GetInt32(), Is.EqualTo(invariantQuery.GetProperty("unknownFactCount").GetInt32()));
+                Assert.That(analysisSummary.GetProperty("invariantStatus").GetString(), Is.EqualTo(SymbolicInvariantQueryStatus.Unresolved.ToString()));
+                Assert.That(analysisSummary.GetProperty("invariantDiagnosticCount").GetInt32(), Is.EqualTo(invariantQuery.GetProperty("diagnosticCount").GetInt32()));
                 Assert.That(analysisSummary.GetProperty("smtQueryTimeoutMs").GetInt32(), Is.EqualTo(333));
                 Assert.That(analysisSummary.GetProperty("smtMethodBudgetMs").GetInt32(), Is.EqualTo(2333));
                 Assert.That(analysisSummary.GetProperty("smtMaxPathConditions").GetInt32(), Is.EqualTo(33));
@@ -1437,6 +1499,12 @@ public class TestClass
                 Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
                 Assert.That(root.GetProperty("proofOutcomes").GetProperty("provenTrueCount").GetInt32(), Is.EqualTo(1));
                 Assert.That(root.GetProperty("conditionProofs")[0].GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(
+                    root.GetProperty("conditionProofs")[0].GetProperty("reasons")[0].GetProperty("truthValue").GetString(),
+                    Is.EqualTo(SymbolicTruthValue.ProvenTrue.ToString()));
+                Assert.That(
+                    root.GetProperty("conditionProofs")[0].GetProperty("reasons")[0].GetProperty("reason").GetString(),
+                    Is.Not.Empty);
 
                 var point = root
                     .GetProperty("lines")[0]

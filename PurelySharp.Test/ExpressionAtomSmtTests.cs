@@ -139,6 +139,98 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesIdentityBooleanCastFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool flag)
+    {
+        if ((bool)flag)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "flag == true");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesIdentityStringCastLengthFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        if (text != null && ((string)text).Length == 3)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "text.Length != 4");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesTupleLiteralElementArithmeticFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value, bool flag)
+    {
+        if ((value + 1, flag).Item1 == 5)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "value == 4");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesConditionalTupleElementFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool flag, (int A, int B) left, (int A, int B) right)
+    {
+        if ((flag ? left : right).A > 0)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "(flag ? left : right).A != 0");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesEnumConstantComparison()
         {
             const string source = @"

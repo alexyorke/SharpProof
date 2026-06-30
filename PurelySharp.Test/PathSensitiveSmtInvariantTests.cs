@@ -340,6 +340,92 @@ public class TestClass
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
 
+        [Test]
+        public void SymbolicSourceQueryService_ProvesOneSidedReassignedLocalFactAfterJoin()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool replace, int value)
+    {
+        if (value <= 0)
+        {
+            return 0;
+        }
+
+        var divisor = value;
+        if (replace)
+        {
+            divisor = 1;
+        }
+
+        return 10 / divisor;
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / divisor;");
+            var proof = ProveAtMarker(source, marker, "divisor > 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesOneSidedReassignedArrayLengthFactAfterJoin()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool replace, int[] input)
+    {
+        if (input == null || input.Length < 2)
+        {
+            return 0;
+        }
+
+        var values = input;
+        if (replace)
+        {
+            values = new[] { 1, 2, 3 };
+        }
+
+        return values.Length;
+    }
+}";
+
+            var marker = FindMarker(source, "return values.Length;");
+            var proof = ProveAtMarker(source, marker, "values.Length >= 2");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public async Task Ps0010_OneSidedReassignedLocalFactMergesAtJoin_DoesNotReportDivideByZero()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                @"
+public class TestClass
+{
+    public int TestMethod(bool replace, int value)
+    {
+        if (value <= 0)
+        {
+            return 0;
+        }
+
+        var divisor = value;
+        if (replace)
+        {
+            divisor = 1;
+        }
+
+        return 10 / divisor;
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
         private static SymbolicProgramPointQueryResult AnalyzeAtPosition(string source, int position)
         {
             return new SymbolicSourceQueryService().AnalyzeSourceAtPosition(

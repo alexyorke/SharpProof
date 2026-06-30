@@ -733,6 +733,168 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_SelectedConditionalSkipsUnsafeUnselectedIntegerBranch()
+        {
+            using var solver = new SmtSolver();
+            var useSafeBranch = new SmtVariable("useSafeBranch", SmtValueKind.Bool);
+            var unsafeBranch = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Divide,
+                new SmtIntegerConstant(1),
+                new SmtIntegerConstant(0));
+            var selectedValue = new SmtConditionalFormula(
+                useSafeBranch,
+                new SmtIntegerConstant(7),
+                unsafeBranch,
+                SmtValueKind.Int);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    useSafeBranch,
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, selectedValue, new SmtIntegerConstant(7)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_NegatedComparisonGuardKeepsDivisionUsable()
+        {
+            using var solver = new SmtSolver();
+            var divisor = new SmtVariable("divisor", SmtValueKind.Int);
+            var division = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Divide,
+                new SmtIntegerConstant(10),
+                divisor);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtUnaryFormula(
+                        SmtUnaryOperator.Not,
+                        new SmtBinaryFormula(
+                            SmtBinaryOperator.LessThanOrEqual,
+                            divisor,
+                            new SmtIntegerConstant(0))),
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, division, new SmtIntegerConstant(999)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_AffineRangeGuardKeepsDerivedDivisorUsable()
+        {
+            using var solver = new SmtSolver();
+            var x = new SmtVariable("x", SmtValueKind.Int);
+            var divisor = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Subtract,
+                x,
+                new SmtIntegerConstant(1));
+            var division = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Divide,
+                new SmtIntegerConstant(10),
+                divisor);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, x, new SmtIntegerConstant(1)),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, division, new SmtIntegerConstant(10)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_AffineEqualityPropagatesSolvedValue()
+        {
+            using var solver = new SmtSolver();
+            var x = new SmtVariable("x", SmtValueKind.Int);
+            var xPlusTwo = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Add,
+                x,
+                new SmtIntegerConstant(2));
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, xPlusTwo, new SmtIntegerConstant(5)),
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, x, new SmtIntegerConstant(3)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_ConflictingStringPrefixesAreUnsatisfiable()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("AB")),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("AC")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_ExactLengthPrefixSuffixOverlapInfersString()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("AB")),
+                    new SmtStringEndsWithFormula(text, new SmtStringConstant("BC")),
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.Equal,
+                        new SmtStringLengthTerm(text),
+                        new SmtIntegerConstant(3)),
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, text, new SmtStringConstant("ABC")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_SelectedConditionalStringConcatSimplifiesPredicate()
+        {
+            using var solver = new SmtSolver();
+            var usePrefix = new SmtVariable("usePrefix", SmtValueKind.Bool);
+            var selected = new SmtConditionalFormula(
+                usePrefix,
+                new SmtStringConstant("AB"),
+                new SmtStringConstant("CD"),
+                SmtValueKind.String);
+            var combined = new SmtStringConcatTerm(selected, new SmtStringConstant("X"));
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    usePrefix,
+                    new SmtUnaryFormula(
+                        SmtUnaryOperator.Not,
+                        new SmtStringStartsWithFormula(combined, new SmtStringConstant("AB"))),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void SmtSolver_ReferenceNullAndNonNullConjunction_IsUnsatisfiable()
         {
             using var solver = new SmtSolver();
