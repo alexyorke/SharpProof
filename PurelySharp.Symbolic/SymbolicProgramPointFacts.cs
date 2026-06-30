@@ -1524,6 +1524,7 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             ICollection<SmtFormula> facts)
         {
+            expression = UnwrapAwaitedNormalCompletionExpression(expression);
             if (!TryGetThrowGuardedValue(
                     expression,
                     out var effectiveValueExpression,
@@ -1564,6 +1565,13 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> facts)
         {
             expression = UnwrapExpression(expression);
+            if (expression is AwaitExpressionSyntax awaitExpression)
+            {
+                var awaitableExpression = UnwrapExpression(awaitExpression.Expression);
+                AddStableReferenceNonNullFact(awaitableExpression, statement, semanticModel, cancellationToken, facts);
+                expression = awaitableExpression;
+            }
+
             if (expression is ElementAccessExpressionSyntax elementAccess &&
                 !AnyConditionSymbolInvalidatedInStatement(elementAccess, statement, semanticModel, cancellationToken) &&
                 CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
@@ -1576,27 +1584,43 @@ namespace PurelySharp.Symbolic
             }
 
             if (!TryGetTopLevelDereferenceReceiver(expression, semanticModel, cancellationToken, out var receiver) ||
-                !IsLocalOrParameterReference(receiver, semanticModel, cancellationToken) ||
-                AnyConditionSymbolMutatedInStatement(receiver, statement, semanticModel, cancellationToken))
+                !AddStableReferenceNonNullFact(receiver, statement, semanticModel, cancellationToken, facts))
             {
                 return;
             }
+        }
+
+        private static bool AddStableReferenceNonNullFact(
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (!IsLocalOrParameterReference(expression, semanticModel, cancellationToken) ||
+                AnyConditionSymbolMutatedInStatement(expression, statement, semanticModel, cancellationToken))
+            {
+                return false;
+            }
 
             if (CSharpConditionToFormula.TryTranslateValue(
-                    receiver,
+                    expression,
                     semanticModel,
                     cancellationToken,
-                    out var receiverFormula,
+                    out var expressionFormula,
                     getSymbolVersion: null) &&
-                receiverFormula is { Kind: SmtValueKind.Reference })
+                expressionFormula is { Kind: SmtValueKind.Reference })
             {
                 AddUniqueFact(
                     facts,
                     new SmtBinaryFormula(
                         SmtBinaryOperator.NotEqual,
-                        receiverFormula,
+                        expressionFormula,
                         new SmtNullConstant()));
+                return true;
             }
+
+            return false;
         }
 
         private static bool TryGetTopLevelDereferenceReceiver(
@@ -1623,6 +1647,14 @@ namespace PurelySharp.Symbolic
                     receiver = null!;
                     return false;
             }
+        }
+
+        private static ExpressionSyntax UnwrapAwaitedNormalCompletionExpression(ExpressionSyntax expression)
+        {
+            expression = UnwrapExpression(expression);
+            return expression is AwaitExpressionSyntax awaitExpression
+                ? UnwrapExpression(awaitExpression.Expression)
+                : expression;
         }
 
         private static bool IsReducedExtensionMethodInvocation(

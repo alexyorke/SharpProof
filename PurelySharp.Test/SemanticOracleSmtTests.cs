@@ -3110,6 +3110,112 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesCompletedAwaitedReceiverNullBranchUnreachable()
+        {
+            const string source = @"
+using System.Threading.Tasks;
+
+public sealed class Service
+{
+    public Task<int> GetAsync() => Task.FromResult(1);
+}
+
+public class TestClass
+{
+    public async Task<int> TestMethod(Service service)
+    {
+        var value = await service.GetAsync();
+
+        if (service == null)
+        {
+            return 1;
+        }
+
+        return value;
+    }
+}";
+            var result = new SymbolicSourceQueryService().AnalyzeSource(
+                source,
+                "CompletedAwaitedReceiverNullBranch.cs",
+                FindLine(source, "return 1;"),
+                17,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(result.PathConditions, Is.Not.Empty);
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+            Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesCompletedAwaitableNullBranchUnreachable()
+        {
+            const string source = @"
+using System.Threading.Tasks;
+
+public class TestClass
+{
+    public async Task<int> TestMethod(Task<int> task)
+    {
+        var value = await task;
+
+        if (task == null)
+        {
+            return 1;
+        }
+
+        return value;
+    }
+}";
+            var result = new SymbolicSourceQueryService().AnalyzeSource(
+                source,
+                "CompletedAwaitableNullBranch.cs",
+                FindLine(source, "return 1;"),
+                17,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(result.PathConditions, Is.Not.Empty);
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+            Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_RefMutatedCompletedAwaitedReceiverDoesNotKeepNonNullFact()
+        {
+            const string source = @"
+using System.Threading.Tasks;
+
+public sealed class Service
+{
+    public Task<int> MutateAsync(ref Service value)
+    {
+        value = null;
+        return Task.FromResult(1);
+    }
+}
+
+public class TestClass
+{
+    public async Task<int> TestMethod(Service service)
+    {
+        await service.MutateAsync(ref service);
+        return service == null ? 1 : 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "RefMutatedCompletedAwaitedReceiver.cs",
+                FindLine(source, "return service == null ? 1 : 0;"),
+                16,
+                "service != null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_RefMutatedCompletedReceiverDoesNotKeepNonNullFact()
         {
             const string source = @"
