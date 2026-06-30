@@ -188,6 +188,57 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_DefaultDotRejectsNewline()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A.\z"),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("\n")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_InlineSinglelineDotAllowsNewline()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A(?s:.)\z"),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("\n")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_ScopedSinglelineDisableDotRejectsNewline()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A(?s:A(?-s:.)C)\z"),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("A\nC")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void SmtSolver_EscapedRegexClassLiteralContradictsPrefix()
         {
             using var solver = new SmtSolver();

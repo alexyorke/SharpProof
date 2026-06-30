@@ -442,6 +442,7 @@ namespace SearchLib.Smt
             private readonly Dictionary<string, RegexClassTranslation> _characterClassCache = new(StringComparer.Ordinal);
             private bool _isExact = true;
             private bool _ignorePatternWhitespace;
+            private bool _singleline;
             private int _position;
 
             private Z3RegexTranslator(Context context, string pattern)
@@ -666,26 +667,26 @@ namespace SearchLib.Smt
                 switch (current)
                 {
                     case '(':
-                        var outerIgnorePatternWhitespace = _ignorePatternWhitespace;
-                        if (!TryParseGroupPrefix(out var groupIgnorePatternWhitespace))
+                        var outerOptions = CaptureOptions();
+                        if (!TryParseGroupPrefix(out var groupOptions))
                         {
                             return false;
                         }
 
-                        _ignorePatternWhitespace = groupIgnorePatternWhitespace;
+                        ApplyOptions(groupOptions);
                         if (!TryParseExpression(out regex) || !Peek(')'))
                         {
-                            _ignorePatternWhitespace = outerIgnorePatternWhitespace;
+                            ApplyOptions(outerOptions);
                             return false;
                         }
 
                         _position++;
-                        _ignorePatternWhitespace = outerIgnorePatternWhitespace;
+                        ApplyOptions(outerOptions);
                         return true;
                     case '[':
                         return TryParseCharClass(out regex);
                     case '.':
-                        regex = _context.MkDiff(CreateAnyCharRegex(), CreateLiteralRegex("\n"));
+                        regex = CreateDotRegex();
                         return true;
                     case '\\':
                         return TryParseEscapedAtom(out regex);
@@ -703,9 +704,20 @@ namespace SearchLib.Smt
                 }
             }
 
-            private bool TryParseGroupPrefix(out bool groupIgnorePatternWhitespace)
+            private RegexOptionScope CaptureOptions()
             {
-                groupIgnorePatternWhitespace = _ignorePatternWhitespace;
+                return new RegexOptionScope(_ignorePatternWhitespace, _singleline);
+            }
+
+            private void ApplyOptions(RegexOptionScope options)
+            {
+                _ignorePatternWhitespace = options.IgnorePatternWhitespace;
+                _singleline = options.Singleline;
+            }
+
+            private bool TryParseGroupPrefix(out RegexOptionScope groupOptions)
+            {
+                groupOptions = CaptureOptions();
                 if (!Peek('?'))
                 {
                     return true;
@@ -726,20 +738,21 @@ namespace SearchLib.Smt
                     return true;
                 }
 
-                if (TryParseOptionGroupPrefix(out groupIgnorePatternWhitespace))
+                if (TryParseOptionGroupPrefix(out groupOptions))
                 {
                     return true;
                 }
 
-                groupIgnorePatternWhitespace = _ignorePatternWhitespace;
+                groupOptions = CaptureOptions();
                 return TryParseNamedCaptureGroupPrefix();
             }
 
-            private bool TryParseOptionGroupPrefix(out bool groupIgnorePatternWhitespace)
+            private bool TryParseOptionGroupPrefix(out RegexOptionScope groupOptions)
             {
-                groupIgnorePatternWhitespace = _ignorePatternWhitespace;
+                groupOptions = CaptureOptions();
                 var savedPosition = _position;
-                var nextIgnorePatternWhitespace = _ignorePatternWhitespace;
+                var nextIgnorePatternWhitespace = groupOptions.IgnorePatternWhitespace;
+                var nextSingleline = groupOptions.Singleline;
                 var sawOption = false;
                 var sawDisableSeparator = false;
                 while (_position < _pattern.Length && !Peek(':'))
@@ -758,17 +771,25 @@ namespace SearchLib.Smt
                         continue;
                     }
 
-                    if (current is 'n')
+                    if (current == 'n')
                     {
                         sawOption = true;
                         _position++;
                         continue;
                     }
 
-                    if (current is 'x')
+                    if (current == 'x')
                     {
                         sawOption = true;
                         nextIgnorePatternWhitespace = !sawDisableSeparator;
+                        _position++;
+                        continue;
+                    }
+
+                    if (current == 's')
+                    {
+                        sawOption = true;
+                        nextSingleline = !sawDisableSeparator;
                         _position++;
                         continue;
                     }
@@ -784,7 +805,7 @@ namespace SearchLib.Smt
                 }
 
                 _position++;
-                groupIgnorePatternWhitespace = nextIgnorePatternWhitespace;
+                groupOptions = new RegexOptionScope(nextIgnorePatternWhitespace, nextSingleline);
                 return true;
             }
 
@@ -1600,6 +1621,13 @@ namespace SearchLib.Smt
                 return _context.MkRange(_context.MkString("\u0000"), _context.MkString("\uffff"));
             }
 
+            private ReExpr CreateDotRegex()
+            {
+                return _singleline
+                    ? CreateAnyCharRegex()
+                    : _context.MkDiff(CreateAnyCharRegex(), CreateLiteralRegex("\n"));
+            }
+
             private ReExpr CreateExactRepeat(ReExpr regex, uint count)
             {
                 if (count == 0)
@@ -1623,6 +1651,19 @@ namespace SearchLib.Smt
             private bool Peek(char value)
             {
                 return _position < _pattern.Length && _pattern[_position] == value;
+            }
+
+            private readonly struct RegexOptionScope
+            {
+                public RegexOptionScope(bool ignorePatternWhitespace, bool singleline)
+                {
+                    IgnorePatternWhitespace = ignorePatternWhitespace;
+                    Singleline = singleline;
+                }
+
+                public bool IgnorePatternWhitespace { get; }
+
+                public bool Singleline { get; }
             }
 
             private static bool IsEscaped(string value, int index)

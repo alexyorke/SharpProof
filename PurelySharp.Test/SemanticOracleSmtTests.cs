@@ -6500,6 +6500,17 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_ScopedSinglelineDisableRegexDotRejectsNewline()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\A(?s:A(?-s:.)C)\z"") && text == ""A\nC""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_NamedCaptureRegexContradictsStringEquality()
         {
             Assert.That(
