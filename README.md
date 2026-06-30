@@ -317,6 +317,17 @@ It can also emit a TRX slow-test profile and test bounded worker counts:
 .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -Workers 8
 ```
 
+For local iteration, the impacted-test wrapper can derive a VSTest filter from
+changed files. It falls back to the full suite for shared infrastructure,
+high-fanout analyzer core, or unmapped files unless `-ForcePartial` is set:
+
+```powershell
+.\scripts\Invoke-PurelySharpImpactedTests.ps1 -NoBuild -ListOnly
+.\scripts\Invoke-PurelySharpImpactedTests.ps1 -NoBuild
+.\scripts\Invoke-PurelySharpImpactedTests.ps1 -BaseRef origin/main -NoBuild
+.\scripts\Invoke-PurelySharpImpactedTests.ps1 -BaseRef origin/main -NoBuild -ForcePartial
+```
+
 Representative evidence suites:
 
 - Packaging and generated-summary policy:
