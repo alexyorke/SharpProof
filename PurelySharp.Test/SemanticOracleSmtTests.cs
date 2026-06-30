@@ -6659,6 +6659,71 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_StringIndexOfCharFoundContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "text.IndexOf('Z') >= 0 && text == \"ABC\""),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIndexOfCharNotFoundContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "text.IndexOf('A') == -1 && text == \"ABC\""),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIndexOfCharReversedFoundComparisonContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "0 <= text.IndexOf('Z') && text == \"ABC\""),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIndexOfOrdinalFoundContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "text.IndexOf(\"ZZ\", StringComparison.Ordinal) >= 0 && text == \"ABC\"",
+                    "using System;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIndexOfOrdinalNotFoundContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "text.IndexOf(\"AB\", StringComparison.Ordinal) < 0 && text == \"ABC\"",
+                    "using System;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIndexOfDefaultStringSearchRemainsConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("string text", "text.IndexOf(\"a\") >= 0 && text == \"A\""),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StringIndexOfOrdinalIgnoreCaseRemainsConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "text.IndexOf(\"a\", StringComparison.OrdinalIgnoreCase) < 0 && text == \"A\"",
+                    "using System;"),
+                Is.False);
+        }
+
+        [Test]
         public void ExecutionVisibility_StringStartsWithCharContradictsEmptyString()
         {
             Assert.That(

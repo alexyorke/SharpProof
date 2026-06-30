@@ -396,6 +396,19 @@ namespace PurelySharp.Symbolic.Smt
                     return true;
                 }
 
+                if (TryTranslateStringIndexOfComparison(
+                        binaryExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var stringIndexOfComparison,
+                        getSymbolVersion,
+                        inlineDepth) &&
+                    stringIndexOfComparison != null)
+                {
+                    formula = stringIndexOfComparison;
+                    return true;
+                }
+
                 if (TryTranslateValueWithSafeDivisors(binaryExpression.Left, semanticModel, cancellationToken, out var leftValue, getSymbolVersion, inlineDepth, nonZeroDivisors) &&
                     TryTranslateValueWithSafeDivisors(binaryExpression.Right, semanticModel, cancellationToken, out var rightValue, getSymbolVersion, inlineDepth, nonZeroDivisors) &&
                     leftValue != null &&
@@ -1128,6 +1141,164 @@ namespace PurelySharp.Symbolic.Smt
 
             formula = new SmtStringConstant(character.ToString());
             return true;
+        }
+
+        private static bool TryTranslateStringIndexOfComparison(
+            BinaryExpressionSyntax binaryExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            if (TryTranslateStringIndexOfComparisonOperand(
+                    binaryExpression.Left,
+                    binaryExpression.Right,
+                    binaryExpression.Kind(),
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
+            return TryTranslateStringIndexOfComparisonOperand(
+                binaryExpression.Right,
+                binaryExpression.Left,
+                ReverseComparisonKind(binaryExpression.Kind()),
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
+        private static bool TryTranslateStringIndexOfComparisonOperand(
+            ExpressionSyntax indexExpression,
+            ExpressionSyntax constantExpression,
+            SyntaxKind comparisonKind,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!TryTranslateStringIndexOfContainsFormula(
+                    indexExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var containsFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                containsFormula == null ||
+                !TryGetIntegralConstantValue(constantExpression, semanticModel, cancellationToken, out var constantValue) ||
+                !TryClassifyStringIndexOfComparison(comparisonKind, constantValue, out var isContains))
+            {
+                return false;
+            }
+
+            formula = isContains
+                ? containsFormula
+                : new SmtUnaryFormula(SmtUnaryOperator.Not, containsFormula);
+            return true;
+        }
+
+        private static bool TryTranslateStringIndexOfContainsFormula(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            expression = UnwrapExpression(expression);
+            if (expression is not InvocationExpressionSyntax invocationExpression ||
+                semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
+                !IsSupportedOrdinalStringIndexOfInvocation(invocationOperation, semanticModel, cancellationToken) ||
+                invocationOperation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
+                invocationOperation.Arguments.Length < 1 ||
+                invocationOperation.Arguments[0].Value.Syntax is not ExpressionSyntax searchExpression ||
+                !TryTranslateStringPredicateArgument(
+                    searchExpression,
+                    invocationOperation.Arguments[0].Parameter?.Type,
+                    semanticModel,
+                    cancellationToken,
+                    getSymbolVersion,
+                    inlineDepth,
+                    out var searchFormula) ||
+                searchFormula == null ||
+                !TryTranslateStringValue(receiverExpression, semanticModel, cancellationToken, out var receiverFormula, getSymbolVersion, inlineDepth) ||
+                receiverFormula == null)
+            {
+                return false;
+            }
+
+            formula = new SmtStringContainsFormula(receiverFormula, searchFormula);
+            return true;
+        }
+
+        private static bool IsSupportedOrdinalStringIndexOfInvocation(
+            IInvocationOperation invocationOperation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var method = invocationOperation.TargetMethod;
+            if (method.Name != "IndexOf" ||
+                method.ReturnType.SpecialType != SpecialType.System_Int32 ||
+                method.ContainingType?.SpecialType != SpecialType.System_String ||
+                method.IsStatic ||
+                method.Parameters.Length == 0 ||
+                invocationOperation.Arguments.Length == 0)
+            {
+                return false;
+            }
+
+            var firstParameter = method.Parameters[0];
+            if (firstParameter.Type.SpecialType == SpecialType.System_Char)
+            {
+                if (method.Parameters.Length == 1)
+                {
+                    return true;
+                }
+
+                return method.Parameters.Length == 2 &&
+                    IsStringComparisonParameter(method.Parameters[1]) &&
+                    HasOrdinalStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken);
+            }
+
+            return method.Parameters.Length == 2 &&
+                firstParameter.Type.SpecialType == SpecialType.System_String &&
+                IsStringComparisonParameter(method.Parameters[1]) &&
+                HasOrdinalStringComparison(invocationOperation.Arguments, semanticModel, cancellationToken);
+        }
+
+        private static bool TryClassifyStringIndexOfComparison(
+            SyntaxKind comparisonKind,
+            long constantValue,
+            out bool isContains)
+        {
+            isContains = default;
+            switch (comparisonKind)
+            {
+                case SyntaxKind.EqualsExpression when constantValue == -1:
+                case SyntaxKind.LessThanExpression when constantValue == 0:
+                case SyntaxKind.LessThanOrEqualExpression when constantValue == -1:
+                    isContains = false;
+                    return true;
+
+                case SyntaxKind.NotEqualsExpression when constantValue == -1:
+                case SyntaxKind.GreaterThanExpression when constantValue == -1:
+                case SyntaxKind.GreaterThanOrEqualExpression when constantValue == 0:
+                    isContains = true;
+                    return true;
+
+                default:
+                    return false;
+            }
         }
 
         private static bool TryTranslateStringIsNullOrEmptyInvocation(
