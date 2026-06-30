@@ -1005,14 +1005,15 @@ namespace PurelySharp.Symbolic.Smt
 
             ExpressionSyntax? inputExpression = null;
             string? pattern = null;
+            RegexOptions options = RegexOptions.None;
             if (method.IsStatic)
             {
-                if (!TryGetSupportedRegexOptionLetters(
+                if (!TryGetRegexOptions(
                         invocationOperation.Arguments,
                         startIndex: 2,
                         semanticModel,
                         cancellationToken,
-                        out var optionLetters))
+                        out options))
                 {
                     return false;
                 }
@@ -1025,9 +1026,9 @@ namespace PurelySharp.Symbolic.Smt
 
                 inputExpression = staticInputExpression;
                 pattern = TryGetConstantString(invocationOperation.Arguments[1].Value.Syntax as ExpressionSyntax, semanticModel, cancellationToken);
-                if (pattern != null)
+                if (pattern != null && CanEncodeRegexOptions(options))
                 {
-                    pattern = WrapRegexPatternWithInlineOptions(pattern, optionLetters);
+                    pattern = WrapRegexPatternWithInlineOptions(pattern, CreateInlineRegexOptionLetters(options));
                 }
             }
             else
@@ -1039,7 +1040,7 @@ namespace PurelySharp.Symbolic.Smt
                 }
 
                 inputExpression = instanceInputExpression;
-                if (!TryGetRegexPatternFromReceiver(invocationExpression, semanticModel, cancellationToken, out pattern))
+                if (!TryGetRegexPatternFromReceiver(invocationExpression, semanticModel, cancellationToken, out pattern, out options))
                 {
                     return false;
                 }
@@ -1053,7 +1054,7 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            formula = new SmtRegexMatchFormula(inputFormula, pattern);
+            formula = new SmtRegexMatchFormula(inputFormula, pattern, options);
             return true;
         }
 
@@ -1360,9 +1361,11 @@ namespace PurelySharp.Symbolic.Smt
             InvocationExpressionSyntax invocationExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out string? pattern)
+            out string? pattern,
+            out RegexOptions options)
         {
             pattern = null;
+            options = RegexOptions.None;
             if (invocationExpression.Expression is not MemberAccessExpressionSyntax memberAccess)
             {
                 return false;
@@ -1374,12 +1377,12 @@ namespace PurelySharp.Symbolic.Smt
                 objectCreationOperation.Constructor?.ContainingType is not { } constructedType ||
                 !IsRegexType(constructedType) ||
                 objectCreationOperation.Arguments.Length < 1 ||
-                !TryGetSupportedRegexOptionLetters(
+                !TryGetRegexOptions(
                     objectCreationOperation.Arguments,
                     startIndex: 1,
                     semanticModel,
                     cancellationToken,
-                    out var optionLetters))
+                    out options))
             {
                 return false;
             }
@@ -1390,26 +1393,20 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
-            pattern = WrapRegexPatternWithInlineOptions(rawPattern, optionLetters);
+            pattern = CanEncodeRegexOptions(options)
+                ? WrapRegexPatternWithInlineOptions(rawPattern, CreateInlineRegexOptionLetters(options))
+                : rawPattern;
             return true;
         }
 
-        private static bool TryGetSupportedRegexOptionLetters(
+        private static bool TryGetRegexOptions(
             ImmutableArray<IArgumentOperation> arguments,
             int startIndex,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            out string optionLetters)
+            out RegexOptions options)
         {
-            const long supportedOptions =
-                (long)RegexOptions.ExplicitCapture |
-                (long)RegexOptions.Compiled |
-                (long)RegexOptions.CultureInvariant |
-                (long)RegexOptions.Singleline |
-                (long)RegexOptions.IgnorePatternWhitespace;
-
-            optionLetters = string.Empty;
-            long options = 0;
+            options = RegexOptions.None;
             for (var index = startIndex; index < arguments.Length; index++)
             {
                 var parameterType = arguments[index].Parameter?.Type;
@@ -1419,38 +1416,48 @@ namespace PurelySharp.Symbolic.Smt
                     continue;
                 }
 
-                if (!TryGetIntegralConstantValue(arguments[index].Value.Syntax as ExpressionSyntax, semanticModel, cancellationToken, out var argumentOptions) ||
-                    (argumentOptions & ~supportedOptions) != 0)
+                if (!TryGetIntegralConstantValue(arguments[index].Value.Syntax as ExpressionSyntax, semanticModel, cancellationToken, out var argumentOptions))
                 {
                     return false;
                 }
 
-                options |= argumentOptions;
+                options |= (RegexOptions)argumentOptions;
             }
 
-            optionLetters = CreateInlineRegexOptionLetters(options);
             return true;
         }
 
-        private static string CreateInlineRegexOptionLetters(long options)
+        private static string CreateInlineRegexOptionLetters(RegexOptions options)
         {
             var letters = string.Empty;
-            if ((options & (long)RegexOptions.ExplicitCapture) != 0)
+            if ((options & RegexOptions.ExplicitCapture) != 0)
             {
                 letters += "n";
             }
 
-            if ((options & (long)RegexOptions.Singleline) != 0)
+            if ((options & RegexOptions.Singleline) != 0)
             {
                 letters += "s";
             }
 
-            if ((options & (long)RegexOptions.IgnorePatternWhitespace) != 0)
+            if ((options & RegexOptions.IgnorePatternWhitespace) != 0)
             {
                 letters += "x";
             }
 
             return letters;
+        }
+
+        private static bool CanEncodeRegexOptions(RegexOptions options)
+        {
+            const RegexOptions supportedOptions =
+                RegexOptions.ExplicitCapture |
+                RegexOptions.Compiled |
+                RegexOptions.CultureInvariant |
+                RegexOptions.Singleline |
+                RegexOptions.IgnorePatternWhitespace;
+
+            return (options & ~supportedOptions) == 0;
         }
 
         private static string WrapRegexPatternWithInlineOptions(string pattern, string optionLetters)
@@ -2318,7 +2325,8 @@ namespace PurelySharp.Symbolic.Smt
                 case SmtRegexMatchFormula regexMatch:
                     return new SmtRegexMatchFormula(
                         SubstituteVariables(regexMatch.Value, substitutions),
-                        regexMatch.Pattern);
+                        regexMatch.Pattern,
+                        regexMatch.Options);
                 case SmtConditionalFormula conditional:
                     return new SmtConditionalFormula(
                         SubstituteVariables(conditional.Condition, substitutions),
@@ -2522,9 +2530,15 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             if (expression is CastExpressionSyntax stringCastExpression &&
-                IsIdentityPreservingReferenceCast(stringCastExpression, semanticModel, cancellationToken) &&
-                TryTranslateValue(stringCastExpression.Expression, semanticModel, cancellationToken, out var castReference, getSymbolVersion, inlineDepth) &&
-                castReference is { Kind: SmtValueKind.Reference })
+                TryTranslateNonUserDefinedReferenceCastOperand(
+                    stringCastExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var castReference,
+                    out var castTargetType,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                castTargetType.SpecialType == SpecialType.System_String)
             {
                 formula = CreateStringValueFormulaForReference(castReference);
                 return true;
@@ -2637,6 +2651,14 @@ namespace PurelySharp.Symbolic.Smt
                 TryTranslateValue(memberAccess.Expression, semanticModel, cancellationToken, out var receiver, getSymbolVersion, inlineDepth) &&
                 receiver != null)
             {
+                if (semanticModel.GetSymbolInfo(memberAccess.Name, cancellationToken).Symbol is IFieldSymbol fieldSymbol &&
+                    TryGetTupleElementStorageName(memberAccess, fieldSymbol, semanticModel, cancellationToken, out var storageName))
+                {
+                    var receiverName = receiver is SmtVariable receiverVariable ? receiverVariable.Name : receiver.ToString();
+                    formula = new SmtVariable(receiverName + "." + storageName + ".String", SmtValueKind.String);
+                    return true;
+                }
+
                 formula = new SmtVariable(receiver + "." + memberAccess.Name.Identifier.ValueText + ".String", SmtValueKind.String);
                 return true;
             }
@@ -6313,6 +6335,17 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (TryCreateReferenceCastBuiltInLengthFormula(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out lengthFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             var receiverTypeInfo = semanticModel.GetTypeInfo(receiverExpression, cancellationToken);
             if ((receiverTypeInfo.Type is IArrayTypeSymbol { Rank: 1 } ||
                  receiverTypeInfo.ConvertedType is IArrayTypeSymbol { Rank: 1 }) &&
@@ -6376,6 +6409,50 @@ namespace PurelySharp.Symbolic.Smt
 
             lengthFormula = candidate;
             return true;
+        }
+
+        private static bool TryCreateReferenceCastBuiltInLengthFormula(
+            ExpressionSyntax receiverExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            lengthFormula = null!;
+            if (UnwrapExpression(receiverExpression) is not CastExpressionSyntax castExpression ||
+                !TryTranslateNonUserDefinedReferenceCastOperand(
+                    castExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var operandReference,
+                    out var targetType,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return false;
+            }
+
+            if (targetType is IArrayTypeSymbol { Rank: 1 })
+            {
+                var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+                if (TryCreateMemberFormula(operandReference, "Length", intType, out var candidate) &&
+                    candidate is { Kind: SmtValueKind.Int })
+                {
+                    lengthFormula = candidate;
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (targetType.SpecialType == SpecialType.System_String)
+            {
+                lengthFormula = new SmtStringLengthTerm(CreateStringValueFormulaForReference(operandReference));
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryCreateBuiltInSliceInvocationResultLengthFormula(
@@ -7988,6 +8065,18 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (TryCreateReferenceCastArrayDimensionLengthFormula(
+                    receiverExpression,
+                    dimension,
+                    semanticModel,
+                    cancellationToken,
+                    out lengthFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             var receiverType = semanticModel.GetTypeInfo(receiverExpression, cancellationToken).ConvertedType ??
                 semanticModel.GetTypeInfo(receiverExpression, cancellationToken).Type;
             if (receiverType is not IArrayTypeSymbol arrayType ||
@@ -8017,6 +8106,46 @@ namespace PurelySharp.Symbolic.Smt
 
             lengthFormula = candidate;
             return true;
+        }
+
+        private static bool TryCreateReferenceCastArrayDimensionLengthFormula(
+            ExpressionSyntax receiverExpression,
+            int dimension,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            lengthFormula = null!;
+            if (UnwrapExpression(receiverExpression) is not CastExpressionSyntax castExpression ||
+                !TryTranslateNonUserDefinedReferenceCastOperand(
+                    castExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var operandReference,
+                    out var targetType,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                targetType is not IArrayTypeSymbol arrayType ||
+                dimension >= arrayType.Rank)
+            {
+                return false;
+            }
+
+            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+            if (TryCreateMemberFormula(
+                    operandReference,
+                    "GetLength(" + dimension.ToString(CultureInfo.InvariantCulture) + ")",
+                    intType,
+                    out var candidate) &&
+                candidate is { Kind: SmtValueKind.Int })
+            {
+                lengthFormula = candidate;
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryGetConstantNonNegativeInt(
@@ -9574,6 +9703,40 @@ namespace PurelySharp.Symbolic.Smt
             return true;
         }
 
+        private static bool TryTranslateNonUserDefinedReferenceCastOperand(
+            CastExpressionSyntax castExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula operand,
+            out ITypeSymbol targetType,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            operand = null!;
+            targetType = null!;
+            var targetTypeInfo = semanticModel.GetTypeInfo(castExpression.Type, cancellationToken);
+            var candidateTargetType = targetTypeInfo.Type ?? targetTypeInfo.ConvertedType;
+            var sourceTypeInfo = semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken);
+            var sourceType = sourceTypeInfo.Type ?? sourceTypeInfo.ConvertedType;
+            if (candidateTargetType?.IsReferenceType != true ||
+                sourceType?.IsReferenceType != true ||
+                semanticModel.GetOperation(castExpression, cancellationToken) is IConversionOperation { OperatorMethod: not null })
+            {
+                return false;
+            }
+
+            if (!TryTranslateValue(castExpression.Expression, semanticModel, cancellationToken, out var candidateOperand, getSymbolVersion, inlineDepth) ||
+                candidateOperand is not { Kind: SmtValueKind.Reference })
+            {
+                operand = null!;
+                return false;
+            }
+
+            operand = candidateOperand;
+            targetType = candidateTargetType;
+            return true;
+        }
+
         private static bool TryTranslateIdentityPreservingAsValue(
             BinaryExpressionSyntax asExpression,
             SemanticModel semanticModel,
@@ -10039,6 +10202,15 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             if (memberSymbol.Name == "Length" &&
+                IsStringExpression(memberAccess.Expression, semanticModel, cancellationToken) &&
+                TryTranslateStringValue(memberAccess.Expression, semanticModel, cancellationToken, out var stringValue, getSymbolVersion, inlineDepth) &&
+                stringValue != null)
+            {
+                formula = new SmtStringLengthTerm(stringValue);
+                return true;
+            }
+
+            if (memberSymbol.Name == "Length" &&
                 TryCreateBuiltInElementAccessLengthFormula(
                     memberAccess.Expression,
                     semanticModel,
@@ -10048,15 +10220,6 @@ namespace PurelySharp.Symbolic.Smt
                     inlineDepth))
             {
                 formula = builtInLength;
-                return true;
-            }
-
-            if (memberSymbol.Name == "Length" &&
-                IsStringExpression(memberAccess.Expression, semanticModel, cancellationToken) &&
-                TryTranslateStringValue(memberAccess.Expression, semanticModel, cancellationToken, out var stringValue, getSymbolVersion, inlineDepth) &&
-                stringValue != null)
-            {
-                formula = new SmtStringLengthTerm(stringValue);
                 return true;
             }
 
@@ -10391,6 +10554,46 @@ namespace PurelySharp.Symbolic.Smt
             return false;
         }
 
+        private static bool TryGetTupleElementStorageName(
+            MemberAccessExpressionSyntax memberAccess,
+            IFieldSymbol fieldSymbol,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out string storageName)
+        {
+            if (TryGetTupleElementStorageName(fieldSymbol, out storageName))
+            {
+                return true;
+            }
+
+            var receiverType = semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(memberAccess.Expression, cancellationToken).Type;
+            if (receiverType is not INamedTypeSymbol { IsTupleType: true } tupleType)
+            {
+                storageName = string.Empty;
+                return false;
+            }
+
+            foreach (var element in tupleType.TupleElements)
+            {
+                if (!string.Equals(element.Name, fieldSymbol.Name, StringComparison.Ordinal) &&
+                    !string.Equals(element.Name, memberAccess.Name.Identifier.ValueText, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var tupleField = element.CorrespondingTupleField ?? element;
+                if (IsTupleElementStorageName(tupleField.Name))
+                {
+                    storageName = tupleField.Name;
+                    return true;
+                }
+            }
+
+            storageName = string.Empty;
+            return false;
+        }
+
         private static bool IsTupleElementStorageName(string name)
         {
             return name.Length > 4 &&
@@ -10405,7 +10608,10 @@ namespace PurelySharp.Symbolic.Smt
             out SmtFormula? formula)
         {
             formula = null;
-            var variableName = receiver + "." + memberName;
+            var receiverName = receiver is SmtVariable variable
+                ? variable.Name
+                : receiver.ToString() ?? string.Empty;
+            var variableName = receiverName + "." + memberName;
             if (type.SpecialType == SpecialType.System_Boolean)
             {
                 formula = new SmtVariable(variableName, SmtValueKind.Bool);

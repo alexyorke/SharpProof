@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace SearchLib.Smt
 {
     public enum SmtValueKind
@@ -69,7 +71,10 @@ namespace SearchLib.Smt
 
     public sealed record SmtStringEndsWithFormula(SmtFormula Value, SmtFormula Suffix) : SmtFormula(SmtValueKind.Bool);
 
-    public sealed record SmtRegexMatchFormula(SmtFormula Value, string Pattern) : SmtFormula(SmtValueKind.Bool);
+    public sealed record SmtRegexMatchFormula(
+        SmtFormula Value,
+        string Pattern,
+        RegexOptions Options = RegexOptions.None) : SmtFormula(SmtValueKind.Bool);
 
     public sealed record SmtConditionalFormula(SmtFormula Condition, SmtFormula WhenTrue, SmtFormula WhenFalse, SmtValueKind ResultKind) : SmtFormula(ResultKind);
 }

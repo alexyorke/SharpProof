@@ -847,6 +847,13 @@ public class TestClass
 
             Assert.That(compact.Kind, Is.EqualTo("point"));
             Assert.That(compact.SchemaVersion, Is.EqualTo(1));
+            Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("point"));
+            Assert.That(compact.QueryDescriptor.FilePath, Is.EqualTo(result.FilePath));
+            Assert.That(compact.QueryDescriptor.Line, Is.EqualTo(result.Line));
+            Assert.That(compact.QueryDescriptor.Column, Is.EqualTo(result.Column));
+            Assert.That(compact.QueryDescriptor.Position, Is.EqualTo(position));
+            Assert.That(compact.QueryDescriptor.NodeKind, Is.EqualTo("ReturnStatement"));
+            Assert.That(compact.QueryDescriptor.ProgramPointKind, Is.EqualTo(SymbolicProgramPointKinds.Statement));
             Assert.That(compact.Line, Is.EqualTo(result.Line));
             Assert.That(compact.Column, Is.EqualTo(result.Column));
             Assert.That(compact.Position, Is.EqualTo(position));
@@ -902,6 +909,14 @@ public class TestClass
             Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
             Assert.That(root.TryGetProperty("Kind", out _), Is.False);
             Assert.That(root.TryGetProperty("lineCount", out _), Is.False);
+            var queryDescriptor = root.GetProperty("queryDescriptor");
+            Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("point"));
+            Assert.That(queryDescriptor.GetProperty("line").GetInt32(), Is.EqualTo(result.Line));
+            Assert.That(queryDescriptor.GetProperty("column").GetInt32(), Is.EqualTo(result.Column));
+            Assert.That(queryDescriptor.GetProperty("position").GetInt32(), Is.EqualTo(position));
+            Assert.That(queryDescriptor.GetProperty("nodeKind").GetString(), Is.EqualTo("ReturnStatement"));
+            Assert.That(queryDescriptor.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Statement));
+            Assert.That(queryDescriptor.TryGetProperty("spanStart", out _), Is.False);
             Assert.That(root.GetProperty("programPointKind").GetString(), Is.EqualTo(SymbolicProgramPointKinds.Statement));
             Assert.That(root.GetProperty("nodeSpanStart").GetInt32(), Is.EqualTo(result.NodeSpanStart));
             Assert.That(root.GetProperty("nodeSpanEnd").GetInt32(), Is.EqualTo(result.NodeSpanEnd));
@@ -956,6 +971,11 @@ public class TestClass
                 maxProofs: 1));
 
             Assert.That(compact.Kind, Is.EqualTo("line"));
+            Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("line"));
+            Assert.That(compact.QueryDescriptor.Line, Is.EqualTo(result.Line));
+            Assert.That(compact.QueryDescriptor.Column, Is.Null);
+            Assert.That(compact.QueryDescriptor.Position, Is.Null);
+            Assert.That(compact.QueryDescriptor.SpanStart, Is.Null);
             Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
             Assert.That(compact.ProgramPoints, Has.Count.EqualTo(1));
             Assert.That(compact.Truncation.ProgramPoints, Is.EqualTo(result.ProgramPoints.Count > 1));
@@ -1039,6 +1059,11 @@ public class TestClass
                 maxProofs: 0));
 
             Assert.That(compact.Kind, Is.EqualTo("file"));
+            Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("file"));
+            Assert.That(compact.QueryDescriptor.FilePath, Is.EqualTo(result.FilePath));
+            Assert.That(compact.QueryDescriptor.Line, Is.Null);
+            Assert.That(compact.QueryDescriptor.Position, Is.Null);
+            Assert.That(compact.QueryDescriptor.SpanStart, Is.Null);
             Assert.That(compact.LineCount, Is.EqualTo(result.LineCount));
             Assert.That(compact.Lines, Has.Count.EqualTo(1));
             Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
@@ -1107,6 +1132,11 @@ public class TestClass
                 maxProofs: 1));
 
             Assert.That(compact.Kind, Is.EqualTo("span"));
+            Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("span"));
+            Assert.That(compact.QueryDescriptor.SpanStart, Is.EqualTo(spanStart));
+            Assert.That(compact.QueryDescriptor.SpanEnd, Is.EqualTo(spanEnd));
+            Assert.That(compact.QueryDescriptor.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
+            Assert.That(compact.QueryDescriptor.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
             Assert.That(compact.QuerySpanStart, Is.EqualTo(spanStart));
             Assert.That(compact.QuerySpanEnd, Is.EqualTo(spanEnd));
             Assert.That(compact.QueryStartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
@@ -1199,6 +1229,8 @@ public class TestClass
             Assert.That(SymbolicCompactQueryOptions.SummaryOnly.MaxLines, Is.Zero);
             Assert.That(SymbolicCompactQueryOptions.SummaryOnly.MaxProgramPoints, Is.Zero);
             Assert.That(compact.Kind, Is.EqualTo("file"));
+            Assert.That(compact.QueryDescriptor.Kind, Is.EqualTo("file"));
+            Assert.That(compact.QueryDescriptor.FilePath, Is.EqualTo(result.FilePath));
             Assert.That(compact.LineCount, Is.EqualTo(result.LineCount));
             Assert.That(compact.LinesWithProgramPoints, Is.EqualTo(result.LinesWithProgramPoints));
             Assert.That(compact.ProgramPointCount, Is.EqualTo(result.ProgramPointCount));
@@ -1282,6 +1314,11 @@ public class TestClass
                 Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
                 Assert.That(root.GetProperty("mergedInvariantText").GetString(), Is.EqualTo("value > 0"));
                 Assert.That(root.GetProperty("proofOutcomes").GetProperty("totalCount").GetInt32(), Is.EqualTo(1));
+                var queryDescriptor = root.GetProperty("queryDescriptor");
+                Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("line"));
+                Assert.That(queryDescriptor.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
+                Assert.That(queryDescriptor.GetProperty("line").GetInt32(), Is.EqualTo(FindLine(source, "return value;")));
+                Assert.That(queryDescriptor.TryGetProperty("position", out _), Is.False);
 
                 var point = root.GetProperty("programPoints")[0];
                 Assert.That(point.GetProperty("filePath").GetString(), Is.EqualTo(Path.GetFullPath(sourcePath)));
@@ -1409,6 +1446,8 @@ public class TestClass
                 var root = document.RootElement;
                 Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("file"));
                 Assert.That(root.GetProperty("schemaVersion").GetInt32(), Is.EqualTo(1));
+                Assert.That(root.GetProperty("queryDescriptor").GetProperty("kind").GetString(), Is.EqualTo("file"));
+                Assert.That(root.GetProperty("queryDescriptor").TryGetProperty("line", out _), Is.False);
                 Assert.That(root.GetProperty("lineCount").GetInt32(), Is.GreaterThan(0));
                 Assert.That(root.GetProperty("linesWithProgramPoints").GetInt32(), Is.GreaterThan(0));
                 Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThan(0));
@@ -1493,6 +1532,12 @@ public class TestClass
                 Assert.That(root.GetProperty("querySpanEnd").GetInt32(), Is.EqualTo(spanEnd));
                 Assert.That(root.GetProperty("queryStartLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
                 Assert.That(root.GetProperty("queryEndLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
+                var queryDescriptor = root.GetProperty("queryDescriptor");
+                Assert.That(queryDescriptor.GetProperty("kind").GetString(), Is.EqualTo("span"));
+                Assert.That(queryDescriptor.GetProperty("spanStart").GetInt32(), Is.EqualTo(spanStart));
+                Assert.That(queryDescriptor.GetProperty("spanEnd").GetInt32(), Is.EqualTo(spanEnd));
+                Assert.That(queryDescriptor.GetProperty("startLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
+                Assert.That(queryDescriptor.GetProperty("endLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
                 Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
 
                 var invariantQuery = root.GetProperty("invariantQuery");

@@ -381,6 +381,27 @@ public class TestClass
             Assert.That(columnProof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), columnProof.Reason);
         }
 
+        [Test]
+        public void ProgramPointFacts_ObjectErasedArrayCastAliasProvesLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int length)
+    {
+        var values = new int[length];
+        object boxed = values;
+        var alias = (int[])boxed;
+        return alias.Length;
+    }
+}";
+
+            var marker = FindMarker(source, "return alias.Length;");
+            var proof = ProveAtMarker(source, marker, "alias.Length == length");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
         private static SymbolicInvariantSnapshot GetSnapshotAtStatement(string source, string statementPrefix)
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(

@@ -1146,6 +1146,12 @@ namespace PurelySharp.Analyzer
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
+                TryCreateReferenceBackedLengthFact(targetSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var referenceLengthFact))
+            {
+                facts.Add(referenceLengthFact);
+            }
+
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
                 TryCreateCollectionExpressionLengthLowerBoundFact(targetSymbol, effectiveValueExpression, out var lowerBoundLengthFact))
             {
                 facts.Add(lowerBoundLengthFact);
@@ -1154,6 +1160,11 @@ namespace PurelySharp.Analyzer
             if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken))
             {
                 AddArrayDimensionLengthAssignedValueFacts(targetSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken))
+            {
+                AddReferenceBackedArrayDimensionLengthFacts(targetSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
 
             if (TryCreateStringContentFormula(targetSymbol, out var targetStringFormula) &&
@@ -1167,6 +1178,12 @@ namespace PurelySharp.Analyzer
                 valueStringFormula != null)
             {
                 facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetStringFormula, valueStringFormula));
+            }
+
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
+                TryCreateReferenceBackedStringContentFact(targetSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var referenceStringFact))
+            {
+                facts.Add(referenceStringFact);
             }
 
             if (TryCreateSymbolSmtValue(targetSymbol, out var targetReferenceFormula) &&
@@ -1213,6 +1230,86 @@ namespace PurelySharp.Analyzer
             {
                 AddSymbolNonNullFact(targetSymbol, facts);
             }
+        }
+
+        private static bool TryCreateReferenceBackedLengthFact(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula fact)
+        {
+            fact = null!;
+            var valueType = semanticModel.GetTypeInfo(UnwrapFactExpression(valueExpression), cancellationToken).Type;
+            if (valueType is not IArrayTypeSymbol { Rank: 1 } ||
+                !TryCreateSymbolSmtValue(targetSymbol, out var targetReference) ||
+                targetReference is not { Kind: SmtValueKind.Reference } ||
+                !TryCreateReferenceBuiltInLengthFormula(targetReference, out var targetLength) ||
+                !TryCreateBuiltInLengthValueFormula(valueExpression, semanticModel, cancellationToken, out var valueLength))
+            {
+                return false;
+            }
+
+            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLength, valueLength);
+            return true;
+        }
+
+        private static void AddReferenceBackedArrayDimensionLengthFacts(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            var valueType = semanticModel.GetTypeInfo(UnwrapFactExpression(valueExpression), cancellationToken).Type;
+            if (valueType is not IArrayTypeSymbol { Rank: > 1 } arrayType ||
+                !TryCreateSymbolSmtValue(targetSymbol, out var targetReference) ||
+                targetReference is not { Kind: SmtValueKind.Reference })
+            {
+                return;
+            }
+
+            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+            {
+                if (!TryCreateReferenceArrayDimensionLengthFormula(targetReference, dimension, out var targetDimensionLength) ||
+                    !TryCreateArrayDimensionLengthValueFormula(valueExpression, dimension, semanticModel, cancellationToken, out var valueDimensionLength))
+                {
+                    continue;
+                }
+
+                facts.Add(new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    targetDimensionLength,
+                    valueDimensionLength));
+            }
+        }
+
+        private static bool TryCreateReferenceBackedStringContentFact(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula fact)
+        {
+            fact = null!;
+            var valueType = semanticModel.GetTypeInfo(UnwrapFactExpression(valueExpression), cancellationToken).Type;
+            if (valueType?.SpecialType != SpecialType.System_String ||
+                !TryCreateSymbolSmtValue(targetSymbol, out var targetReference) ||
+                targetReference is not { Kind: SmtValueKind.Reference } ||
+                !TryCreateReferenceStringContentFormula(targetReference, out var targetString) ||
+                !CSharpConditionToFormula.TryTranslateStringValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueString,
+                    getSymbolVersion: null) ||
+                valueString == null)
+            {
+                return false;
+            }
+
+            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetString, valueString);
+            return true;
         }
 
         private static bool TryCreateCollectionExpressionLengthLowerBoundFact(
@@ -1522,7 +1619,7 @@ namespace PurelySharp.Analyzer
                 IsBuiltInSpanOrMemoryType(type))
             {
                 var receiverFormula = new SmtVariable(GetSmtVariableName(symbol), SmtValueKind.Reference);
-                formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
+                formula = new SmtVariable(GetReferenceFormulaName(receiverFormula) + ".Length", SmtValueKind.Int);
                 return true;
             }
 
@@ -1546,9 +1643,58 @@ namespace PurelySharp.Analyzer
             }
 
             formula = new SmtVariable(
-                receiverFormula + ".GetLength(" + dimension.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")",
+                GetReferenceFormulaName(receiverFormula) + ".GetLength(" + dimension.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")",
                 SmtValueKind.Int);
             return true;
+        }
+
+        private static bool TryCreateReferenceBuiltInLengthFormula(SmtFormula receiverFormula, out SmtFormula formula)
+        {
+            if (receiverFormula.Kind != SmtValueKind.Reference)
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(GetReferenceFormulaName(receiverFormula) + ".Length", SmtValueKind.Int);
+            return true;
+        }
+
+        private static bool TryCreateReferenceArrayDimensionLengthFormula(
+            SmtFormula receiverFormula,
+            int dimension,
+            out SmtFormula formula)
+        {
+            if (receiverFormula.Kind != SmtValueKind.Reference ||
+                dimension < 0)
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(
+                GetReferenceFormulaName(receiverFormula) + ".GetLength(" + dimension.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")",
+                SmtValueKind.Int);
+            return true;
+        }
+
+        private static bool TryCreateReferenceStringContentFormula(SmtFormula receiverFormula, out SmtFormula formula)
+        {
+            if (receiverFormula.Kind != SmtValueKind.Reference)
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(GetReferenceFormulaName(receiverFormula) + ".String", SmtValueKind.String);
+            return true;
+        }
+
+        private static string GetReferenceFormulaName(SmtFormula receiverFormula)
+        {
+            return receiverFormula is SmtVariable variable
+                ? variable.Name
+                : receiverFormula.ToString() ?? string.Empty;
         }
 
         private static bool TryCreateBuiltInLengthValueFormula(

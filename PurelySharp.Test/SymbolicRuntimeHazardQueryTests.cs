@@ -467,6 +467,30 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesObjectErasedArrayCastAliasIndexOutOfRange()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = new int[4];
+        object boxed = values;
+        var alias = (int[])boxed;
+        return alias[4];
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(source, "return alias[4];", smtAnalysis);
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesAssignedSpanSliceIndexOutOfRange()
         {
             const string source = @"

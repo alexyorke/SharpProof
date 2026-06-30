@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using SearchLib.Purity;
 using SearchLib.Smt;
+using System.Text.RegularExpressions;
 
 namespace PurelySharp.Test
 {
@@ -109,6 +110,39 @@ namespace PurelySharp.Test
                 TimeSpan.FromMilliseconds(50));
 
             Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
+        public void SmtSolver_UnsupportedRegexOptionsWithoutConcreteInput_ReturnsUnknown()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\Aab\z", RegexOptions.IgnoreCase),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
+        public void SmtSolver_UnsupportedRegexOptionsConcreteMismatchUsesDotNetOptions()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\Aab\z", RegexOptions.IgnoreCase),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("CD")),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
         }
 
         [Test]

@@ -11,6 +11,12 @@ namespace SearchLib.Smt
         private readonly Expr _nullReference;
         private readonly Dictionary<(string Name, SmtValueKind Kind), Expr> _variables = new();
         private readonly Dictionary<string, RegexTranslationPrecision> _regexPrecisionCache = new(StringComparer.Ordinal);
+        private const RegexOptions Z3SupportedRegexOptions =
+            RegexOptions.ExplicitCapture |
+            RegexOptions.Compiled |
+            RegexOptions.CultureInvariant |
+            RegexOptions.Singleline |
+            RegexOptions.IgnorePatternWhitespace;
 
         public Z3FormulaEncoder()
         {
@@ -185,6 +191,11 @@ namespace SearchLib.Smt
 
         private BoolExpr EncodeRegexMatch(SmtRegexMatchFormula formula)
         {
+            if (!CanEncodeRegexOptions(formula.Options))
+            {
+                throw new InvalidOperationException("Unsupported SMT regex options.");
+            }
+
             if (!Z3RegexTranslator.TryTranslate(_context, formula.Pattern, out var regex, out _))
             {
                 throw new InvalidOperationException("Unsupported SMT regex pattern.");
@@ -198,6 +209,11 @@ namespace SearchLib.Smt
             switch (formula)
             {
                 case SmtRegexMatchFormula regexMatch:
+                    if (!CanEncodeRegexOptions(regexMatch.Options))
+                    {
+                        throw new InvalidOperationException("Unsupported SMT regex options.");
+                    }
+
                     if (isNegativeContext && IsApproximateRegexPattern(regexMatch.Pattern))
                     {
                         throw new InvalidOperationException("Approximate SMT regex patterns cannot be safely negated.");
@@ -307,6 +323,11 @@ namespace SearchLib.Smt
             switch (formula)
             {
                 case SmtRegexMatchFormula regexMatch:
+                    if (!CanEncodeRegexOptions(regexMatch.Options))
+                    {
+                        throw new InvalidOperationException("Unsupported SMT regex options.");
+                    }
+
                     if (IsApproximateRegexPattern(regexMatch.Pattern))
                     {
                         throw new InvalidOperationException("Approximate SMT regex patterns require positive polarity.");
@@ -374,6 +395,11 @@ namespace SearchLib.Smt
                 : RegexTranslationPrecision.Unsupported;
             _regexPrecisionCache.Add(pattern, precision);
             return precision;
+        }
+
+        private static bool CanEncodeRegexOptions(RegexOptions options)
+        {
+            return (options & ~Z3SupportedRegexOptions) == 0;
         }
 
         private static bool GetBooleanComparisonOperandPolarity(

@@ -2337,6 +2337,98 @@ namespace PurelySharp.Symbolic
         }
     }
 
+    public sealed class SymbolicCompactSourceQueryDescriptor
+    {
+        private SymbolicCompactSourceQueryDescriptor(
+            string kind,
+            string filePath,
+            int? line,
+            int? column,
+            int? position,
+            int? spanStart,
+            int? spanEnd,
+            int? spanLength,
+            int? startLine,
+            int? startColumn,
+            int? endLine,
+            int? endColumn,
+            string? nodeKind,
+            string? methodName,
+            string? programPointKind)
+        {
+            Kind = kind ?? string.Empty;
+            FilePath = filePath ?? string.Empty;
+            Line = line;
+            Column = column;
+            Position = position;
+            SpanStart = spanStart;
+            SpanEnd = spanEnd;
+            SpanLength = spanLength;
+            StartLine = startLine;
+            StartColumn = startColumn;
+            EndLine = endLine;
+            EndColumn = endColumn;
+            NodeKind = nodeKind;
+            MethodName = string.IsNullOrWhiteSpace(methodName) ? null : methodName;
+            ProgramPointKind = programPointKind;
+        }
+
+        public string Kind { get; }
+
+        public string FilePath { get; }
+
+        public int? Line { get; }
+
+        public int? Column { get; }
+
+        public int? Position { get; }
+
+        public int? SpanStart { get; }
+
+        public int? SpanEnd { get; }
+
+        public int? SpanLength { get; }
+
+        public int? StartLine { get; }
+
+        public int? StartColumn { get; }
+
+        public int? EndLine { get; }
+
+        public int? EndColumn { get; }
+
+        public string? NodeKind { get; }
+
+        public string? MethodName { get; }
+
+        public string? ProgramPointKind { get; }
+
+        internal static SymbolicCompactSourceQueryDescriptor FromCompactResult(SymbolicCompactQueryResult result)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+
+            return new SymbolicCompactSourceQueryDescriptor(
+                result.Kind,
+                result.FilePath,
+                result.Line,
+                result.Column,
+                result.Position,
+                result.QuerySpanStart,
+                result.QuerySpanEnd,
+                result.QuerySpanLength,
+                result.QueryStartLine,
+                result.QueryStartColumn,
+                result.QueryEndLine,
+                result.QueryEndColumn,
+                result.NodeKind,
+                result.MethodName,
+                result.ProgramPointKind);
+        }
+    }
+
     public sealed class SymbolicCompactQueryResult
     {
         private SymbolicCompactQueryResult(
@@ -2406,6 +2498,7 @@ namespace PurelySharp.Symbolic
                 InvariantQuery,
                 ProgramPointSummary,
                 SmtDiagnostics);
+            QueryDescriptor = SymbolicCompactSourceQueryDescriptor.FromCompactResult(this);
             Truncation = truncation ?? throw new ArgumentNullException(nameof(truncation));
         }
 
@@ -2414,6 +2507,8 @@ namespace PurelySharp.Symbolic
         public int SchemaVersion => 1;
 
         public string FilePath { get; }
+
+        public SymbolicCompactSourceQueryDescriptor QueryDescriptor { get; }
 
         public int? Line { get; }
 

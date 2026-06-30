@@ -712,7 +712,9 @@ namespace SearchLib.Smt
                             remainingDepth,
                             out var valueChanged);
                         changed = valueChanged;
-                        return valueChanged ? new SmtRegexMatchFormula(value, regexMatch.Pattern) : formula;
+                        return valueChanged
+                            ? new SmtRegexMatchFormula(value, regexMatch.Pattern, regexMatch.Options)
+                            : formula;
                     }
                 case SmtConditionalFormula conditionalFormula:
                     {
@@ -873,7 +875,7 @@ namespace SearchLib.Smt
                         var value = SimplifyKnownConditionalTerms(regexMatch.Value, facts, out var valueChanged);
                         changed = valueChanged;
                         return valueChanged
-                            ? new SmtRegexMatchFormula(value, regexMatch.Pattern)
+                            ? new SmtRegexMatchFormula(value, regexMatch.Pattern, regexMatch.Options)
                             : formula;
                     }
                 case SmtConditionalFormula conditionalFormula:
@@ -3283,6 +3285,7 @@ namespace SearchLib.Smt
                 var validationStatus = TryValidateRegexMatch(
                     concreteInput,
                     regexMatch.Pattern,
+                    regexMatch.Options,
                     out var actualMatch);
                 if (validationStatus != ConcreteFactPreparationStatus.Ready)
                 {
@@ -3466,9 +3469,10 @@ namespace SearchLib.Smt
         private ConcreteFactPreparationStatus TryValidateRegexMatch(
             string input,
             string pattern,
+            RegexOptions options,
             out bool isMatch)
         {
-            var key = new RegexValidationKey(input, pattern);
+            var key = new RegexValidationKey(input, pattern, options);
             if (_regexValidationCache.TryGetValue(key, out var cached))
             {
                 isMatch = cached.IsMatch;
@@ -3480,7 +3484,7 @@ namespace SearchLib.Smt
                 isMatch = Regex.IsMatch(
                     input,
                     pattern,
-                    RegexOptions.None,
+                    options,
                     ConcreteRegexValidationTimeout);
                 _regexValidationCache[key] = new RegexValidationResult(ConcreteFactPreparationStatus.Ready, isMatch);
                 return ConcreteFactPreparationStatus.Ready;
@@ -3503,17 +3507,20 @@ namespace SearchLib.Smt
         {
             private readonly string _input;
             private readonly string _pattern;
+            private readonly RegexOptions _options;
 
-            public RegexValidationKey(string input, string pattern)
+            public RegexValidationKey(string input, string pattern, RegexOptions options)
             {
                 _input = input;
                 _pattern = pattern;
+                _options = options;
             }
 
             public bool Equals(RegexValidationKey other)
             {
                 return string.Equals(_input, other._input, StringComparison.Ordinal) &&
-                    string.Equals(_pattern, other._pattern, StringComparison.Ordinal);
+                    string.Equals(_pattern, other._pattern, StringComparison.Ordinal) &&
+                    _options == other._options;
             }
 
             public override bool Equals(object? obj)
@@ -3526,7 +3533,8 @@ namespace SearchLib.Smt
                 unchecked
                 {
                     return (StringComparer.Ordinal.GetHashCode(_input) * 397) ^
-                        StringComparer.Ordinal.GetHashCode(_pattern);
+                        (StringComparer.Ordinal.GetHashCode(_pattern) * 397) ^
+                        (int)_options;
                 }
             }
         }

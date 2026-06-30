@@ -4489,6 +4489,12 @@ namespace PurelySharp.Symbolic
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
+                TryCreateReferenceBackedLengthFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var referenceLengthFact))
+            {
+                AddUniqueFact(facts, referenceLengthFact);
+            }
+
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
                 TryCreateCollectionExpressionLengthLowerBoundFact(assignedSymbol, effectiveValueExpression, out var lowerBoundLengthFact))
             {
                 AddUniqueFact(facts, lowerBoundLengthFact);
@@ -4497,6 +4503,11 @@ namespace PurelySharp.Symbolic
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
             {
                 AddArrayDimensionLengthAssignedValueFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
+            {
+                AddReferenceBackedArrayDimensionLengthFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
@@ -4513,6 +4524,12 @@ namespace PurelySharp.Symbolic
                     SmtBinaryOperator.NotEqual,
                     targetFormula,
                     new SmtNullConstant()));
+            }
+
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
+                TryCreateReferenceBackedStringContentFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var referenceStringFact))
+            {
+                AddUniqueFact(facts, referenceStringFact);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
@@ -4590,6 +4607,89 @@ namespace PurelySharp.Symbolic
             }
 
             AddTupleElementSourceSymbolSnapshotFacts(assignedSymbol, sourceSymbol, facts);
+        }
+
+        private static bool TryCreateReferenceBackedLengthFact(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula fact)
+        {
+            fact = null!;
+            var valueType = semanticModel.GetTypeInfo(UnwrapExpression(valueExpression), cancellationToken).Type;
+            if (valueType is not IArrayTypeSymbol { Rank: 1 } ||
+                !TryCreateSymbolSmtValue(targetSymbol, out var targetReference) ||
+                targetReference is not { Kind: SmtValueKind.Reference } ||
+                !TryCreateReferenceBuiltInLengthFormula(targetReference, out var targetLength) ||
+                !TryCreateBuiltInLengthValueFormula(valueExpression, semanticModel, cancellationToken, out var valueLength))
+            {
+                return false;
+            }
+
+            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLength, valueLength);
+            return true;
+        }
+
+        private static void AddReferenceBackedArrayDimensionLengthFacts(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            var valueType = semanticModel.GetTypeInfo(UnwrapExpression(valueExpression), cancellationToken).Type;
+            if (valueType is not IArrayTypeSymbol { Rank: > 1 } arrayType ||
+                !TryCreateSymbolSmtValue(targetSymbol, out var targetReference) ||
+                targetReference is not { Kind: SmtValueKind.Reference })
+            {
+                return;
+            }
+
+            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+            {
+                if (!TryCreateReferenceArrayDimensionLengthFormula(targetReference, dimension, out var targetDimensionLength) ||
+                    !TryCreateArrayDimensionLengthValueFormula(valueExpression, dimension, semanticModel, cancellationToken, out var valueDimensionLength))
+                {
+                    continue;
+                }
+
+                AddUniqueFact(
+                    facts,
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.Equal,
+                        targetDimensionLength,
+                        valueDimensionLength));
+            }
+        }
+
+        private static bool TryCreateReferenceBackedStringContentFact(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula fact)
+        {
+            fact = null!;
+            var valueType = semanticModel.GetTypeInfo(UnwrapExpression(valueExpression), cancellationToken).Type;
+            if (valueType?.SpecialType != SpecialType.System_String ||
+                !TryCreateSymbolSmtValue(targetSymbol, out var targetReference) ||
+                targetReference is not { Kind: SmtValueKind.Reference } ||
+                !TryCreateStringContentFormulaForReference(targetReference, valueType, out var targetString) ||
+                !CSharpConditionToFormula.TryTranslateStringValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueString,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) ||
+                valueString == null)
+            {
+                return false;
+            }
+
+            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetString, valueString);
+            return true;
         }
 
         private static void AddArrayDimensionLengthSourceSymbolSnapshotFacts(
@@ -4676,6 +4776,43 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
+        private static bool TryCreateReferenceBuiltInLengthFormula(SmtFormula receiverFormula, out SmtFormula formula)
+        {
+            if (receiverFormula.Kind != SmtValueKind.Reference)
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(GetReferenceFormulaName(receiverFormula) + ".Length", SmtValueKind.Int);
+            return true;
+        }
+
+        private static bool TryCreateReferenceArrayDimensionLengthFormula(
+            SmtFormula receiverFormula,
+            int dimension,
+            out SmtFormula formula)
+        {
+            if (receiverFormula.Kind != SmtValueKind.Reference ||
+                dimension < 0)
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(
+                GetReferenceFormulaName(receiverFormula) + ".GetLength(" + dimension.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")",
+                SmtValueKind.Int);
+            return true;
+        }
+
+        private static string GetReferenceFormulaName(SmtFormula receiverFormula)
+        {
+            return receiverFormula is SmtVariable variable
+                ? variable.Name
+                : receiverFormula.ToString() ?? string.Empty;
+        }
+
         private static IEnumerable<ExpressionSyntax> GetExplicitArraySizeExpressions(ArrayCreationExpressionSyntax arrayCreation)
         {
             foreach (var rankSpecifier in arrayCreation.Type.RankSpecifiers)
@@ -4745,6 +4882,56 @@ namespace PurelySharp.Symbolic
                 }
 
                 AddSubstitutedCurrentFacts(facts, sourceElement, targetElement);
+
+                AddTupleElementDerivedSourceSymbolSnapshotFacts(
+                    assignedSymbol,
+                    targetElementNames[index],
+                    sourceSymbol,
+                    sourceElementNames[index],
+                    facts);
+            }
+        }
+
+        private static void AddTupleElementDerivedSourceSymbolSnapshotFacts(
+            ISymbol targetTupleSymbol,
+            string targetElementName,
+            ISymbol sourceTupleSymbol,
+            string sourceElementName,
+            List<SmtFormula> facts)
+        {
+            if (TryCreateTupleElementBuiltInLengthFormula(sourceTupleSymbol, sourceElementName, out var sourceLength) &&
+                TryCreateTupleElementBuiltInLengthFormula(targetTupleSymbol, targetElementName, out var targetLength))
+            {
+                AddSubstitutedCurrentFacts(facts, sourceLength, targetLength);
+            }
+
+            if (TryCreateTupleElementStringContentFormula(sourceTupleSymbol, sourceElementName, out var sourceString) &&
+                TryCreateTupleElementStringContentFormula(targetTupleSymbol, targetElementName, out var targetString))
+            {
+                AddSubstitutedCurrentFacts(facts, sourceString, targetString);
+            }
+
+            var sourceElementType = TryGetTupleElementType(sourceTupleSymbol, sourceElementName, out var sourceType)
+                ? sourceType
+                : null;
+            var targetElementType = TryGetTupleElementType(targetTupleSymbol, targetElementName, out var targetType)
+                ? targetType
+                : null;
+            if (sourceElementType is not IArrayTypeSymbol sourceArrayType ||
+                targetElementType is not IArrayTypeSymbol targetArrayType ||
+                sourceArrayType.Rank != targetArrayType.Rank ||
+                sourceArrayType.Rank <= 1)
+            {
+                return;
+            }
+
+            for (var dimension = 0; dimension < sourceArrayType.Rank; dimension++)
+            {
+                if (TryCreateTupleElementArrayDimensionLengthFormula(sourceTupleSymbol, sourceElementName, dimension, out var sourceDimensionLength) &&
+                    TryCreateTupleElementArrayDimensionLengthFormula(targetTupleSymbol, targetElementName, dimension, out var targetDimensionLength))
+                {
+                    AddSubstitutedCurrentFacts(facts, sourceDimensionLength, targetDimensionLength);
+                }
             }
         }
 
@@ -4891,7 +5078,7 @@ namespace PurelySharp.Symbolic
                 case SmtRegexMatchFormula regexMatch:
                     if (TrySubstituteFormula(regexMatch.Value, sourceFormula, targetFormula, out var regexValue))
                     {
-                        substituted = new SmtRegexMatchFormula(regexValue, regexMatch.Pattern);
+                        substituted = new SmtRegexMatchFormula(regexValue, regexMatch.Pattern, regexMatch.Options);
                         return true;
                     }
 
@@ -5248,6 +5435,23 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
+        private static bool TryCreateStringContentFormulaForReference(
+            SmtFormula receiverFormula,
+            ITypeSymbol? type,
+            out SmtFormula formula)
+        {
+            if (type?.SpecialType != SpecialType.System_String ||
+                receiverFormula.Kind != SmtValueKind.Reference)
+            {
+                formula = null!;
+                return false;
+            }
+
+            var receiverName = receiverFormula is SmtVariable variable ? variable.Name : receiverFormula.ToString();
+            formula = new SmtVariable(receiverName + ".String", SmtValueKind.String);
+            return true;
+        }
+
         private static void AddFiniteArrayElementAssignedValueFacts(
             ISymbol assignedSymbol,
             ExpressionSyntax valueExpression,
@@ -5467,8 +5671,20 @@ namespace PurelySharp.Symbolic
             for (var index = 0; index < tupleExpression.Arguments.Count; index++)
             {
                 var argumentExpression = tupleExpression.Arguments[index].Expression;
-                if (ExpressionReferencesSymbol(argumentExpression, assignedSymbol, semanticModel, cancellationToken) ||
-                    !TryCreateTupleElementSmtValue(assignedSymbol, elementNames[index], out var targetFormula) ||
+                if (ExpressionReferencesSymbol(argumentExpression, assignedSymbol, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddTupleElementDerivedAssignedValueFacts(
+                    assignedSymbol,
+                    elementNames[index],
+                    argumentExpression,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+
+                if (!TryCreateTupleElementSmtValue(assignedSymbol, elementNames[index], out var targetFormula) ||
                     !CSharpConditionToFormula.TryTranslateValue(
                         argumentExpression,
                         semanticModel,
@@ -5483,6 +5699,56 @@ namespace PurelySharp.Symbolic
                 }
 
                 facts.Add(CreateAssignedValueFact(targetFormula, valueFormula));
+            }
+        }
+
+        private static void AddTupleElementDerivedAssignedValueFacts(
+            ISymbol tupleSymbol,
+            string elementName,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (TryCreateTupleElementStringContentFormula(tupleSymbol, elementName, out var targetString) &&
+                CSharpConditionToFormula.TryTranslateStringValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var valueString,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                valueString != null)
+            {
+                facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetString, valueString));
+            }
+
+            if (TryCreateTupleElementBuiltInLengthFormula(tupleSymbol, elementName, out var targetLength) &&
+                TryCreateBuiltInLengthValueFormula(valueExpression, semanticModel, cancellationToken, out var valueLength))
+            {
+                AddUniqueFact(
+                    facts,
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLength, valueLength));
+            }
+
+            if (!TryGetTupleElementType(tupleSymbol, elementName, out var elementType) ||
+                elementType is not IArrayTypeSymbol { Rank: > 1 } arrayType)
+            {
+                return;
+            }
+
+            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+            {
+                if (TryCreateTupleElementArrayDimensionLengthFormula(tupleSymbol, elementName, dimension, out var targetDimensionLength) &&
+                    TryCreateArrayDimensionLengthValueFormula(valueExpression, dimension, semanticModel, cancellationToken, out var valueDimensionLength))
+                {
+                    AddUniqueFact(
+                        facts,
+                        new SmtBinaryFormula(
+                            SmtBinaryOperator.Equal,
+                            targetDimensionLength,
+                            valueDimensionLength));
+                }
             }
         }
 
@@ -5526,28 +5792,12 @@ namespace PurelySharp.Symbolic
             string elementName,
             out SmtFormula formula)
         {
-            var type = tupleSymbol switch
-            {
-                ILocalSymbol localSymbol => localSymbol.Type,
-                IParameterSymbol parameterSymbol => parameterSymbol.Type,
-                _ => null
-            };
-
-            if (type is not INamedTypeSymbol { IsTupleType: true } tupleType)
+            if (!TryGetTupleElementType(tupleSymbol, elementName, out var elementType))
             {
                 formula = null!;
                 return false;
             }
 
-            var element = tupleType.TupleElements
-                .FirstOrDefault(field => string.Equals((field.CorrespondingTupleField ?? field).Name, elementName, StringComparison.Ordinal));
-            if (element == null)
-            {
-                formula = null!;
-                return false;
-            }
-
-            var elementType = element.Type;
             var variableName = GetSmtVariableName(tupleSymbol) + "." + elementName;
             if (elementType.SpecialType == SpecialType.System_Boolean)
             {
@@ -5569,6 +5819,97 @@ namespace PurelySharp.Symbolic
 
             formula = null!;
             return false;
+        }
+
+        private static bool TryGetTupleElementType(
+            ISymbol tupleSymbol,
+            string elementName,
+            out ITypeSymbol elementType)
+        {
+            var type = GetSymbolType(tupleSymbol);
+            if (type is not INamedTypeSymbol { IsTupleType: true } tupleType)
+            {
+                elementType = null!;
+                return false;
+            }
+
+            var element = tupleType.TupleElements
+                .FirstOrDefault(field => string.Equals((field.CorrespondingTupleField ?? field).Name, elementName, StringComparison.Ordinal));
+            if (element == null)
+            {
+                elementType = null!;
+                return false;
+            }
+
+            elementType = element.Type;
+            return true;
+        }
+
+        private static bool TryCreateTupleElementStringContentFormula(
+            ISymbol tupleSymbol,
+            string elementName,
+            out SmtFormula formula)
+        {
+            if (!TryGetTupleElementType(tupleSymbol, elementName, out var elementType) ||
+                elementType.SpecialType != SpecialType.System_String)
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(GetSmtVariableName(tupleSymbol) + "." + elementName + ".String", SmtValueKind.String);
+            return true;
+        }
+
+        private static bool TryCreateTupleElementBuiltInLengthFormula(
+            ISymbol tupleSymbol,
+            string elementName,
+            out SmtFormula formula)
+        {
+            if (!TryGetTupleElementType(tupleSymbol, elementName, out var elementType))
+            {
+                formula = null!;
+                return false;
+            }
+
+            var elementFormula = new SmtVariable(GetSmtVariableName(tupleSymbol) + "." + elementName, SmtValueKind.Reference);
+            if (elementType.SpecialType == SpecialType.System_String)
+            {
+                formula = new SmtStringLengthTerm(new SmtVariable(GetSmtVariableName(tupleSymbol) + "." + elementName + ".String", SmtValueKind.String));
+                return true;
+            }
+
+            if (elementType is IArrayTypeSymbol { Rank: 1 } ||
+                IsBuiltInSpanOrMemoryType(elementType))
+            {
+                formula = new SmtVariable(GetReferenceFormulaName(elementFormula) + ".Length", SmtValueKind.Int);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryCreateTupleElementArrayDimensionLengthFormula(
+            ISymbol tupleSymbol,
+            string elementName,
+            int dimension,
+            out SmtFormula formula)
+        {
+            if (dimension < 0 ||
+                !TryGetTupleElementType(tupleSymbol, elementName, out var elementType) ||
+                elementType is not IArrayTypeSymbol arrayType ||
+                dimension >= arrayType.Rank)
+            {
+                formula = null!;
+                return false;
+            }
+
+            var elementFormula = new SmtVariable(GetSmtVariableName(tupleSymbol) + "." + elementName, SmtValueKind.Reference);
+            formula = new SmtVariable(
+                GetReferenceFormulaName(elementFormula) + ".GetLength(" + dimension.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")",
+                SmtValueKind.Int);
+            return true;
         }
 
         private static void AddCoalesceAssignmentFacts(
@@ -6446,6 +6787,40 @@ namespace PurelySharp.Symbolic
                 {
                     facts.Add(fact);
                 }
+
+                AddTupleElementDerivedTargetFacts(targetSymbols[index]!, valueFormulas[index], facts);
+            }
+        }
+
+        private static void AddTupleElementDerivedTargetFacts(
+            ISymbol targetSymbol,
+            SmtFormula sourceFormula,
+            List<SmtFormula> facts)
+        {
+            if (TryCreateBuiltInLengthFormulaForReference(sourceFormula, GetSymbolType(targetSymbol), out var sourceLength) &&
+                TryCreateBuiltInLengthFormula(targetSymbol, out var targetLength))
+            {
+                AddSubstitutedCurrentFacts(facts, sourceLength, targetLength);
+            }
+
+            if (TryCreateStringContentFormulaForReference(sourceFormula, GetSymbolType(targetSymbol), out var sourceString) &&
+                TryCreateStringContentFormula(targetSymbol, out var targetString))
+            {
+                AddSubstitutedCurrentFacts(facts, sourceString, targetString);
+            }
+
+            if (GetSymbolType(targetSymbol) is not IArrayTypeSymbol { Rank: > 1 } arrayType)
+            {
+                return;
+            }
+
+            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+            {
+                if (TryCreateArrayDimensionLengthFormulaForReference(sourceFormula, arrayType, dimension, out var sourceDimensionLength) &&
+                    TryCreateArrayDimensionLengthFormula(targetSymbol, dimension, out var targetDimensionLength))
+                {
+                    AddSubstitutedCurrentFacts(facts, sourceDimensionLength, targetDimensionLength);
+                }
             }
         }
 
@@ -6894,12 +7269,61 @@ namespace PurelySharp.Symbolic
                 IsBuiltInSpanOrMemoryType(type))
             {
                 var receiverFormula = new SmtVariable(GetSmtVariableName(symbol), SmtValueKind.Reference);
-                formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
+                formula = new SmtVariable(GetReferenceFormulaName(receiverFormula) + ".Length", SmtValueKind.Int);
                 return true;
             }
 
             formula = null!;
             return false;
+        }
+
+        private static bool TryCreateBuiltInLengthFormulaForReference(
+            SmtFormula receiverFormula,
+            ITypeSymbol? type,
+            out SmtFormula formula)
+        {
+            if (receiverFormula.Kind != SmtValueKind.Reference)
+            {
+                formula = null!;
+                return false;
+            }
+
+            if (type?.SpecialType == SpecialType.System_String)
+            {
+                var receiverName = GetReferenceFormulaName(receiverFormula);
+                formula = new SmtStringLengthTerm(new SmtVariable(receiverName + ".String", SmtValueKind.String));
+                return true;
+            }
+
+            if (type is IArrayTypeSymbol { Rank: 1 } ||
+                IsBuiltInSpanOrMemoryType(type))
+            {
+                formula = new SmtVariable(GetReferenceFormulaName(receiverFormula) + ".Length", SmtValueKind.Int);
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryCreateArrayDimensionLengthFormulaForReference(
+            SmtFormula receiverFormula,
+            IArrayTypeSymbol arrayType,
+            int dimension,
+            out SmtFormula formula)
+        {
+            if (receiverFormula.Kind != SmtValueKind.Reference ||
+                dimension < 0 ||
+                dimension >= arrayType.Rank)
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(
+                GetReferenceFormulaName(receiverFormula) + ".GetLength(" + dimension.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")",
+                SmtValueKind.Int);
+            return true;
         }
 
         private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)

@@ -1710,6 +1710,25 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_ObjectErasedArrayCastAliasUpperBound_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var values = new int[4];
+        object boxed = values;
+        var alias = (int[])boxed;
+        return alias[4];
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
         public async Task Ps0010_NegativeStringIndexGuard_ReportsIndexOutOfRangeException()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"

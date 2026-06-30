@@ -4426,6 +4426,17 @@ namespace PurelySharp.Analyzer.Engine
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula)));
             }
 
+            if (TryCreateReferenceBackedLengthFact(
+                    targetSymbol,
+                    valueExpression,
+                    currentState,
+                    valueState,
+                    semanticModel,
+                    out var referenceLengthFact))
+            {
+                nextState = nextState.WithPathConditions(nextState.PathConditions.Add(referenceLengthFact));
+            }
+
             if (TryCreateCollectionExpressionLengthLowerBoundFact(
                     targetSymbol,
                     valueExpression,
@@ -4448,6 +4459,17 @@ namespace PurelySharp.Analyzer.Engine
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, targetStringFormula, valueStringFormula)));
             }
 
+            if (TryCreateReferenceBackedStringContentFact(
+                    targetSymbol,
+                    valueExpression,
+                    currentState,
+                    valueState,
+                    semanticModel,
+                    out var referenceStringFact))
+            {
+                nextState = nextState.WithPathConditions(nextState.PathConditions.Add(referenceStringFact));
+            }
+
             if (TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReferenceFormula) &&
                 targetReferenceFormula is { Kind: SmtValueKind.Reference } &&
                 GetTrackedSymbolType(targetSymbol)?.SpecialType == SpecialType.System_String &&
@@ -4468,6 +4490,63 @@ namespace PurelySharp.Analyzer.Engine
             }
 
             return nextState;
+        }
+
+        private static bool TryCreateReferenceBackedLengthFact(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            PurityAnalysisState currentState,
+            PurityAnalysisState valueState,
+            SemanticModel semanticModel,
+            out SmtFormula fact)
+        {
+            fact = null!;
+            var valueType = semanticModel.GetTypeInfo(UnwrapSmtFactExpression(valueExpression), CancellationToken.None).Type;
+            if (valueType is not IArrayTypeSymbol { Rank: 1 } ||
+                !TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReference) ||
+                targetReference is not { Kind: SmtValueKind.Reference } ||
+                !TryCreateReferenceBuiltInLengthFormula(targetReference, out var targetLength) ||
+                !TryCreateBuiltInLengthValueFormula(
+                    valueExpression,
+                    semanticModel,
+                    CancellationToken.None,
+                    valueState.GetSmtSymbolVersion,
+                    out var valueLength))
+            {
+                return false;
+            }
+
+            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLength, valueLength);
+            return true;
+        }
+
+        private static bool TryCreateReferenceBackedStringContentFact(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            PurityAnalysisState currentState,
+            PurityAnalysisState valueState,
+            SemanticModel semanticModel,
+            out SmtFormula fact)
+        {
+            fact = null!;
+            var valueType = semanticModel.GetTypeInfo(UnwrapSmtFactExpression(valueExpression), CancellationToken.None).Type;
+            if (valueType?.SpecialType != SpecialType.System_String ||
+                !TryCreateSymbolSmtValue(targetSymbol, currentState, out var targetReference) ||
+                targetReference is not { Kind: SmtValueKind.Reference } ||
+                !TryCreateReferenceStringContentFormula(targetReference, out var targetString) ||
+                !CSharpConditionToFormula.TryTranslateStringValue(
+                    valueExpression,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var valueString,
+                    valueState.GetSmtSymbolVersion) ||
+                valueString == null)
+            {
+                return false;
+            }
+
+            fact = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetString, valueString);
+            return true;
         }
 
         private static ITypeSymbol? GetTrackedSymbolType(ISymbol symbol)
@@ -4578,12 +4657,43 @@ namespace PurelySharp.Analyzer.Engine
                 IsBuiltInSpanOrMemoryType(type))
             {
                 var receiverFormula = new SmtVariable(GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion), SmtValueKind.Reference);
-                formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
+                formula = new SmtVariable(GetReferenceFormulaName(receiverFormula) + ".Length", SmtValueKind.Int);
                 return true;
             }
 
             formula = null!;
             return false;
+        }
+
+        private static bool TryCreateReferenceBuiltInLengthFormula(SmtFormula receiverFormula, out SmtFormula formula)
+        {
+            if (receiverFormula.Kind != SmtValueKind.Reference)
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(GetReferenceFormulaName(receiverFormula) + ".Length", SmtValueKind.Int);
+            return true;
+        }
+
+        private static bool TryCreateReferenceStringContentFormula(SmtFormula receiverFormula, out SmtFormula formula)
+        {
+            if (receiverFormula.Kind != SmtValueKind.Reference)
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(GetReferenceFormulaName(receiverFormula) + ".String", SmtValueKind.String);
+            return true;
+        }
+
+        private static string GetReferenceFormulaName(SmtFormula receiverFormula)
+        {
+            return receiverFormula is SmtVariable variable
+                ? variable.Name
+                : receiverFormula.ToString() ?? string.Empty;
         }
 
         private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)

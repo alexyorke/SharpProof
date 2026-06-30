@@ -294,7 +294,8 @@ namespace PurelySharp.Analyzer.Engine
                 case SmtRegexMatchFormula regexMatch:
                     return new SmtRegexMatchFormula(
                         RewriteSmtSymbolVersions(regexMatch.Value, rewrites),
-                        regexMatch.Pattern);
+                        regexMatch.Pattern,
+                        regexMatch.Options);
                 case SmtConditionalFormula conditional:
                     return new SmtConditionalFormula(
                         RewriteSmtSymbolVersions(conditional.Condition, rewrites),

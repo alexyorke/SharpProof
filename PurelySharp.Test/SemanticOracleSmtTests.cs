@@ -5085,6 +5085,132 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleStringLiteralElementContent()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (text: ""abc"", other: 1);
+        if (pair.text != ""abc"")
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "TupleStringLiteralElementContent.cs",
+                FindLine(source, "return 0;"),
+                12,
+                "pair.text == \"abc\"",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleStringLiteralElementLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (text: ""abc"", other: 1);
+        return pair.text.Length;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "TupleStringLiteralElementLength.cs",
+                FindLine(source, "return pair.text.Length;"),
+                16,
+                "pair.text.Length == 3",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleArrayElementLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (values: new int[2], other: 1);
+        return pair.values.Length;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "TupleArrayElementLength.cs",
+                FindLine(source, "return pair.values.Length;"),
+                16,
+                "pair.values.Length == 2",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleMultidimensionalArrayElementGetLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (values: new int[2, 3], other: 1);
+        return pair.values.GetLength(1);
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "TupleMultidimensionalArrayElementGetLength.cs",
+                FindLine(source, "return pair.values.GetLength(1);"),
+                16,
+                "pair.values.GetLength(1) == 3",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesTupleDeconstructedArrayLength()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (new int[2], ""abc"");
+        var (values, text) = pair;
+        return values.Length + text.Length;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "TupleDeconstructedArrayLength.cs",
+                FindLine(source, "return values.Length + text.Length;"),
+                16,
+                "values.Length == 2 && text.Length == 3",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicInvariantService_CollectsIfElseThenExitFacts()
         {
             var facts = CollectProgramPointFacts(
@@ -6925,6 +7051,17 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_UnsupportedRegexOptionsConcreteMismatchUsesSelfVerification()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "Regex.IsMatch(text, \"^ab$\", RegexOptions.IgnoreCase) && text == \"CD\"",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_CultureInvariantWithUnsupportedRegexOptionsRemainConservative()
         {
             Assert.That(
@@ -6944,6 +7081,17 @@ public class TestClass
                     "new Regex(\"^ab$\", RegexOptions.IgnoreCase).IsMatch(text) && text == \"AB\"",
                     "using System.Text.RegularExpressions;"),
                 Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceUnsupportedRegexOptionsConcreteMismatchUsesSelfVerification()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "new Regex(\"^ab$\", RegexOptions.IgnoreCase).IsMatch(text) && text == \"CD\"",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
         }
 
         [Test]
@@ -8456,6 +8604,55 @@ public class TestClass
         var values = new int[length];
         var alias = values;
         if (alias.Length != length)
+        {
+            Console.WriteLine(alias.Length);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_ObjectErasedArrayCastAliasLengthContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(int length)
+    {
+        var values = new int[length];
+        object boxed = values;
+        var alias = (int[])boxed;
+        if (alias.Length != length)
+        {
+            Console.WriteLine(alias.Length);
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0002_ObjectErasedStringCastAliasLengthContradictoryGuardedImpureCall_DoesNotReport()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(@"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod()
+    {
+        object boxed = ""abcd"";
+        var alias = (string)boxed;
+        if (alias.Length != 4)
         {
             Console.WriteLine(alias.Length);
         }
@@ -11332,6 +11529,48 @@ public class TestClass
 }");
 
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_TupleArrayElementLengthIndex_ReportsIndexOutOfRange()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (values: new int[1], other: 0);
+        return pair.values[1];
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
+        public async Task Ps0010_TupleMultidimensionalArrayElementGetLengthIndex_ReportsIndexOutOfRange()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        var pair = (values: new int[2, 3], other: 0);
+        return pair.values[1, 3];
+    }
+}");
+
+            var diagnostic = AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
+                PurelySharpDiagnostics.ExceptionSummaryId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
         }
 
         [Test]
