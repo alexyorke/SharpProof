@@ -569,6 +569,42 @@ namespace PurelySharp.Analyzer
             return PathConditionsAreSatisfiable(pathConditions, smtAnalysis);
         }
 
+        internal static bool IsMethodCallCandidatePathReachable(
+            MethodCallCandidate candidate,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            var relevantSymbols = new HashSet<ISymbol>(
+                CollectLocalAndParameterSymbols(candidate.CallSite, semanticModel, cancellationToken),
+                SymbolEqualityComparer.Default);
+            if (candidate.UsingDisposeGuard?.ResourceExpression is { } resourceExpression)
+            {
+                foreach (var symbol in CollectLocalAndParameterSymbols(resourceExpression, semanticModel, cancellationToken))
+                {
+                    relevantSymbols.Add(symbol);
+                }
+            }
+
+            var pathConditions = CollectPathConditionsForUse(
+                candidate.CallSite,
+                relevantSymbols,
+                semanticModel,
+                cancellationToken);
+
+            if (candidate.UsingDisposeGuard?.ResourceExpression is { } disposeReceiver)
+            {
+                TryAddReferenceNullCondition(
+                    disposeReceiver,
+                    isNull: false,
+                    semanticModel,
+                    cancellationToken,
+                    pathConditions);
+            }
+
+            return PathConditionsAreSatisfiable(pathConditions, smtAnalysis);
+        }
+
         internal static List<SmtFormula> CollectExceptionSitePathConditions(
             SyntaxNode exceptionSite,
             SyntaxNode? relevantRoot,

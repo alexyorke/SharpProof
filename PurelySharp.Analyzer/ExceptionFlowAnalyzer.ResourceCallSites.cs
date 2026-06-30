@@ -15,17 +15,17 @@ namespace PurelySharp.Analyzer
         {
             foreach (var usingStatement in GetRelevantDescendants<UsingStatementSyntax>(methodNode))
             {
-                var resourceType = GetUsingStatementResourceType(usingStatement, semanticModel, cancellationToken);
-                if (resourceType == null)
+                foreach (var resource in GetUsingStatementResources(usingStatement, semanticModel, cancellationToken))
                 {
-                    continue;
-                }
-
-                foreach (var disposeMethod in GetDisposableMethods(
-                             resourceType,
-                             includeAsyncDispose: usingStatement.AwaitKeyword.RawKind != 0))
-                {
-                    yield return new MethodCallCandidate(usingStatement, disposeMethod);
+                    foreach (var disposeMethod in GetDisposableMethods(
+                                 resource.Type,
+                                 includeAsyncDispose: usingStatement.AwaitKeyword.RawKind != 0))
+                    {
+                        yield return new MethodCallCandidate(
+                            usingStatement,
+                            disposeMethod,
+                            CreateUsingDisposeGuard(resource.Expression, resource.Type));
+                    }
                 }
             }
 
@@ -44,25 +44,36 @@ namespace PurelySharp.Analyzer
                                  resourceType,
                                  includeAsyncDispose: usingDeclaration.AwaitKeyword.RawKind != 0))
                     {
-                        yield return new MethodCallCandidate(usingDeclaration, disposeMethod);
+                        yield return new MethodCallCandidate(
+                            usingDeclaration,
+                            disposeMethod,
+                            CreateUsingDisposeGuard(
+                                variable.Initializer?.Value,
+                                resourceType));
                     }
                 }
             }
         }
 
-        private static ITypeSymbol? GetUsingStatementResourceType(
+        private static IEnumerable<UsingResource> GetUsingStatementResources(
             UsingStatementSyntax usingStatement,
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken)
         {
             if (usingStatement.Expression != null)
             {
-                return semanticModel.GetTypeInfo(usingStatement.Expression, cancellationToken).ConvertedType;
+                var expressionType = semanticModel.GetTypeInfo(usingStatement.Expression, cancellationToken).ConvertedType;
+                if (expressionType != null)
+                {
+                    yield return new UsingResource(usingStatement.Expression, expressionType);
+                }
+
+                yield break;
             }
 
             if (usingStatement.Declaration == null)
             {
-                return null;
+                yield break;
             }
 
             foreach (var variable in usingStatement.Declaration.Variables)
@@ -70,11 +81,9 @@ namespace PurelySharp.Analyzer
                 var type = GetUsingDeclarationVariableType(variable, semanticModel, cancellationToken);
                 if (type != null)
                 {
-                    return type;
+                    yield return new UsingResource(variable.Initializer?.Value, type);
                 }
             }
-
-            return semanticModel.GetTypeInfo(usingStatement.Declaration.Type, cancellationToken).Type;
         }
 
         private static ITypeSymbol? GetUsingDeclarationVariableType(
@@ -90,6 +99,28 @@ namespace PurelySharp.Analyzer
             return variable.Initializer == null
                 ? null
                 : semanticModel.GetTypeInfo(variable.Initializer.Value, cancellationToken).ConvertedType;
+        }
+
+        private static UsingDisposeGuard? CreateUsingDisposeGuard(
+            ExpressionSyntax? resourceExpression,
+            ITypeSymbol resourceType)
+        {
+            return resourceExpression != null && IsReferenceType(resourceType)
+                ? new UsingDisposeGuard(resourceExpression)
+                : null;
+        }
+
+        private readonly struct UsingResource
+        {
+            public UsingResource(ExpressionSyntax? expression, ITypeSymbol type)
+            {
+                Expression = expression;
+                Type = type;
+            }
+
+            public ExpressionSyntax? Expression { get; }
+
+            public ITypeSymbol Type { get; }
         }
 
         private static IEnumerable<MethodCallCandidate> GetForEachRuntimeMethodNodes(

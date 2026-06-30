@@ -148,6 +148,202 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_UsingNullLiteralResource_DoesNotPropagateDispose()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public sealed class ThrowingResource : IDisposable
+{
+    public void Dispose()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        using ((ThrowingResource)null)
+        {
+        }
+    }
+}");
+
+            Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_UsingNullLocalResource_DoesNotPropagateDispose()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public sealed class ThrowingResource : IDisposable
+{
+    public void Dispose()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        ThrowingResource resource = null;
+        using (resource)
+        {
+        }
+    }
+}");
+
+            Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_UsingMaybeNullLocalResource_StillPropagatesDispose()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public sealed class ThrowingResource : IDisposable
+{
+    public void Dispose()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod(ThrowingResource resource)
+    {
+        using (resource)
+        {
+        }
+    }
+}", "TestMethod");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
+        public async Task Ps0010_UsingResourceAfterNullOnlyContinuation_DoesNotPropagateDispose()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public sealed class ThrowingResource : IDisposable
+{
+    public void Dispose()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod(ThrowingResource resource)
+    {
+        if (resource != null)
+        {
+            return;
+        }
+
+        using (resource)
+        {
+        }
+    }
+}");
+
+            Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_UsingResourceAfterNonNullGuard_StillPropagatesDispose()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public sealed class ThrowingResource : IDisposable
+{
+    public void Dispose()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod(ThrowingResource resource)
+    {
+        if (resource == null)
+        {
+            return;
+        }
+
+        using (resource)
+        {
+        }
+    }
+}", "TestMethod");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
+        public async Task Ps0010_UsingDeclarationNullResource_DoesNotPropagateDispose()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public sealed class ThrowingResource : IDisposable
+{
+    public void Dispose()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        using var resource = (ThrowingResource)null;
+    }
+}");
+
+            Assert.That(HasExceptionDiagnosticForMethod(diagnostics, "TestMethod"), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_UsingDeclarationMaybeNullResource_StillPropagatesDispose()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public sealed class ThrowingResource : IDisposable
+{
+    public void Dispose()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod(ThrowingResource maybe)
+    {
+        using var resource = maybe;
+    }
+}", "TestMethod");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
         public async Task Ps0011_UsingExistingLocalDispose_CheckedOnly_ReportsUsingSite()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
@@ -177,6 +373,39 @@ public class TestClass
                 d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId &&
                 d.GetMessage().Contains("using (resource)", StringComparison.Ordinal));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
+        public async Task Ps0011_UsingNullLocalDispose_CheckedOnly_DoesNotReportUsingSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public sealed class ThrowingResource : IDisposable
+{
+    public void Dispose()
+    {
+        throw new InvalidOperationException();
+    }
+}
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        ThrowingResource resource = null;
+        using (resource)
+        {
+        }
+    }
+}",
+                CheckedExceptionsOptions());
+
+            Assert.That(
+                diagnostics.Any(d =>
+                    d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId &&
+                    d.GetMessage().Contains("using (resource)", StringComparison.Ordinal)),
+                Is.False);
         }
 
         [Test]

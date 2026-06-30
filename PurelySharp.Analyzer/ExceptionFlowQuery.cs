@@ -122,7 +122,7 @@ namespace PurelySharp.Analyzer
 
             foreach (var calleeCallSite in ExceptionFlowAnalyzer.GetCalleeCallSites(methodNode, semanticModel, cancellationToken))
             {
-                if (IsInStaticallyUnreachableBranch(calleeCallSite.CallSite, semanticModel, cancellationToken, smtAnalysis))
+                if (!ExceptionFlowAnalyzer.IsMethodCallCandidatePathReachable(calleeCallSite, semanticModel, cancellationToken, smtAnalysis))
                 {
                     continue;
                 }

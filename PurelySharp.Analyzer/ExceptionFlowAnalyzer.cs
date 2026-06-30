@@ -269,7 +269,7 @@ namespace PurelySharp.Analyzer
 
             foreach (var usingDisposeNode in GetUsingDisposeNodes(methodNode, semanticModel, cancellationToken))
             {
-                if (seen.Add(CreateMethodCallSiteKey(usingDisposeNode.CallSite, usingDisposeNode.Method)))
+                if (seen.Add(CreateMethodCallSiteKey(usingDisposeNode)))
                 {
                     yield return usingDisposeNode;
                 }
@@ -315,6 +315,21 @@ namespace PurelySharp.Analyzer
                 callSite.Span.End.ToString(System.Globalization.CultureInfo.InvariantCulture) +
                 "|" +
                 method.OriginalDefinition.ToDisplayString();
+        }
+
+        private static string CreateMethodCallSiteKey(MethodCallCandidate candidate)
+        {
+            var key = CreateMethodCallSiteKey(candidate.CallSite, candidate.Method);
+            if (candidate.UsingDisposeGuard?.ResourceExpression is not { } resourceExpression)
+            {
+                return key;
+            }
+
+            return key +
+                "|using-resource:" +
+                resourceExpression.SpanStart.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                ":" +
+                resourceExpression.Span.End.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private static IEnumerable<IMethodSymbol> ResolveInvocationTargets(
@@ -549,15 +564,31 @@ namespace PurelySharp.Analyzer
 
         internal sealed class MethodCallCandidate
         {
-            public MethodCallCandidate(SyntaxNode callSite, IMethodSymbol method)
+            public MethodCallCandidate(
+                SyntaxNode callSite,
+                IMethodSymbol method,
+                UsingDisposeGuard? usingDisposeGuard = null)
             {
                 CallSite = callSite;
                 Method = method;
+                UsingDisposeGuard = usingDisposeGuard;
             }
 
             public SyntaxNode CallSite { get; }
 
             public IMethodSymbol Method { get; }
+
+            public UsingDisposeGuard? UsingDisposeGuard { get; }
+        }
+
+        internal sealed class UsingDisposeGuard
+        {
+            public UsingDisposeGuard(ExpressionSyntax resourceExpression)
+            {
+                ResourceExpression = resourceExpression;
+            }
+
+            public ExpressionSyntax ResourceExpression { get; }
         }
 
         private enum PathFactKind
