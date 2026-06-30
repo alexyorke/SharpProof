@@ -409,6 +409,16 @@ static void PrintPointResult(
 
     Console.WriteLine($"Node: {result.NodeKind}");
     Console.WriteLine($"Program point kind: {result.ProgramPointKind}");
+    if (result.RequestedPosition.HasValue)
+    {
+        Console.WriteLine(
+            "Requested location: " +
+            $"{result.FilePath}:{result.RequestedLine}:{result.RequestedColumn} " +
+            $"position={result.RequestedPosition} " +
+            $"distance={result.RequestedPositionDistance} " +
+            $"contained={result.ContainsRequestedPosition}");
+    }
+
     if (!string.IsNullOrWhiteSpace(result.MethodName))
     {
         Console.WriteLine($"Method: {result.MethodName}");

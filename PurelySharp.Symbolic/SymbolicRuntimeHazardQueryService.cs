@@ -681,6 +681,11 @@ namespace PurelySharp.Symbolic
                         yield return invocationDynamicCandidate;
                     }
 
+                    if (TryCreateSlicingArgumentOutOfRangeCandidate(invocation, semanticModel, cancellationToken, out var slicingCandidate))
+                    {
+                        yield return slicingCandidate;
+                    }
+
                     if (invocation.Expression is not MemberAccessExpressionSyntax &&
                         TryCreateNullDereferenceCandidate(invocation, invocation.Expression, semanticModel, cancellationToken, out var invocationNullCandidate))
                     {
@@ -1270,6 +1275,87 @@ namespace PurelySharp.Symbolic
                 kind,
                 new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
                 exceptionType,
+                category);
+            return true;
+        }
+
+        private static bool TryCreateSlicingArgumentOutOfRangeCandidate(
+            InvocationExpressionSyntax invocation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
+                !TryGetSlicingInvocationShape(
+                    invocationOperation,
+                    out var sourceExpression,
+                    out var startExpression,
+                    out var countExpression,
+                    out var oneArgumentUpperBoundIsInclusive,
+                    out var category) ||
+                !CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+                    sourceExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var sourceLength) ||
+                sourceLength is not { Kind: SmtValueKind.Int } ||
+                !CSharpConditionToFormula.TryTranslateValue(
+                    startExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var start,
+                    getSymbolVersion: null) ||
+                start is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            SmtFormula inRange;
+            var startNonNegative = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                start,
+                new SmtIntegerConstant(0));
+            if (countExpression == null)
+            {
+                var upperBound = new SmtBinaryFormula(
+                    oneArgumentUpperBoundIsInclusive
+                        ? SmtBinaryOperator.LessThanOrEqual
+                        : SmtBinaryOperator.LessThan,
+                    start,
+                    sourceLength);
+                inRange = Conjoin(startNonNegative, upperBound);
+            }
+            else
+            {
+                if (!CSharpConditionToFormula.TryTranslateValue(
+                        countExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out var count,
+                        getSymbolVersion: null) ||
+                    count is not { Kind: SmtValueKind.Int })
+                {
+                    return false;
+                }
+
+                var countNonNegative = new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThanOrEqual,
+                    count,
+                    new SmtIntegerConstant(0));
+                var end = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, start, count);
+                var endWithinLength = new SmtBinaryFormula(
+                    SmtBinaryOperator.LessThanOrEqual,
+                    end,
+                    sourceLength);
+                inRange = Conjoin(startNonNegative, Conjoin(countNonNegative, endWithinLength));
+            }
+
+            candidate = new RuntimeHazardCandidate(
+                invocation,
+                SymbolicRuntimeHazardKind.ArgumentOutOfRange,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, inRange),
+                "System.ArgumentOutOfRangeException",
                 category);
             return true;
         }
@@ -2282,6 +2368,132 @@ namespace PurelySharp.Symbolic
             return false;
         }
 
+        private static bool TryGetSlicingInvocationShape(
+            IInvocationOperation invocationOperation,
+            out ExpressionSyntax sourceExpression,
+            out ExpressionSyntax startExpression,
+            out ExpressionSyntax? countExpression,
+            out bool oneArgumentUpperBoundIsInclusive,
+            out string category)
+        {
+            sourceExpression = null!;
+            startExpression = null!;
+            countExpression = null;
+            oneArgumentUpperBoundIsInclusive = true;
+            category = string.Empty;
+
+            var method = invocationOperation.TargetMethod;
+            if (method.IsStatic ||
+                invocationOperation.Instance?.Syntax is not ExpressionSyntax instanceExpression ||
+                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var firstArgument))
+            {
+                return false;
+            }
+
+            if (IsStringSubstringInvocation(method))
+            {
+                sourceExpression = instanceExpression;
+                startExpression = firstArgument;
+                oneArgumentUpperBoundIsInclusive = true;
+                category = "definite_string_substring_out_of_range";
+                return TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression);
+            }
+
+            if (IsStringRemoveInvocation(method))
+            {
+                sourceExpression = instanceExpression;
+                startExpression = firstArgument;
+                category = "definite_string_remove_out_of_range";
+                if (!TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression))
+                {
+                    return false;
+                }
+
+                oneArgumentUpperBoundIsInclusive = countExpression != null;
+                return true;
+            }
+
+            if (IsBuiltInSpanOrMemorySliceInvocation(method))
+            {
+                sourceExpression = instanceExpression;
+                startExpression = firstArgument;
+                oneArgumentUpperBoundIsInclusive = true;
+                category = "definite_slice_out_of_range";
+                return TryGetOptionalSecondIntArgument(invocationOperation, method, out countExpression);
+            }
+
+            return false;
+        }
+
+        private static bool TryGetOptionalSecondIntArgument(
+            IInvocationOperation invocationOperation,
+            IMethodSymbol method,
+            out ExpressionSyntax? secondArgument)
+        {
+            secondArgument = null;
+            if (method.Parameters.Length == 1)
+            {
+                return invocationOperation.Arguments.Length == 1 &&
+                    method.Parameters[0].Type.SpecialType == SpecialType.System_Int32;
+            }
+
+            if (method.Parameters.Length != 2 ||
+                invocationOperation.Arguments.Length != 2 ||
+                method.Parameters[0].Type.SpecialType != SpecialType.System_Int32 ||
+                method.Parameters[1].Type.SpecialType != SpecialType.System_Int32)
+            {
+                return false;
+            }
+
+            return TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 1, out secondArgument);
+        }
+
+        private static bool TryGetInvocationArgumentExpression(
+            IInvocationOperation invocationOperation,
+            int parameterIndex,
+            out ExpressionSyntax expression)
+        {
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (argument.Parameter?.Ordinal == parameterIndex &&
+                    argument.Value.Syntax is ExpressionSyntax argumentExpression)
+                {
+                    expression = argumentExpression;
+                    return true;
+                }
+            }
+
+            expression = null!;
+            return false;
+        }
+
+        private static bool IsStringSubstringInvocation(IMethodSymbol method)
+        {
+            return method.Name == "Substring" &&
+                method.ContainingType?.SpecialType == SpecialType.System_String &&
+                method.ReturnType.SpecialType == SpecialType.System_String &&
+                (method.Parameters.Length == 1 || method.Parameters.Length == 2) &&
+                method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32);
+        }
+
+        private static bool IsStringRemoveInvocation(IMethodSymbol method)
+        {
+            return method.Name == "Remove" &&
+                method.ContainingType?.SpecialType == SpecialType.System_String &&
+                method.ReturnType.SpecialType == SpecialType.System_String &&
+                (method.Parameters.Length == 1 || method.Parameters.Length == 2) &&
+                method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32);
+        }
+
+        private static bool IsBuiltInSpanOrMemorySliceInvocation(IMethodSymbol method)
+        {
+            return method.Name == "Slice" &&
+                (method.Parameters.Length == 1 || method.Parameters.Length == 2) &&
+                method.Parameters.All(static parameter => parameter.Type.SpecialType == SpecialType.System_Int32) &&
+                IsBuiltInSpanOrMemoryType(method.ContainingType) &&
+                IsBuiltInSpanOrMemoryType(method.ReturnType);
+        }
+
         private static bool IsCountBackedIntIndexerElementAccess(
             ElementAccessExpressionSyntax elementAccess,
             SemanticModel semanticModel,
@@ -2411,6 +2623,18 @@ namespace PurelySharp.Symbolic
         {
             return typeSymbol is INamedTypeSymbol namedType &&
                 namedType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>";
+        }
+
+        private static bool IsBuiltInMemoryType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.ToDisplayString() is "System.Memory<T>" or "System.ReadOnlyMemory<T>";
+        }
+
+        private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
+        {
+            return IsBuiltInSpanType(typeSymbol) ||
+                IsBuiltInMemoryType(typeSymbol);
         }
 
         private static bool IsSystemRangeType(ITypeSymbol? typeSymbol)

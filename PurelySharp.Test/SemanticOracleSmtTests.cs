@@ -6891,6 +6891,45 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_NullableGetValueOrDefaultAbsentContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int? maybe", "!maybe.HasValue && maybe.GetValueOrDefault() != 0"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NullableGetValueOrDefaultPresentContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int? maybe", "maybe.HasValue && maybe.GetValueOrDefault() != maybe.Value"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NullableGetValueOrDefaultFallbackContradiction_IsAlwaysFalse()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse("int? maybe", "!maybe.HasValue && maybe.GetValueOrDefault(7) != 7"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_NullableGetValueOrDefaultUnknownFallback_RemainsUnknown()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "int? maybe",
+                    "!maybe.HasValue && maybe.GetValueOrDefault(UnknownFallback.Next()) != 7",
+                    @"
+public static class UnknownFallback
+{
+    public static int Next() => 7;
+}"),
+                Is.False);
+        }
+
+        [Test]
         public void ExecutionVisibility_UnguardedVariableDivision_RemainsUnknown()
         {
             Assert.That(

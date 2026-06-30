@@ -576,6 +576,373 @@ public class TestClass
         }
 
         [Test]
+        public void ProgramPointFacts_NotNullWhenTrueBranchProvesArgumentNonNull()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static bool IsPresent([NotNullWhen(true)] string? value)
+    {
+        return value is not null;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        if (Guard.IsPresent(value))
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return value.Length;");
+            var proof = ProveAtMarker(source, marker, "value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_NotNullWhenFalseNegatedBranchProvesArgumentNonNull()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static bool IsMissing([NotNullWhen(false)] string? value)
+    {
+        return value is null;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        if (!Guard.IsMissing(value))
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return value.Length;");
+            var proof = ProveAtMarker(source, marker, "value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_NotNullWhenBoolComparisonBranchProvesArgumentNonNull()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static bool IsMissing([NotNullWhen(false)] string? value)
+    {
+        return value is null;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        if (Guard.IsMissing(value) == false)
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return value.Length;");
+            var proof = ProveAtMarker(source, marker, "value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_NotNullWhenMemberArgumentRemainsConservative()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public interface IGuard
+{
+    bool IsPresent([NotNullWhen(true)] string? value);
+}
+
+public sealed class Box
+{
+    public string? Value;
+}
+
+public class TestClass
+{
+    public int TestMethod(IGuard guard, Box box)
+    {
+        if (guard.IsPresent(box.Value))
+        {
+            return box.Value.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return box.Value.Length;");
+            var proof = ProveAtMarker(source, marker, "box.Value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_NotNullWhenOutArgumentProvesAssignedLocalNonNull()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static bool TryRead([NotNullWhen(true)] out string? value)
+    {
+        value = null;
+        return true;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        string? value;
+        if (Guard.TryRead(out value))
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return value.Length;");
+            var proof = ProveAtMarker(source, marker, "value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_NotNullWhenOutVarArgumentProvesDeclaredLocalNonNull()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static bool TryRead([NotNullWhen(true)] out string? value)
+    {
+        value = null;
+        return true;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod()
+    {
+        if (Guard.TryRead(out var value))
+        {
+            return value.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return value.Length;");
+            var proof = ProveAtMarker(source, marker, "value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_NotNullWhenBranchFactDoesNotSurviveArgumentReassignment()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static bool IsPresent([NotNullWhen(true)] string? value)
+    {
+        return value is not null;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        if (Guard.IsPresent(value))
+        {
+            value = null;
+            return value.Length;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return value.Length;");
+            var proof = ProveAtMarker(source, marker, "value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_DoesNotReturnIfTrueNormalCompletionProvesFalseCondition()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static void ThrowIf([DoesNotReturnIf(true)] bool condition)
+    {
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        Guard.ThrowIf(value is null);
+        return value.Length;
+    }
+}";
+
+            var marker = FindMarker(source, "return value.Length;");
+            var proof = ProveAtMarker(source, marker, "value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_DoesNotReturnIfFalseNormalCompletionProvesTrueCondition()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static void Require([DoesNotReturnIf(false)] bool condition)
+    {
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        Guard.Require(value is not null);
+        return value.Length;
+    }
+}";
+
+            var marker = FindMarker(source, "return value.Length;");
+            var proof = ProveAtMarker(source, marker, "value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_DoesNotReturnIfFactDoesNotSurviveArgumentReassignment()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    public static void ThrowIf([DoesNotReturnIf(true)] bool condition)
+    {
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        Guard.ThrowIf(value is null);
+        value = null;
+        return value.Length;
+    }
+}";
+
+            var marker = FindMarker(source, "return value.Length;");
+            var proof = ProveAtMarker(source, marker, "value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenFalse), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_DoesNotReturnCallInTrueBranchProvesFalseCondition()
+        {
+            const string source = @"
+#nullable enable
+using System.Diagnostics.CodeAnalysis;
+
+public static class Guard
+{
+    [DoesNotReturn]
+    public static void Fail()
+    {
+        throw new System.Exception();
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(string? value)
+    {
+        if (value is null)
+        {
+            Guard.Fail();
+        }
+
+        return value.Length;
+    }
+}";
+
+            var marker = FindMarker(source, "return value.Length;");
+            var proof = ProveAtMarker(source, marker, "value != null");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
         public void ProgramPointFacts_MultidimensionalArrayCreationAssignsDimensionLengths()
         {
             const string source = @"

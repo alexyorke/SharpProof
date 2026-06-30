@@ -819,6 +819,7 @@ namespace PurelySharp.Symbolic
                 .ThenBy(candidate => Math.Abs(position - candidate.SpanStart))
                 .ThenBy(candidate => candidate.SpanStart)
                 .First();
+            var requestedPositionDistance = GetProgramPointDistance(node, position);
             var query = AnalyzeProgramPointNode(
                 semanticModel,
                 node.SpanStart,
@@ -856,7 +857,12 @@ namespace PurelySharp.Symbolic
                 nodeSourceSpan.EndLine,
                 nodeSourceSpan.EndColumn,
                 GetContainingMethodName(query.Node),
-                GetProgramPointKind(query.Node));
+                GetProgramPointKind(query.Node),
+                line,
+                column,
+                position,
+                requestedPositionDistance,
+                ContainsProgramPointPosition(node, position));
         }
 
         public SymbolicSpanQueryResult QuerySyntaxTreeSpan(
@@ -1505,15 +1511,21 @@ namespace PurelySharp.Symbolic
 
         private static int GetProgramPointDistance(SyntaxNode candidate, int targetPosition)
         {
-            var span = candidate.Span;
-            if (targetPosition >= span.Start && targetPosition <= span.End)
+            if (ContainsProgramPointPosition(candidate, targetPosition))
             {
                 return 0;
             }
 
+            var span = candidate.Span;
             return targetPosition < span.Start
                 ? span.Start - targetPosition
                 : targetPosition - span.End;
+        }
+
+        private static bool ContainsProgramPointPosition(SyntaxNode candidate, int targetPosition)
+        {
+            var span = candidate.Span;
+            return targetPosition >= span.Start && targetPosition <= span.End;
         }
 
         private static bool IsUsefulLineExpressionProgramPoint(ExpressionSyntax expression)
@@ -2635,13 +2647,23 @@ namespace PurelySharp.Symbolic
             IReadOnlyList<SymbolicCompactLineResult> lines,
             IReadOnlyList<SymbolicCompactProgramPointResult> programPoints,
             SymbolicCompactSmtDiagnostics smtDiagnostics,
-            SymbolicCompactOutputTruncation truncation)
+            SymbolicCompactOutputTruncation truncation,
+            int? requestedLine = null,
+            int? requestedColumn = null,
+            int? requestedPosition = null,
+            int? requestedPositionDistance = null,
+            bool? containsRequestedPosition = null)
         {
             Kind = kind ?? throw new ArgumentNullException(nameof(kind));
             FilePath = filePath ?? string.Empty;
             Line = line;
             Column = column;
             Position = position;
+            RequestedLine = requestedLine;
+            RequestedColumn = requestedColumn;
+            RequestedPosition = requestedPosition;
+            RequestedPositionDistance = requestedPositionDistance;
+            ContainsRequestedPosition = containsRequestedPosition;
             NodeKind = nodeKind;
             MethodName = methodName;
             ProgramPointKind = programPointKind;
@@ -2689,6 +2711,16 @@ namespace PurelySharp.Symbolic
         public int? Column { get; }
 
         public int? Position { get; }
+
+        public int? RequestedLine { get; }
+
+        public int? RequestedColumn { get; }
+
+        public int? RequestedPosition { get; }
+
+        public int? RequestedPositionDistance { get; }
+
+        public bool? ContainsRequestedPosition { get; }
 
         public string? NodeKind { get; }
 
@@ -2833,7 +2865,12 @@ namespace PurelySharp.Symbolic
                         ? new SymbolicCompactOutputTruncation(false, false, false, false, false)
                         : programPoint.Truncation,
                     SymbolicCompactOutputTruncation.FromInvariant(observedInvariant),
-                    SymbolicCompactOutputTruncation.FromInvariant(conservativeInvariant)));
+                    SymbolicCompactOutputTruncation.FromInvariant(conservativeInvariant)),
+                result.RequestedLine,
+                result.RequestedColumn,
+                result.RequestedPosition,
+                result.RequestedPositionDistance,
+                result.ContainsRequestedPosition);
         }
 
         public static SymbolicCompactQueryResult FromLine(
@@ -3171,12 +3208,22 @@ namespace PurelySharp.Symbolic
             IReadOnlyList<SymbolicConditionProofResult> conditionProofs,
             SymbolicProofOutcomeSummary proofOutcomes,
             SymbolicCompactSmtDiagnostics smtDiagnostics,
-            SymbolicCompactOutputTruncation truncation)
+            SymbolicCompactOutputTruncation truncation,
+            int? requestedLine = null,
+            int? requestedColumn = null,
+            int? requestedPosition = null,
+            int? requestedPositionDistance = null,
+            bool? containsRequestedPosition = null)
         {
             FilePath = filePath ?? string.Empty;
             Line = line;
             Column = column;
             Position = position;
+            RequestedLine = requestedLine;
+            RequestedColumn = requestedColumn;
+            RequestedPosition = requestedPosition;
+            RequestedPositionDistance = requestedPositionDistance;
+            ContainsRequestedPosition = containsRequestedPosition;
             NodeSpanStart = nodeSpanStart;
             NodeSpanEnd = nodeSpanEnd;
             NodeSpanLength = nodeSpanLength;
@@ -3210,6 +3257,16 @@ namespace PurelySharp.Symbolic
         public int Column { get; }
 
         public int Position { get; }
+
+        public int? RequestedLine { get; }
+
+        public int? RequestedColumn { get; }
+
+        public int? RequestedPosition { get; }
+
+        public int? RequestedPositionDistance { get; }
+
+        public bool? ContainsRequestedPosition { get; }
 
         public int NodeSpanStart { get; }
 
@@ -3311,7 +3368,12 @@ namespace PurelySharp.Symbolic
                 conditionProofs,
                 result.ProofOutcomes,
                 SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
-                truncation);
+                truncation,
+                result.RequestedLine,
+                result.RequestedColumn,
+                result.RequestedPosition,
+                result.RequestedPositionDistance,
+                result.ContainsRequestedPosition);
         }
     }
 
@@ -5399,12 +5461,22 @@ namespace PurelySharp.Symbolic
             int? nodeEndLine = null,
             int? nodeEndColumn = null,
             string? methodName = null,
-            string? programPointKind = null)
+            string? programPointKind = null,
+            int? requestedLine = null,
+            int? requestedColumn = null,
+            int? requestedPosition = null,
+            int? requestedPositionDistance = null,
+            bool? containsRequestedPosition = null)
         {
             FilePath = filePath;
             Line = line;
             Column = column;
             Position = position;
+            RequestedLine = requestedLine;
+            RequestedColumn = requestedColumn;
+            RequestedPosition = requestedPosition;
+            RequestedPositionDistance = requestedPositionDistance;
+            ContainsRequestedPosition = containsRequestedPosition;
             NodeSpanStart = nodeSpanStart;
             NodeSpanEnd = nodeSpanEnd ?? nodeSpanStart;
             NodeSpanLength = Math.Max(0, NodeSpanEnd - NodeSpanStart);
@@ -5441,6 +5513,16 @@ namespace PurelySharp.Symbolic
         public int Column { get; }
 
         public int Position { get; }
+
+        public int? RequestedLine { get; }
+
+        public int? RequestedColumn { get; }
+
+        public int? RequestedPosition { get; }
+
+        public int? RequestedPositionDistance { get; }
+
+        public bool? ContainsRequestedPosition { get; }
 
         public int NodeSpanStart { get; }
 

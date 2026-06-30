@@ -18,7 +18,9 @@ namespace PurelySharp.Symbolic
         private const int MaxMergedSwitchFacts = 32;
         private const int MaxFiniteForeachElementFacts = 8;
         private const int MaxStructuralNullStateDepth = 4;
-
+        private const string DoesNotReturnAttributeName = "System.Diagnostics.CodeAnalysis.DoesNotReturnAttribute";
+        private const string DoesNotReturnIfAttributeName = "System.Diagnostics.CodeAnalysis.DoesNotReturnIfAttribute";
+        private const string NotNullAttributeName = "System.Diagnostics.CodeAnalysis.NotNullAttribute";
         public static List<SmtFormula> CollectPriorAssignmentFacts(
             SyntaxNode site,
             SemanticModel semanticModel,
@@ -1872,6 +1874,7 @@ namespace PurelySharp.Symbolic
             }
 
             AddTopLevelNotNullParameterNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
+            AddTopLevelDoesNotReturnIfNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
             AddTopLevelArrayCreationNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
             AddTopLevelDereferenceNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
         }
@@ -1917,7 +1920,87 @@ namespace PurelySharp.Symbolic
             return parameter.GetAttributes().Any(attribute =>
                 string.Equals(
                     GetFullMetadataName(attribute.AttributeClass),
-                    "System.Diagnostics.CodeAnalysis.NotNullAttribute",
+                    NotNullAttributeName,
+                    StringComparison.Ordinal));
+        }
+
+        private static void AddTopLevelDoesNotReturnIfNormalCompletionFacts(
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            expression = UnwrapAwaitedNormalCompletionExpression(expression);
+            if (expression is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation)
+            {
+                return;
+            }
+
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (argument.ArgumentKind != ArgumentKind.Explicit ||
+                    argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
+                    !TryGetDoesNotReturnIfValue(parameter, out var doesNotReturnWhen) ||
+                    argument.Syntax is not ArgumentSyntax argumentSyntax ||
+                    !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None) ||
+                    AnyConditionSymbolInvalidatedInStatement(argumentSyntax.Expression, statement, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                AddBranchConditionFacts(
+                    argumentSyntax.Expression,
+                    branchWhenTrue: !doesNotReturnWhen,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
+        }
+
+        private static bool TryGetDoesNotReturnIfValue(IParameterSymbol parameter, out bool value)
+        {
+            return TryGetDoesNotReturnIfValueFromSymbol(parameter, out value) ||
+                (!SymbolEqualityComparer.Default.Equals(parameter, parameter.OriginalDefinition) &&
+                 TryGetDoesNotReturnIfValueFromSymbol(parameter.OriginalDefinition, out value));
+        }
+
+        private static bool TryGetDoesNotReturnIfValueFromSymbol(IParameterSymbol parameter, out bool value)
+        {
+            foreach (var attribute in parameter.GetAttributes())
+            {
+                if (!string.Equals(
+                        GetFullMetadataName(attribute.AttributeClass),
+                        DoesNotReturnIfAttributeName,
+                        StringComparison.Ordinal) ||
+                    attribute.ConstructorArguments.Length != 1 ||
+                    attribute.ConstructorArguments[0].Value is not bool attributeValue)
+                {
+                    continue;
+                }
+
+                value = attributeValue;
+                return true;
+            }
+
+            value = false;
+            return false;
+        }
+
+        private static bool MethodHasDoesNotReturnAttribute(IMethodSymbol method)
+        {
+            return SymbolHasDoesNotReturnAttribute(method) ||
+                (!SymbolEqualityComparer.Default.Equals(method, method.OriginalDefinition) &&
+                 SymbolHasDoesNotReturnAttribute(method.OriginalDefinition));
+        }
+
+        private static bool SymbolHasDoesNotReturnAttribute(IMethodSymbol method)
+        {
+            return method.GetAttributes().Any(attribute =>
+                string.Equals(
+                    GetFullMetadataName(attribute.AttributeClass),
+                    DoesNotReturnAttributeName,
                     StringComparison.Ordinal));
         }
 
@@ -2141,7 +2224,7 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             ICollection<SmtFormula> facts)
         {
-            if (StatementDefinitelyExits(ifStatement.Statement) &&
+            if (StatementDefinitelyExits(ifStatement.Statement, semanticModel, cancellationToken) &&
                 (ifStatement.Else?.Statement == null ||
                  !AnyConditionSymbolInvalidatedInStatement(ifStatement.Condition, ifStatement.Else.Statement, semanticModel, cancellationToken)))
             {
@@ -2154,7 +2237,7 @@ namespace PurelySharp.Symbolic
             }
 
             if (ifStatement.Else?.Statement is { } elseStatement &&
-                StatementDefinitelyExits(elseStatement) &&
+                StatementDefinitelyExits(elseStatement, semanticModel, cancellationToken) &&
                 !AnyConditionSymbolInvalidatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken))
             {
                 AddBranchConditionFacts(
@@ -2177,9 +2260,9 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             ICollection<SmtFormula> facts)
         {
-            var trueBranchExits = StatementDefinitelyExits(ifStatement.Statement);
+            var trueBranchExits = StatementDefinitelyExits(ifStatement.Statement, semanticModel, cancellationToken);
             var falseBranch = ifStatement.Else?.Statement;
-            var falseBranchExits = falseBranch != null && StatementDefinitelyExits(falseBranch);
+            var falseBranchExits = falseBranch != null && StatementDefinitelyExits(falseBranch, semanticModel, cancellationToken);
 
             if (trueBranchExits &&
                 falseBranch is { } survivingFalseBranch &&
@@ -2271,7 +2354,7 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> facts)
         {
             if (ifStatement.Else != null ||
-                StatementDefinitelyExits(ifStatement.Statement))
+                StatementDefinitelyExits(ifStatement.Statement, semanticModel, cancellationToken))
             {
                 return;
             }
@@ -2311,8 +2394,8 @@ namespace PurelySharp.Symbolic
             ICollection<SmtFormula> facts)
         {
             if (ifStatement.Else?.Statement is not { } elseStatement ||
-                StatementDefinitelyExits(ifStatement.Statement) ||
-                StatementDefinitelyExits(elseStatement))
+                StatementDefinitelyExits(ifStatement.Statement, semanticModel, cancellationToken) ||
+                StatementDefinitelyExits(elseStatement, semanticModel, cancellationToken))
             {
                 return;
             }
@@ -2642,7 +2725,7 @@ namespace PurelySharp.Symbolic
 
             foreach (var section in switchStatement.Sections)
             {
-                if (!SectionDefinitelyExitsFromSwitch(section, switchStatement) ||
+                if (!SectionDefinitelyExitsFromSwitch(section, switchStatement, semanticModel, cancellationToken) ||
                     !SwitchPathConditionBuilder.TryCreateSwitchStatementSectionCondition(
                         switchStatement.Expression,
                         section,
@@ -2672,7 +2755,7 @@ namespace PurelySharp.Symbolic
 
             foreach (var section in switchStatement.Sections)
             {
-                if (SectionDefinitelyExitsFromSwitch(section, switchStatement))
+                if (SectionDefinitelyExitsFromSwitch(section, switchStatement, semanticModel, cancellationToken))
                 {
                     continue;
                 }
@@ -2926,15 +3009,19 @@ namespace PurelySharp.Symbolic
 
         private static bool SectionDefinitelyExitsFromSwitch(
             SwitchSectionSyntax section,
-            SwitchStatementSyntax switchStatement)
+            SwitchStatementSyntax switchStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             return section.Statements.Count > 0 &&
-                StatementDefinitelyExitsFromSwitch(section.Statements[section.Statements.Count - 1], switchStatement);
+                StatementDefinitelyExitsFromSwitch(section.Statements[section.Statements.Count - 1], switchStatement, semanticModel, cancellationToken);
         }
 
         private static bool StatementDefinitelyExitsFromSwitch(
             StatementSyntax statement,
-            SwitchStatementSyntax switchStatement)
+            SwitchStatementSyntax switchStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             statement = UnwrapSingleStatementBlock(statement);
             return statement switch
@@ -2943,10 +3030,11 @@ namespace PurelySharp.Symbolic
                 ThrowStatementSyntax => true,
                 BreakStatementSyntax breakStatement => !BreakTargetsSwitch(breakStatement, switchStatement),
                 ContinueStatementSyntax => true,
-                BlockSyntax block when block.Statements.Count > 0 => StatementDefinitelyExitsFromSwitch(block.Statements[block.Statements.Count - 1], switchStatement),
+                ExpressionStatementSyntax expressionStatement => ExpressionStatementDefinitelyExits(expressionStatement, semanticModel, cancellationToken),
+                BlockSyntax block when block.Statements.Count > 0 => StatementDefinitelyExitsFromSwitch(block.Statements[block.Statements.Count - 1], switchStatement, semanticModel, cancellationToken),
                 IfStatementSyntax ifStatement when ifStatement.Else != null =>
-                    StatementDefinitelyExitsFromSwitch(ifStatement.Statement, switchStatement) &&
-                    StatementDefinitelyExitsFromSwitch(ifStatement.Else.Statement, switchStatement),
+                    StatementDefinitelyExitsFromSwitch(ifStatement.Statement, switchStatement, semanticModel, cancellationToken) &&
+                    StatementDefinitelyExitsFromSwitch(ifStatement.Else.Statement, switchStatement, semanticModel, cancellationToken),
                 _ => false
             };
         }
@@ -4283,7 +4371,10 @@ namespace PurelySharp.Symbolic
                 new SmtNullConstant()));
         }
 
-        private static bool StatementDefinitelyExits(StatementSyntax statement)
+        private static bool StatementDefinitelyExits(
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
         {
             statement = UnwrapSingleStatementBlock(statement);
             return statement switch
@@ -4292,12 +4383,24 @@ namespace PurelySharp.Symbolic
                 ThrowStatementSyntax => true,
                 BreakStatementSyntax => true,
                 ContinueStatementSyntax => true,
-                BlockSyntax block when block.Statements.Count > 0 => StatementDefinitelyExits(block.Statements[block.Statements.Count - 1]),
+                ExpressionStatementSyntax expressionStatement => ExpressionStatementDefinitelyExits(expressionStatement, semanticModel, cancellationToken),
+                BlockSyntax block when block.Statements.Count > 0 => StatementDefinitelyExits(block.Statements[block.Statements.Count - 1], semanticModel, cancellationToken),
                 IfStatementSyntax ifStatement when ifStatement.Else != null =>
-                    StatementDefinitelyExits(ifStatement.Statement) &&
-                    StatementDefinitelyExits(ifStatement.Else.Statement),
+                    StatementDefinitelyExits(ifStatement.Statement, semanticModel, cancellationToken) &&
+                    StatementDefinitelyExits(ifStatement.Else.Statement, semanticModel, cancellationToken),
                 _ => false
             };
+        }
+
+        private static bool ExpressionStatementDefinitelyExits(
+            ExpressionStatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var expression = UnwrapExpression(statement.Expression);
+            return expression is InvocationExpressionSyntax invocation &&
+                semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation invocationOperation &&
+                MethodHasDoesNotReturnAttribute(invocationOperation.TargetMethod);
         }
 
         private static StatementSyntax UnwrapSingleStatementBlock(StatementSyntax statement)

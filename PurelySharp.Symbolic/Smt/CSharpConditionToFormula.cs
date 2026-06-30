@@ -4396,6 +4396,7 @@ namespace PurelySharp.Symbolic.Smt
 
             AddNullComparisonOperandImplications(expression, branchWhenTrue, semanticModel, cancellationToken, formulas, getSymbolVersion);
             AddConditionalAccessStringEqualityBranchFacts(expression, branchWhenTrue, semanticModel, cancellationToken, formulas, getSymbolVersion);
+            AddNotNullWhenBranchFacts(expression, branchWhenTrue, semanticModel, cancellationToken, formulas, getSymbolVersion);
             if (TryAddInlineAssignmentBranchFacts(expression, branchWhenTrue, semanticModel, cancellationToken, formulas, getSymbolVersion))
             {
                 return;
@@ -4410,6 +4411,240 @@ namespace PurelySharp.Symbolic.Smt
             formulas.Add(branchWhenTrue
                 ? formula
                 : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
+        }
+
+        private static void AddNotNullWhenBranchFacts(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is BinaryExpressionSyntax binaryExpression)
+            {
+                if ((binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
+                     binaryExpression.IsKind(SyntaxKind.NotEqualsExpression)) &&
+                    TryGetBoolLiteral(binaryExpression.Left, out var leftValue))
+                {
+                    AddNotNullWhenBranchFacts(
+                        binaryExpression.Right,
+                        GetComparedBranchValue(leftValue, binaryExpression, branchWhenTrue),
+                        semanticModel,
+                        cancellationToken,
+                        formulas,
+                        getSymbolVersion);
+                    return;
+                }
+
+                if ((binaryExpression.IsKind(SyntaxKind.EqualsExpression) ||
+                     binaryExpression.IsKind(SyntaxKind.NotEqualsExpression)) &&
+                    TryGetBoolLiteral(binaryExpression.Right, out var rightValue))
+                {
+                    AddNotNullWhenBranchFacts(
+                        binaryExpression.Left,
+                        GetComparedBranchValue(rightValue, binaryExpression, branchWhenTrue),
+                        semanticModel,
+                        cancellationToken,
+                        formulas,
+                        getSymbolVersion);
+                    return;
+                }
+            }
+
+            if (expression is InvocationExpressionSyntax invocation)
+            {
+                AddNotNullWhenInvocationBranchFacts(
+                    invocation,
+                    branchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion);
+            }
+        }
+
+        private static bool TryGetBoolLiteral(ExpressionSyntax expression, out bool value)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression.IsKind(SyntaxKind.TrueLiteralExpression))
+            {
+                value = true;
+                return true;
+            }
+
+            if (expression.IsKind(SyntaxKind.FalseLiteralExpression))
+            {
+                value = false;
+                return true;
+            }
+
+            value = false;
+            return false;
+        }
+
+        private static bool GetComparedBranchValue(
+            bool literalValue,
+            BinaryExpressionSyntax comparison,
+            bool branchWhenTrue)
+        {
+            return comparison.IsKind(SyntaxKind.EqualsExpression)
+                ? literalValue == branchWhenTrue
+                : literalValue != branchWhenTrue;
+        }
+
+        private static void AddNotNullWhenInvocationBranchFacts(
+            InvocationExpressionSyntax invocation,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod.ReturnType.SpecialType != SpecialType.System_Boolean)
+            {
+                return;
+            }
+
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (argument.ArgumentKind != ArgumentKind.Explicit ||
+                    argument.Parameter is not { IsParams: false } parameter ||
+                    !IsSupportedNotNullWhenArgument(parameter, argument.Syntax as ArgumentSyntax) ||
+                    !TryGetNotNullWhenValue(parameter, out var notNullWhenValue) ||
+                    notNullWhenValue != branchWhenTrue ||
+                    argument.Syntax is not ArgumentSyntax argumentSyntax ||
+                    !TryCreateNotNullWhenArgumentFormula(
+                        argumentSyntax.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        getSymbolVersion,
+                        out var argumentFormula))
+                {
+                    continue;
+                }
+
+                formulas.Add(CreateNonNullFormula(argumentFormula));
+            }
+        }
+
+        private static bool IsSupportedNotNullWhenArgument(
+            IParameterSymbol parameter,
+            ArgumentSyntax? argument)
+        {
+            if (argument == null)
+            {
+                return false;
+            }
+
+            return parameter.RefKind switch
+            {
+                RefKind.None => argument.RefKindKeyword.IsKind(SyntaxKind.None),
+                RefKind.Out => argument.RefKindKeyword.IsKind(SyntaxKind.OutKeyword),
+                _ => false,
+            };
+        }
+
+        private static bool TryGetNotNullWhenValue(IParameterSymbol parameter, out bool value)
+        {
+            if (TryGetSymbolNotNullWhenValue(parameter, out value))
+            {
+                return true;
+            }
+
+            if (!SymbolEqualityComparer.Default.Equals(parameter, parameter.OriginalDefinition) &&
+                TryGetSymbolNotNullWhenValue(parameter.OriginalDefinition, out value))
+            {
+                return true;
+            }
+
+            value = false;
+            return false;
+        }
+
+        private static bool TryGetSymbolNotNullWhenValue(IParameterSymbol parameter, out bool value)
+        {
+            foreach (var attribute in parameter.GetAttributes())
+            {
+                if (!string.Equals(
+                        GetFullMetadataName(attribute.AttributeClass),
+                        "System.Diagnostics.CodeAnalysis.NotNullWhenAttribute",
+                        StringComparison.Ordinal) ||
+                    attribute.ConstructorArguments.Length != 1 ||
+                    attribute.ConstructorArguments[0].Value is not bool attributeValue)
+                {
+                    continue;
+                }
+
+                value = attributeValue;
+                return true;
+            }
+
+            value = false;
+            return false;
+        }
+
+        private static string? GetFullMetadataName(INamedTypeSymbol? type)
+        {
+            if (type == null)
+            {
+                return null;
+            }
+
+            var namespaceName = type.ContainingNamespace?.IsGlobalNamespace == false
+                ? type.ContainingNamespace.ToDisplayString()
+                : string.Empty;
+            return string.IsNullOrEmpty(namespaceName)
+                ? type.MetadataName
+                : namespaceName + "." + type.MetadataName;
+        }
+
+        private static bool TryCreateNotNullWhenArgumentFormula(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            Func<ISymbol, int>? getSymbolVersion,
+            out SmtFormula formula)
+        {
+            if (TryGetLocalOrParameterArgumentSymbol(expression, semanticModel, cancellationToken, out var symbol) &&
+                TryCreateSymbolFormula(symbol, getSymbolVersion, out formula) &&
+                formula.Kind == SmtValueKind.Reference)
+            {
+                return true;
+            }
+
+            formula = null!;
+            return false;
+        }
+
+        private static bool TryGetLocalOrParameterArgumentSymbol(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ISymbol symbol)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is DeclarationExpressionSyntax
+                {
+                    Designation: SingleVariableDesignationSyntax singleVariableDesignation
+                } &&
+                semanticModel.GetDeclaredSymbol(singleVariableDesignation, cancellationToken) is ILocalSymbol declaredLocal)
+            {
+                symbol = declaredLocal.OriginalDefinition;
+                return true;
+            }
+
+            var candidate = semanticModel.GetSymbolInfo(expression, cancellationToken).Symbol?.OriginalDefinition;
+            if (candidate is ILocalSymbol or IParameterSymbol)
+            {
+                symbol = candidate;
+                return true;
+            }
+
+            symbol = null!;
+            return false;
         }
 
         private static bool TryAddInlineAssignmentBranchFacts(
@@ -6922,11 +7157,30 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             var receiverTypeInfo = semanticModel.GetTypeInfo(receiverExpression, cancellationToken);
+            var receiverType = receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type;
             if ((receiverTypeInfo.Type is IArrayTypeSymbol { Rank: 1 } ||
                  receiverTypeInfo.ConvertedType is IArrayTypeSymbol { Rank: 1 }) &&
                 TryCreateArrayLengthFormula(receiverExpression, semanticModel, cancellationToken, out lengthFormula, getSymbolVersion, inlineDepth))
             {
                 return true;
+            }
+
+            if (receiverType is IArrayTypeSymbol { Rank: 1 } &&
+                TryCreateBuiltInLengthReceiverFormula(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var arrayLengthReceiverFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+                if (TryCreateMemberFormula(arrayLengthReceiverFormula, "Length", intType, out var arrayLength) &&
+                    arrayLength is { Kind: SmtValueKind.Int })
+                {
+                    lengthFormula = arrayLength;
+                    return true;
+                }
             }
 
             if (TryGetKnownStringLength(receiverExpression, semanticModel, cancellationToken, out var knownStringLength))
@@ -6943,7 +7197,7 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
-            if (IsBuiltInSpanOrMemoryType(receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type) &&
+            if (IsBuiltInSpanOrMemoryType(receiverType) &&
                 TryCreateBuiltInLengthReceiverFormula(
                     receiverExpression,
                     semanticModel,
@@ -6961,7 +7215,7 @@ namespace PurelySharp.Symbolic.Smt
                 }
             }
 
-            if (HasCountBackedIntIndexer(receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type) &&
+            if (HasCountBackedIntIndexer(receiverType) &&
                 TryCreateBuiltInLengthReceiverFormula(
                     receiverExpression,
                     semanticModel,
@@ -9738,6 +9992,18 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (expression is InvocationExpressionSyntax nullableGetValueOrDefaultInvocation &&
+                TryTranslateNullableGetValueOrDefaultValue(
+                    nullableGetValueOrDefaultInvocation,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             if (expression is BinaryExpressionSyntax coalesceExpression &&
                 coalesceExpression.IsKind(SyntaxKind.CoalesceExpression) &&
                 TryTranslateValue(coalesceExpression.Left, semanticModel, cancellationToken, out var coalesceLeft, getSymbolVersion, inlineDepth) &&
@@ -10952,6 +11218,73 @@ namespace PurelySharp.Symbolic.Smt
                 nullableValueFormula,
                 fallbackFormula,
                 fallbackFormula.Kind);
+            return true;
+        }
+
+        private static bool TryTranslateNullableGetValueOrDefaultValue(
+            InvocationExpressionSyntax invocationExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationExpression.Expression is not MemberAccessExpressionSyntax memberAccess ||
+                invocationOperation.TargetMethod.Name != "GetValueOrDefault" ||
+                invocationOperation.TargetMethod.IsStatic ||
+                invocationOperation.TargetMethod.ContainingType is not INamedTypeSymbol containingType ||
+                containingType.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T ||
+                containingType.TypeArguments.Length != 1 ||
+                !IsIntegralOrEnumType(containingType.TypeArguments[0]) ||
+                !TryTranslateNullableValueParts(
+                    memberAccess.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var hasValueFormula,
+                    out var nullableValueFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                nullableValueFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            SmtFormula? fallbackFormula;
+            if (invocationOperation.TargetMethod.Parameters.Length == 0)
+            {
+                if (!TryCreateDefaultValueFormula(containingType.TypeArguments[0], out fallbackFormula) ||
+                    fallbackFormula is not { Kind: SmtValueKind.Int })
+                {
+                    return false;
+                }
+            }
+            else if (invocationOperation.TargetMethod.Parameters.Length == 1)
+            {
+                if (!TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var fallbackExpression) ||
+                    !TryTranslateValue(
+                        fallbackExpression,
+                        semanticModel,
+                        cancellationToken,
+                        out fallbackFormula,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    fallbackFormula is not { Kind: SmtValueKind.Int })
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                return false;
+            }
+
+            formula = new SmtConditionalFormula(
+                hasValueFormula,
+                nullableValueFormula,
+                fallbackFormula,
+                SmtValueKind.Int);
             return true;
         }
 

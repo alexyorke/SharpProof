@@ -31,6 +31,10 @@ param(
     [ValidateRange(0, 1048576)]
     [int]$MemoryLimitMb = 0,
 
+    [Parameter()]
+    [ValidateRange(0, 86400)]
+    [int]$TimeoutSeconds = 0,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$DotnetTestArgs
 )
@@ -105,7 +109,76 @@ function Write-SlowestTestsFromTrx
     Write-Host $slowestFixtures
 }
 
+function Get-PurelySharpTestWorkerProcesses
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot
+    )
+
+    $processes = Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe' OR Name = 'testhost.exe' OR Name = 'vstest.console.exe'" -ErrorAction SilentlyContinue
+    foreach ($process in $processes)
+    {
+        $commandLine = [string]$process.CommandLine
+        if ($process.Name -eq 'testhost.exe' -or
+            $commandLine.IndexOf($RepoRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            $commandLine.IndexOf('PurelySharp.Test', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            $commandLine.IndexOf('MSBuild.dll', [StringComparison]::OrdinalIgnoreCase) -ge 0 -or
+            $commandLine.IndexOf('VBCSCompiler.dll', [StringComparison]::OrdinalIgnoreCase) -ge 0)
+        {
+            $process
+        }
+    }
+}
+
+function Stop-NewPurelySharpTestWorkerProcesses
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [int[]]$InitialProcessIds,
+
+        [Parameter(Mandatory = $true)]
+        [datetime]$StartedAfter,
+
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot
+    )
+
+    $initialProcessIdSet = [System.Collections.Generic.HashSet[int]]::new()
+    foreach ($processId in $InitialProcessIds)
+    {
+        [void]$initialProcessIdSet.Add($processId)
+    }
+
+    $stoppedCount = 0
+    foreach ($process in Get-PurelySharpTestWorkerProcesses -RepoRoot $RepoRoot)
+    {
+        $processId = [int]$process.ProcessId
+        if ($initialProcessIdSet.Contains($processId))
+        {
+            continue
+        }
+
+        $creationDate = [System.Management.ManagementDateTimeConverter]::ToDateTime($process.CreationDate)
+        if ($creationDate -lt $StartedAfter.AddSeconds(-2))
+        {
+            continue
+        }
+
+        Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+        $stoppedCount++
+    }
+
+    if ($stoppedCount -gt 0)
+    {
+        Write-Host "Stopped $stoppedCount orphaned test worker process(es)."
+    }
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$testRunStartedAt = Get-Date
+$initialTestWorkerIds = @(Get-PurelySharpTestWorkerProcesses -RepoRoot $repoRoot | ForEach-Object { [int]$_.ProcessId })
 $settingsPath = ''
 $useGeneratedRunSettings = $Workers -gt 0 -or $FailFast
 if ($useGeneratedRunSettings)
@@ -214,7 +287,7 @@ foreach ($argument in $DotnetTestArgs)
 Push-Location $repoRoot
 try
 {
-    & (Join-Path $PSScriptRoot 'Invoke-PurelySharpDotnet.ps1') -MemoryLimitMb $MemoryLimitMb @testArgs
+    & (Join-Path $PSScriptRoot 'Invoke-PurelySharpDotnet.ps1') -MemoryLimitMb $MemoryLimitMb -TimeoutSeconds $TimeoutSeconds @testArgs
     $exitCode = $LASTEXITCODE
 
     if ($Profile)
@@ -236,6 +309,11 @@ try
 }
 finally
 {
+    Stop-NewPurelySharpTestWorkerProcesses `
+        -InitialProcessIds $initialTestWorkerIds `
+        -StartedAfter $testRunStartedAt `
+        -RepoRoot $repoRoot
+
     Pop-Location
     if (-not [string]::IsNullOrWhiteSpace($settingsPath))
     {

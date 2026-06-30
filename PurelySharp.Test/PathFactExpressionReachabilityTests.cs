@@ -188,5 +188,38 @@ public sealed class Worker
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task DoesNotReturnIfGuard_ImpossibleConditionalArmWithImpureCall_NoDiagnostic()
+        {
+            var test = @"
+using System.Diagnostics.CodeAnalysis;
+using PurelySharp.Attributes;
+
+public static class Guard
+{
+    [Pure]
+    public static void ThrowIf([DoesNotReturnIf(true)] bool condition)
+    {
+    }
+}
+
+public class TestClass
+{
+    [EnforcePure]
+    public int TestMethod(int value)
+    {
+        Guard.ThrowIf(value <= 0);
+
+        return value > 0 ? value : Impure();
+    }
+
+    [Impure]
+    private static int Impure() => 1;
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
     }
 }

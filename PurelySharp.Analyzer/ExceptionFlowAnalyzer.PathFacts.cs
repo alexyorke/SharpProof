@@ -13,6 +13,9 @@ namespace PurelySharp.Analyzer
 {
     internal static partial class ExceptionFlowAnalyzer
     {
+        private const string DoesNotReturnIfAttributeName = "System.Diagnostics.CodeAnalysis.DoesNotReturnIfAttribute";
+        private const string NotNullAttributeName = "System.Diagnostics.CodeAnalysis.NotNullAttribute";
+
         private static bool IsKnownByDominatingIf(
             ExpressionSyntax expression,
             SyntaxNode useNode,
@@ -922,6 +925,12 @@ namespace PurelySharp.Analyzer
                         semanticModel,
                         cancellationToken,
                         facts);
+                    AddDoesNotReturnIfNormalCompletionFacts(
+                        declarator.Initializer.Value,
+                        localDeclaration,
+                        semanticModel,
+                        cancellationToken,
+                        facts);
                     AddArrayCreationNormalCompletionFacts(
                         declarator.Initializer.Value,
                         localDeclaration,
@@ -987,6 +996,12 @@ namespace PurelySharp.Analyzer
                     semanticModel,
                     cancellationToken,
                     facts);
+                AddDoesNotReturnIfNormalCompletionFacts(
+                    assignment.Right,
+                    expressionStatement,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
                 return;
             }
 
@@ -1024,6 +1039,12 @@ namespace PurelySharp.Analyzer
             else if (statement is ExpressionStatementSyntax completedExpressionStatement)
             {
                 AddNotNullParameterNormalCompletionFacts(
+                    completedExpressionStatement.Expression,
+                    completedExpressionStatement,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+                AddDoesNotReturnIfNormalCompletionFacts(
                     completedExpressionStatement.Expression,
                     completedExpressionStatement,
                     semanticModel,
@@ -1088,8 +1109,72 @@ namespace PurelySharp.Analyzer
             return parameter.GetAttributes().Any(attribute =>
                 string.Equals(
                     GetFullMetadataName(attribute.AttributeClass),
-                    "System.Diagnostics.CodeAnalysis.NotNullAttribute",
+                    NotNullAttributeName,
                     System.StringComparison.Ordinal));
+        }
+
+        private static void AddDoesNotReturnIfNormalCompletionFacts(
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            expression = UnwrapAwaitedFactExpression(expression);
+            if (expression is not InvocationExpressionSyntax invocation ||
+                semanticModel.GetOperation(invocation, cancellationToken) is not IInvocationOperation invocationOperation)
+            {
+                return;
+            }
+
+            foreach (var argument in invocationOperation.Arguments)
+            {
+                if (argument.ArgumentKind != ArgumentKind.Explicit ||
+                    argument.Parameter is not { RefKind: RefKind.None, IsParams: false } parameter ||
+                    !TryGetDoesNotReturnIfValue(parameter, out var doesNotReturnWhen) ||
+                    argument.Syntax is not ArgumentSyntax argumentSyntax ||
+                    !argumentSyntax.RefKindKeyword.IsKind(SyntaxKind.None) ||
+                    AnyConditionSymbolMutatedInStatement(argumentSyntax.Expression, statement, semanticModel, cancellationToken))
+                {
+                    continue;
+                }
+
+                TryAddPathCondition(
+                    argumentSyntax.Expression,
+                    branchWhenTrue: !doesNotReturnWhen,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
+        }
+
+        private static bool TryGetDoesNotReturnIfValue(IParameterSymbol parameter, out bool value)
+        {
+            return TryGetDoesNotReturnIfValueFromSymbol(parameter, out value) ||
+                (!SymbolEqualityComparer.Default.Equals(parameter, parameter.OriginalDefinition) &&
+                 TryGetDoesNotReturnIfValueFromSymbol(parameter.OriginalDefinition, out value));
+        }
+
+        private static bool TryGetDoesNotReturnIfValueFromSymbol(IParameterSymbol parameter, out bool value)
+        {
+            foreach (var attribute in parameter.GetAttributes())
+            {
+                if (!string.Equals(
+                        GetFullMetadataName(attribute.AttributeClass),
+                        DoesNotReturnIfAttributeName,
+                        System.StringComparison.Ordinal) ||
+                    attribute.ConstructorArguments.Length != 1 ||
+                    attribute.ConstructorArguments[0].Value is not bool attributeValue)
+                {
+                    continue;
+                }
+
+                value = attributeValue;
+                return true;
+            }
+
+            value = false;
+            return false;
         }
 
         private static string? GetFullMetadataName(INamedTypeSymbol? type)

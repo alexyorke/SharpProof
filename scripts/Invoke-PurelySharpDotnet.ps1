@@ -4,6 +4,10 @@ param(
     [ValidateRange(0, 1048576)]
     [int]$MemoryLimitMb = 0,
 
+    [Parameter()]
+    [ValidateRange(0, 86400)]
+    [int]$TimeoutSeconds = 0,
+
     [Parameter(Mandatory = $true, Position = 0, ValueFromRemainingArguments = $true)]
     [string[]]$DotnetArgs
 )
@@ -17,6 +21,7 @@ $exitCode = Invoke-ProcessUnderJobObject `
     -FilePath 'dotnet' `
     -ArgumentList $DotnetArgs `
     -MemoryLimitMb $MemoryLimitMb `
+    -TimeoutSeconds $TimeoutSeconds `
     -WorkingDirectory (Get-Location).Path
 
 exit $exitCode

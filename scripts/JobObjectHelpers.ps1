@@ -79,6 +79,10 @@ namespace PurelySharp
 
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool TerminateJobObject(IntPtr hJob, uint uExitCode);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool CloseHandle(IntPtr hObject);
     }
 }
@@ -119,6 +123,9 @@ function Invoke-ProcessUnderJobObject {
         [ValidateRange(0, 1048576)]
         [int]$MemoryLimitMb = 0,
 
+        [ValidateRange(0, 86400)]
+        [int]$TimeoutSeconds = 0,
+
         [string]$WorkingDirectory = (Get-Location).Path
     )
 
@@ -140,6 +147,7 @@ function Invoke-ProcessUnderJobObject {
     $limitInfoSize = [uint32][Runtime.InteropServices.Marshal]::SizeOf([type][PurelySharp.JobObjectNative+JOBOBJECT_EXTENDED_LIMIT_INFORMATION])
     $limitInfoBuffer = [Runtime.InteropServices.Marshal]::AllocHGlobal([int]$limitInfoSize)
 
+    $process = $null
     try {
         [Runtime.InteropServices.Marshal]::StructureToPtr($limitInfo, $limitInfoBuffer, $false)
         if (-not [PurelySharp.JobObjectNative]::SetInformationJobObject(
@@ -169,11 +177,27 @@ function Invoke-ProcessUnderJobObject {
             }
         }
 
-        $process.WaitForExit()
+        if ($TimeoutSeconds -gt 0) {
+            $timeoutMilliseconds = $TimeoutSeconds * 1000
+            if (-not $process.WaitForExit($timeoutMilliseconds)) {
+                [void][PurelySharp.JobObjectNative]::TerminateJobObject($jobHandle, 124)
+                $process.WaitForExit()
+                $global:LASTEXITCODE = 124
+                return 124
+            }
+        }
+        else {
+            $process.WaitForExit()
+        }
+
         $global:LASTEXITCODE = $process.ExitCode
         return $process.ExitCode
     }
     finally {
+        if ($null -ne $process -and -not $process.HasExited) {
+            [void][PurelySharp.JobObjectNative]::TerminateJobObject($jobHandle, 124)
+        }
+
         [Runtime.InteropServices.Marshal]::FreeHGlobal($limitInfoBuffer)
         [void][PurelySharp.JobObjectNative]::CloseHandle($jobHandle)
     }

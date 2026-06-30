@@ -176,6 +176,102 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySyntaxTreeLinePoint_ExposesRequestedLocationForExactExpressionHit()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value + 1;
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "LinePointRequestedLocation.cs");
+            var compilation = CSharpCompilation.Create(
+                "LinePointRequestedLocation",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var line = FindLine(source, "return value + 1;");
+            var column = FindColumn(source, "value + 1");
+            var requestedPosition = syntaxTree.GetText().Lines[line - 1].Start + column - 1;
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLinePoint(
+                syntaxTree,
+                compilation,
+                line,
+                column,
+                includeExpressionProgramPoints: true);
+
+            Assert.That(result.NodeKind, Is.EqualTo("AddExpression"));
+            Assert.That(result.RequestedLine, Is.EqualTo(line));
+            Assert.That(result.RequestedColumn, Is.EqualTo(column));
+            Assert.That(result.RequestedPosition, Is.EqualTo(requestedPosition));
+            Assert.That(result.RequestedPositionDistance, Is.EqualTo(0));
+            Assert.That(result.ContainsRequestedPosition, Is.True);
+
+            var compact = result.ToCompactResult();
+            Assert.That(compact.RequestedLine, Is.EqualTo(line));
+            Assert.That(compact.RequestedColumn, Is.EqualTo(column));
+            Assert.That(compact.RequestedPosition, Is.EqualTo(requestedPosition));
+            Assert.That(compact.RequestedPositionDistance, Is.EqualTo(0));
+            Assert.That(compact.ContainsRequestedPosition, Is.True);
+            var compactPoint = compact.ProgramPoints.Single();
+            Assert.That(compactPoint.RequestedLine, Is.EqualTo(line));
+            Assert.That(compactPoint.RequestedColumn, Is.EqualTo(column));
+            Assert.That(compactPoint.RequestedPosition, Is.EqualTo(requestedPosition));
+            Assert.That(compactPoint.RequestedPositionDistance, Is.EqualTo(0));
+            Assert.That(compactPoint.ContainsRequestedPosition, Is.True);
+        }
+
+        [Test]
+        public void QuerySyntaxTreeLinePoint_ExposesNearestFallbackWhenColumnMissesProgramPoint()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        return value;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "LinePointNearestFallback.cs");
+            var compilation = CSharpCompilation.Create(
+                "LinePointNearestFallback",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var line = FindLine(source, "return value;");
+            var column = 1;
+            var requestedPosition = syntaxTree.GetText().Lines[line - 1].Start;
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLinePoint(
+                syntaxTree,
+                compilation,
+                line,
+                column);
+
+            Assert.That(result.NodeKind, Is.EqualTo("ReturnStatement"));
+            Assert.That(result.RequestedLine, Is.EqualTo(line));
+            Assert.That(result.RequestedColumn, Is.EqualTo(column));
+            Assert.That(result.RequestedPosition, Is.EqualTo(requestedPosition));
+            Assert.That(result.RequestedPositionDistance, Is.EqualTo(result.NodeSpanStart - requestedPosition));
+            Assert.That(result.RequestedPositionDistance, Is.GreaterThan(0));
+            Assert.That(result.ContainsRequestedPosition, Is.False);
+        }
+
+        [Test]
         public void QuerySyntaxTreeLine_PostLineInvariants_ProvesCurrentAssignmentCompletionFact()
         {
             const string source = @"
