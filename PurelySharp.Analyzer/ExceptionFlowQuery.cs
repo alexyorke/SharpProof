@@ -6,8 +6,6 @@ using System.Text.Json;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Operations;
-using PurelySharp.Analyzer.Engine;
-using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Purity;
 using SearchLib.Smt;
@@ -630,7 +628,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            return ExecutionVisibility.IsInStaticallyUnreachableBranchUsingSmt(node, semanticModel, cancellationToken, smtAnalysis);
+            return !ExceptionFlowAnalyzer.IsExceptionPathReachable(node, semanticModel, cancellationToken, smtAnalysis);
         }
 
         private static bool CatchesException(
@@ -687,7 +685,11 @@ namespace PurelySharp.Analyzer
                 return booleanValue;
             }
 
-            var pathConditions = CollectExceptionSitePathConditions(exceptionSite, semanticModel, cancellationToken);
+            var pathConditions = ExceptionFlowAnalyzer.CollectExceptionSitePathConditions(
+                exceptionSite,
+                filterExpression,
+                semanticModel,
+                cancellationToken);
             CSharpConditionToFormula.TryCollectDomainFacts(filterExpression, semanticModel, cancellationToken, pathConditions);
             if (!PathConditionsAreSatisfiable(pathConditions, smtAnalysis))
             {
@@ -709,16 +711,6 @@ namespace PurelySharp.Analyzer
                     cancellationToken,
                     falseBranchConditions) &&
                 !PathConditionsAreSatisfiable(falseBranchConditions, smtAnalysis);
-        }
-
-        private static List<SmtFormula> CollectExceptionSitePathConditions(
-            SyntaxNode exceptionSite,
-            SemanticModel semanticModel,
-            System.Threading.CancellationToken cancellationToken)
-        {
-            var pathConditions = SymbolicProgramPointFacts.CollectPriorAssignmentFacts(exceptionSite, semanticModel, cancellationToken);
-            pathConditions.AddRange(SymbolicProgramPointFacts.CollectAncestorReachabilityConditions(exceptionSite, semanticModel, cancellationToken));
-            return pathConditions;
         }
 
         private static bool PathConditionsAreSatisfiable(

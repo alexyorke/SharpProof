@@ -536,7 +536,7 @@ namespace PurelySharp.Analyzer
             }
         }
 
-        private static bool IsExceptionPathReachable(
+        internal static bool IsExceptionPathReachable(
             SyntaxNode useNode,
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken,
@@ -549,6 +549,30 @@ namespace PurelySharp.Analyzer
                 cancellationToken);
 
             return PathConditionsAreSatisfiable(pathConditions, smtAnalysis);
+        }
+
+        internal static List<SmtFormula> CollectExceptionSitePathConditions(
+            SyntaxNode exceptionSite,
+            SyntaxNode? relevantRoot,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var relevantSymbols = new HashSet<ISymbol>(
+                CollectLocalAndParameterSymbols(exceptionSite, semanticModel, cancellationToken),
+                SymbolEqualityComparer.Default);
+            if (relevantRoot != null && !ReferenceEquals(relevantRoot, exceptionSite))
+            {
+                foreach (var symbol in CollectLocalAndParameterSymbols(relevantRoot, semanticModel, cancellationToken))
+                {
+                    relevantSymbols.Add(symbol);
+                }
+            }
+
+            return CollectPathConditionsForUse(
+                exceptionSite,
+                relevantSymbols,
+                semanticModel,
+                cancellationToken);
         }
 
         private static IEnumerable<(BlockSyntax Block, StatementSyntax ContainingStatement)> EnumerateContainingBlocks(SyntaxNode useNode)

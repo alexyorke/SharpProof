@@ -85,9 +85,12 @@ namespace PurelySharp.Test
         [Test]
         public void Classify_DuplicateAndTruePathConditions_AreNormalizedBeforeBudgetAndCache()
         {
-            var x = new SmtVariable("x", SmtValueKind.Int);
-            var xIsZero = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, new SmtIntegerConstant(0));
-            var fact = new SmtBinaryFormula(SmtBinaryOperator.LessThanOrEqual, x, new SmtIntegerConstant(0));
+            var text = new SmtVariable("normalized_" + Guid.NewGuid().ToString("N"), SmtValueKind.String);
+            var textIsA = new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("A"));
+            var fact = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                new SmtStringLengthTerm(text),
+                new SmtIntegerConstant(1));
             var service = new SmtAnalysisService(new SmtAnalysisOptions(
                 SmtAnalysisMode.Bounded,
                 TimeSpan.FromMilliseconds(250),
@@ -96,9 +99,9 @@ namespace PurelySharp.Test
                 maxExpressionNodes: 32));
 
             var first = service.ClassifyImplication(
-                new SmtFormula[] { xIsZero, new SmtBooleanConstant(true), xIsZero },
+                new SmtFormula[] { textIsA, new SmtBooleanConstant(true), textIsA },
                 fact);
-            var second = service.ClassifyImplication(new[] { xIsZero }, fact);
+            var second = service.ClassifyImplication(new[] { textIsA }, fact);
 
             Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
             Assert.That(second.Outcome, Is.EqualTo(first.Outcome));
@@ -110,18 +113,19 @@ namespace PurelySharp.Test
         public void Classify_EquivalentPathConditionOrder_UsesSameCacheEntry()
         {
             var x = new SmtVariable("ordered_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var y = new SmtVariable("ordered_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
             var xAtLeastZero = new SmtBinaryFormula(
                 SmtBinaryOperator.GreaterThanOrEqual,
                 x,
                 new SmtIntegerConstant(0));
-            var xLessThanTen = new SmtBinaryFormula(
-                SmtBinaryOperator.LessThan,
-                x,
-                new SmtIntegerConstant(10));
+            var yAtLeastZero = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                y,
+                new SmtIntegerConstant(0));
             var fact = new SmtBinaryFormula(
-                SmtBinaryOperator.LessThan,
-                x,
-                new SmtIntegerConstant(11));
+                SmtBinaryOperator.GreaterThanOrEqual,
+                new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Add, x, y),
+                new SmtIntegerConstant(0));
             var service = new SmtAnalysisService(new SmtAnalysisOptions(
                 SmtAnalysisMode.Bounded,
                 TimeSpan.FromMilliseconds(250),
@@ -129,8 +133,8 @@ namespace PurelySharp.Test
                 maxPathConditions: 4,
                 maxExpressionNodes: 64));
 
-            var first = service.ClassifyImplication(new[] { xAtLeastZero, xLessThanTen }, fact);
-            var second = service.ClassifyImplication(new[] { xLessThanTen, xAtLeastZero }, fact);
+            var first = service.ClassifyImplication(new[] { xAtLeastZero, yAtLeastZero }, fact);
+            var second = service.ClassifyImplication(new[] { yAtLeastZero, xAtLeastZero }, fact);
 
             Assert.That(first.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
             Assert.That(second.Outcome, Is.EqualTo(first.Outcome));
@@ -232,6 +236,30 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void ClassifyImplication_IntegerIntervalEntailment_BypassesSolver()
+        {
+            var x = new SmtVariable("interval_entailment_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var xAtMostNine = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThanOrEqual,
+                x,
+                new SmtIntegerConstant(9));
+            var xLessThanTen = new SmtBinaryFormula(
+                SmtBinaryOperator.LessThan,
+                x,
+                new SmtIntegerConstant(10));
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = service.ClassifyImplication(new[] { xAtMostNine }, xLessThanTen);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unknown));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("branch_unreachable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
         public void Classify_DivideByZeroContradictedByGuard_BypassesSolver()
         {
             var divisor = new SmtVariable("divisor", SmtValueKind.Int);
@@ -247,6 +275,32 @@ namespace PurelySharp.Test
 
             var result = service.Classify(new PurityProofQuery(
                 new[] { divisorIsNotZero },
+                new PurityHazard(PurityHazardKind.DivideByZero, divisorIsZero)));
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unknown));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("divide_by_zero_unreachable"));
+            Assert.That(service.ExecutedQueryCount, Is.EqualTo(0));
+            Assert.That(service.CacheEntryCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void Classify_DivideByZeroContradictedByPositiveInterval_BypassesSolver()
+        {
+            var divisor = new SmtVariable("positive_divisor_" + Guid.NewGuid().ToString("N"), SmtValueKind.Int);
+            var divisorIsPositive = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThan,
+                divisor,
+                new SmtIntegerConstant(0));
+            var divisorIsZero = new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                divisor,
+                new SmtIntegerConstant(0));
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = service.Classify(new PurityProofQuery(
+                new[] { divisorIsPositive },
                 new PurityHazard(PurityHazardKind.DivideByZero, divisorIsZero)));
 
             Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
@@ -405,7 +459,7 @@ namespace PurelySharp.Test
             var result = service.ClassifyImplication(pathConditions, fact);
 
             Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
-            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Satisfiable));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unknown));
             Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
             Assert.That(service.PathConditionsImply(pathConditions, fact), Is.True);
         }

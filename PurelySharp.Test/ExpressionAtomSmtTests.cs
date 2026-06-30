@@ -60,6 +60,62 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesConditionalAccessStringEqualityFacts()
+        {
+            const string source = @"
+public sealed class Holder
+{
+    public string Text;
+}
+
+public class TestClass
+{
+    public int TestMethod(Holder holder)
+    {
+        if (holder?.Text == ""ABC"")
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "holder != null && holder.Text == \"ABC\"");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesConditionalAccessStringCoalesceLengthFacts()
+        {
+            const string source = @"
+public sealed class Holder
+{
+    public string Text;
+}
+
+public class TestClass
+{
+    public int TestMethod(Holder holder, string fallback)
+    {
+        if ((holder?.Text ?? fallback) == ""OK"")
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "(holder?.Text ?? fallback).Length == 2");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesTupleEqualityElementRelation()
         {
             const string source = @"

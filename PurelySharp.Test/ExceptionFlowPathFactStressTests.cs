@@ -1972,6 +1972,118 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_NestedCatchFilterTrueFromOuterCatchFilter_SuppressesException()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        try
+        {
+            if (divisor == 0)
+            {
+                throw new ApplicationException();
+            }
+
+            return 1;
+        }
+        catch (ApplicationException) when (divisor == 0)
+        {
+            try
+            {
+                throw new InvalidOperationException();
+            }
+            catch (InvalidOperationException) when (divisor == 0)
+            {
+                return 0;
+            }
+        }
+
+        return 2;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_NestedCatchFilterFactReassignedBeforeThrow_RemainsConservativeReports()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        try
+        {
+            if (divisor == 0)
+            {
+                throw new ApplicationException();
+            }
+
+            return 1;
+        }
+        catch (ApplicationException) when (divisor == 0)
+        {
+            divisor = 1;
+            try
+            {
+                throw new InvalidOperationException();
+            }
+            catch (InvalidOperationException) when (divisor == 0)
+            {
+                return 0;
+            }
+        }
+
+        return 2;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.InvalidOperationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
+        public async Task Ps0010_FilteredCatchContradictoryGuardedThrow_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        try
+        {
+            if (divisor == 0)
+            {
+                throw new ApplicationException();
+            }
+
+            return 1;
+        }
+        catch (ApplicationException) when (divisor == 0)
+        {
+            if (divisor != 0)
+            {
+                throw new InvalidOperationException();
+            }
+
+            return 0;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0011_CatchFilterTrueFromThrowSiteBranch_SuppressesExceptionSite()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(
@@ -1993,6 +2105,84 @@ public class TestClass
         }
         catch (InvalidOperationException) when (divisor == 0)
         {
+            return 0;
+        }
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0011_NestedCatchFilterTrueFromOuterCatchFilter_SuppressesExceptionSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        try
+        {
+            if (divisor == 0)
+            {
+                throw new ApplicationException();
+            }
+
+            return 1;
+        }
+        catch (ApplicationException) when (divisor == 0)
+        {
+            try
+            {
+                throw new InvalidOperationException();
+            }
+            catch (InvalidOperationException) when (divisor == 0)
+            {
+                return 0;
+            }
+        }
+
+        return 2;
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0011_FilteredCatchContradictoryGuardedThrow_DoesNotReportExceptionSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        try
+        {
+            if (divisor == 0)
+            {
+                throw new ApplicationException();
+            }
+
+            return 1;
+        }
+        catch (ApplicationException) when (divisor == 0)
+        {
+            if (divisor != 0)
+            {
+                throw new InvalidOperationException();
+            }
+
             return 0;
         }
     }

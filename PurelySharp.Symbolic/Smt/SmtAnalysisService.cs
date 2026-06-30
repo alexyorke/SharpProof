@@ -412,7 +412,7 @@ namespace PurelySharp.Symbolic.Smt
                     SmtBinaryOperator.GreaterThan or
                     SmtBinaryOperator.GreaterThanOrEqual))
             {
-                return false;
+                return TryGetNegatedIntegerComparison(formula, out term, out op, out constant);
             }
 
             if (binary.Left.Kind == SmtValueKind.Int &&
@@ -436,6 +436,27 @@ namespace PurelySharp.Symbolic.Smt
             return false;
         }
 
+        private static bool TryGetNegatedIntegerComparison(
+            SmtFormula formula,
+            out SmtFormula term,
+            out SmtBinaryOperator op,
+            out long constant)
+        {
+            term = null!;
+            op = default;
+            constant = default;
+
+            if (formula is not SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated ||
+                negated.Operand is not SmtBinaryFormula comparison ||
+                !TryGetIntegerComparison(comparison, out term, out op, out constant))
+            {
+                return false;
+            }
+
+            op = NegateComparison(op);
+            return true;
+        }
+
         private static SmtBinaryOperator ReverseComparison(SmtBinaryOperator op)
         {
             return op switch
@@ -444,6 +465,20 @@ namespace PurelySharp.Symbolic.Smt
                 SmtBinaryOperator.LessThanOrEqual => SmtBinaryOperator.GreaterThanOrEqual,
                 SmtBinaryOperator.GreaterThan => SmtBinaryOperator.LessThan,
                 SmtBinaryOperator.GreaterThanOrEqual => SmtBinaryOperator.LessThanOrEqual,
+                _ => op,
+            };
+        }
+
+        private static SmtBinaryOperator NegateComparison(SmtBinaryOperator op)
+        {
+            return op switch
+            {
+                SmtBinaryOperator.Equal => SmtBinaryOperator.NotEqual,
+                SmtBinaryOperator.NotEqual => SmtBinaryOperator.Equal,
+                SmtBinaryOperator.LessThan => SmtBinaryOperator.GreaterThanOrEqual,
+                SmtBinaryOperator.LessThanOrEqual => SmtBinaryOperator.GreaterThan,
+                SmtBinaryOperator.GreaterThan => SmtBinaryOperator.LessThanOrEqual,
+                SmtBinaryOperator.GreaterThanOrEqual => SmtBinaryOperator.LessThan,
                 _ => op,
             };
         }
@@ -487,11 +522,7 @@ namespace PurelySharp.Symbolic.Smt
             {
                 return op switch
                 {
-                    SmtBinaryOperator.Equal => new IntegerInterval(
-                        constant,
-                        constant,
-                        ExcludedValues,
-                        IsImpossible),
+                    SmtBinaryOperator.Equal => WithExactValue(constant),
                     SmtBinaryOperator.NotEqual => new IntegerInterval(
                         LowerBound,
                         UpperBound,
@@ -527,6 +558,17 @@ namespace PurelySharp.Symbolic.Smt
                     IsImpossible);
             }
 
+            private IntegerInterval WithExactValue(long value)
+            {
+                return new IntegerInterval(
+                    value,
+                    value,
+                    ExcludedValues,
+                    IsImpossible ||
+                    LowerBound.HasValue && value < LowerBound.Value ||
+                    UpperBound.HasValue && value > UpperBound.Value);
+            }
+
             private IntegerInterval Impossible()
             {
                 return new IntegerInterval(
@@ -553,6 +595,12 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (query.Hazard.TriggerCondition is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negatedTrigger &&
+                IsFormulaSyntacticallyEntailed(negatedTrigger.Operand, pathConditions))
+            {
+                return true;
+            }
+
             foreach (var pathCondition in pathConditions)
             {
                 if (AreSyntacticComplements(pathCondition, query.Hazard.TriggerCondition))
@@ -561,8 +609,64 @@ namespace PurelySharp.Symbolic.Smt
                 }
             }
 
+            if (ContainsSyntacticContradiction(pathConditions.Add(query.Hazard.TriggerCondition)))
+            {
+                return true;
+            }
+
             pureReason = string.Empty;
             return false;
+        }
+
+        private static bool IsFormulaSyntacticallyEntailed(
+            SmtFormula formula,
+            ImmutableArray<SmtFormula> pathConditions)
+        {
+            var pathConjuncts = pathConditions
+                .SelectMany(EnumerateConjuncts)
+                .ToImmutableArray();
+            return IsFormulaSyntacticallyEntailed(formula, pathConditions, pathConjuncts);
+        }
+
+        private static bool IsFormulaSyntacticallyEntailed(
+            SmtFormula formula,
+            ImmutableArray<SmtFormula> pathConditions,
+            ImmutableArray<SmtFormula> pathConjuncts)
+        {
+            if (formula is SmtBooleanConstant booleanConstant)
+            {
+                return booleanConstant.Value;
+            }
+
+            foreach (var pathConjunct in pathConjuncts)
+            {
+                if (pathConjunct.Equals(formula))
+                {
+                    return true;
+                }
+            }
+
+            if (formula is SmtBinaryFormula binary)
+            {
+                if (binary.Operator == SmtBinaryOperator.And)
+                {
+                    return IsFormulaSyntacticallyEntailed(binary.Left, pathConditions, pathConjuncts) &&
+                        IsFormulaSyntacticallyEntailed(binary.Right, pathConditions, pathConjuncts);
+                }
+
+                if (binary.Operator == SmtBinaryOperator.Or)
+                {
+                    return IsFormulaSyntacticallyEntailed(binary.Left, pathConditions, pathConjuncts) ||
+                        IsFormulaSyntacticallyEntailed(binary.Right, pathConditions, pathConjuncts);
+                }
+            }
+
+            if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } negated)
+            {
+                return ContainsSyntacticContradiction(pathConditions.Add(negated.Operand));
+            }
+
+            return ContainsSyntacticContradiction(pathConditions.Add(new SmtUnaryFormula(SmtUnaryOperator.Not, formula)));
         }
 
         private static bool TryGetTriggerBasedPureReason(PurityHazard hazard, out string reason)

@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Immutable;
+using System.Linq;
+using System.Threading.Tasks;
 using NUnit.Framework;
+using PurelySharp.Analyzer;
 using PurelySharp.Symbolic;
 using PurelySharp.Symbolic.Smt;
 
@@ -302,6 +306,38 @@ public class TestClass
             var proof = ProveAtMarker(source, marker, "value != 0");
 
             Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
+        [Test]
+        public async Task Ps0010_IfElseRangeGuardsMergeAtJoin_DoesNotReportDivideByZero()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value < 10)
+        {
+            if (value <= 0)
+            {
+                return 0;
+            }
+        }
+        else
+        {
+            if (value == 10)
+            {
+                return 1;
+            }
+        }
+
+        return 10 / value;
+    }
+}",
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
 
         private static SymbolicProgramPointQueryResult AnalyzeAtPosition(string source, int position)

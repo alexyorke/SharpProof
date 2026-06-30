@@ -11,6 +11,8 @@ namespace PurelySharp.Analyzer.Engine
     internal partial class PurityAnalysisEngine
     {
         private const int MaxMergedStatePathConditions = 32;
+        private const int MaxMergeableFactsPerTargetPerState = 4;
+        private const int MaxMergedStateFactChoiceCombinationsPerTarget = 64;
 
         private static ImmutableDictionary<ISymbol, PotentialTargets> MergeDelegateTargetMapsFromBlockStates(
             IEnumerable<PurityAnalysisState> states)
@@ -239,26 +241,66 @@ namespace PurelySharp.Analyzer.Engine
             var emittedCount = 0;
             foreach (var target in candidateTargets)
             {
-                var factChoices = stateFacts
-                    .Select(state => state.FactsByTarget[target][0])
-                    .ToArray();
-                if (factChoices.Select(static fact => fact.FactKey).Distinct(StringComparer.Ordinal).Count() == 1)
+                var combinationCount = 0;
+                foreach (var factChoices in EnumerateFactChoices(stateFacts, target))
                 {
-                    continue;
-                }
+                    combinationCount++;
+                    if (combinationCount > MaxMergedStateFactChoiceCombinationsPerTarget)
+                    {
+                        break;
+                    }
 
-                var mergedFact = CreateConditionalMergedPathCondition(stateFacts, factChoices);
-                var mergedKey = GetFormulaKey(mergedFact);
-                if (!existingKeys.Add(mergedKey))
-                {
-                    continue;
-                }
+                    if (factChoices.Select(static fact => fact.FactKey).Distinct(StringComparer.Ordinal).Count() == 1)
+                    {
+                        continue;
+                    }
 
-                builder.Add(mergedFact);
-                emittedCount++;
-                if (emittedCount >= MaxMergedStatePathConditions)
+                    var mergedFact = CreateConditionalMergedPathCondition(stateFacts, factChoices);
+                    var mergedKey = GetFormulaKey(mergedFact);
+                    if (!existingKeys.Add(mergedKey))
+                    {
+                        continue;
+                    }
+
+                    builder.Add(mergedFact);
+                    emittedCount++;
+                    if (emittedCount >= MaxMergedStatePathConditions)
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+
+        private static IEnumerable<MergeablePathFact[]> EnumerateFactChoices(
+            IReadOnlyList<StatePathFacts> stateFacts,
+            string target)
+        {
+            var selectedFacts = new MergeablePathFact[stateFacts.Count];
+            foreach (var choices in EnumerateFactChoices(stateFacts, target, 0, selectedFacts))
+            {
+                yield return choices;
+            }
+        }
+
+        private static IEnumerable<MergeablePathFact[]> EnumerateFactChoices(
+            IReadOnlyList<StatePathFacts> stateFacts,
+            string target,
+            int stateIndex,
+            MergeablePathFact[] selectedFacts)
+        {
+            if (stateIndex == stateFacts.Count)
+            {
+                yield return selectedFacts.ToArray();
+                yield break;
+            }
+
+            foreach (var fact in stateFacts[stateIndex].FactsByTarget[target].Take(MaxMergeableFactsPerTargetPerState))
+            {
+                selectedFacts[stateIndex] = fact;
+                foreach (var choices in EnumerateFactChoices(stateFacts, target, stateIndex + 1, selectedFacts))
                 {
-                    return;
+                    yield return choices;
                 }
             }
         }
@@ -393,6 +435,35 @@ namespace PurelySharp.Analyzer.Engine
                     } when target.Kind == right.Kind:
                         targetKey = GetFormulaKey(target);
                         return true;
+                    case SmtBinaryFormula
+                    {
+                        Operator: SmtBinaryOperator.NotEqual,
+                        Left: SmtVariable target,
+                        Right: SmtNullConstant
+                    }:
+                        targetKey = GetFormulaKey(target);
+                        return true;
+                    case SmtBinaryFormula
+                    {
+                        Operator: SmtBinaryOperator.Equal,
+                        Left: SmtVariable target,
+                        Right: SmtNullConstant
+                    }:
+                        targetKey = GetFormulaKey(target);
+                        return true;
+                    case SmtBinaryFormula
+                    {
+                        Operator: SmtBinaryOperator.Equal or
+                            SmtBinaryOperator.NotEqual or
+                            SmtBinaryOperator.GreaterThan or
+                            SmtBinaryOperator.GreaterThanOrEqual or
+                            SmtBinaryOperator.LessThan or
+                            SmtBinaryOperator.LessThanOrEqual,
+                        Left: { } left,
+                        Right: { } right
+                    } when TryGetMergeTargetTermKey(left, out targetKey) ||
+                           TryGetMergeTargetTermKey(right, out targetKey):
+                        return true;
                     case SmtVariable { Kind: SmtValueKind.Bool } target:
                         targetKey = GetFormulaKey(target);
                         return true;
@@ -402,6 +473,39 @@ namespace PurelySharp.Analyzer.Engine
                         Operand: SmtVariable { Kind: SmtValueKind.Bool } target
                     }:
                         targetKey = GetFormulaKey(target);
+                        return true;
+                    case SmtUnaryFormula
+                    {
+                        Operator: SmtUnaryOperator.Not,
+                        Operand: SmtBinaryFormula
+                        {
+                            Operator: SmtBinaryOperator.Equal or
+                                SmtBinaryOperator.NotEqual or
+                                SmtBinaryOperator.GreaterThan or
+                                SmtBinaryOperator.GreaterThanOrEqual or
+                                SmtBinaryOperator.LessThan or
+                                SmtBinaryOperator.LessThanOrEqual,
+                            Left: { } left,
+                            Right: { } right
+                        }
+                    } when TryGetMergeTargetTermKey(left, out targetKey) ||
+                           TryGetMergeTargetTermKey(right, out targetKey):
+                        return true;
+                    default:
+                        targetKey = string.Empty;
+                        return false;
+                }
+            }
+
+            private static bool TryGetMergeTargetTermKey(SmtFormula formula, out string targetKey)
+            {
+                switch (formula)
+                {
+                    case SmtVariable variable:
+                        targetKey = GetFormulaKey(variable);
+                        return true;
+                    case SmtStringLengthTerm stringLength:
+                        targetKey = GetFormulaKey(stringLength);
                         return true;
                     default:
                         targetKey = string.Empty;

@@ -230,6 +230,120 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySyntaxTreeLine_InvariantQuerySummarizesMustMaybeUnknownFactsAndBudget()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0) { return value; } else { return -value; }
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "InvariantQueryLine.cs");
+            var compilation = CSharpCompilation.Create(
+                "InvariantQueryLine",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            using var smtAnalysis = new SmtAnalysisService(
+                SmtAnalysisOptions.ForMode(SmtAnalysisMode.Bounded).WithOverrides(
+                    TimeSpan.FromMilliseconds(321),
+                    TimeSpan.FromMilliseconds(2345),
+                    maxPathConditions: 17,
+                    maxExpressionNodes: 99));
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeLine(
+                syntaxTree,
+                compilation,
+                FindLine(source, "if (value > 0)"),
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "value > 0" });
+
+            Assert.That(result.InvariantQuery.Text, Is.EqualTo(result.MergedInvariantText));
+            Assert.That(result.InvariantQuery.MergeKind, Is.EqualTo(SymbolicInvariantMergeKind.ConservativeFactMerge));
+            Assert.That(result.InvariantQuery.MustFacts, Is.Empty);
+            Assert.That(result.InvariantQuery.MaybeFacts, Is.EquivalentTo(new[] { "value > 0", "!(value > 0)" }));
+            Assert.That(result.InvariantQuery.UnknownFacts, Is.EquivalentTo(new[] { "unknown(value)" }));
+            Assert.That(result.InvariantQuery.HasMaybeFacts, Is.True);
+            Assert.That(result.InvariantQuery.HasUnknowns, Is.True);
+            Assert.That(result.InvariantQuery.HasUnresolvedAnalysis, Is.True);
+            Assert.That(result.InvariantQuery.CandidateProgramPointCount, Is.EqualTo(result.MergedPathFacts.CandidateProgramPointCount));
+            Assert.That(result.InvariantQuery.SmtDiagnostics.QueryTimeoutMs, Is.EqualTo(321));
+            Assert.That(result.InvariantQuery.SmtDiagnostics.MethodBudgetMs, Is.EqualTo(2345));
+            Assert.That(result.InvariantQuery.SmtDiagnostics.MaxPathConditions, Is.EqualTo(17));
+            Assert.That(result.InvariantQuery.SmtDiagnostics.MaxExpressionNodes, Is.EqualTo(99));
+
+            var positiveReturn = result.ProgramPoints
+                .Where(static point => point.NodeKind == "ReturnStatement")
+                .Single(point => point.MergedInvariantText == "value > 0");
+            Assert.That(positiveReturn.InvariantQuery.MustFacts, Is.EquivalentTo(new[] { "value > 0" }));
+            Assert.That(positiveReturn.InvariantQuery.MaybeFacts, Is.Empty);
+            Assert.That(positiveReturn.InvariantQuery.UnknownFacts, Is.Empty);
+            Assert.That(positiveReturn.InvariantQuery.HasUnresolvedAnalysis, Is.False);
+            Assert.That(positiveReturn.InvariantQuery.ProofOutcomes.ProvenTrueCount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void QuerySyntaxTreeSpan_ReturnsMergedInvariantQueryForSourceSpan()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        var copy = value;
+        if (copy > 0)
+        {
+            return copy;
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "InvariantSpanQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "InvariantSpanQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var spanStart = FindPosition(source, "if (copy > 0)");
+            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+                syntaxTree,
+                compilation,
+                spanStart,
+                spanEnd,
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "copy > 0" });
+
+            Assert.That(result.SpanStart, Is.EqualTo(spanStart));
+            Assert.That(result.SpanEnd, Is.EqualTo(spanEnd));
+            Assert.That(result.StartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
+            Assert.That(result.EndLine, Is.EqualTo(FindLine(source, "return 0;")));
+            Assert.That(result.ProgramPoints.Select(static point => point.NodeKind), Does.Contain("IfStatement"));
+            Assert.That(result.ProgramPoints.Count(static point => point.NodeKind == "ReturnStatement"), Is.EqualTo(2));
+            Assert.That(result.InvariantQuery.MaybeFacts, Does.Contain("copy > 0"));
+            Assert.That(result.InvariantQuery.MaybeFacts, Does.Contain("!(copy > 0)"));
+            Assert.That(result.InvariantQuery.UnknownFacts, Does.Contain("unknown(copy)"));
+            Assert.That(result.InvariantQuery.CandidateProgramPointCount, Is.EqualTo(result.ProgramPoints.Count));
+
+            var guardedReturn = result.ProgramPoints
+                .Where(static point => point.NodeKind == "ReturnStatement")
+                .Single(point => point.PathConditions.Any(static condition => condition.Text == "copy > 0"));
+            Assert.That(guardedReturn.InvariantQuery.MustFacts, Does.Contain("copy > 0"));
+            Assert.That(guardedReturn.ConditionProofs.Single().TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void QuerySyntaxTreeLine_ClassifiesImpossibleReturnAsUnreachable()
         {
             const string source = @"
@@ -836,6 +950,75 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSpanQueryResult_ToCompactResult_ExposesInvariantQueryAndBudgetMetadata()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        var copy = value;
+        if (copy > 0)
+        {
+            return copy;
+        }
+
+        return 0;
+    }
+}";
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                source,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                "CompactSpanQuery.cs");
+            var compilation = CSharpCompilation.Create(
+                "CompactSpanQuery",
+                new[] { syntaxTree },
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var spanStart = FindPosition(source, "if (copy > 0)");
+            var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+            using var smtAnalysis = new SmtAnalysisService(
+                SmtAnalysisOptions.ForMode(SmtAnalysisMode.Bounded).WithOverrides(
+                    TimeSpan.FromMilliseconds(222),
+                    TimeSpan.FromMilliseconds(2222),
+                    maxPathConditions: 22,
+                    maxExpressionNodes: 222));
+
+            var result = new SymbolicSourceQueryService().QuerySyntaxTreeSpan(
+                syntaxTree,
+                compilation,
+                spanStart,
+                spanEnd,
+                smtAnalysis: smtAnalysis,
+                impliedConditions: new[] { "copy > 0" });
+            var compact = result.ToCompactResult(new SymbolicCompactQueryOptions(
+                maxProgramPoints: 2,
+                maxFacts: 1,
+                maxConditions: 2,
+                maxProofs: 1));
+
+            Assert.That(compact.Kind, Is.EqualTo("span"));
+            Assert.That(compact.QuerySpanStart, Is.EqualTo(spanStart));
+            Assert.That(compact.QuerySpanEnd, Is.EqualTo(spanEnd));
+            Assert.That(compact.QueryStartLine, Is.EqualTo(FindLine(source, "if (copy > 0)")));
+            Assert.That(compact.QueryEndLine, Is.EqualTo(FindLine(source, "return 0;")));
+            Assert.That(compact.InvariantQuery.Text, Is.EqualTo(result.InvariantQuery.Text));
+            Assert.That(compact.InvariantQuery.MaybeFactCount, Is.EqualTo(result.InvariantQuery.MaybeFactCount));
+            Assert.That(compact.InvariantQuery.MaybeFacts, Is.EquivalentTo(result.InvariantQuery.MaybeFacts.Take(2)));
+            Assert.That(compact.InvariantQuery.UnknownFacts, Does.Contain("unknown(copy)"));
+            Assert.That(compact.InvariantQuery.HasUnresolvedAnalysis, Is.True);
+            Assert.That(compact.AnalysisSummary.MustFactCount, Is.EqualTo(result.InvariantQuery.MustFactCount));
+            Assert.That(compact.AnalysisSummary.MaybeFactCount, Is.EqualTo(result.InvariantQuery.MaybeFactCount));
+            Assert.That(compact.AnalysisSummary.UnknownFactCount, Is.EqualTo(result.InvariantQuery.UnknownFactCount));
+            Assert.That(compact.AnalysisSummary.SmtQueryTimeoutMs, Is.EqualTo(222));
+            Assert.That(compact.AnalysisSummary.SmtMethodBudgetMs, Is.EqualTo(2222));
+            Assert.That(compact.AnalysisSummary.SmtMaxPathConditions, Is.EqualTo(22));
+            Assert.That(compact.AnalysisSummary.SmtMaxExpressionNodes, Is.EqualTo(222));
+            Assert.That(compact.SmtDiagnostics.QueryTimeoutMs, Is.EqualTo(222));
+            Assert.That(compact.ProgramPoints, Has.Count.EqualTo(2));
+        }
+
+        [Test]
         public void SymbolicFileQueryResult_ToCompactResult_SummaryOnlyOmitsNestedResults()
         {
             const string source = @"
@@ -1037,6 +1220,90 @@ public class TestClass
                 Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.Zero);
                 Assert.That(root.GetProperty("truncation").GetProperty("lines").GetBoolean(), Is.True);
                 Assert.That(root.GetProperty("truncation").GetProperty("programPoints").GetBoolean(), Is.True);
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public async Task SymbolicCli_SpanCompactJson_EmitsInvariantQueryAndBudgetMetadata()
+        {
+            var source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        var copy = value;
+        if (copy > 0)
+        {
+            return copy;
+        }
+
+        return 0;
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliSpanInvariantQuery-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var spanStart = FindPosition(source, "if (copy > 0)");
+                var spanEnd = FindPosition(source, "return 0;") + "return 0;".Length;
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--span-start",
+                    spanStart.ToString(),
+                    "--span-end",
+                    spanEnd.ToString(),
+                    "--check-reachability",
+                    "--implies",
+                    "copy > 0",
+                    "--smt-timeout-ms",
+                    "333",
+                    "--smt-method-budget-ms",
+                    "2333",
+                    "--smt-max-path-conditions",
+                    "33",
+                    "--smt-max-expression-nodes",
+                    "333",
+                    "--compact-json",
+                    "--max-points",
+                    "2",
+                    "--max-conditions",
+                    "3");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("span"));
+                Assert.That(root.GetProperty("querySpanStart").GetInt32(), Is.EqualTo(spanStart));
+                Assert.That(root.GetProperty("querySpanEnd").GetInt32(), Is.EqualTo(spanEnd));
+                Assert.That(root.GetProperty("queryStartLine").GetInt32(), Is.EqualTo(FindLine(source, "if (copy > 0)")));
+                Assert.That(root.GetProperty("queryEndLine").GetInt32(), Is.EqualTo(FindLine(source, "return 0;")));
+                Assert.That(root.GetProperty("programPointCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+
+                var invariantQuery = root.GetProperty("invariantQuery");
+                Assert.That(invariantQuery.GetProperty("maybeFactCount").GetInt32(), Is.GreaterThanOrEqualTo(2));
+                Assert.That(
+                    invariantQuery.GetProperty("maybeFacts").EnumerateArray().Select(static fact => fact.GetString()),
+                    Does.Contain("copy > 0"));
+                Assert.That(
+                    invariantQuery.GetProperty("unknownFacts").EnumerateArray().Select(static fact => fact.GetString()),
+                    Does.Contain("unknown(copy)"));
+                Assert.That(invariantQuery.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.True);
+
+                var analysisSummary = root.GetProperty("analysisSummary");
+                Assert.That(analysisSummary.GetProperty("maybeFactCount").GetInt32(), Is.EqualTo(invariantQuery.GetProperty("maybeFactCount").GetInt32()));
+                Assert.That(analysisSummary.GetProperty("unknownFactCount").GetInt32(), Is.EqualTo(invariantQuery.GetProperty("unknownFactCount").GetInt32()));
+                Assert.That(analysisSummary.GetProperty("smtQueryTimeoutMs").GetInt32(), Is.EqualTo(333));
+                Assert.That(analysisSummary.GetProperty("smtMethodBudgetMs").GetInt32(), Is.EqualTo(2333));
+                Assert.That(analysisSummary.GetProperty("smtMaxPathConditions").GetInt32(), Is.EqualTo(33));
+                Assert.That(analysisSummary.GetProperty("smtMaxExpressionNodes").GetInt32(), Is.EqualTo(333));
             }
             finally
             {
@@ -1337,7 +1604,7 @@ public class TestClass
                     "0",
                     "--line-expressions");
                 Assert.That(lineExpressionsWithoutLineMode.ExitCode, Is.EqualTo(64));
-                Assert.That(lineExpressionsWithoutLineMode.StandardError, Does.Contain("--line-expressions requires --line-invariants or --all-lines."));
+                Assert.That(lineExpressionsWithoutLineMode.StandardError, Does.Contain("--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines."));
             }
             finally
             {

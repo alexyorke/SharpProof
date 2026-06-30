@@ -137,6 +137,38 @@ namespace PurelySharp.Symbolic
                 includeExpressionProgramPoints);
         }
 
+        public SymbolicSpanQueryResult QueryFileSpan(
+            string filePath,
+            int spanStart,
+            int spanEnd,
+            IEnumerable<MetadataReference>? references = null,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null,
+            IEnumerable<string>? impliedConditions = null,
+            bool includeExpressionProgramPoints = false)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                throw new ArgumentException("File path is required.", nameof(filePath));
+            }
+
+            if (!File.Exists(filePath))
+            {
+                throw new FileNotFoundException("Source file does not exist.", filePath);
+            }
+
+            return QuerySourceSpan(
+                File.ReadAllText(filePath),
+                Path.GetFullPath(filePath),
+                spanStart,
+                spanEnd,
+                references,
+                cancellationToken,
+                smtAnalysis,
+                impliedConditions,
+                includeExpressionProgramPoints);
+        }
+
         public SymbolicFileQueryResult QueryFileAllLines(
             string filePath,
             IEnumerable<MetadataReference>? references = null,
@@ -353,6 +385,49 @@ namespace PurelySharp.Symbolic
                 syntaxTree,
                 compilation,
                 line,
+                cancellationToken,
+                smtAnalysis,
+                impliedConditions,
+                includeExpressionProgramPoints);
+        }
+
+        public SymbolicSpanQueryResult QuerySourceSpan(
+            string sourceText,
+            string filePath,
+            int spanStart,
+            int spanEnd,
+            IEnumerable<MetadataReference>? references = null,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null,
+            IEnumerable<string>? impliedConditions = null,
+            bool includeExpressionProgramPoints = false)
+        {
+            if (sourceText == null)
+            {
+                throw new ArgumentNullException(nameof(sourceText));
+            }
+
+            if (string.IsNullOrWhiteSpace(filePath))
+            {
+                filePath = "PurelySharp.Symbolic.Query.cs";
+            }
+
+            var syntaxTree = CSharpSyntaxTree.ParseText(
+                sourceText,
+                new CSharpParseOptions(LanguageVersion.Preview),
+                filePath,
+                cancellationToken: cancellationToken);
+            var referenceArray = references?.ToImmutableArray() ?? GetTrustedPlatformReferences();
+            var compilation = CSharpCompilation.Create(
+                "PurelySharp.Symbolic.Query",
+                new[] { syntaxTree },
+                referenceArray,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            return QuerySyntaxTreeSpan(
+                syntaxTree,
+                compilation,
+                spanStart,
+                spanEnd,
                 cancellationToken,
                 smtAnalysis,
                 impliedConditions,
@@ -605,6 +680,90 @@ namespace PurelySharp.Symbolic
             return new SymbolicLineQueryResult(
                 syntaxTree.FilePath,
                 line,
+                results,
+                SymbolicSmtDiagnostics.FromService(smtAnalysis));
+        }
+
+        public SymbolicSpanQueryResult QuerySyntaxTreeSpan(
+            SyntaxTree syntaxTree,
+            Compilation compilation,
+            int spanStart,
+            int spanEnd,
+            CancellationToken cancellationToken = default,
+            SmtAnalysisService? smtAnalysis = null,
+            IEnumerable<string>? impliedConditions = null,
+            bool includeExpressionProgramPoints = false)
+        {
+            if (syntaxTree == null)
+            {
+                throw new ArgumentNullException(nameof(syntaxTree));
+            }
+
+            if (compilation == null)
+            {
+                throw new ArgumentNullException(nameof(compilation));
+            }
+
+            var sourceSpan = GetSourceSpan(syntaxTree, spanStart, spanEnd, cancellationToken);
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var root = syntaxTree.GetRoot(cancellationToken);
+            var nodes = FindQueryNodesInSpan(
+                root,
+                sourceSpan,
+                includeExpressionProgramPoints);
+            var results = nodes
+                .Select(node =>
+                {
+                    var query = AnalyzeProgramPointNode(
+                        semanticModel,
+                        node.SpanStart,
+                        node,
+                        smtAnalysis,
+                        cancellationToken);
+                    var lineColumn = GetLineAndColumn(syntaxTree, query.Position, cancellationToken);
+                    var nodeSourceSpan = GetNodeSourceSpan(syntaxTree, query.Node.Span, cancellationToken);
+                    var conditionProofs = ProveConditions(
+                        query.SemanticModel,
+                        query.Position,
+                        query.Analysis,
+                        impliedConditions,
+                        smtAnalysis,
+                        cancellationToken);
+
+                    return new SymbolicSourceQueryResult(
+                        syntaxTree.FilePath,
+                        lineColumn.Line,
+                        lineColumn.Column,
+                        query.Position,
+                        query.Node.SpanStart,
+                        query.Node.Kind().ToString(),
+                        query.Analysis.Facts,
+                        query.Analysis.Reachability,
+                        query.Analysis.ReachabilityReason,
+                        conditionProofs,
+                        SymbolicSmtDiagnostics.FromService(smtAnalysis),
+                        SymbolicFormulaDisplay.FormatMergedInvariant(query.Analysis.PathConditions),
+                        query.Analysis.PathConditions,
+                        query.Node.Span.End,
+                        nodeSourceSpan.StartLine,
+                        nodeSourceSpan.StartColumn,
+                        nodeSourceSpan.EndLine,
+                        nodeSourceSpan.EndColumn,
+                        GetContainingMethodName(query.Node),
+                        GetProgramPointKind(query.Node));
+                })
+                .ToArray();
+            var startLineColumn = GetLineAndColumn(syntaxTree, sourceSpan.Start, cancellationToken);
+            var endLineColumn = GetLineAndColumn(syntaxTree, sourceSpan.End, cancellationToken);
+
+            return new SymbolicSpanQueryResult(
+                syntaxTree.FilePath,
+                sourceSpan.Start,
+                sourceSpan.End,
+                startLineColumn.Line,
+                startLineColumn.Column,
+                endLineColumn.Line,
+                endLineColumn.Column,
                 results,
                 SymbolicSmtDiagnostics.FromService(smtAnalysis));
         }
@@ -1122,6 +1281,14 @@ namespace PurelySharp.Symbolic
             bool includeExpressionProgramPoints)
         {
             var lineSpan = GetLineSpan(syntaxTree, line, cancellationToken);
+            return FindQueryNodesInSpan(root, lineSpan, includeExpressionProgramPoints);
+        }
+
+        private static IReadOnlyList<SyntaxNode> FindQueryNodesInSpan(
+            SyntaxNode root,
+            TextSpan lineSpan,
+            bool includeExpressionProgramPoints)
+        {
             if (lineSpan.Length == 0)
             {
                 return Array.Empty<SyntaxNode>();
@@ -1244,6 +1411,31 @@ namespace PurelySharp.Symbolic
             }
 
             return text.Lines[line - 1].Span;
+        }
+
+        private static TextSpan GetSourceSpan(
+            SyntaxTree syntaxTree,
+            int spanStart,
+            int spanEnd,
+            CancellationToken cancellationToken)
+        {
+            var text = syntaxTree.GetText(cancellationToken);
+            if (spanStart < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(spanStart), "--span-start must be zero or greater.");
+            }
+
+            if (spanEnd < spanStart)
+            {
+                throw new ArgumentOutOfRangeException(nameof(spanEnd), "--span-end cannot be less than --span-start.");
+            }
+
+            if (spanEnd > text.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(spanEnd), "--span-end exceeds the source text length.");
+            }
+
+            return TextSpan.FromBounds(spanStart, spanEnd);
         }
 
         private static LineColumn GetLineAndColumn(
@@ -1437,6 +1629,12 @@ namespace PurelySharp.Symbolic
             MergedInvariant = SymbolicInvariantResult.FromMergedPathFacts(MergedPathFacts);
             ProgramPointSummary = SymbolicProgramPointSummary.FromProgramPoints(ProgramPoints);
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
+            InvariantQuery = SymbolicInvariantQueryView.FromMergedPathFacts(
+                MergedInvariant,
+                MergedPathFacts,
+                ProgramPointSummary.Reachability,
+                ProgramPointSummary.ProofOutcomes,
+                SmtDiagnostics);
         }
 
         public string FilePath { get; }
@@ -1461,6 +1659,8 @@ namespace PurelySharp.Symbolic
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
+        public SymbolicInvariantQueryView InvariantQuery { get; }
+
         public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
         {
             return SymbolicCompactQueryResult.FromLine(this, options);
@@ -1476,6 +1676,134 @@ namespace PurelySharp.Symbolic
             return new SymbolicLineQueryResult(
                 FilePath,
                 Line,
+                ProgramPoints.Where(filter.Matches).ToArray(),
+                SmtDiagnostics);
+        }
+    }
+
+    public sealed class SymbolicSpanQueryResult
+    {
+        public SymbolicSpanQueryResult(
+            string filePath,
+            int spanStart,
+            int spanEnd,
+            int startLine,
+            int startColumn,
+            int endLine,
+            int endColumn,
+            IReadOnlyList<SymbolicSourceQueryResult> programPoints,
+            SymbolicSmtDiagnostics? smtDiagnostics = null)
+        {
+            if (spanStart < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(spanStart), "Span start cannot be negative.");
+            }
+
+            if (spanEnd < spanStart)
+            {
+                throw new ArgumentOutOfRangeException(nameof(spanEnd), "Span end cannot be less than span start.");
+            }
+
+            FilePath = filePath;
+            SpanStart = spanStart;
+            SpanEnd = spanEnd;
+            SpanLength = spanEnd - spanStart;
+            StartLine = startLine;
+            StartColumn = startColumn;
+            EndLine = endLine;
+            EndColumn = endColumn;
+            ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
+            ProgramPointCount = ProgramPoints.Count;
+            LinesWithProgramPoints = ProgramPoints
+                .Select(static point => point.Line)
+                .Distinct()
+                .Count();
+            var factSummary = SymbolicInvariantService.MergeInvariantFacts(ProgramPoints.Select(static point => point.Facts));
+            Facts = factSummary.Facts;
+            ObservedFactCount = Facts.Count;
+            ObservedInvariant = SymbolicInvariantResult.FromFacts(
+                Facts,
+                factSummary.MergedInvariantText,
+                SymbolicInvariantMergeKind.DistinctFactUnion);
+            MergedPathFacts = SymbolicMergedPathFacts.FromProgramPoints(ProgramPoints);
+            MergedInvariantText = MergedPathFacts.MergedInvariantText;
+            MergedInvariant = SymbolicInvariantResult.FromMergedPathFacts(MergedPathFacts);
+            ProgramPointSummary = SymbolicProgramPointSummary.FromProgramPoints(ProgramPoints);
+            Reachability = ProgramPointSummary.Reachability;
+            ConditionProofs = SymbolicConditionProofSummary.FromProgramPoints(ProgramPoints);
+            SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
+            InvariantQuery = SymbolicInvariantQueryView.FromMergedPathFacts(
+                MergedInvariant,
+                MergedPathFacts,
+                Reachability,
+                ProgramPointSummary.ProofOutcomes,
+                SmtDiagnostics);
+        }
+
+        public string FilePath { get; }
+
+        public int SpanStart { get; }
+
+        public int SpanEnd { get; }
+
+        public int SpanLength { get; }
+
+        public int StartLine { get; }
+
+        public int StartColumn { get; }
+
+        public int EndLine { get; }
+
+        public int EndColumn { get; }
+
+        public int LinesWithProgramPoints { get; }
+
+        public int ProgramPointCount { get; }
+
+        public IReadOnlyList<SymbolicSourceQueryResult> ProgramPoints { get; }
+
+        public IReadOnlyList<string> Facts { get; }
+
+        public int ObservedFactCount { get; }
+
+        public SymbolicInvariantResult ObservedInvariant { get; }
+
+        public SymbolicMergedPathFacts MergedPathFacts { get; }
+
+        public string MergedInvariantText { get; }
+
+        public SymbolicInvariantResult MergedInvariant { get; }
+
+        public SymbolicProgramPointSummary ProgramPointSummary { get; }
+
+        public SymbolicReachabilitySummary Reachability { get; }
+
+        public IReadOnlyList<SymbolicConditionProofSummary> ConditionProofs { get; }
+
+        public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+
+        public SymbolicInvariantQueryView InvariantQuery { get; }
+
+        public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
+        {
+            return SymbolicCompactQueryResult.FromSpan(this, options);
+        }
+
+        public SymbolicSpanQueryResult Filter(SymbolicSourceQueryFilter filter)
+        {
+            if (filter == null)
+            {
+                throw new ArgumentNullException(nameof(filter));
+            }
+
+            return new SymbolicSpanQueryResult(
+                FilePath,
+                SpanStart,
+                SpanEnd,
+                StartLine,
+                StartColumn,
+                EndLine,
+                EndColumn,
                 ProgramPoints.Where(filter.Matches).ToArray(),
                 SmtDiagnostics);
         }
@@ -1514,6 +1842,12 @@ namespace PurelySharp.Symbolic
             Reachability = ProgramPointSummary.Reachability;
             ConditionProofs = SymbolicConditionProofSummary.FromProgramPoints(programPoints);
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
+            InvariantQuery = SymbolicInvariantQueryView.FromMergedPathFacts(
+                MergedInvariant,
+                MergedPathFacts,
+                Reachability,
+                ProgramPointSummary.ProofOutcomes,
+                SmtDiagnostics);
         }
 
         public string FilePath { get; }
@@ -1546,6 +1880,8 @@ namespace PurelySharp.Symbolic
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
+        public SymbolicInvariantQueryView InvariantQuery { get; }
+
         public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
         {
             return SymbolicCompactQueryResult.FromFile(this, options);
@@ -1567,6 +1903,135 @@ namespace PurelySharp.Symbolic
                 LineCount,
                 lines,
                 SmtDiagnostics);
+        }
+    }
+
+    public sealed class SymbolicInvariantQueryView
+    {
+        private SymbolicInvariantQueryView(
+            string text,
+            SymbolicInvariantMergeKind mergeKind,
+            IReadOnlyList<string> mustFacts,
+            IReadOnlyList<string> maybeFacts,
+            IReadOnlyList<string> unknownFacts,
+            IReadOnlyList<SymbolicConservativeUnknownDiagnostic> unknownDiagnostics,
+            int candidateProgramPointCount,
+            int unreachableProgramPointCount,
+            bool isUnreachable,
+            SymbolicReachabilitySummary reachability,
+            SymbolicProofOutcomeSummary proofOutcomes,
+            SymbolicSmtDiagnostics smtDiagnostics)
+        {
+            Text = text ?? string.Empty;
+            MergeKind = mergeKind;
+            MustFacts = mustFacts ?? throw new ArgumentNullException(nameof(mustFacts));
+            MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
+            UnknownFacts = unknownFacts ?? throw new ArgumentNullException(nameof(unknownFacts));
+            UnknownDiagnostics = unknownDiagnostics ?? throw new ArgumentNullException(nameof(unknownDiagnostics));
+            CandidateProgramPointCount = candidateProgramPointCount;
+            UnreachableProgramPointCount = unreachableProgramPointCount;
+            IsUnreachable = isUnreachable;
+            Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
+            ProofOutcomes = proofOutcomes ?? throw new ArgumentNullException(nameof(proofOutcomes));
+            SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
+        }
+
+        public string Text { get; }
+
+        public SymbolicInvariantMergeKind MergeKind { get; }
+
+        public IReadOnlyList<string> MustFacts { get; }
+
+        public int MustFactCount => MustFacts.Count;
+
+        public IReadOnlyList<string> MaybeFacts { get; }
+
+        public int MaybeFactCount => MaybeFacts.Count;
+
+        public IReadOnlyList<string> UnknownFacts { get; }
+
+        public int UnknownFactCount => UnknownFacts.Count;
+
+        public IReadOnlyList<SymbolicConservativeUnknownDiagnostic> UnknownDiagnostics { get; }
+
+        public int CandidateProgramPointCount { get; }
+
+        public int UnreachableProgramPointCount { get; }
+
+        public bool IsUnreachable { get; }
+
+        public SymbolicReachabilitySummary Reachability { get; }
+
+        public SymbolicProofOutcomeSummary ProofOutcomes { get; }
+
+        public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+
+        public bool HasUnknowns => UnknownFacts.Count != 0;
+
+        public bool HasMaybeFacts => MaybeFacts.Count != 0;
+
+        public bool HasUnresolvedAnalysis =>
+            HasUnknowns ||
+            Reachability.UnknownCount != 0 ||
+            Reachability.NotCheckedCount != 0 ||
+            ProofOutcomes.UnknownCount != 0;
+
+        public static SymbolicInvariantQueryView FromPoint(SymbolicSourceQueryResult result)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+
+            var reachability = SymbolicReachabilitySummary.FromProgramPoints(new[] { result });
+            return new SymbolicInvariantQueryView(
+                result.MergedInvariantText,
+                result.Invariant.MergeKind,
+                result.PathConditions.Select(static condition => condition.Text).ToArray(),
+                Array.Empty<string>(),
+                result.Invariant.Conditions
+                    .Where(static condition => condition.IsConservativeUnknown)
+                    .Select(static condition => condition.Text)
+                    .ToArray(),
+                Array.Empty<SymbolicConservativeUnknownDiagnostic>(),
+                result.Reachability == SymbolicReachability.Unreachable ? 0 : 1,
+                result.Reachability == SymbolicReachability.Unreachable ? 1 : 0,
+                result.Reachability == SymbolicReachability.Unreachable,
+                reachability,
+                result.ProofOutcomes,
+                result.SmtDiagnostics);
+        }
+
+        public static SymbolicInvariantQueryView FromMergedPathFacts(
+            SymbolicInvariantResult invariant,
+            SymbolicMergedPathFacts mergedPathFacts,
+            SymbolicReachabilitySummary reachability,
+            SymbolicProofOutcomeSummary proofOutcomes,
+            SymbolicSmtDiagnostics smtDiagnostics)
+        {
+            if (invariant == null)
+            {
+                throw new ArgumentNullException(nameof(invariant));
+            }
+
+            if (mergedPathFacts == null)
+            {
+                throw new ArgumentNullException(nameof(mergedPathFacts));
+            }
+
+            return new SymbolicInvariantQueryView(
+                mergedPathFacts.MergedInvariantText,
+                invariant.MergeKind,
+                mergedPathFacts.AlwaysFacts,
+                mergedPathFacts.MaybeFacts,
+                mergedPathFacts.ConservativeUnknowns,
+                mergedPathFacts.ConservativeUnknownDiagnostics,
+                mergedPathFacts.CandidateProgramPointCount,
+                mergedPathFacts.UnreachableProgramPointCount,
+                mergedPathFacts.IsUnreachable,
+                reachability,
+                proofOutcomes,
+                smtDiagnostics);
         }
     }
 
@@ -1644,6 +2109,7 @@ namespace PurelySharp.Symbolic
             int programPointCount,
             SymbolicCompactInvariantSummary observedInvariant,
             SymbolicCompactInvariantSummary conservativeInvariant,
+            SymbolicCompactInvariantQueryView invariantQuery,
             SymbolicReachabilitySummary reachability,
             SymbolicProgramPointSummary programPointSummary,
             IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
@@ -1674,6 +2140,7 @@ namespace PurelySharp.Symbolic
             ProgramPointCount = programPointCount;
             ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
             ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
+            InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
             MergedInvariantText = ConservativeInvariant.Text;
             Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
             ProgramPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
@@ -1683,7 +2150,7 @@ namespace PurelySharp.Symbolic
             ProgramPoints = programPoints ?? throw new ArgumentNullException(nameof(programPoints));
             SmtDiagnostics = smtDiagnostics ?? throw new ArgumentNullException(nameof(smtDiagnostics));
             AnalysisSummary = SymbolicCompactAnalysisSummary.From(
-                ConservativeInvariant,
+                InvariantQuery,
                 ProgramPointSummary,
                 SmtDiagnostics);
             Truncation = truncation ?? throw new ArgumentNullException(nameof(truncation));
@@ -1721,6 +2188,20 @@ namespace PurelySharp.Symbolic
 
         public int? NodeEndColumn { get; }
 
+        public int? QuerySpanStart => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeSpanStart : null;
+
+        public int? QuerySpanEnd => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeSpanEnd : null;
+
+        public int? QuerySpanLength => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeSpanLength : null;
+
+        public int? QueryStartLine => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeStartLine : null;
+
+        public int? QueryStartColumn => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeStartColumn : null;
+
+        public int? QueryEndLine => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeEndLine : null;
+
+        public int? QueryEndColumn => string.Equals(Kind, "span", StringComparison.Ordinal) ? NodeEndColumn : null;
+
         public string? PointReachability { get; }
 
         public string? ReachabilityReason { get; }
@@ -1734,6 +2215,8 @@ namespace PurelySharp.Symbolic
         public SymbolicCompactInvariantSummary ObservedInvariant { get; }
 
         public SymbolicCompactInvariantSummary ConservativeInvariant { get; }
+
+        public SymbolicCompactInvariantQueryView InvariantQuery { get; }
 
         public string MergedInvariantText { get; }
 
@@ -1781,6 +2264,9 @@ namespace PurelySharp.Symbolic
                 result.Invariant,
                 null,
                 normalizedOptions);
+            var invariantQuery = SymbolicCompactInvariantQueryView.FromQueryView(
+                result.InvariantQuery,
+                normalizedOptions);
 
             return new SymbolicCompactQueryResult(
                 "point",
@@ -1805,6 +2291,7 @@ namespace PurelySharp.Symbolic
                 1,
                 observedInvariant,
                 conservativeInvariant,
+                invariantQuery,
                 SymbolicReachabilitySummary.FromProgramPoints(sourcePoints),
                 SymbolicProgramPointSummary.FromProgramPoints(sourcePoints),
                 SymbolicCompactProjection.Take(
@@ -1865,6 +2352,7 @@ namespace PurelySharp.Symbolic
                 result.ProgramPoints.Count,
                 lineResult.ObservedInvariant,
                 lineResult.ConservativeInvariant,
+                lineResult.InvariantQuery,
                 lineResult.Reachability,
                 result.ProgramPointSummary,
                 lineResult.ConditionProofs,
@@ -1872,6 +2360,75 @@ namespace PurelySharp.Symbolic
                 lineResult.ProgramPoints,
                 lineResult.SmtDiagnostics,
                 lineResult.Truncation);
+        }
+
+        public static SymbolicCompactQueryResult FromSpan(
+            SymbolicSpanQueryResult result,
+            SymbolicCompactQueryOptions? options = null)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+
+            var normalizedOptions = options ?? SymbolicCompactQueryOptions.Default;
+            var programPoints = SymbolicCompactProjection
+                .Take(result.ProgramPoints, normalizedOptions.MaxProgramPoints)
+                .Select(point => SymbolicCompactProgramPointResult.FromResult(point, normalizedOptions))
+                .ToArray();
+            var observedInvariant = SymbolicCompactInvariantSummary.FromObservedFacts(
+                result.ObservedInvariant,
+                result.Facts,
+                normalizedOptions);
+            var conservativeInvariant = SymbolicCompactInvariantSummary.FromInvariant(
+                result.MergedInvariant,
+                result.MergedPathFacts,
+                normalizedOptions);
+            var conditionProofs = SymbolicCompactProjection.Take(
+                result.ConditionProofs,
+                normalizedOptions.MaxProofs);
+            var truncation = SymbolicCompactOutputTruncation.Combine(
+                new SymbolicCompactOutputTruncation(
+                    false,
+                    result.ProgramPoints.Count > programPoints.Length,
+                    false,
+                    false,
+                    result.ConditionProofs.Count > normalizedOptions.MaxProofs),
+                SymbolicCompactOutputTruncation.FromInvariant(observedInvariant),
+                SymbolicCompactOutputTruncation.FromInvariant(conservativeInvariant),
+                SymbolicCompactOutputTruncation.Combine(programPoints.Select(static point => point.Truncation)));
+
+            return new SymbolicCompactQueryResult(
+                "span",
+                result.FilePath,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                result.SpanStart,
+                result.SpanEnd,
+                result.SpanLength,
+                result.StartLine,
+                result.StartColumn,
+                result.EndLine,
+                result.EndColumn,
+                null,
+                null,
+                null,
+                result.LinesWithProgramPoints,
+                result.ProgramPointCount,
+                observedInvariant,
+                conservativeInvariant,
+                SymbolicCompactInvariantQueryView.FromQueryView(result.InvariantQuery, normalizedOptions),
+                result.Reachability,
+                result.ProgramPointSummary,
+                conditionProofs,
+                Array.Empty<SymbolicCompactLineResult>(),
+                programPoints,
+                SymbolicCompactSmtDiagnostics.FromDiagnostics(result.SmtDiagnostics),
+                truncation);
         }
 
         public static SymbolicCompactQueryResult FromFile(
@@ -1944,6 +2501,7 @@ namespace PurelySharp.Symbolic
                 result.ProgramPointCount,
                 observedInvariant,
                 conservativeInvariant,
+                SymbolicCompactInvariantQueryView.FromQueryView(result.InvariantQuery, normalizedOptions),
                 result.Reachability,
                 result.ProgramPointSummary,
                 SymbolicCompactProjection.Take(result.ConditionProofs, normalizedOptions.MaxProofs),
@@ -1962,6 +2520,7 @@ namespace PurelySharp.Symbolic
             int programPointCount,
             SymbolicCompactInvariantSummary observedInvariant,
             SymbolicCompactInvariantSummary conservativeInvariant,
+            SymbolicCompactInvariantQueryView invariantQuery,
             SymbolicReachabilitySummary reachability,
             SymbolicProgramPointSummary programPointSummary,
             IReadOnlyList<SymbolicConditionProofSummary> conditionProofs,
@@ -1974,6 +2533,7 @@ namespace PurelySharp.Symbolic
             ProgramPointCount = programPointCount;
             ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
             ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
+            InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
             MergedInvariantText = ConservativeInvariant.Text;
             Reachability = reachability ?? throw new ArgumentNullException(nameof(reachability));
             ProgramPointSummary = programPointSummary ?? throw new ArgumentNullException(nameof(programPointSummary));
@@ -1993,6 +2553,8 @@ namespace PurelySharp.Symbolic
         public SymbolicCompactInvariantSummary ObservedInvariant { get; }
 
         public SymbolicCompactInvariantSummary ConservativeInvariant { get; }
+
+        public SymbolicCompactInvariantQueryView InvariantQuery { get; }
 
         public string MergedInvariantText { get; }
 
@@ -2048,6 +2610,7 @@ namespace PurelySharp.Symbolic
                 result.ProgramPoints.Count,
                 observedInvariant,
                 conservativeInvariant,
+                SymbolicCompactInvariantQueryView.FromQueryView(result.InvariantQuery, options),
                 result.ProgramPointSummary.Reachability,
                 result.ProgramPointSummary,
                 conditionProofs,
@@ -2078,6 +2641,7 @@ namespace PurelySharp.Symbolic
             IReadOnlyList<string> facts,
             SymbolicCompactInvariantSummary observedInvariant,
             SymbolicCompactInvariantSummary conservativeInvariant,
+            SymbolicCompactInvariantQueryView invariantQuery,
             int pathConditionCount,
             IReadOnlyList<SymbolicInvariantCondition> pathConditions,
             string reachability,
@@ -2105,6 +2669,7 @@ namespace PurelySharp.Symbolic
             Facts = facts ?? throw new ArgumentNullException(nameof(facts));
             ObservedInvariant = observedInvariant ?? throw new ArgumentNullException(nameof(observedInvariant));
             ConservativeInvariant = conservativeInvariant ?? throw new ArgumentNullException(nameof(conservativeInvariant));
+            InvariantQuery = invariantQuery ?? throw new ArgumentNullException(nameof(invariantQuery));
             MergedInvariantText = ConservativeInvariant.Text;
             PathConditionCount = pathConditionCount;
             PathConditions = pathConditions ?? throw new ArgumentNullException(nameof(pathConditions));
@@ -2151,6 +2716,8 @@ namespace PurelySharp.Symbolic
         public SymbolicCompactInvariantSummary ObservedInvariant { get; }
 
         public SymbolicCompactInvariantSummary ConservativeInvariant { get; }
+
+        public SymbolicCompactInvariantQueryView InvariantQuery { get; }
 
         public string MergedInvariantText { get; }
 
@@ -2214,6 +2781,7 @@ namespace PurelySharp.Symbolic
                 facts,
                 observedInvariant,
                 conservativeInvariant,
+                SymbolicCompactInvariantQueryView.FromQueryView(result.InvariantQuery, options),
                 result.PathConditionCount,
                 pathConditions,
                 result.Reachability.ToString(),
@@ -2497,6 +3065,131 @@ namespace PurelySharp.Symbolic
         }
     }
 
+    public sealed class SymbolicCompactInvariantQueryView
+    {
+        private SymbolicCompactInvariantQueryView(
+            string text,
+            string mergeKind,
+            int mustFactCount,
+            IReadOnlyList<string> mustFacts,
+            int maybeFactCount,
+            IReadOnlyList<string> maybeFacts,
+            int unknownFactCount,
+            IReadOnlyList<string> unknownFacts,
+            IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> unknownDiagnostics,
+            int candidateProgramPointCount,
+            int unreachableProgramPointCount,
+            bool isUnreachable,
+            bool hasMaybeFacts,
+            bool hasUnknowns,
+            bool hasUnresolvedAnalysis,
+            bool mustFactsTruncated,
+            bool maybeFactsTruncated,
+            bool unknownFactsTruncated,
+            bool unknownDiagnosticsTruncated)
+        {
+            Text = text ?? string.Empty;
+            MergeKind = mergeKind ?? string.Empty;
+            MustFactCount = mustFactCount;
+            MustFacts = mustFacts ?? throw new ArgumentNullException(nameof(mustFacts));
+            MaybeFactCount = maybeFactCount;
+            MaybeFacts = maybeFacts ?? throw new ArgumentNullException(nameof(maybeFacts));
+            UnknownFactCount = unknownFactCount;
+            UnknownFacts = unknownFacts ?? throw new ArgumentNullException(nameof(unknownFacts));
+            UnknownDiagnostics = unknownDiagnostics ?? throw new ArgumentNullException(nameof(unknownDiagnostics));
+            CandidateProgramPointCount = candidateProgramPointCount;
+            UnreachableProgramPointCount = unreachableProgramPointCount;
+            IsUnreachable = isUnreachable;
+            HasMaybeFacts = hasMaybeFacts;
+            HasUnknowns = hasUnknowns;
+            HasUnresolvedAnalysis = hasUnresolvedAnalysis;
+            MustFactsTruncated = mustFactsTruncated;
+            MaybeFactsTruncated = maybeFactsTruncated;
+            UnknownFactsTruncated = unknownFactsTruncated;
+            UnknownDiagnosticsTruncated = unknownDiagnosticsTruncated;
+        }
+
+        public string Text { get; }
+
+        public string MergeKind { get; }
+
+        public int MustFactCount { get; }
+
+        public IReadOnlyList<string> MustFacts { get; }
+
+        public int MaybeFactCount { get; }
+
+        public IReadOnlyList<string> MaybeFacts { get; }
+
+        public int UnknownFactCount { get; }
+
+        public IReadOnlyList<string> UnknownFacts { get; }
+
+        public IReadOnlyList<SymbolicCompactConservativeUnknownDiagnostic> UnknownDiagnostics { get; }
+
+        public int CandidateProgramPointCount { get; }
+
+        public int UnreachableProgramPointCount { get; }
+
+        public bool IsUnreachable { get; }
+
+        public bool HasMaybeFacts { get; }
+
+        public bool HasUnknowns { get; }
+
+        public bool HasUnresolvedAnalysis { get; }
+
+        public bool MustFactsTruncated { get; }
+
+        public bool MaybeFactsTruncated { get; }
+
+        public bool UnknownFactsTruncated { get; }
+
+        public bool UnknownDiagnosticsTruncated { get; }
+
+        public bool IsTruncated =>
+            MustFactsTruncated ||
+            MaybeFactsTruncated ||
+            UnknownFactsTruncated ||
+            UnknownDiagnosticsTruncated ||
+            UnknownDiagnostics.Any(static diagnostic => diagnostic.MaybeFactsTruncated);
+
+        internal static SymbolicCompactInvariantQueryView FromQueryView(
+            SymbolicInvariantQueryView query,
+            SymbolicCompactQueryOptions options)
+        {
+            if (query == null)
+            {
+                throw new ArgumentNullException(nameof(query));
+            }
+
+            var unknownDiagnostics = SymbolicCompactProjection
+                .Take(query.UnknownDiagnostics, options.MaxConditions)
+                .Select(diagnostic => SymbolicCompactConservativeUnknownDiagnostic.FromDiagnostic(diagnostic, options))
+                .ToArray();
+            return new SymbolicCompactInvariantQueryView(
+                query.Text,
+                query.MergeKind.ToString(),
+                query.MustFactCount,
+                SymbolicCompactProjection.Take(query.MustFacts, options.MaxConditions),
+                query.MaybeFactCount,
+                SymbolicCompactProjection.Take(query.MaybeFacts, options.MaxConditions),
+                query.UnknownFactCount,
+                SymbolicCompactProjection.Take(query.UnknownFacts, options.MaxConditions),
+                unknownDiagnostics,
+                query.CandidateProgramPointCount,
+                query.UnreachableProgramPointCount,
+                query.IsUnreachable,
+                query.HasMaybeFacts,
+                query.HasUnknowns,
+                query.HasUnresolvedAnalysis,
+                query.MustFactCount > options.MaxConditions,
+                query.MaybeFactCount > options.MaxConditions,
+                query.UnknownFactCount > options.MaxConditions,
+                query.UnknownDiagnostics.Count > options.MaxConditions);
+        }
+    }
+
     public sealed class SymbolicCompactSmtDiagnostics
     {
         private SymbolicCompactSmtDiagnostics(
@@ -2560,6 +3253,9 @@ namespace PurelySharp.Symbolic
             int programPointCount,
             int invariantConditionCount,
             int conservativeUnknownCount,
+            int mustFactCount,
+            int maybeFactCount,
+            int unknownFactCount,
             int totalPathConditionCount,
             int maxPathConditionCount,
             int reachabilityCheckedCount,
@@ -2571,11 +3267,19 @@ namespace PurelySharp.Symbolic
             int proofUnknownCount,
             bool smtConfigured,
             bool smtEnabled,
-            int smtExecutedQueryCount)
+            int smtExecutedQueryCount,
+            int smtCacheEntryCount,
+            int smtQueryTimeoutMs,
+            int smtMethodBudgetMs,
+            int smtMaxPathConditions,
+            int smtMaxExpressionNodes)
         {
             ProgramPointCount = programPointCount;
             InvariantConditionCount = invariantConditionCount;
             ConservativeUnknownCount = conservativeUnknownCount;
+            MustFactCount = mustFactCount;
+            MaybeFactCount = maybeFactCount;
+            UnknownFactCount = unknownFactCount;
             TotalPathConditionCount = totalPathConditionCount;
             MaxPathConditionCount = maxPathConditionCount;
             ReachabilityCheckedCount = reachabilityCheckedCount;
@@ -2588,6 +3292,11 @@ namespace PurelySharp.Symbolic
             SmtConfigured = smtConfigured;
             SmtEnabled = smtEnabled;
             SmtExecutedQueryCount = smtExecutedQueryCount;
+            SmtCacheEntryCount = smtCacheEntryCount;
+            SmtQueryTimeoutMs = smtQueryTimeoutMs;
+            SmtMethodBudgetMs = smtMethodBudgetMs;
+            SmtMaxPathConditions = smtMaxPathConditions;
+            SmtMaxExpressionNodes = smtMaxExpressionNodes;
         }
 
         public int ProgramPointCount { get; }
@@ -2595,6 +3304,12 @@ namespace PurelySharp.Symbolic
         public int InvariantConditionCount { get; }
 
         public int ConservativeUnknownCount { get; }
+
+        public int MustFactCount { get; }
+
+        public int MaybeFactCount { get; }
+
+        public int UnknownFactCount { get; }
 
         public int TotalPathConditionCount { get; }
 
@@ -2620,6 +3335,16 @@ namespace PurelySharp.Symbolic
 
         public int SmtExecutedQueryCount { get; }
 
+        public int SmtCacheEntryCount { get; }
+
+        public int SmtQueryTimeoutMs { get; }
+
+        public int SmtMethodBudgetMs { get; }
+
+        public int SmtMaxPathConditions { get; }
+
+        public int SmtMaxExpressionNodes { get; }
+
         public bool HasUnresolvedAnalysis =>
             ConservativeUnknownCount != 0 ||
             ReachabilityUnknownCount != 0 ||
@@ -2627,13 +3352,13 @@ namespace PurelySharp.Symbolic
             ProofUnknownCount != 0;
 
         internal static SymbolicCompactAnalysisSummary From(
-            SymbolicCompactInvariantSummary conservativeInvariant,
+            SymbolicCompactInvariantQueryView invariantQuery,
             SymbolicProgramPointSummary programPointSummary,
             SymbolicCompactSmtDiagnostics smtDiagnostics)
         {
-            if (conservativeInvariant == null)
+            if (invariantQuery == null)
             {
-                throw new ArgumentNullException(nameof(conservativeInvariant));
+                throw new ArgumentNullException(nameof(invariantQuery));
             }
 
             if (programPointSummary == null)
@@ -2662,8 +3387,11 @@ namespace PurelySharp.Symbolic
 
             return new SymbolicCompactAnalysisSummary(
                 programPointSummary.ProgramPointCount,
-                conservativeInvariant.ConditionCount,
-                conservativeInvariant.ConservativeUnknownCount,
+                invariantQuery.MustFactCount + invariantQuery.UnknownFactCount,
+                invariantQuery.UnknownFactCount,
+                invariantQuery.MustFactCount,
+                invariantQuery.MaybeFactCount,
+                invariantQuery.UnknownFactCount,
                 programPointSummary.TotalPathConditionCount,
                 programPointSummary.MaxPathConditionCount,
                 reachabilityCheckedCount,
@@ -2675,7 +3403,12 @@ namespace PurelySharp.Symbolic
                 proofOutcomes.UnknownCount,
                 smtDiagnostics.IsConfigured,
                 smtDiagnostics.IsEnabled,
-                smtDiagnostics.ExecutedQueryCount);
+                smtDiagnostics.ExecutedQueryCount,
+                smtDiagnostics.CacheEntryCount,
+                smtDiagnostics.QueryTimeoutMs,
+                smtDiagnostics.MethodBudgetMs,
+                smtDiagnostics.MaxPathConditions,
+                smtDiagnostics.MaxExpressionNodes);
         }
     }
 
@@ -3918,6 +4651,7 @@ namespace PurelySharp.Symbolic
             ConditionProofs = conditionProofs ?? Array.Empty<SymbolicConditionProofResult>();
             ProofOutcomes = SymbolicProofOutcomeSummary.FromProofs(ConditionProofs);
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
+            InvariantQuery = SymbolicInvariantQueryView.FromPoint(this);
         }
 
         public string FilePath { get; }
@@ -3967,6 +4701,8 @@ namespace PurelySharp.Symbolic
         public SymbolicProofOutcomeSummary ProofOutcomes { get; }
 
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
+
+        public SymbolicInvariantQueryView InvariantQuery { get; }
 
         public SymbolicCompactQueryResult ToCompactResult(SymbolicCompactQueryOptions? options = null)
         {

@@ -374,5 +374,124 @@ public sealed class TestClass
 
             await VerifyCS.VerifyAnalyzerAsync(test);
         }
+
+        [Test]
+        public async Task SwitchStatementDefaultExcludesCustomListPatternLength()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Bag
+{
+    [Pure]
+    public int Count { get; }
+
+    [Pure]
+    public int this[int index] => index;
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Bag bag)
+    {
+        switch (bag)
+        {
+            case [_]:
+                return;
+            default:
+                if (bag != null && bag.Count == 1)
+                {
+                    Console.WriteLine(bag.Count);
+                }
+
+                return;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchStatementPriorCustomListPatternWithGuardExcludesLaterSection()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Bag
+{
+    [Pure]
+    public int Count { get; }
+
+    [Pure]
+    public int this[int index] => index;
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Bag bag)
+    {
+        switch (bag)
+        {
+            case [_, ..] when bag.Count >= 1:
+                return;
+            case [_]:
+                Console.WriteLine(bag.Count);
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchStatementDefaultExcludesNestedCustomListPropertyPattern()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class Bag
+{
+    [Pure]
+    public int Count { get; }
+
+    [Pure]
+    public int this[int index] => index;
+}
+
+public sealed class Box
+{
+    [Pure]
+    public Bag Items { get; init; }
+}
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(Box box)
+    {
+        switch (box)
+        {
+            case { Items: [_] }:
+                return;
+            default:
+                if (box != null && box.Items != null && box.Items.Count == 1)
+                {
+                    Console.WriteLine(box.Items.Count);
+                }
+
+                return;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
     }
 }

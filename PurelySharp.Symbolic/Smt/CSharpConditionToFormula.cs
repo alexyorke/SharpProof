@@ -2191,6 +2191,18 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (expression is ConditionalAccessExpressionSyntax conditionalAccessExpression &&
+                TryTranslateConditionalAccessStringValue(
+                    conditionalAccessExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             if (expression is ConditionalExpressionSyntax conditionalExpression &&
                 TryTranslate(conditionalExpression.Condition, semanticModel, cancellationToken, out var conditionFormula, getSymbolVersion, inlineDepth) &&
                 conditionFormula != null &&
@@ -2256,6 +2268,64 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
+        }
+
+        private static bool TryTranslateConditionalAccessStringValue(
+            ConditionalAccessExpressionSyntax conditionalAccess,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            var resultTypeInfo = semanticModel.GetTypeInfo(conditionalAccess, cancellationToken);
+            var resultType = resultTypeInfo.ConvertedType ?? resultTypeInfo.Type;
+            if (resultType?.SpecialType != SpecialType.System_String ||
+                !TryTranslateValue(
+                    conditionalAccess.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                receiverFormula is not { Kind: SmtValueKind.Reference } ||
+                !TryCreateConditionalAccessWhenNotNullValueFormula(
+                    conditionalAccess,
+                    receiverFormula,
+                    resultType,
+                    semanticModel,
+                    cancellationToken,
+                    out var whenNotNullReference,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                whenNotNullReference is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            formula = new SmtConditionalFormula(
+                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, receiverFormula, new SmtNullConstant()),
+                CreateStringValueFormulaForReference(whenNotNullReference),
+                CreateConditionalAccessNullBranchStringFormula(receiverFormula),
+                SmtValueKind.String);
+            return true;
+        }
+
+        private static SmtFormula CreateStringValueFormulaForReference(SmtFormula referenceFormula)
+        {
+            var referenceName = referenceFormula is SmtVariable variable
+                ? variable.Name
+                : referenceFormula.ToString();
+            return new SmtVariable(referenceName + ".String", SmtValueKind.String);
+        }
+
+        private static SmtFormula CreateConditionalAccessNullBranchStringFormula(SmtFormula receiverFormula)
+        {
+            var receiverName = receiverFormula is SmtVariable variable
+                ? variable.Name
+                : receiverFormula.ToString();
+            return new SmtVariable(receiverName + "?.String", SmtValueKind.String);
         }
 
         private static bool TryTranslateStringConcatOperand(
@@ -3134,6 +3204,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             AddNullComparisonOperandImplications(expression, branchWhenTrue, semanticModel, cancellationToken, formulas, getSymbolVersion);
+            AddConditionalAccessStringEqualityBranchFacts(expression, branchWhenTrue, semanticModel, cancellationToken, formulas, getSymbolVersion);
 
             if (!TryTranslate(expression, semanticModel, cancellationToken, out var formula, getSymbolVersion) ||
                 formula == null)
@@ -3144,6 +3215,89 @@ namespace PurelySharp.Symbolic.Smt
             formulas.Add(branchWhenTrue
                 ? formula
                 : new SmtUnaryFormula(SmtUnaryOperator.Not, formula));
+        }
+
+        private static void AddConditionalAccessStringEqualityBranchFacts(
+            ExpressionSyntax expression,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (expression is not BinaryExpressionSyntax binaryExpression ||
+                (!binaryExpression.IsKind(SyntaxKind.EqualsExpression) &&
+                 !binaryExpression.IsKind(SyntaxKind.NotEqualsExpression)) ||
+                branchWhenTrue != binaryExpression.IsKind(SyntaxKind.EqualsExpression))
+            {
+                return;
+            }
+
+            if (TryAddConditionalAccessStringEqualityBranchFacts(
+                    binaryExpression.Left,
+                    binaryExpression.Right,
+                    semanticModel,
+                    cancellationToken,
+                    formulas,
+                    getSymbolVersion))
+            {
+                return;
+            }
+
+            TryAddConditionalAccessStringEqualityBranchFacts(
+                binaryExpression.Right,
+                binaryExpression.Left,
+                semanticModel,
+                cancellationToken,
+                formulas,
+                getSymbolVersion);
+        }
+
+        private static bool TryAddConditionalAccessStringEqualityBranchFacts(
+            ExpressionSyntax conditionalCandidate,
+            ExpressionSyntax otherCandidate,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> formulas,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            conditionalCandidate = UnwrapExpression(conditionalCandidate);
+            otherCandidate = UnwrapExpression(otherCandidate);
+            if (conditionalCandidate is not ConditionalAccessExpressionSyntax conditionalAccess ||
+                !TryCreateStringNonNullFormula(otherCandidate, semanticModel, cancellationToken, out var otherNonNull, getSymbolVersion) ||
+                otherNonNull is not SmtBooleanConstant { Value: true } ||
+                !TryTranslateStringValue(otherCandidate, semanticModel, cancellationToken, out var otherString, getSymbolVersion) ||
+                otherString == null ||
+                !TryTranslateValue(conditionalAccess.Expression, semanticModel, cancellationToken, out var receiver, getSymbolVersion) ||
+                receiver is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            var resultTypeInfo = semanticModel.GetTypeInfo(conditionalAccess, cancellationToken);
+            var resultType = resultTypeInfo.ConvertedType ?? resultTypeInfo.Type;
+            if (resultType?.SpecialType != SpecialType.System_String ||
+                !TryCreateConditionalAccessWhenNotNullValueFormula(
+                    conditionalAccess,
+                    receiver,
+                    resultType,
+                    semanticModel,
+                    cancellationToken,
+                    out var whenNotNullReference,
+                    getSymbolVersion,
+                    inlineDepth: 0) ||
+                whenNotNullReference is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            formulas.Add(new SmtBinaryFormula(SmtBinaryOperator.NotEqual, receiver, new SmtNullConstant()));
+            formulas.Add(new SmtBinaryFormula(SmtBinaryOperator.NotEqual, whenNotNullReference, new SmtNullConstant()));
+            formulas.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.Equal,
+                CreateStringValueFormulaForReference(whenNotNullReference),
+                otherString));
+            return true;
         }
 
         private static bool TryCreateTypeTestNonNullBranchFact(

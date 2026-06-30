@@ -33,6 +33,15 @@ try
             smtAnalysis: smtAnalysis,
             impliedConditions: options.ImpliedConditions,
             includeExpressionProgramPoints: options.LineExpressions)
+        : options.IsSpanQuery
+        ? queryService.QueryFileSpan(
+            options.FilePath,
+            options.SpanStart!.Value,
+            options.SpanEnd!.Value,
+            options.CreateReferences(),
+            smtAnalysis: smtAnalysis,
+            impliedConditions: options.ImpliedConditions,
+            includeExpressionProgramPoints: options.LineExpressions)
         : options.Position.HasValue
             ? queryService.QueryFileAtPosition(
             options.FilePath,
@@ -56,6 +65,7 @@ try
         {
             SymbolicFileQueryResult fileResult => fileResult.Filter(filter),
             SymbolicLineQueryResult lineResult => lineResult.Filter(filter),
+            SymbolicSpanQueryResult spanResult => spanResult.Filter(filter),
             _ => result,
         };
     }
@@ -66,6 +76,7 @@ try
         {
             SymbolicFileQueryResult fileResult => fileResult.ToCompactResult(options.CreateCompactOptions()),
             SymbolicLineQueryResult lineResult => lineResult.ToCompactResult(options.CreateCompactOptions()),
+            SymbolicSpanQueryResult spanResult => spanResult.ToCompactResult(options.CreateCompactOptions()),
             SymbolicSourceQueryResult pointResult => pointResult.ToCompactResult(options.CreateCompactOptions()),
             _ => throw new InvalidOperationException("Unexpected query result type."),
         };
@@ -79,6 +90,7 @@ try
         {
             SymbolicFileQueryResult fileResult => JsonSerializer.Serialize(fileResult, CreateFullJsonOptions()),
             SymbolicLineQueryResult lineResult => JsonSerializer.Serialize(lineResult, CreateFullJsonOptions()),
+            SymbolicSpanQueryResult spanResult => JsonSerializer.Serialize(spanResult, CreateFullJsonOptions()),
             SymbolicSourceQueryResult pointResult => JsonSerializer.Serialize(pointResult, CreateFullJsonOptions()),
             _ => throw new InvalidOperationException("Unexpected query result type."),
         };
@@ -91,6 +103,10 @@ try
     else if (result is SymbolicLineQueryResult lineResult)
     {
         PrintLineResult(lineResult, options);
+    }
+    else if (result is SymbolicSpanQueryResult spanResult)
+    {
+        PrintSpanResult(spanResult, options);
     }
     else
     {
@@ -118,6 +134,7 @@ static void PrintFileResult(
     Console.WriteLine($"Merged invariant: {result.MergedInvariantText}");
     Console.WriteLine($"Merged invariant merge: {result.MergedInvariant.MergeKind}");
     Console.WriteLine($"Merged invariant conditions: {result.MergedInvariant.ConditionCount}");
+    PrintInvariantQuery("Merged invariant query", result.InvariantQuery);
     PrintMergedPathFacts("Merged path facts", result.MergedPathFacts);
     Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
     Console.WriteLine($"Observed invariant merge: {result.ObservedInvariant.MergeKind}");
@@ -163,7 +180,32 @@ static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions o
     Console.WriteLine($"Line merged invariant: {result.MergedInvariantText}");
     Console.WriteLine($"Line invariant merge: {result.MergedInvariant.MergeKind}");
     Console.WriteLine($"Line invariant conditions: {result.MergedInvariant.ConditionCount}");
+    PrintInvariantQuery("Line invariant query", result.InvariantQuery);
     PrintMergedPathFacts("Line merged path facts", result.MergedPathFacts);
+    foreach (var point in result.ProgramPoints)
+    {
+        Console.WriteLine();
+        PrintPointResult(point, options, includeLocation: true);
+    }
+
+    if (result.SmtDiagnostics.IsConfigured && result.ProgramPoints.Count == 0)
+    {
+        PrintSmtDiagnostics(result.SmtDiagnostics);
+    }
+}
+
+static void PrintSpanResult(SymbolicSpanQueryResult result, SymbolicCliOptions options)
+{
+    Console.WriteLine($"{result.FilePath}:{result.SpanStart}-{result.SpanEnd}");
+    Console.WriteLine($"Span lines: {result.StartLine}:{result.StartColumn}-{result.EndLine}:{result.EndColumn}");
+    Console.WriteLine($"Program points: {result.ProgramPoints.Count}");
+    PrintProgramPointSummary(result.ProgramPointSummary, options);
+    Console.WriteLine($"Observed distinct facts: {result.ObservedFactCount}");
+    Console.WriteLine($"Span merged invariant: {result.MergedInvariantText}");
+    Console.WriteLine($"Span invariant merge: {result.MergedInvariant.MergeKind}");
+    Console.WriteLine($"Span invariant conditions: {result.MergedInvariant.ConditionCount}");
+    PrintInvariantQuery("Span invariant query", result.InvariantQuery);
+    PrintMergedPathFacts("Span merged path facts", result.MergedPathFacts);
     foreach (var point in result.ProgramPoints)
     {
         Console.WriteLine();
@@ -200,6 +242,33 @@ static void PrintMergedPathFacts(
     }
 }
 
+static void PrintInvariantQuery(
+    string label,
+    SymbolicInvariantQueryView query)
+{
+    Console.WriteLine(
+        $"{label}: " +
+        $"Must={query.MustFactCount}, " +
+        $"Maybe={query.MaybeFactCount}, " +
+        $"Unknown={query.UnknownFactCount}, " +
+        $"CandidatePoints={query.CandidateProgramPointCount}, " +
+        $"UnreachablePoints={query.UnreachableProgramPointCount}");
+    if (query.MustFacts.Count != 0)
+    {
+        Console.WriteLine(label + " must facts: " + string.Join("; ", query.MustFacts));
+    }
+
+    if (query.MaybeFacts.Count != 0)
+    {
+        Console.WriteLine(label + " maybe facts: " + string.Join("; ", query.MaybeFacts));
+    }
+
+    if (query.UnknownFacts.Count != 0)
+    {
+        Console.WriteLine(label + " unknowns: " + string.Join("; ", query.UnknownFacts));
+    }
+}
+
 static void PrintPointResult(
     SymbolicSourceQueryResult result,
     SymbolicCliOptions options,
@@ -221,6 +290,7 @@ static void PrintPointResult(
     Console.WriteLine($"Invariant merge: {result.Invariant.MergeKind}");
     Console.WriteLine($"Path conditions: {result.PathConditionCount}");
     Console.WriteLine($"Conservative unknown conditions: {result.Invariant.ConservativeUnknownCount}");
+    PrintInvariantQuery("Invariant query", result.InvariantQuery);
     if (result.Invariant.ConditionCount != 0)
     {
         Console.WriteLine("Invariant conditions:");
@@ -339,15 +409,17 @@ static JsonSerializerOptions CreateFullJsonOptions()
 internal sealed class SymbolicCliOptions
 {
     public const string Usage = """
-Usage: PurelySharp.SymbolicCli --file <path> (--line <n> [--column <n>] [--line-invariants] | --position <n>) [--json|--compact-json]
+Usage: PurelySharp.SymbolicCli --file <path> (--line <n> [--column <n>] [--line-invariants] | --position <n> | --span-start <n> --span-end <n>) [--json|--compact-json]
 
 Options:
   --file <path>       C# source file to query.
   --line <n>          1-based source line to query.
   --column <n>        1-based source column to query. Default: 1.
   --line-invariants   Query every statement/expression program point on the line.
+  --span-start <n>    0-based inclusive source span start to query.
+  --span-end <n>      0-based exclusive source span end to query.
   --all-lines         Query every line that contains statement/expression program points.
-  --line-expressions  Include expression program points in --line-invariants or --all-lines.
+  --line-expressions  Include expression program points in --line-invariants, --span-start/--span-end, or --all-lines.
   --position <n>      0-based absolute source position to query.
   --reference <path>  Metadata reference path. Can be repeated.
   --node-kind <kind>  Keep only matching Roslyn node kinds in --line-invariants or --all-lines output. Can be repeated.
@@ -403,6 +475,10 @@ Options:
     public int Column { get; private set; } = 1;
 
     public int? Position { get; private set; }
+
+    public int? SpanStart { get; private set; }
+
+    public int? SpanEnd { get; private set; }
 
     public bool LineInvariants { get; private set; }
 
@@ -482,6 +558,8 @@ Options:
 
     public bool RequiresSmt => CheckReachability || ImpliedConditions.Count != 0;
 
+    public bool IsSpanQuery => SpanStart.HasValue || SpanEnd.HasValue;
+
     public bool HasResultFilter =>
         NodeKinds.Count != 0 ||
         ProgramPointKinds.Count != 0 ||
@@ -524,6 +602,12 @@ Options:
                     break;
                 case "--position":
                     options.Position = ReadNonNegativeInt(args, ref index, arg);
+                    break;
+                case "--span-start":
+                    options.SpanStart = ReadNonNegativeInt(args, ref index, arg);
+                    break;
+                case "--span-end":
+                    options.SpanEnd = ReadNonNegativeInt(args, ref index, arg);
                     break;
                 case "--line-invariants":
                 case "--all-line-points":
@@ -684,10 +768,42 @@ Options:
                 throw new ArgumentException("--position cannot be combined with --line.");
             }
 
-            if (options.AllLines &&
-                (options.Position.HasValue || options.Line != 0 || options.Column != 1 || options.LineInvariants))
+            if (options.Position.HasValue && options.IsSpanQuery)
             {
-                throw new ArgumentException("--all-lines cannot be combined with --line, --column, --position, or --line-invariants.");
+                throw new ArgumentException("--position cannot be combined with --span-start or --span-end.");
+            }
+
+            if (options.IsSpanQuery && options.Line != 0)
+            {
+                throw new ArgumentException("--span-start and --span-end cannot be combined with --line.");
+            }
+
+            if (options.IsSpanQuery && options.LineInvariants)
+            {
+                throw new ArgumentException("--span-start and --span-end cannot be combined with --line-invariants.");
+            }
+
+            if (options.IsSpanQuery && options.Column != 1)
+            {
+                throw new ArgumentException("--span-start and --span-end cannot be combined with --column.");
+            }
+
+            if (options.IsSpanQuery && (!options.SpanStart.HasValue || !options.SpanEnd.HasValue))
+            {
+                throw new ArgumentException("--span-start and --span-end must be provided together.");
+            }
+
+            if (options.SpanEnd.HasValue &&
+                options.SpanStart.HasValue &&
+                options.SpanEnd.Value < options.SpanStart.Value)
+            {
+                throw new ArgumentException("--span-end cannot be less than --span-start.");
+            }
+
+            if (options.AllLines &&
+                (options.Position.HasValue || options.IsSpanQuery || options.Line != 0 || options.Column != 1 || options.LineInvariants))
+            {
+                throw new ArgumentException("--all-lines cannot be combined with --line, --column, --position, --span-start, --span-end, or --line-invariants.");
             }
 
             if (options.Position.HasValue && options.LineInvariants)
@@ -700,9 +816,9 @@ Options:
                 throw new ArgumentException("--line-invariants cannot be combined with --column.");
             }
 
-            if (options.LineExpressions && !options.LineInvariants && !options.AllLines)
+            if (options.LineExpressions && !options.LineInvariants && !options.AllLines && !options.IsSpanQuery)
             {
-                throw new ArgumentException("--line-expressions requires --line-invariants or --all-lines.");
+                throw new ArgumentException("--line-expressions requires --line-invariants, --span-start/--span-end, or --all-lines.");
             }
 
             if (options.FilterLineStart.HasValue &&
@@ -712,14 +828,14 @@ Options:
                 throw new ArgumentException("--line-start cannot be greater than --line-end.");
             }
 
-            if (!options.AllLines && !options.Position.HasValue && options.Line == 0)
+            if (!options.AllLines && !options.Position.HasValue && !options.IsSpanQuery && options.Line == 0)
             {
-                throw new ArgumentException("--line, --position, or --all-lines is required.");
+                throw new ArgumentException("--line, --position, --span-start/--span-end, or --all-lines is required.");
             }
 
-            if (options.HasResultFilter && !options.AllLines && !options.LineInvariants)
+            if (options.HasResultFilter && !options.AllLines && !options.LineInvariants && !options.IsSpanQuery)
             {
-                throw new ArgumentException("Result filters require --line-invariants or --all-lines.");
+                throw new ArgumentException("Result filters require --line-invariants, --span-start/--span-end, or --all-lines.");
             }
 
             foreach (var referencePath in options.ReferencePaths)

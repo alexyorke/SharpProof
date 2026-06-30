@@ -431,14 +431,14 @@ namespace PurelySharp.Symbolic.Smt
             Func<ISymbol, int>? getSymbolVersion)
         {
             formula = null!;
-            if (!CSharpConditionToFormula.TryTranslatePattern(
+            if (!TryCreatePatternSelectionCondition(
                     governingValue,
+                    governingType,
                     pattern,
                     semanticModel,
                     cancellationToken,
                     out var patternFormula,
-                    getSymbolVersion,
-                    governingType) ||
+                    getSymbolVersion) ||
                 patternFormula == null)
             {
                 return false;
@@ -462,6 +462,438 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return TryCreateConjunction(conditions, out formula);
+        }
+
+        private static bool TryCreatePatternSelectionCondition(
+            SmtFormula value,
+            ITypeSymbol? valueType,
+            PatternSyntax pattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null;
+
+            if (CanUseTranslatedPatternForSelection(pattern, valueType, semanticModel, cancellationToken) &&
+                CSharpConditionToFormula.TryTranslatePattern(
+                    value,
+                    pattern,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    valueType) &&
+                formula != null)
+            {
+                return true;
+            }
+
+            if (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
+            {
+                return TryCreatePatternSelectionCondition(
+                    value,
+                    valueType,
+                    parenthesizedPattern.Pattern,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion);
+            }
+
+            if (pattern is UnaryPatternSyntax unaryPattern &&
+                unaryPattern.OperatorToken.IsKind(SyntaxKind.NotKeyword) &&
+                TryCreatePatternSelectionCondition(
+                    value,
+                    valueType,
+                    unaryPattern.Pattern,
+                    semanticModel,
+                    cancellationToken,
+                    out var negatedPattern,
+                    getSymbolVersion) &&
+                negatedPattern != null)
+            {
+                formula = new SmtUnaryFormula(SmtUnaryOperator.Not, negatedPattern);
+                return true;
+            }
+
+            if (pattern is BinaryPatternSyntax binaryPattern)
+            {
+                return TryCreateBinaryPatternSelectionCondition(
+                    value,
+                    valueType,
+                    binaryPattern,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion);
+            }
+
+            if (pattern is RecursivePatternSyntax recursivePattern)
+            {
+                return TryCreateRecursivePatternSelectionCondition(
+                    value,
+                    valueType,
+                    recursivePattern,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion);
+            }
+
+            if (pattern is ListPatternSyntax listPattern)
+            {
+                return TryCreateListPatternSelectionCondition(
+                    value,
+                    valueType,
+                    listPattern,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion);
+            }
+
+            return false;
+        }
+
+        private static bool TryCreateBinaryPatternSelectionCondition(
+            SmtFormula value,
+            ITypeSymbol? valueType,
+            BinaryPatternSyntax binaryPattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null;
+            if (!TryCreatePatternSelectionCondition(
+                    value,
+                    valueType,
+                    binaryPattern.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out var leftPattern,
+                    getSymbolVersion) ||
+                !TryCreatePatternSelectionCondition(
+                    value,
+                    valueType,
+                    binaryPattern.Right,
+                    semanticModel,
+                    cancellationToken,
+                    out var rightPattern,
+                    getSymbolVersion) ||
+                leftPattern == null ||
+                rightPattern == null)
+            {
+                return false;
+            }
+
+            if (binaryPattern.OperatorToken.IsKind(SyntaxKind.AndKeyword))
+            {
+                formula = new SmtBinaryFormula(SmtBinaryOperator.And, leftPattern, rightPattern);
+                return true;
+            }
+
+            if (binaryPattern.OperatorToken.IsKind(SyntaxKind.OrKeyword))
+            {
+                formula = new SmtBinaryFormula(SmtBinaryOperator.Or, leftPattern, rightPattern);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryCreateRecursivePatternSelectionCondition(
+            SmtFormula value,
+            ITypeSymbol? valueType,
+            RecursivePatternSyntax recursivePattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null;
+            if (!CanUseRecursivePatternTypeAsStructuralFact(
+                    recursivePattern,
+                    valueType,
+                    semanticModel,
+                    cancellationToken))
+            {
+                return false;
+            }
+
+            var conditions = new List<SmtFormula>();
+            if (value.Kind == SmtValueKind.Reference &&
+                (valueType == null || valueType.IsReferenceType))
+            {
+                AddReferenceNonNullFact(value, conditions);
+            }
+
+            var propertySubpatterns = recursivePattern.PropertyPatternClause?.Subpatterns;
+            if (propertySubpatterns != null)
+            {
+                foreach (var subpattern in propertySubpatterns.Value)
+                {
+                    if (!TryResolvePropertySubpatternValue(
+                            value,
+                            subpattern,
+                            semanticModel,
+                            cancellationToken,
+                            out var memberValue,
+                            out var memberType,
+                            out var pathCondition) ||
+                        memberValue == null ||
+                        memberType == null ||
+                        !TryCreatePatternSelectionCondition(
+                            memberValue,
+                            memberType,
+                            subpattern.Pattern,
+                            semanticModel,
+                            cancellationToken,
+                            out var subpatternCondition,
+                            getSymbolVersion) ||
+                        subpatternCondition == null)
+                    {
+                        return false;
+                    }
+
+                    if (pathCondition != null)
+                    {
+                        conditions.Add(pathCondition);
+                    }
+
+                    conditions.Add(subpatternCondition);
+                }
+            }
+
+            var positionalSubpatterns = recursivePattern.PositionalPatternClause?.Subpatterns;
+            if (positionalSubpatterns != null)
+            {
+                for (var position = 0; position < positionalSubpatterns.Value.Count; position++)
+                {
+                    if (!TryResolveTuplePositionalSubpatternValue(
+                            value,
+                            valueType,
+                            position,
+                            out var memberValue,
+                            out var memberType) ||
+                        memberValue == null ||
+                        memberType == null ||
+                        !TryCreatePatternSelectionCondition(
+                            memberValue,
+                            memberType,
+                            positionalSubpatterns.Value[position].Pattern,
+                            semanticModel,
+                            cancellationToken,
+                            out var subpatternCondition,
+                            getSymbolVersion) ||
+                        subpatternCondition == null)
+                    {
+                        return false;
+                    }
+
+                    conditions.Add(subpatternCondition);
+                }
+            }
+
+            if (conditions.Count == 0)
+            {
+                formula = new SmtBooleanConstant(true);
+                return true;
+            }
+
+            return TryCreateConjunction(conditions, out formula);
+        }
+
+        private static bool TryCreateListPatternSelectionCondition(
+            SmtFormula value,
+            ITypeSymbol? valueType,
+            ListPatternSyntax listPattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            formula = null;
+            if (value.Kind != SmtValueKind.Reference ||
+                !TryCreateListPatternLengthFormula(value, valueType, semanticModel, out var lengthFormula))
+            {
+                return false;
+            }
+
+            var conditions = new List<SmtFormula>();
+            AddReferenceNonNullFact(value, conditions);
+
+            var hasSlice = false;
+            var minimumLength = 0;
+            foreach (var subpattern in listPattern.Patterns)
+            {
+                if (subpattern is SlicePatternSyntax slicePattern)
+                {
+                    if (!IsSelectionNeutralSlicePattern(slicePattern.Pattern))
+                    {
+                        return false;
+                    }
+
+                    hasSlice = true;
+                    continue;
+                }
+
+                minimumLength++;
+            }
+
+            conditions.Add(hasSlice
+                ? new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThanOrEqual,
+                    lengthFormula,
+                    new SmtIntegerConstant(minimumLength))
+                : new SmtBinaryFormula(
+                    SmtBinaryOperator.Equal,
+                    lengthFormula,
+                    new SmtIntegerConstant(minimumLength)));
+
+            if (!TryAddListPatternElementSelectionConditions(
+                    value,
+                    valueType,
+                    listPattern,
+                    semanticModel,
+                    cancellationToken,
+                    conditions,
+                    getSymbolVersion))
+            {
+                return false;
+            }
+
+            return TryCreateConjunction(conditions, out formula);
+        }
+
+        private static bool TryAddListPatternElementSelectionConditions(
+            SmtFormula value,
+            ITypeSymbol? valueType,
+            ListPatternSyntax listPattern,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> conditions,
+            Func<ISymbol, int>? getSymbolVersion)
+        {
+            if (!TryGetListPatternElementType(valueType, out var elementType) ||
+                !TryGetValueKind(elementType, out var elementKind))
+            {
+                return listPattern.Patterns.All(static pattern =>
+                    pattern is SlicePatternSyntax ||
+                    IsSelectionNeutralPattern(pattern));
+            }
+
+            for (var patternIndex = 0; patternIndex < listPattern.Patterns.Count; patternIndex++)
+            {
+                var subpattern = listPattern.Patterns[patternIndex];
+                if (subpattern is SlicePatternSyntax)
+                {
+                    continue;
+                }
+
+                if (IsSelectionNeutralPattern(subpattern))
+                {
+                    continue;
+                }
+
+                if (!TryGetListPatternElementPosition(listPattern, patternIndex, out var elementIndex, out var fromEnd))
+                {
+                    return false;
+                }
+
+                var elementValue = CreateListPatternElementFormula(value, elementIndex, fromEnd, elementKind);
+                if (!TryCreatePatternSelectionCondition(
+                        elementValue,
+                        elementType,
+                        subpattern,
+                        semanticModel,
+                        cancellationToken,
+                        out var elementCondition,
+                        getSymbolVersion) ||
+                    elementCondition == null)
+                {
+                    return false;
+                }
+
+                conditions.Add(elementCondition);
+            }
+
+            return true;
+        }
+
+        private static bool CanUseTranslatedPatternForSelection(
+            PatternSyntax pattern,
+            ITypeSymbol? valueType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            pattern = UnwrapParenthesizedPattern(pattern);
+            if (pattern is RecursivePatternSyntax recursivePattern)
+            {
+                return CanUseRecursivePatternTypeAsStructuralFact(
+                    recursivePattern,
+                    valueType,
+                    semanticModel,
+                    cancellationToken);
+            }
+
+            if (pattern is BinaryPatternSyntax binaryPattern)
+            {
+                return CanUseTranslatedPatternForSelection(binaryPattern.Left, valueType, semanticModel, cancellationToken) &&
+                    CanUseTranslatedPatternForSelection(binaryPattern.Right, valueType, semanticModel, cancellationToken);
+            }
+
+            if (pattern is UnaryPatternSyntax unaryPattern &&
+                unaryPattern.OperatorToken.IsKind(SyntaxKind.NotKeyword))
+            {
+                return CanUseTranslatedPatternForSelection(unaryPattern.Pattern, valueType, semanticModel, cancellationToken);
+            }
+
+            return true;
+        }
+
+        private static bool CanUseRecursivePatternTypeAsStructuralFact(
+            RecursivePatternSyntax recursivePattern,
+            ITypeSymbol? valueType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (recursivePattern.Type == null)
+            {
+                return true;
+            }
+
+            var patternType = semanticModel.GetTypeInfo(recursivePattern.Type, cancellationToken).Type;
+            if (valueType == null ||
+                patternType == null)
+            {
+                return false;
+            }
+
+            return semanticModel.Compilation.ClassifyConversion(valueType, patternType).IsImplicit;
+        }
+
+        private static PatternSyntax UnwrapParenthesizedPattern(PatternSyntax pattern)
+        {
+            while (pattern is ParenthesizedPatternSyntax parenthesizedPattern)
+            {
+                pattern = parenthesizedPattern.Pattern;
+            }
+
+            return pattern;
+        }
+
+        private static bool IsSelectionNeutralSlicePattern(PatternSyntax? pattern)
+        {
+            return pattern == null ||
+                IsSelectionNeutralPattern(pattern);
+        }
+
+        private static bool IsSelectionNeutralPattern(PatternSyntax pattern)
+        {
+            pattern = UnwrapParenthesizedPattern(pattern);
+            return pattern is DiscardPatternSyntax or VarPatternSyntax;
         }
 
         private static bool TryCreatePatternAndGuardCondition(
