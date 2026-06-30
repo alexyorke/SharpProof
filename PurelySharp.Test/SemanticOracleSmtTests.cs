@@ -399,6 +399,50 @@ public class TestClass
         }
 
         [Test]
+        public void CSharpConditionToFormula_ElementAccessInRange_TranslatesMultidimensionalArrayBounds()
+        {
+            var source = @"
+public class TestClass
+{
+    public int TestMethod(int[,] values, int row, int column)
+    {
+        if (row >= 0 && row < values.GetLength(0) && column >= 0 && column < values.GetLength(1))
+        {
+            return values[row, column];
+        }
+
+        return 0;
+    }
+}";
+            var (semanticModel, root) = CreateElementAccessRangeFormulaHost(
+                source,
+                "ElementAccessMultidimensionalInRangeHost");
+            var guard = root.DescendantNodes().OfType<IfStatementSyntax>().Single().Condition;
+            var elementAccess = root.DescendantNodes().OfType<ElementAccessExpressionSyntax>().Single();
+
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+                    elementAccess,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var inRangeFormula),
+                Is.True);
+            Assert.That(
+                PurelySharp.Symbolic.Smt.CSharpConditionToFormula.TryTranslate(
+                    guard,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var guardFormula),
+                Is.True);
+            Assert.That(guardFormula, Is.Not.Null);
+
+            var proof = new SmtAnalysisService(SmtAnalysisOptions.Default)
+                .ClassifyImplication(new[] { guardFormula! }, inRangeFormula);
+
+            Assert.That(proof.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        }
+
+        [Test]
         public void CSharpConditionToFormula_ElementAccessInRange_TranslatesRangeEndpoints()
         {
             var source = @"

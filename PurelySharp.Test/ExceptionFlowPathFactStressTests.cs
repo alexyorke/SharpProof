@@ -490,6 +490,66 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_MultidimensionalArrayRowUpperBoundGuard_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[,] values, int row)
+    {
+        if (row >= values.GetLength(0))
+        {
+            return values[row, 0];
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
+        public async Task Ps0010_MultidimensionalArrayGuardedInRange_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[,] values, int row, int column)
+    {
+        if (row >= 0 &&
+            row < values.GetLength(0) &&
+            column >= 0 &&
+            column < values.GetLength(1))
+        {
+            return values[row, column];
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_DirectMultidimensionalArrayCreationOutOfRange_ReportsIndexOutOfRangeException()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+public class TestClass
+{
+    public int TestMethod()
+    {
+        return (new int[1, 2])[0, 2];
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
         public async Task Ps0010_ReadOnlySpanUpperBoundIndexGuard_ReportsIndexOutOfRangeException()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"
@@ -2662,6 +2722,57 @@ public class TestClass
         if (index >= 0 && index < values.Length)
         {
             return values[index];
+        }
+
+        return 0;
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0011_MultidimensionalArrayRowUpperBoundGuard_ReportsExceptionSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+public class TestClass
+{
+    public int TestMethod(int[,] values, int row)
+    {
+        if (row >= values.GetLength(0))
+        {
+            return values[row, 0];
+        }
+
+        return 0;
+    }
+}",
+                reportExceptions: false,
+                checkedExceptions: true);
+
+            var diagnostic = diagnostics.Single(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId);
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.IndexOutOfRangeException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_index_out_of_range"));
+        }
+
+        [Test]
+        public async Task Ps0011_MultidimensionalArrayGuardedInRange_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(
+                @"
+public class TestClass
+{
+    public int TestMethod(int[,] values, int row, int column)
+    {
+        if (row >= 0 &&
+            row < values.GetLength(0) &&
+            column >= 0 &&
+            column < values.GetLength(1))
+        {
+            return values[row, column];
         }
 
         return 0;

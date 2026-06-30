@@ -351,16 +351,22 @@ namespace PurelySharp.Analyzer
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken)
         {
-            if (elementAccess.ArgumentList.Arguments.Count != 1)
+            var argumentCount = elementAccess.ArgumentList.Arguments.Count;
+            if (argumentCount == 0)
             {
                 return false;
             }
 
             var receiverTypeInfo = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken);
             var receiverType = receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type;
-            return receiverType is IArrayTypeSymbol { Rank: 1 } ||
-                receiverType?.SpecialType == SpecialType.System_String ||
-                IsBuiltInSpanType(receiverType);
+            if (receiverType is IArrayTypeSymbol arrayType)
+            {
+                return arrayType.Rank == argumentCount;
+            }
+
+            return argumentCount == 1 &&
+                (receiverType?.SpecialType == SpecialType.System_String ||
+                 IsBuiltInSpanType(receiverType));
         }
 
         private static bool IsBuiltInSpanType(ITypeSymbol? typeSymbol)

@@ -2958,13 +2958,26 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth = 0)
         {
             formula = null!;
+            var receiverType = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).Type;
+            if (receiverType is IArrayTypeSymbol { Rank: > 1 } multidimensionalArrayType &&
+                elementAccess.ArgumentList.Arguments.Count == multidimensionalArrayType.Rank)
+            {
+                return TryTranslateMultidimensionalArrayElementAccessInRange(
+                    elementAccess,
+                    multidimensionalArrayType,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth);
+            }
+
             if (elementAccess.ArgumentList.Arguments.Count != 1)
             {
                 return false;
             }
 
-            var receiverType = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).ConvertedType ??
-                semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken).Type;
             if (!IsSupportedBuiltInElementAccessReceiver(receiverType))
             {
                 return false;
@@ -3017,6 +3030,69 @@ namespace PurelySharp.Symbolic.Smt
             return true;
         }
 
+        private static bool TryTranslateMultidimensionalArrayElementAccessInRange(
+            ElementAccessExpressionSyntax elementAccess,
+            IArrayTypeSymbol arrayType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null!;
+            if (arrayType.Rank <= 1 ||
+                elementAccess.ArgumentList.Arguments.Count != arrayType.Rank)
+            {
+                return false;
+            }
+
+            SmtFormula? combined = null;
+            for (var dimension = 0; dimension < arrayType.Rank; dimension++)
+            {
+                if (!TryTranslateValue(
+                        elementAccess.ArgumentList.Arguments[dimension].Expression,
+                        semanticModel,
+                        cancellationToken,
+                        out var indexFormula,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    indexFormula is not { Kind: SmtValueKind.Int } ||
+                    !TryCreateArrayDimensionLengthFormula(
+                        elementAccess.Expression,
+                        dimension,
+                        semanticModel,
+                        cancellationToken,
+                        out var lengthFormula,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    lengthFormula is not { Kind: SmtValueKind.Int })
+                {
+                    return false;
+                }
+
+                var lowerBound = new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThanOrEqual,
+                    indexFormula,
+                    new SmtIntegerConstant(0));
+                var upperBound = new SmtBinaryFormula(
+                    SmtBinaryOperator.LessThan,
+                    indexFormula,
+                    lengthFormula);
+                var dimensionInRange = new SmtBinaryFormula(SmtBinaryOperator.And, lowerBound, upperBound);
+                combined = combined == null
+                    ? dimensionInRange
+                    : new SmtBinaryFormula(SmtBinaryOperator.And, combined, dimensionInRange);
+            }
+
+            if (combined == null)
+            {
+                return false;
+            }
+
+            formula = combined;
+            return true;
+        }
+
         public static bool TryTranslateBuiltInLengthValue(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
@@ -3027,6 +3103,25 @@ namespace PurelySharp.Symbolic.Smt
         {
             return TryCreateBuiltInElementAccessLengthFormula(
                 expression,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
+        }
+
+        public static bool TryTranslateArrayDimensionLengthValue(
+            ExpressionSyntax expression,
+            int dimension,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            return TryCreateArrayDimensionLengthFormula(
+                expression,
+                dimension,
                 semanticModel,
                 cancellationToken,
                 out formula,
@@ -6418,6 +6513,91 @@ namespace PurelySharp.Symbolic.Smt
             return false;
         }
 
+        private static bool TryCreateArrayDimensionLengthFormula(
+            ExpressionSyntax receiverExpression,
+            int dimension,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula lengthFormula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            lengthFormula = null!;
+            if (dimension < 0)
+            {
+                return false;
+            }
+
+            receiverExpression = UnwrapExpression(receiverExpression);
+            if (receiverExpression is ArrayCreationExpressionSyntax arrayCreation &&
+                arrayCreation.Type.RankSpecifiers.Count == 1 &&
+                arrayCreation.Type.RankSpecifiers[0].Sizes.Count > dimension &&
+                !arrayCreation.Type.RankSpecifiers[0].Sizes[dimension].IsKind(SyntaxKind.OmittedArraySizeExpression) &&
+                TryTranslateValue(
+                    arrayCreation.Type.RankSpecifiers[0].Sizes[dimension],
+                    semanticModel,
+                    cancellationToken,
+                    out var dimensionSize,
+                    getSymbolVersion,
+                    inlineDepth) &&
+                dimensionSize is { Kind: SmtValueKind.Int })
+            {
+                lengthFormula = dimensionSize;
+                return true;
+            }
+
+            var receiverType = semanticModel.GetTypeInfo(receiverExpression, cancellationToken).ConvertedType ??
+                semanticModel.GetTypeInfo(receiverExpression, cancellationToken).Type;
+            if (receiverType is not IArrayTypeSymbol arrayType ||
+                dimension >= arrayType.Rank ||
+                !TryTranslateValue(
+                    receiverExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                receiverFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            var intType = semanticModel.Compilation.GetSpecialType(SpecialType.System_Int32);
+            if (!TryCreateMemberFormula(
+                    receiverFormula,
+                    "GetLength(" + dimension.ToString(CultureInfo.InvariantCulture) + ")",
+                    intType,
+                    out var candidate) ||
+                candidate is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            lengthFormula = candidate;
+            return true;
+        }
+
+        private static bool TryGetConstantNonNegativeInt(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out int value)
+        {
+            value = 0;
+            var constantValue = semanticModel.GetConstantValue(expression, cancellationToken);
+            if (!constantValue.HasValue ||
+                constantValue.Value == null ||
+                !TryGetIntegralConstant(constantValue.Value, out var integralValue) ||
+                integralValue < 0 ||
+                integralValue > int.MaxValue)
+            {
+                return false;
+            }
+
+            value = (int)integralValue;
+            return true;
+        }
+
         private static bool TryCreateCollectionExpressionLengthFormula(
             ExpressionSyntax receiverExpression,
             out SmtFormula lengthFormula)
@@ -7466,6 +7646,18 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
+            if (expression is InvocationExpressionSyntax invocationExpression &&
+                TryTranslateArrayGetLengthInvocation(
+                    invocationExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             if (expression is PrefixUnaryExpressionSyntax prefixUnary)
             {
                 if (prefixUnary.IsKind(SyntaxKind.UnaryPlusExpression))
@@ -7544,6 +7736,38 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
+        }
+
+        private static bool TryTranslateArrayGetLengthInvocation(
+            InvocationExpressionSyntax invocationExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod.Name != "GetLength" ||
+                invocationOperation.TargetMethod.Parameters.Length != 1 ||
+                invocationOperation.TargetMethod.ReturnType.SpecialType != SpecialType.System_Int32 ||
+                invocationOperation.Instance?.Syntax is not ExpressionSyntax receiverExpression ||
+                invocationOperation.Instance.Type is not IArrayTypeSymbol arrayType ||
+                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var dimensionExpression) ||
+                !TryGetConstantNonNegativeInt(dimensionExpression, semanticModel, cancellationToken, out var dimension) ||
+                dimension >= arrayType.Rank)
+            {
+                return false;
+            }
+
+            return TryCreateArrayDimensionLengthFormula(
+                receiverExpression,
+                dimension,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth);
         }
 
         private static bool TryTranslateIntegralTermWithSafeDivisors(
