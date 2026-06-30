@@ -6522,6 +6522,17 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_StaticCultureInvariantRegexOptionContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"Regex.IsMatch(text, @""\AAB\z"", RegexOptions.CultureInvariant) && text != ""AB""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
         public void ExecutionVisibility_StaticSinglelineRegexOptionAllowsNewlineDot()
         {
             Assert.That(
@@ -6561,6 +6572,17 @@ public class TestClass
                 IsConditionAlwaysFalse(
                     "string text",
                     @"!Regex.IsMatch(text, @""\A.\z"", RegexOptions.Compiled | RegexOptions.Singleline) && text == ""\n""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_StaticCultureInvariantCombinedWithSinglelineRegexOptionAllowsNewlineDot()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"!Regex.IsMatch(text, @""\A.\z"", RegexOptions.CultureInvariant | RegexOptions.Singleline) && text == ""\n""",
                     "using System.Text.RegularExpressions;"),
                 Is.True);
         }
@@ -6627,6 +6649,17 @@ public class TestClass
                 IsConditionAlwaysFalse(
                     "string text",
                     @"new Regex(@""\AAB\z"", RegexOptions.Compiled).IsMatch(text) && text != ""AB""",
+                    "using System.Text.RegularExpressions;"),
+                Is.True);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceCultureInvariantRegexOptionContradictsStringEquality()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    @"new Regex(@""\AAB\z"", RegexOptions.CultureInvariant).IsMatch(text) && text != ""AB""",
                     "using System.Text.RegularExpressions;"),
                 Is.True);
         }
@@ -6731,12 +6764,34 @@ public class TestClass
         }
 
         [Test]
+        public void ExecutionVisibility_CultureInvariantWithUnsupportedRegexOptionsRemainConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "Regex.IsMatch(text, \"^ab$\", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase) && text == \"AB\"",
+                    "using System.Text.RegularExpressions;"),
+                Is.False);
+        }
+
+        [Test]
         public void ExecutionVisibility_InstanceUnsupportedRegexOptionsRemainConservative()
         {
             Assert.That(
                 IsConditionAlwaysFalse(
                     "string text",
                     "new Regex(\"^ab$\", RegexOptions.IgnoreCase).IsMatch(text) && text == \"AB\"",
+                    "using System.Text.RegularExpressions;"),
+                Is.False);
+        }
+
+        [Test]
+        public void ExecutionVisibility_InstanceCultureInvariantWithUnsupportedRegexOptionsRemainConservative()
+        {
+            Assert.That(
+                IsConditionAlwaysFalse(
+                    "string text",
+                    "new Regex(\"^ab$\", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase).IsMatch(text) && text == \"AB\"",
                     "using System.Text.RegularExpressions;"),
                 Is.False);
         }
