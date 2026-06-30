@@ -639,6 +639,60 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazards_SuppressesNullableValueAfterCoalesceFallbackAssignment()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int? left)
+    {
+        int? value = left ?? 5;
+        return value.Value;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return value.Value;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullableValueWithoutValue }));
+
+            Assert.That(result.Hazards, Is.Empty);
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_ProvesNullableValueAfterConditionalAccessNullReceiverAssignment()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        int? value = text?.Length;
+        if (text is null)
+        {
+            return value.Value;
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return value.Value;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullableValueWithoutValue }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullableValueWithoutValue));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidOperationException"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesUnboxNullCast()
         {
             const string source = @"

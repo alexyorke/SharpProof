@@ -271,6 +271,54 @@ public class TestClass
         }
 
         [Test]
+        public void ProgramPointFacts_NullableCoalesceAssignmentPreservesValueParts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int? left)
+    {
+        if (left.HasValue && left.Value == 5)
+        {
+            int? result = left ?? 9;
+            return result.Value;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return result.Value;");
+            var proof = ProveAtMarker(source, marker, "result.HasValue && result.Value == 5");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_ConditionalAccessAssignmentProvesNoNullableValueOnNullReceiver()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string text)
+    {
+        int? length = text?.Length;
+        if (text is null)
+        {
+            return length.Value;
+        }
+
+        return 0;
+    }
+}";
+
+            var marker = FindMarker(source, "return length.Value;");
+            var proof = ProveAtMarker(source, marker, "!length.HasValue");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
         public void ProgramPointFacts_DeconstructionDeclarationDiscardPreservesVisibleTupleSlotFact()
         {
             const string source = @"

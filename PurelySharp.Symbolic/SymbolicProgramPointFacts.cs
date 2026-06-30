@@ -6012,13 +6012,14 @@ namespace PurelySharp.Symbolic
                 return;
             }
 
-            if (TryCreateNullableStateFormulas(
+            if (CSharpConditionToFormula.TryTranslateNullableValueParts(
                     rightExpression,
                     semanticModel,
                     cancellationToken,
-                    out var rightHasValue,
-                    out _) &&
-                rightHasValue is SmtBooleanConstant { Value: true })
+                    out var parts,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                parts.HasValue is SmtBooleanConstant { Value: true })
             {
                 facts.Add(targetHasValue);
             }
@@ -6401,19 +6402,20 @@ namespace PurelySharp.Symbolic
                 return;
             }
 
-            if (TryCreateNullableStateFormulas(
+            if (CSharpConditionToFormula.TryTranslateNullableValueParts(
                     valueExpression,
                     semanticModel,
                     cancellationToken,
-                    out var hasValueFormula,
-                    out var valueFormula))
+                    out var parts,
+                    getSymbolVersion: null,
+                    inlineDepth: 0))
             {
-                facts.Add(CreateAssignedValueFact(targetHasValue, hasValueFormula));
+                facts.Add(CreateAssignedValueFact(targetHasValue, parts.HasValue));
 
-                if (valueFormula != null &&
-                    CanCompareSmtValues(targetValue, valueFormula))
+                if (parts.Value != null &&
+                    CanCompareSmtValues(targetValue, parts.Value))
                 {
-                    facts.Add(CreateAssignedValueFact(targetValue, valueFormula));
+                    facts.Add(CreateAssignedValueFact(targetValue, parts.Value));
                 }
             }
             else if (TryGetNullableUnderlyingType(GetSymbolType(assignedSymbol), out var underlyingType) &&
@@ -6431,79 +6433,6 @@ namespace PurelySharp.Symbolic
                     facts.Add(CreateAssignedValueFact(targetValue, wrappedValueFormula));
                 }
             }
-        }
-
-        private static bool TryCreateNullableStateFormulas(
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out SmtFormula hasValueFormula,
-            out SmtFormula? valueFormula)
-        {
-            valueExpression = UnwrapExpression(valueExpression);
-            if (IsNullOrDefaultNullableValue(valueExpression, semanticModel, cancellationToken))
-            {
-                hasValueFormula = new SmtBooleanConstant(false);
-                valueFormula = null;
-                return true;
-            }
-
-            if (TryGetNullableWrappedValueExpression(valueExpression, semanticModel, cancellationToken, out var wrappedValueExpression) &&
-                CSharpConditionToFormula.TryTranslateValue(
-                    wrappedValueExpression,
-                    semanticModel,
-                    cancellationToken,
-                    out valueFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
-                valueFormula != null)
-            {
-                hasValueFormula = new SmtBooleanConstant(true);
-                return true;
-            }
-
-            if (semanticModel.GetSymbolInfo(valueExpression, cancellationToken).Symbol is { } sourceSymbol &&
-                sourceSymbol is ILocalSymbol or IParameterSymbol &&
-                TryCreateNullableHasValueFormula(sourceSymbol.OriginalDefinition, out hasValueFormula))
-            {
-                valueFormula = null;
-                return true;
-            }
-
-            if (valueExpression is ConditionalExpressionSyntax conditionalExpression &&
-                CSharpConditionToFormula.TryTranslate(
-                    conditionalExpression.Condition,
-                    semanticModel,
-                    cancellationToken,
-                    out var conditionFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) &&
-                conditionFormula != null &&
-                TryCreateNullableStateFormulas(
-                    conditionalExpression.WhenTrue,
-                    semanticModel,
-                    cancellationToken,
-                    out var trueHasValue,
-                    out var trueValue) &&
-                TryCreateNullableStateFormulas(
-                    conditionalExpression.WhenFalse,
-                    semanticModel,
-                    cancellationToken,
-                    out var falseHasValue,
-                    out var falseValue))
-            {
-                hasValueFormula = new SmtConditionalFormula(conditionFormula, trueHasValue, falseHasValue, SmtValueKind.Bool);
-                valueFormula = trueValue != null &&
-                    falseValue != null &&
-                    trueValue.Kind == falseValue.Kind
-                        ? new SmtConditionalFormula(conditionFormula, trueValue, falseValue, trueValue.Kind)
-                        : null;
-                return true;
-            }
-
-            hasValueFormula = null!;
-            valueFormula = null;
-            return false;
         }
 
         private static bool TryTranslateNullableWrappedValueForUnderlyingType(
@@ -6536,71 +6465,6 @@ namespace PurelySharp.Symbolic
             }
 
             valueFormula = null!;
-            return false;
-        }
-
-        private static bool IsNullOrDefaultNullableValue(
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken)
-        {
-            if (semanticModel.GetConstantValue(valueExpression, cancellationToken) is { HasValue: true, Value: null } &&
-                TryGetNullableUnderlyingType(
-                    semanticModel.GetTypeInfo(valueExpression, cancellationToken).ConvertedType ??
-                    semanticModel.GetTypeInfo(valueExpression, cancellationToken).Type,
-                    out _))
-            {
-                return true;
-            }
-
-            if (!valueExpression.IsKind(SyntaxKind.DefaultLiteralExpression) &&
-                valueExpression is not DefaultExpressionSyntax)
-            {
-                return false;
-            }
-
-            return TryGetNullableUnderlyingType(
-                semanticModel.GetTypeInfo(valueExpression, cancellationToken).ConvertedType ??
-                semanticModel.GetTypeInfo(valueExpression, cancellationToken).Type,
-                out _);
-        }
-
-        private static bool TryGetNullableWrappedValueExpression(
-            ExpressionSyntax valueExpression,
-            SemanticModel semanticModel,
-            CancellationToken cancellationToken,
-            out ExpressionSyntax wrappedValueExpression)
-        {
-            valueExpression = UnwrapExpression(valueExpression);
-            if (valueExpression is CastExpressionSyntax castExpression &&
-                TryGetNullableUnderlyingType(
-                    semanticModel.GetTypeInfo(castExpression, cancellationToken).Type,
-                    out _))
-            {
-                wrappedValueExpression = castExpression.Expression;
-                return true;
-            }
-
-            if (valueExpression is ObjectCreationExpressionSyntax objectCreation &&
-                TryGetNullableUnderlyingType(
-                    semanticModel.GetTypeInfo(objectCreation, cancellationToken).Type,
-                    out _) &&
-                objectCreation.ArgumentList?.Arguments.Count == 1)
-            {
-                wrappedValueExpression = objectCreation.ArgumentList.Arguments[0].Expression;
-                return true;
-            }
-
-            var typeInfo = semanticModel.GetTypeInfo(valueExpression, cancellationToken);
-            if (TryGetNullableUnderlyingType(typeInfo.ConvertedType, out var convertedUnderlyingType) &&
-                typeInfo.Type != null &&
-                SymbolEqualityComparer.Default.Equals(typeInfo.Type, convertedUnderlyingType))
-            {
-                wrappedValueExpression = valueExpression;
-                return true;
-            }
-
-            wrappedValueExpression = null!;
             return false;
         }
 

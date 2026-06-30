@@ -19,6 +19,19 @@ namespace PurelySharp.Symbolic.Smt
         private static readonly ConditionalWeakTable<Compilation, ConcurrentDictionary<SourceBooleanFormulaCacheKey, SourceBooleanFormulaCacheEntry>> s_sourceBooleanFormulaCache = new();
         private static readonly ConditionalWeakTable<Compilation, ConcurrentDictionary<ExpressionFormulaCacheKey, SourceBooleanFormulaCacheEntry>> s_expressionFormulaCache = new();
 
+        public readonly struct NullableSmtValueParts
+        {
+            public NullableSmtValueParts(SmtFormula hasValue, SmtFormula? value)
+            {
+                HasValue = hasValue;
+                Value = value;
+            }
+
+            public SmtFormula HasValue { get; }
+
+            public SmtFormula? Value { get; }
+        }
+
         private readonly struct SourceBooleanFormulaCacheEntry
         {
             public SourceBooleanFormulaCacheEntry(bool success, SmtFormula? formula)
@@ -3799,15 +3812,40 @@ namespace PurelySharp.Symbolic.Smt
                     expression,
                     semanticModel,
                     cancellationToken,
-                    out formula,
-                    out _,
+                    out var parts,
                     getSymbolVersion,
                     inlineDepth))
             {
+                formula = parts.HasValue;
                 return true;
             }
 
             formula = null!;
+            return false;
+        }
+
+        public static bool TryTranslateNullableValueParts(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out NullableSmtValueParts parts,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            if (TryTranslateNullableValueParts(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var hasValueFormula,
+                    out var valueFormula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                parts = new NullableSmtValueParts(hasValueFormula, valueFormula);
+                return true;
+            }
+
+            parts = default;
             return false;
         }
 
