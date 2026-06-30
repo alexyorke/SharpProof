@@ -236,14 +236,30 @@ namespace PurelySharp.Symbolic
                         cancellationToken);
                 }
                 else if (ancestor is UsingStatementSyntax usingStatementSyntax &&
-                         usingStatementSyntax.Declaration != null &&
                          usingStatementSyntax.Statement.Span.Contains(syntaxNode.Span))
                 {
-                    AddUsingStatementDeclarationFacts(
-                        builder,
-                        usingStatementSyntax,
-                        semanticModel,
-                        cancellationToken);
+                    if (usingStatementSyntax.Declaration != null)
+                    {
+                        AddUsingStatementDeclarationFacts(
+                            builder,
+                            usingStatementSyntax,
+                            semanticModel,
+                            cancellationToken);
+                    }
+                    else if (usingStatementSyntax.Expression != null &&
+                             !AnyReferencedSymbolAssignedBeforeUse(
+                                 usingStatementSyntax.Expression,
+                                 usingStatementSyntax.Statement,
+                                 syntaxNode.SpanStart,
+                                 semanticModel,
+                                 cancellationToken))
+                    {
+                        AddUsingStatementExpressionFacts(
+                            builder,
+                            usingStatementSyntax.Expression,
+                            semanticModel,
+                            cancellationToken);
+                    }
                 }
                 else if (ancestor is WhileStatementSyntax whileStatementSyntax &&
                          whileStatementSyntax.Statement.Span.Contains(syntaxNode.Span) &&
@@ -3204,6 +3220,37 @@ namespace PurelySharp.Symbolic
             foreach (var fact in declarationFacts)
             {
                 facts.Add(fact);
+            }
+        }
+
+        private static void AddUsingStatementExpressionFacts(
+            ICollection<SmtFormula> facts,
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            if (!TryGetThrowGuardedValue(
+                    expression,
+                    out var effectiveValueExpression,
+                    out var guardExpression,
+                    out var guardBranchWhenTrue,
+                    out var requiresNonNullValue))
+            {
+                return;
+            }
+
+            if (guardExpression != null)
+            {
+                AddBranchConditionFacts(
+                    guardExpression,
+                    guardBranchWhenTrue,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
+            else if (requiresNonNullValue)
+            {
+                AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
         }
 
