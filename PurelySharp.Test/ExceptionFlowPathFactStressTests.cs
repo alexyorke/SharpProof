@@ -1918,6 +1918,27 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_ArrayCollectionExpressionSpreadFixedElementsPruneZeroLengthBranch_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int[] input)
+    {
+        int[] values = [.. input, 1];
+        if (values.Length == 0)
+        {
+            return values[0];
+        }
+
+        return values[0];
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_IndexAssignedFromArrayLength_ReportsIndexOutOfRangeException()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"

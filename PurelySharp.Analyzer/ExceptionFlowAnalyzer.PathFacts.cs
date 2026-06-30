@@ -1127,6 +1127,12 @@ namespace PurelySharp.Analyzer
                 facts.Add(new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula));
             }
 
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
+                TryCreateCollectionExpressionLengthLowerBoundFact(targetSymbol, effectiveValueExpression, out var lowerBoundLengthFact))
+            {
+                facts.Add(lowerBoundLengthFact);
+            }
+
             if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken))
             {
                 AddArrayDimensionLengthAssignedValueFacts(targetSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
@@ -1189,6 +1195,49 @@ namespace PurelySharp.Analyzer
             {
                 AddSymbolNonNullFact(targetSymbol, facts);
             }
+        }
+
+        private static bool TryCreateCollectionExpressionLengthLowerBoundFact(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            out SmtFormula fact)
+        {
+            fact = null!;
+            valueExpression = UnwrapFactExpression(valueExpression);
+            if (valueExpression is not CollectionExpressionSyntax collectionExpression ||
+                !TryCreateBuiltInLengthFormula(targetSymbol, out var targetLengthFormula) ||
+                !TryGetCollectionExpressionFixedLowerBound(collectionExpression, out var lowerBound))
+            {
+                return false;
+            }
+
+            fact = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                targetLengthFormula,
+                new SmtIntegerConstant(lowerBound));
+            return true;
+        }
+
+        private static bool TryGetCollectionExpressionFixedLowerBound(
+            CollectionExpressionSyntax collectionExpression,
+            out int lowerBound)
+        {
+            lowerBound = 0;
+            var hasSpread = false;
+            foreach (var element in collectionExpression.Elements)
+            {
+                switch (element)
+                {
+                    case ExpressionElementSyntax:
+                        lowerBound++;
+                        break;
+                    case SpreadElementSyntax:
+                        hasSpread = true;
+                        break;
+                }
+            }
+
+            return hasSpread && lowerBound > 0;
         }
 
         private static void AddArrayDimensionLengthAssignedValueFacts(

@@ -4426,6 +4426,15 @@ namespace PurelySharp.Analyzer.Engine
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, targetLengthFormula, valueLengthFormula)));
             }
 
+            if (TryCreateCollectionExpressionLengthLowerBoundFact(
+                    targetSymbol,
+                    valueExpression,
+                    currentState,
+                    out var lowerBoundLengthFact))
+            {
+                nextState = nextState.WithPathConditions(nextState.PathConditions.Add(lowerBoundLengthFact));
+            }
+
             if (TryCreateStringContentFormula(targetSymbol, currentState, out var targetStringFormula) &&
                 CSharpConditionToFormula.TryTranslateStringValue(
                     valueExpression,
@@ -4565,7 +4574,8 @@ namespace PurelySharp.Analyzer.Engine
                 return true;
             }
 
-            if (type is IArrayTypeSymbol { Rank: 1 })
+            if (type is IArrayTypeSymbol { Rank: 1 } ||
+                IsBuiltInSpanOrMemoryType(type))
             {
                 var receiverFormula = new SmtVariable(GetSmtVariableName(symbol, currentState.GetSmtSymbolVersion), SmtValueKind.Reference);
                 formula = new SmtVariable(receiverFormula + ".Length", SmtValueKind.Int);
@@ -4574,6 +4584,16 @@ namespace PurelySharp.Analyzer.Engine
 
             formula = null!;
             return false;
+        }
+
+        private static bool IsBuiltInSpanOrMemoryType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.ToDisplayString() is
+                    "System.Span<T>" or
+                    "System.ReadOnlySpan<T>" or
+                    "System.Memory<T>" or
+                    "System.ReadOnlyMemory<T>";
         }
 
         private static bool TryCreateBuiltInLengthValueFormula(
@@ -4701,6 +4721,50 @@ namespace PurelySharp.Analyzer.Engine
 
             formula = null!;
             return false;
+        }
+
+        private static bool TryCreateCollectionExpressionLengthLowerBoundFact(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            PurityAnalysisState currentState,
+            out SmtFormula fact)
+        {
+            fact = null!;
+            valueExpression = UnwrapSmtFactExpression(valueExpression);
+            if (valueExpression is not CollectionExpressionSyntax collectionExpression ||
+                !TryCreateBuiltInLengthFormula(targetSymbol, currentState, out var targetLengthFormula) ||
+                !TryGetCollectionExpressionFixedLowerBound(collectionExpression, out var lowerBound))
+            {
+                return false;
+            }
+
+            fact = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                targetLengthFormula,
+                new SmtIntegerConstant(lowerBound));
+            return true;
+        }
+
+        private static bool TryGetCollectionExpressionFixedLowerBound(
+            CollectionExpressionSyntax collectionExpression,
+            out int lowerBound)
+        {
+            lowerBound = 0;
+            var hasSpread = false;
+            foreach (var element in collectionExpression.Elements)
+            {
+                switch (element)
+                {
+                    case ExpressionElementSyntax:
+                        lowerBound++;
+                        break;
+                    case SpreadElementSyntax:
+                        hasSpread = true;
+                        break;
+                }
+            }
+
+            return hasSpread && lowerBound > 0;
         }
 
         private static bool TryCreateCollectionExpressionLengthFormula(

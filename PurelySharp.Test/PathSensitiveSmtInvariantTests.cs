@@ -68,6 +68,64 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesCollectionExpressionSpreadFixedLengthLowerBound()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] input)
+    {
+        int[] values = [.. input, 1, 2];
+        return values.Length;
+    }
+}";
+
+            var marker = FindMarker(source, "return values.Length;");
+            var proof = ProveAtMarker(source, marker, "values.Length >= 2");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_CollectionExpressionSpreadLowerBoundSurvivesSourceReassignment()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] input)
+    {
+        int[] values = [.. input, 1];
+        input = null;
+        return values.Length;
+    }
+}";
+
+            var marker = FindMarker(source, "return values.Length;");
+            var proof = ProveAtMarker(source, marker, "values.Length >= 1");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_CollectionExpressionSpreadFixedLengthIsNotExact()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] input)
+    {
+        int[] values = [.. input, 1];
+        return values.Length;
+    }
+}";
+
+            var marker = FindMarker(source, "return values.Length;");
+            var proof = ProveAtMarker(source, marker, "values.Length == 1");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesNullPatternSnapshotAfterSourceReassignment()
         {
             const string source = @"
