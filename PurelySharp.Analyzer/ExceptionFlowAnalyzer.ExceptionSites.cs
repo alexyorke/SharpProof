@@ -279,7 +279,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            if (!IsBuiltInArrayOrStringElementAccess(elementAccess, semanticModel, cancellationToken) ||
+            if (!IsBuiltInSequenceElementAccess(elementAccess, semanticModel, cancellationToken) ||
                 IsBuiltInRangeAccessArgument(
                     elementAccess.ArgumentList.Arguments[0].Expression,
                     semanticModel,
@@ -306,7 +306,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            if (!IsBuiltInArrayOrStringElementAccess(elementAccess, semanticModel, cancellationToken) ||
+            if (!IsBuiltInSequenceElementAccess(elementAccess, semanticModel, cancellationToken) ||
                 !IsBuiltInRangeAccessArgument(
                     elementAccess.ArgumentList.Arguments[0].Expression,
                     semanticModel,
@@ -346,7 +346,7 @@ namespace PurelySharp.Analyzer
                 PathConditionsImplyFact(pathConditions, outOfRangeFormula, smtAnalysis);
         }
 
-        private static bool IsBuiltInArrayOrStringElementAccess(
+        private static bool IsBuiltInSequenceElementAccess(
             ElementAccessExpressionSyntax elementAccess,
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken)
@@ -359,7 +359,14 @@ namespace PurelySharp.Analyzer
             var receiverTypeInfo = semanticModel.GetTypeInfo(elementAccess.Expression, cancellationToken);
             var receiverType = receiverTypeInfo.ConvertedType ?? receiverTypeInfo.Type;
             return receiverType is IArrayTypeSymbol { Rank: 1 } ||
-                receiverType?.SpecialType == SpecialType.System_String;
+                receiverType?.SpecialType == SpecialType.System_String ||
+                IsBuiltInSpanType(receiverType);
+        }
+
+        private static bool IsBuiltInSpanType(ITypeSymbol? typeSymbol)
+        {
+            return typeSymbol is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.ToDisplayString() is "System.Span<T>" or "System.ReadOnlySpan<T>";
         }
 
         private static bool IsBuiltInRangeAccessArgument(
