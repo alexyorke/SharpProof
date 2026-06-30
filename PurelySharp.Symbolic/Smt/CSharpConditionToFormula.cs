@@ -3648,8 +3648,21 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
+            var indexArgumentExpression = elementAccess.ArgumentList.Arguments[0].Expression;
             if (TryCreateBuiltInRangeAccessInRangeFormula(
-                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    indexArgumentExpression,
+                    lengthFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
+            if (TryCreateAbsRemainderIndexAccessInRangeFormula(
+                    indexArgumentExpression,
                     lengthFormula,
                     semanticModel,
                     cancellationToken,
@@ -3661,7 +3674,7 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             if (!TryResolveBuiltInIndexAccessIndexShape(
-                    elementAccess.ArgumentList.Arguments[0].Expression,
+                    indexArgumentExpression,
                     semanticModel,
                     cancellationToken,
                     out var indexShape) ||
@@ -3698,6 +3711,40 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             formula = ApplyWellFormedPrecondition(indexWellFormed, formula);
+            return true;
+        }
+
+        private static bool TryCreateAbsRemainderIndexAccessInRangeFormula(
+            ExpressionSyntax indexExpression,
+            SmtFormula lengthFormula,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null!;
+            if (indexExpression is not InvocationExpressionSyntax invocationExpression ||
+                !TryGetMathAbsRemainderOperands(
+                    invocationExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out _,
+                    out var divisorExpression) ||
+                !TryTranslateValue(
+                    divisorExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var divisorFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                divisorFormula is not { Kind: SmtValueKind.Int } ||
+                !Equals(divisorFormula, lengthFormula))
+            {
+                return false;
+            }
+
+            formula = new SmtBooleanConstant(true);
             return true;
         }
 
@@ -9889,6 +9936,19 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
+            if (expression is InvocationExpressionSyntax mathAbsInvocation &&
+                TryTranslateSafeMathAbsRemainder(
+                    mathAbsInvocation,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth,
+                    nonZeroDivisors))
+            {
+                return true;
+            }
+
             if (expression is PrefixUnaryExpressionSyntax prefixUnary)
             {
                 if (prefixUnary.IsKind(SyntaxKind.UnaryPlusExpression))
@@ -9996,6 +10056,92 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
+        }
+
+        private static bool TryTranslateSafeMathAbsRemainder(
+            InvocationExpressionSyntax invocationExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth,
+            ISet<string> nonZeroDivisors)
+        {
+            formula = null;
+            if (!TryGetMathAbsRemainderOperands(
+                    invocationExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var dividendExpression,
+                    out var divisorExpression) ||
+                !TryTranslateIntegralOperandWithSafeDivisors(
+                    dividendExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var dividend,
+                    getSymbolVersion,
+                    inlineDepth,
+                    nonZeroDivisors) ||
+                dividend is not { Kind: SmtValueKind.Int } ||
+                !TryTranslateIntegralOperandWithSafeDivisors(
+                    divisorExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var divisor,
+                    getSymbolVersion,
+                    inlineDepth,
+                    nonZeroDivisors) ||
+                divisor is not { Kind: SmtValueKind.Int } ||
+                !IsSafeIntegerDivisor(divisor, nonZeroDivisors))
+            {
+                return false;
+            }
+
+            var remainder = new SmtIntegerBinaryTerm(SmtIntegerBinaryOperator.Remainder, dividend, divisor);
+            var isNonNegative = new SmtBinaryFormula(
+                SmtBinaryOperator.GreaterThanOrEqual,
+                remainder,
+                new SmtIntegerConstant(0));
+            formula = new SmtConditionalFormula(
+                isNonNegative,
+                remainder,
+                new SmtIntegerUnaryTerm(SmtIntegerUnaryOperator.Negate, remainder),
+                SmtValueKind.Int);
+            return true;
+        }
+
+        internal static bool TryGetMathAbsRemainderOperands(
+            InvocationExpressionSyntax invocationExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax dividendExpression,
+            out ExpressionSyntax divisorExpression)
+        {
+            dividendExpression = null!;
+            divisorExpression = null!;
+            if (semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
+                invocationOperation.TargetMethod.Name != "Abs" ||
+                !invocationOperation.TargetMethod.IsStatic ||
+                invocationOperation.TargetMethod.ContainingType?.ToDisplayString() != "System.Math" ||
+                invocationOperation.TargetMethod.Parameters.Length != 1 ||
+                !IsIntegralOrEnumType(invocationOperation.TargetMethod.ReturnType) ||
+                !TryGetInvocationArgumentExpression(invocationOperation, parameterIndex: 0, out var argumentExpression))
+            {
+                return false;
+            }
+
+            argumentExpression = UnwrapExpression(argumentExpression);
+            if (argumentExpression is not BinaryExpressionSyntax remainderExpression ||
+                !remainderExpression.IsKind(SyntaxKind.ModuloExpression) ||
+                !HasSupportedIntegralType(remainderExpression.Left, semanticModel, cancellationToken) ||
+                !HasSupportedIntegralType(remainderExpression.Right, semanticModel, cancellationToken))
+            {
+                return false;
+            }
+
+            dividendExpression = remainderExpression.Left;
+            divisorExpression = remainderExpression.Right;
+            return true;
         }
 
         private static bool TryTranslateIntegralOperandWithSafeDivisors(

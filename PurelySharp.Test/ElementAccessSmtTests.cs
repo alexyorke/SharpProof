@@ -60,6 +60,32 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesAssignedAbsModuloIndexRange()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values, int hash)
+    {
+        if (values != null && values.Length > 0)
+        {
+            var index = Math.Abs(hash % values.Length);
+            return values[index];
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return values[index];",
+                "index >= 0 && index < values.Length");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesMultidimensionalArrayElementAccess()
         {
             const string source = @"

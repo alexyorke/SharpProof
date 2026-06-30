@@ -4453,6 +4453,11 @@ namespace PurelySharp.Symbolic
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
             {
+                AddMathAbsRemainderAssignedRangeFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
+            {
                 AddAssignedSourceSymbolSnapshotFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
             }
 
@@ -4607,6 +4612,137 @@ namespace PurelySharp.Symbolic
             }
 
             AddTupleElementSourceSymbolSnapshotFacts(assignedSymbol, sourceSymbol, facts);
+        }
+
+        private static void AddMathAbsRemainderAssignedRangeFacts(
+            ISymbol assignedSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            valueExpression = UnwrapExpression(valueExpression);
+            if (valueExpression is not InvocationExpressionSyntax invocationExpression ||
+                !TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula) ||
+                targetFormula.Kind != SmtValueKind.Int ||
+                !CSharpConditionToFormula.TryGetMathAbsRemainderOperands(
+                    invocationExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out _,
+                    out var divisorExpression) ||
+                !CSharpConditionToFormula.TryTranslateValue(
+                    divisorExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var divisorFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) ||
+                divisorFormula is not { Kind: SmtValueKind.Int } ||
+                (!FactsProvePositiveInteger(divisorFormula, facts) &&
+                    !IsBuiltInNonNegativeLengthValue(divisorExpression, divisorFormula, semanticModel, cancellationToken)))
+            {
+                return;
+            }
+
+            AddUniqueFact(
+                facts,
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.GreaterThanOrEqual,
+                    targetFormula,
+                    new SmtIntegerConstant(0)));
+            AddUniqueFact(
+                facts,
+                new SmtBinaryFormula(
+                    SmtBinaryOperator.LessThan,
+                    targetFormula,
+                    divisorFormula));
+        }
+
+        private static bool IsBuiltInNonNegativeLengthValue(
+            ExpressionSyntax expression,
+            SmtFormula expectedFormula,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is MemberAccessExpressionSyntax memberAccess &&
+                string.Equals(memberAccess.Name.Identifier.ValueText, "Length", StringComparison.Ordinal) &&
+                CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+                    memberAccess.Expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverLengthFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                Equals(receiverLengthFormula, expectedFormula))
+            {
+                return true;
+            }
+
+            return CSharpConditionToFormula.TryTranslateBuiltInLengthValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var lengthFormula,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                Equals(lengthFormula, expectedFormula);
+        }
+
+        private static bool FactsProvePositiveInteger(SmtFormula expression, IEnumerable<SmtFormula> facts)
+        {
+            foreach (var fact in facts)
+            {
+                if (FactProvesPositiveInteger(fact, expression))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool FactProvesPositiveInteger(SmtFormula fact, SmtFormula expression)
+        {
+            return fact switch
+            {
+                SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula =>
+                    FactProvesPositiveInteger(andFormula.Left, expression) ||
+                    FactProvesPositiveInteger(andFormula.Right, expression),
+                SmtBinaryFormula comparison =>
+                    ComparisonProvesPositiveInteger(comparison, expression),
+                _ => false,
+            };
+        }
+
+        private static bool ComparisonProvesPositiveInteger(SmtBinaryFormula comparison, SmtFormula expression)
+        {
+            if (Equals(comparison.Left, expression) &&
+                comparison.Right is SmtIntegerConstant rightConstant)
+            {
+                return comparison.Operator switch
+                {
+                    SmtBinaryOperator.Equal => rightConstant.Value > 0,
+                    SmtBinaryOperator.GreaterThan => rightConstant.Value >= 0,
+                    SmtBinaryOperator.GreaterThanOrEqual => rightConstant.Value > 0,
+                    _ => false,
+                };
+            }
+
+            if (Equals(comparison.Right, expression) &&
+                comparison.Left is SmtIntegerConstant leftConstant)
+            {
+                return comparison.Operator switch
+                {
+                    SmtBinaryOperator.Equal => leftConstant.Value > 0,
+                    SmtBinaryOperator.LessThan => leftConstant.Value >= 0,
+                    SmtBinaryOperator.LessThanOrEqual => leftConstant.Value > 0,
+                    _ => false,
+                };
+            }
+
+            return false;
         }
 
         private static bool TryCreateReferenceBackedLengthFact(
