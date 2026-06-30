@@ -2082,7 +2082,7 @@ namespace PurelySharp.Symbolic
         {
             if (StatementDefinitelyExits(ifStatement.Statement) &&
                 (ifStatement.Else?.Statement == null ||
-                 !AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Else.Statement, semanticModel, cancellationToken)))
+                 !AnyConditionSymbolInvalidatedInStatement(ifStatement.Condition, ifStatement.Else.Statement, semanticModel, cancellationToken)))
             {
                 AddBranchConditionFacts(
                     ifStatement.Condition,
@@ -2094,7 +2094,7 @@ namespace PurelySharp.Symbolic
 
             if (ifStatement.Else?.Statement is { } elseStatement &&
                 StatementDefinitelyExits(elseStatement) &&
-                !AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken))
+                !AnyConditionSymbolInvalidatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken))
             {
                 AddBranchConditionFacts(
                     ifStatement.Condition,
@@ -2122,7 +2122,8 @@ namespace PurelySharp.Symbolic
 
             if (trueBranchExits &&
                 falseBranch is { } survivingFalseBranch &&
-                !falseBranchExits)
+                !falseBranchExits &&
+                !AnyConditionSymbolInvalidatedInStatement(ifStatement.Condition, survivingFalseBranch, semanticModel, cancellationToken))
             {
                 var branchFacts = CollectCompletedBranchFacts(
                     factsBeforeStatement,
@@ -2135,7 +2136,8 @@ namespace PurelySharp.Symbolic
             }
 
             if (falseBranchExits &&
-                !trueBranchExits)
+                !trueBranchExits &&
+                !AnyConditionSymbolInvalidatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken))
             {
                 var branchFacts = CollectCompletedBranchFacts(
                     factsBeforeStatement,
@@ -2225,7 +2227,7 @@ namespace PurelySharp.Symbolic
 
             AddIdenticalBranchFacts(trueBranchFacts, falseBranchFacts, facts);
 
-            if (AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken) ||
+            if (AnyConditionSymbolInvalidatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken) ||
                 !TryCreateBranchConditionFormula(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, out var trueCondition) ||
                 !TryCreateBranchConditionFormula(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, out var falseCondition))
             {
@@ -2272,8 +2274,8 @@ namespace PurelySharp.Symbolic
 
             AddIdenticalBranchFacts(trueBranchFacts, falseBranchFacts, facts);
 
-            if (AnyConditionSymbolMutatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken) ||
-                AnyConditionSymbolMutatedInStatement(ifStatement.Condition, elseStatement, semanticModel, cancellationToken) ||
+            if (AnyConditionSymbolInvalidatedInStatement(ifStatement.Condition, ifStatement.Statement, semanticModel, cancellationToken) ||
+                AnyConditionSymbolInvalidatedInStatement(ifStatement.Condition, elseStatement, semanticModel, cancellationToken) ||
                 !TryCreateBranchConditionFormula(ifStatement.Condition, branchWhenTrue: true, semanticModel, cancellationToken, out var trueCondition) ||
                 !TryCreateBranchConditionFormula(ifStatement.Condition, branchWhenTrue: false, semanticModel, cancellationToken, out var falseCondition))
             {

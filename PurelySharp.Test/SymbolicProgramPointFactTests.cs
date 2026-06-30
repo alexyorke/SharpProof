@@ -96,6 +96,114 @@ public class TestClass
         }
 
         [Test]
+        public void ProgramPointFacts_DoesNotReplaySurvivingBranchGuardAfterReferenceMutation()
+        {
+            const string source = @"
+public sealed class Box
+{
+    public int Value;
+
+    public void MaybeMutate()
+    {
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Box box)
+    {
+        if (box.Value > 0)
+        {
+            return 0;
+        }
+        else
+        {
+            box.MaybeMutate();
+        }
+
+        return box.Value;
+    }
+}";
+
+            var marker = FindMarker(source, "return box.Value;");
+            var proof = ProveAtMarker(source, marker, "box.Value <= 0");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_DoesNotMergeIfElseWithReferenceMutatedCondition()
+        {
+            const string source = @"
+public sealed class Box
+{
+    public int Value;
+
+    public void MaybeMutate()
+    {
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Box box)
+    {
+        var divisor = 0;
+        if (box.Value > 0)
+        {
+            box.MaybeMutate();
+            divisor = 1;
+        }
+        else
+        {
+            divisor = 2;
+        }
+
+        return 10 / divisor;
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / divisor;");
+            var proof = ProveAtMarker(source, marker, "box.Value > 0 || divisor == 2");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
+        [Test]
+        public void ProgramPointFacts_DoesNotMergeImplicitElseWithReferenceMutatedCondition()
+        {
+            const string source = @"
+public sealed class Box
+{
+    public int Value;
+
+    public void MaybeMutate()
+    {
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Box box)
+    {
+        var divisor = 1;
+        if (box.Value > 0)
+        {
+            box.MaybeMutate();
+            divisor = 2;
+        }
+
+        return 10 / divisor;
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / divisor;");
+            var proof = ProveAtMarker(source, marker, "box.Value > 0 || divisor == 1");
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown), proof.Reason);
+        }
+
+        [Test]
         public void ProgramPointFacts_FilterBranchLocalSymbolsWhenReplayingSingleSurvivingBranch()
         {
             const string source = @"
