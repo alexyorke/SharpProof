@@ -1174,6 +1174,11 @@ namespace PurelySharp.Analyzer
                 facts.Add(CreateAssignedValueFact(targetFormula, valueFormula));
             }
 
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken))
+            {
+                AddNullableAssignedValueFacts(targetSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+
             if (TryCreateBuiltInLengthFormula(targetSymbol, out var targetLengthFormula) &&
                 !ExpressionReferencesSymbol(effectiveValueExpression, targetSymbol, semanticModel, cancellationToken) &&
                 TryCreateBuiltInLengthValueFormula(effectiveValueExpression, semanticModel, cancellationToken, out var valueLengthFormula))
@@ -1266,6 +1271,124 @@ namespace PurelySharp.Analyzer
             {
                 AddSymbolNonNullFact(targetSymbol, facts);
             }
+        }
+
+        private static void AddNullableAssignedValueFacts(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            List<SmtFormula> facts)
+        {
+            if (!TryCreateNullableHasValueFormula(targetSymbol, out var targetHasValue) ||
+                !TryCreateNullableValueFormula(targetSymbol, out var targetValue))
+            {
+                return;
+            }
+
+            if (CSharpConditionToFormula.TryTranslateNullableValueParts(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var parts,
+                    getSymbolVersion: null,
+                    inlineDepth: 0))
+            {
+                facts.Add(CreateAssignedValueFact(targetHasValue, parts.HasValue));
+
+                if (parts.Value != null &&
+                    CanCompareSmtValues(targetValue, parts.Value))
+                {
+                    facts.Add(CreateAssignedValueFact(targetValue, parts.Value));
+                }
+            }
+            else if (TryGetNullableUnderlyingType(GetTrackedSymbolType(targetSymbol), out var underlyingType) &&
+                     TryTranslateNullableWrappedValueForUnderlyingType(
+                         valueExpression,
+                         underlyingType,
+                         semanticModel,
+                         cancellationToken,
+                         out var wrappedValueFormula))
+            {
+                facts.Add(targetHasValue);
+
+                if (CanCompareSmtValues(targetValue, wrappedValueFormula))
+                {
+                    facts.Add(CreateAssignedValueFact(targetValue, wrappedValueFormula));
+                }
+            }
+        }
+
+        private static bool TryTranslateNullableWrappedValueForUnderlyingType(
+            ExpressionSyntax valueExpression,
+            ITypeSymbol underlyingType,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            out SmtFormula valueFormula)
+        {
+            valueExpression = UnwrapFactExpression(valueExpression);
+            var typeInfo = semanticModel.GetTypeInfo(valueExpression, cancellationToken);
+            if (!SymbolEqualityComparer.Default.Equals(typeInfo.ConvertedType, underlyingType) &&
+                !SymbolEqualityComparer.Default.Equals(typeInfo.Type, underlyingType))
+            {
+                valueFormula = null!;
+                return false;
+            }
+
+            if (CSharpConditionToFormula.TryTranslateValue(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out var translatedValue,
+                    getSymbolVersion: null,
+                    inlineDepth: 0) &&
+                translatedValue != null)
+            {
+                valueFormula = translatedValue;
+                return true;
+            }
+
+            valueFormula = null!;
+            return false;
+        }
+
+        private static bool TryCreateNullableHasValueFormula(ISymbol symbol, out SmtFormula formula)
+        {
+            if (!TryGetNullableUnderlyingType(GetTrackedSymbolType(symbol), out _))
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(GetSmtVariableName(symbol) + ".HasValue", SmtValueKind.Bool);
+            return true;
+        }
+
+        private static bool TryCreateNullableValueFormula(ISymbol symbol, out SmtFormula formula)
+        {
+            if (!TryGetNullableUnderlyingType(GetTrackedSymbolType(symbol), out var underlyingType) ||
+                !TryGetValueKind(underlyingType, out var kind))
+            {
+                formula = null!;
+                return false;
+            }
+
+            formula = new SmtVariable(GetSmtVariableName(symbol) + ".Value", kind);
+            return true;
+        }
+
+        private static bool TryGetNullableUnderlyingType(ITypeSymbol? type, out ITypeSymbol underlyingType)
+        {
+            if (type is INamedTypeSymbol namedType &&
+                namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T &&
+                namedType.TypeArguments.Length == 1)
+            {
+                underlyingType = namedType.TypeArguments[0];
+                return true;
+            }
+
+            underlyingType = null!;
+            return false;
         }
 
         private static bool TryCreateReferenceBackedLengthFact(
@@ -1614,6 +1737,30 @@ namespace PurelySharp.Analyzer
             }
 
             formula = null!;
+            return false;
+        }
+
+        private static bool TryGetValueKind(ITypeSymbol type, out SmtValueKind kind)
+        {
+            if (type.SpecialType == SpecialType.System_Boolean)
+            {
+                kind = SmtValueKind.Bool;
+                return true;
+            }
+
+            if (IsSearchLibIntegralType(type))
+            {
+                kind = SmtValueKind.Int;
+                return true;
+            }
+
+            if (IsReferenceType(type))
+            {
+                kind = SmtValueKind.Reference;
+                return true;
+            }
+
+            kind = default;
             return false;
         }
 
