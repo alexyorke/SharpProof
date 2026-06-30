@@ -44,7 +44,7 @@ the entire test surface.
   ranges, branch reachability, string predicates, and regex constraints.
 - Query symbolic invariants at a source line or syntax position from a
   standalone .NET library or CLI.
-- Audit exception-flow risks such as uncaught throws, divide-by-zero,
+- Audit runtime-failure risks such as uncaught throws, divide-by-zero,
   null dereferences, and index hazards.
 - Calibrate .NET SDK and BCL purity behavior with regenerated effect-summary
   data instead of checked-in generated artifacts.
@@ -87,7 +87,7 @@ dotnet add package PurelySharp.Attributes --version 0.0.4
 | Purity diagnostics | [x] | `PS0002` reports marked methods whose bodies cannot be proven pure. `PS0003` reports misplaced purity attributes. `PS0004` suggests missing purity attributes on methods that appear pure. `PS0005` through `PS0008` cover conflicting purity attributes and synchronization attribute misuse. | [PurelySharpDiagnostics.cs](PurelySharp.Analyzer/PurelySharpDiagnostics.cs), [DiagnosticEvidenceTests.cs](PurelySharp.Test/DiagnosticEvidenceTests.cs) |
 | Optional explanation diagnostics | [x] | `PS0009` emits structured explanation data when `purelysharp_emit_explanations = true`. `PS0012` emits a non-authoritative BCL fallback guess when an otherwise unknown metadata BCL member has no stronger evidence and either explanations or `purelysharp_report_bcl_fallback_guesses` are enabled. | [AnalyzerReleases.Unshipped.md](PurelySharp.Analyzer/AnalyzerReleases.Unshipped.md), [DiagnosticEvidenceTests.cs](PurelySharp.Test/DiagnosticEvidenceTests.cs) |
 | Code fixes | [x] | Code fixes add `[EnforcePure]`, remove conflicting attributes, remove invalid purity attributes, and clean up synchronization attributes. | [PurelySharpCodeFixTests.cs](PurelySharp.Test/PurelySharpCodeFixTests.cs) |
-| Analyzer configuration | [x] | `.editorconfig` and global analyzerconfig settings control known pure/impure methods, impure namespaces/types, purity profile, missing-attribute suggestions, explanations, exception reporting, effect-summary JSON, SMT mode, and SMT budgets. | [ConfigKeys.cs](PurelySharp.Analyzer/Configuration/ConfigKeys.cs), [AnalyzerConfiguration.cs](PurelySharp.Analyzer/Configuration/AnalyzerConfiguration.cs) |
+| Analyzer configuration | [x] | `.editorconfig` and global analyzerconfig settings control known pure/impure methods, impure namespaces/types, purity profile, missing-attribute suggestions, explanations, runtime-hazard reporting, exception summaries, effect-summary JSON, SMT mode, and SMT budgets. | [ConfigKeys.cs](PurelySharp.Analyzer/Configuration/ConfigKeys.cs), [AnalyzerConfiguration.cs](PurelySharp.Analyzer/Configuration/AnalyzerConfiguration.cs) |
 | Baseline suppression | [x] | `PurelySharp.Baseline.json` additional files can suppress known diagnostics by ID, symbol documentation ID, and path for incremental adoption. | [BaselineSuppressionTests.cs](PurelySharp.Test/BaselineSuppressionTests.cs) |
 | NuGet/package layout | [x] | The analyzer package contains the analyzer, code fixes, attributes, symbolic library, SearchLib, and Z3 assets. It does not ship loose effect-summary JSON artifacts. | [AnalyzerPackagingTests.cs](PurelySharp.Test/AnalyzerPackagingTests.cs), [PurelySharp.Package.csproj](PurelySharp.Package/PurelySharp.Package.csproj) |
 | Build-time built-in summaries | [x] | Built-in summaries are regenerated into analyzer intermediates, embedded for the current build, and loaded only from embedded resources. Loose analyzer-directory JSON files are ignored for built-ins. | [AnalyzerPackagingTests.cs](PurelySharp.Test/AnalyzerPackagingTests.cs), [PurelySharp.Analyzer.csproj](PurelySharp.Analyzer/PurelySharp.Analyzer.csproj) |
@@ -98,7 +98,7 @@ dotnet add package PurelySharp.Attributes --version 0.0.4
 | String and regex SMT facts | [~] | Z3 string theory is used for string equality, concatenation, length, contains, starts-with, ends-with, and a translated subset of .NET regex patterns. Concrete regex/string facts are self-validated with .NET regex where applicable. Unsupported regex options or patterns stay unknown. Regex APIs are not automatically pure just because their predicates can feed SMT. | [SmtAnalysisServiceTests.cs](PurelySharp.Test/SmtAnalysisServiceTests.cs), [SemanticOracleSmtTests.cs](PurelySharp.Test/SemanticOracleSmtTests.cs), [RegexTests.cs](PurelySharp.Test/RegexTests.cs) |
 | Symbolic invariant API | [~] | `PurelySharp.Symbolic` can query merged invariants at a line, column, syntax position, or all source lines, and can use SMT to check reachability or implication. Line and file queries expose per-program-point facts plus merged aggregate summaries. It is useful as a library independent of the analyzer package, but the facts are still bounded and syntax/semantic-model derived. | [SymbolicSourceQueryLineTests.cs](PurelySharp.Test/SymbolicSourceQueryLineTests.cs), [docs/symbolic-invariants.md](docs/symbolic-invariants.md), [SymbolicSourceQueryService.cs](PurelySharp.Symbolic/SymbolicSourceQueryService.cs) |
 | Symbolic CLI | [x] | `Tools/PurelySharp.SymbolicCli` exposes line, position, and all-lines invariant queries, references, JSON output, reachability checks, implication checks, and SMT budget switches. | [AnalyzerPackagingTests.cs](PurelySharp.Test/AnalyzerPackagingTests.cs), [Program.cs](Tools/PurelySharp.SymbolicCli/Program.cs) |
-| Exception-flow diagnostics | [~] | `PS0010` reports method-level escaping exceptions when `purelysharp_report_exceptions = true`. `PS0011` reports uncaught operation sites when `purelysharp_checked_exceptions = true`. The analyzer tracks direct throws, rethrows, source call chains, trusted metadata summaries, divide-by-zero, null dereference, index hazards, catch filters, and some resource disposal flows. | [SemanticOracleSmtTests.cs](PurelySharp.Test/SemanticOracleSmtTests.cs), [ExceptionSummaryCatalogValidationTests.cs](PurelySharp.Test/ExceptionSummaryCatalogValidationTests.cs), [RecursiveExceptionFlowTests.cs](PurelySharp.Test/RecursiveExceptionFlowTests.cs) |
+| Runtime hazards and exception flow | [~] | `purelysharp_runtime_hazard_mode = sites` reports `PS0011` operation-site hazards without requiring purity attributes. `all` also emits `PS0010` method summaries. Legacy `purelysharp_report_exceptions` and `purelysharp_checked_exceptions` remain supported. The analyzer tracks direct throws, rethrows, source call chains, trusted metadata summaries, divide-by-zero, null dereference, index hazards, catch filters, and some resource disposal flows. | [DiagnosticEvidenceTests.cs](PurelySharp.Test/DiagnosticEvidenceTests.cs), [SemanticOracleSmtTests.cs](PurelySharp.Test/SemanticOracleSmtTests.cs), [ExceptionSummaryCatalogValidationTests.cs](PurelySharp.Test/ExceptionSummaryCatalogValidationTests.cs), [RecursiveExceptionFlowTests.cs](PurelySharp.Test/RecursiveExceptionFlowTests.cs) |
 | Dispatch, delegates, and LINQ | [~] | The analyzer narrows many exact concrete receiver flows, delegate targets, default equality/comparison dispatch, immutable collection operations, LINQ materialization, and enumerable hazards. Deeper heterogeneous merges, unknown dynamic dispatch, and unresolved external targets remain conservative. | [ExactConcreteDispatchFlowTests.cs](PurelySharp.Test/ExactConcreteDispatchFlowTests.cs), [DelegateTests.cs](PurelySharp.Test/DelegateTests.cs), [LinqOperationsTests.cs](PurelySharp.Test/LinqOperationsTests.cs), [LinqSoundnessStressTests.cs](PurelySharp.Test/LinqSoundnessStressTests.cs) |
 | Fresh ownership and mutation | [~] | Some fresh arrays, collection expressions, inline arrays, local mutation, fresh returns, and disposal cases are modeled. Full borrow-checker-grade ownership, escape, alias, lifetime, and resource-release analysis is not implemented. | [CollectionExpressionTests.cs](PurelySharp.Test/CollectionExpressionTests.cs), [ArrayMutationTests.cs](PurelySharp.Test/ArrayMutationTests.cs), [UsingStatementTests.cs](PurelySharp.Test/UsingStatementTests.cs), [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
 | BCL/.NET SDK coverage | [~] | Coverage is evidence-backed and member-level, using reviewed catalogs, generated build-time summaries, hand-coded conservative roots, and tests for many runtime families. There is no meaningful "percent of the .NET SDK" claim yet because SDK APIs are not a uniform denominator and many APIs depend on runtime, OS, culture, time, randomness, reflection, native state, or hidden implementation behavior. | [EffectSummaryToolTests.cs](PurelySharp.Test/EffectSummaryToolTests.cs), [ConstantsTests.cs](PurelySharp.Test/ConstantsTests.cs), [CryptographyTests.cs](PurelySharp.Test/CryptographyTests.cs), [REMAINING_ANALYZER_BACKLOG.md](REMAINING_ANALYZER_BACKLOG.md) |
@@ -119,8 +119,8 @@ dotnet add package PurelySharp.Attributes --version 0.0.4
 | `PS0007` | Error | `[AllowSynchronization]` is applied to a non-method declaration. |
 | `PS0008` | Info | `[AllowSynchronization]` is redundant because no synchronization was detected. |
 | `PS0009` | Info | Optional purity explanation emitted when `purelysharp_emit_explanations = true`. |
-| `PS0010` | Info | Optional escaping-exception summary emitted when `purelysharp_report_exceptions = true`. |
-| `PS0011` | Warning | Optional uncaught operation-site exception warning emitted when `purelysharp_checked_exceptions = true`. |
+| `PS0010` | Info | Optional escaping-exception summary emitted when `purelysharp_report_exceptions = true` or `purelysharp_runtime_hazard_mode = summaries/all`. |
+| `PS0011` | Warning | Optional uncaught operation-site exception/runtime-hazard warning emitted when `purelysharp_checked_exceptions = true` or `purelysharp_runtime_hazard_mode = sites/all`. |
 | `PS0012` | Info | Optional non-authoritative BCL purity fallback guess emitted when `purelysharp_emit_explanations = true` or `purelysharp_report_bcl_fallback_guesses = true`. |
 
 ## Configuration
@@ -139,6 +139,7 @@ purelysharp_suggest_missing_enforce_pure_scope = all
 purelysharp_emit_explanations = false
 purelysharp_report_bcl_fallback_guesses = false
 
+purelysharp_runtime_hazard_mode = off
 purelysharp_report_exceptions = false
 purelysharp_checked_exceptions = false
 purelysharp_enable_effect_summary_json = false
@@ -166,6 +167,7 @@ Supported analyzer keys:
 - `purelysharp_suggest_missing_enforce_pure_namespace_filters`
 - `purelysharp_emit_explanations`
 - `purelysharp_report_bcl_fallback_guesses`
+- `purelysharp_runtime_hazard_mode`
 - `purelysharp_report_exceptions`
 - `purelysharp_checked_exceptions`
 - `purelysharp_enable_effect_summary_json`
@@ -174,6 +176,15 @@ Supported analyzer keys:
 - `purelysharp_smt_method_budget_ms`
 - `purelysharp_smt_max_path_conditions`
 - `purelysharp_smt_max_expression_nodes`
+
+Runtime hazard modes:
+
+| Mode | Diagnostics | Use |
+| --- | --- | --- |
+| `off` | None | Default. Runtime-failure checks stay disabled unless legacy exception switches are enabled. |
+| `sites` | `PS0011` | Report analyzer-proven uncaught operation-site hazards such as throws, divide-by-zero, null dereference, and index hazards. |
+| `summaries` | `PS0010` | Report method-level escaping exception summaries without operation-site warnings. |
+| `all` | `PS0010`, `PS0011` | Emit both method summaries and operation-site runtime-hazard warnings. |
 
 SMT modes:
 

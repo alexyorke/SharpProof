@@ -1,17 +1,18 @@
-﻿## Unshipped Release
+## Unshipped Release
 
 ### New Rules
 
 | Rule ID | Category | Severity | Notes |
 | ------- | -------- | -------- | ----- |
 | PS0009 | Purity | Info | Optional purity diagnostic explanation emitted when `purelysharp_emit_explanations` is enabled. |
-| PS0010 | ExceptionFlow | Info | Optional thrown-exception summary emitted when `purelysharp_report_exceptions` is enabled. |
-| PS0011 | ExceptionFlow | Warning | Optional uncaught call-site warning emitted when `purelysharp_checked_exceptions` is enabled. |
+| PS0010 | ExceptionFlow | Info | Optional thrown-exception summary emitted when `purelysharp_report_exceptions` or `purelysharp_runtime_hazard_mode = summaries/all` is enabled. |
+| PS0011 | ExceptionFlow | Warning | Optional uncaught call-site and runtime-hazard warning emitted when `purelysharp_checked_exceptions` or `purelysharp_runtime_hazard_mode = sites/all` is enabled. |
 | PS0012 | Purity | Info | Optional non-authoritative BCL purity fallback guess emitted when `purelysharp_emit_explanations` or `purelysharp_report_bcl_fallback_guesses` is enabled. |
 
 ### Enhancements
 
 - `PS0010` can consume generated `PurelySharp.EffectSummary.json` additional files and propagate summarized metadata/library exception types through source callers.
+- `purelysharp_runtime_hazard_mode` enables runtime-failure checks over ordinary methods without requiring purity attributes. `sites` emits `PS0011`; `summaries` emits `PS0010`; `all` emits both.
 - `PS0010` infers typed `throw;` rethrows from enclosing catch clauses and still suppresses them when an outer catch handles the same exception type.
 - `PS0010` reports definite integer/decimal divide-by-zero and modulo-by-zero expressions with compile-time constant zero divisors, excluding floating-point division.
 - `PS0010` reports definite null dereferences on literal/default-null receivers and suppresses them when caught.

@@ -18,6 +18,7 @@ namespace PurelySharp.Analyzer.Configuration
         public const string SuggestMissingEnforcePureNamespaceFilters = "purelysharp_suggest_missing_enforce_pure_namespace_filters";
         public const string EmitExplanations = "purelysharp_emit_explanations";
         public const string ReportBclFallbackGuesses = "purelysharp_report_bcl_fallback_guesses";
+        public const string RuntimeHazardMode = "purelysharp_runtime_hazard_mode";
         public const string ReportExceptions = "purelysharp_report_exceptions";
         public const string CheckedExceptions = "purelysharp_checked_exceptions";
         public const string EnableEffectSummaryJson = "purelysharp_enable_effect_summary_json";

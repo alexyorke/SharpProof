@@ -13170,6 +13170,71 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0011_RuntimeHazardModeSites_ReportsDefiniteHazardWithoutPurityAttribute()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        int divisor = 0;
+        return value / divisor;
+    }
+}",
+                RuntimeHazardSitesOptions());
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+
+            var diagnostic = SingleDiagnostic(
+                diagnostics.Where(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("value / divisor"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.DivideByZeroException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_divide_by_zero"));
+        }
+
+        [Test]
+        public async Task Ps0010_RuntimeHazardModeAll_ReportsSummaryAndSite()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public void TestMethod()
+    {
+        throw new InvalidOperationException();
+    }
+}",
+                RuntimeHazardAllOptions());
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.True);
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.True);
+        }
+
+        [Test]
+        public async Task Ps0011_RuntimeHazardModeSites_UsesPathFactsToSuppressGuardedHazard()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+public class TestClass
+{
+    public int TestMethod(int value, int divisor)
+    {
+        if (divisor != 0)
+        {
+            return value / divisor;
+        }
+
+        return 0;
+    }
+}",
+                RuntimeHazardSitesOptions());
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_DirectThrows_ReportsExceptionTypes()
         {
             var diagnostics = await GetAnalyzerDiagnosticsAsync(@"

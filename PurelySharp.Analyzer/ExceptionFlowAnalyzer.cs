@@ -16,19 +16,24 @@ namespace PurelySharp.Analyzer
     {
         public static void AnalyzeSymbolForExceptions(
             SyntaxNodeAnalysisContext context,
-            bool reportExceptions,
-            bool checkedExceptions,
+            Analyzer.Configuration.AnalyzerConfiguration config,
             ExceptionSummaryCatalog exceptionSummaryCatalog,
             CompilationPurityService purityService)
         {
+            var runtimeHazardMode = Analyzer.Configuration.AnalyzerConfiguration.GetRuntimeHazardMode(
+                context.Options,
+                context.Node.SyntaxTree,
+                config.RuntimeHazardMode);
             var reportMethodSummaries = Analyzer.Configuration.AnalyzerConfiguration.GetReportExceptions(
                 context.Options,
                 context.Node.SyntaxTree,
-                reportExceptions);
+                config.ReportExceptions) ||
+                Analyzer.Configuration.AnalyzerConfiguration.RuntimeHazardReportsMethodSummaries(runtimeHazardMode);
             var reportCheckedExceptionSites = Analyzer.Configuration.AnalyzerConfiguration.GetCheckedExceptions(
                 context.Options,
                 context.Node.SyntaxTree,
-                checkedExceptions);
+                config.CheckedExceptions) ||
+                Analyzer.Configuration.AnalyzerConfiguration.RuntimeHazardReportsSites(runtimeHazardMode);
             if (!reportMethodSummaries && !reportCheckedExceptionSites)
             {
                 return;

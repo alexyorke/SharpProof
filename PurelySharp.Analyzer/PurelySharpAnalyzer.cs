@@ -43,9 +43,7 @@ namespace PurelySharp.Analyzer
                 var emitExplanations = config.EmitExplanations;
                 var reportBclFallbackGuesses = config.ReportBclFallbackGuesses;
                 var baseline = Configuration.DiagnosticBaseline.FromOptions(startContext.Options, startContext.CancellationToken);
-                var needsExceptionSummaryCatalog = config.EnableEffectSummaryJson &&
-                    (config.ReportExceptions || config.CheckedExceptions);
-                var exceptionSummaryCatalog = needsExceptionSummaryCatalog
+                var exceptionSummaryCatalog = config.EnableEffectSummaryJson
                     ? ExceptionSummaryCatalog.FromOptions(startContext.Options, startContext.CancellationToken)
                     : ExceptionSummaryCatalog.Empty;
                 var generatedPurityCatalog = config.EnableEffectSummaryJson
@@ -60,7 +58,7 @@ namespace PurelySharp.Analyzer
                     using (Engine.ImpurityCatalog.UseConfiguredOverrides(config))
                     {
                         MethodPurityAnalyzer.AnalyzeSymbolForPurity(c, purityService, missingPuritySuggestions, emitExplanations, reportBclFallbackGuesses, baseline);
-                        ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(c, config.ReportExceptions, config.CheckedExceptions, exceptionSummaryCatalog, purityService);
+                        ExceptionFlowAnalyzer.AnalyzeSymbolForExceptions(c, config, exceptionSummaryCatalog, purityService);
                     }
                 },
                     SyntaxKind.AddAccessorDeclaration,

@@ -18,6 +18,7 @@ namespace PurelySharp.Analyzer.Configuration
         public MissingPuritySuggestionOptions MissingPuritySuggestions { get; }
         public bool EmitExplanations { get; }
         public bool ReportBclFallbackGuesses { get; }
+        public RuntimeHazardMode RuntimeHazardMode { get; }
         public bool ReportExceptions { get; }
         public bool CheckedExceptions { get; }
         public bool EnableEffectSummaryJson { get; }
@@ -34,6 +35,7 @@ namespace PurelySharp.Analyzer.Configuration
             MissingPuritySuggestionOptions missingPuritySuggestions,
             bool emitExplanations,
             bool reportBclFallbackGuesses,
+            RuntimeHazardMode runtimeHazardMode,
             bool reportExceptions,
             bool checkedExceptions,
             bool enableEffectSummaryJson,
@@ -49,6 +51,7 @@ namespace PurelySharp.Analyzer.Configuration
             MissingPuritySuggestions = missingPuritySuggestions;
             EmitExplanations = emitExplanations;
             ReportBclFallbackGuesses = reportBclFallbackGuesses;
+            RuntimeHazardMode = runtimeHazardMode;
             ReportExceptions = reportExceptions;
             CheckedExceptions = checkedExceptions;
             EnableEffectSummaryJson = enableEffectSummaryJson;
@@ -73,6 +76,7 @@ namespace PurelySharp.Analyzer.Configuration
                 GetValues(options, ConfigKeys.SuggestMissingEnforcePureNamespaceFilters));
             bool emitExplanations = GetBool(options, ConfigKeys.EmitExplanations);
             bool reportBclFallbackGuesses = GetBool(options, ConfigKeys.ReportBclFallbackGuesses);
+            var runtimeHazardMode = GetRuntimeHazardMode(options, RuntimeHazardMode.Off);
             bool reportExceptions = GetBool(options, ConfigKeys.ReportExceptions);
             bool checkedExceptions = GetBool(options, ConfigKeys.CheckedExceptions);
             bool enableEffectSummaryJson = GetBool(options, ConfigKeys.EnableEffectSummaryJson);
@@ -86,6 +90,7 @@ namespace PurelySharp.Analyzer.Configuration
                 missingPuritySuggestions,
                 emitExplanations,
                 reportBclFallbackGuesses,
+                runtimeHazardMode,
                 reportExceptions,
                 checkedExceptions,
                 enableEffectSummaryJson,
@@ -178,6 +183,32 @@ namespace PurelySharp.Analyzer.Configuration
             {
                 return fallback;
             }
+        }
+
+        public static RuntimeHazardMode GetRuntimeHazardMode(
+            AnalyzerOptions options,
+            SyntaxTree syntaxTree,
+            RuntimeHazardMode fallback)
+        {
+            try
+            {
+                var treeOptions = options.AnalyzerConfigOptionsProvider.GetOptions(syntaxTree);
+                return GetRuntimeHazardMode(treeOptions, fallback);
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
+        public static bool RuntimeHazardReportsMethodSummaries(RuntimeHazardMode mode)
+        {
+            return mode == RuntimeHazardMode.Summaries || mode == RuntimeHazardMode.All;
+        }
+
+        public static bool RuntimeHazardReportsSites(RuntimeHazardMode mode)
+        {
+            return mode == RuntimeHazardMode.Sites || mode == RuntimeHazardMode.All;
         }
 
         private static ImmutableHashSet<string> GetValues(AnalyzerOptions options, string key)
@@ -356,6 +387,68 @@ namespace PurelySharp.Analyzer.Configuration
             return "balanced";
         }
 
+        private static RuntimeHazardMode GetRuntimeHazardMode(AnalyzerOptions options, RuntimeHazardMode fallback)
+        {
+            try
+            {
+                var global = options.AnalyzerConfigOptionsProvider.GlobalOptions;
+                if (global.TryGetValue(ConfigKeys.RuntimeHazardMode, out var value) && !string.IsNullOrWhiteSpace(value))
+                {
+                    return ParseRuntimeHazardMode(value, fallback);
+                }
+            }
+            catch
+            {
+            }
+
+            return fallback;
+        }
+
+        private static RuntimeHazardMode GetRuntimeHazardMode(AnalyzerConfigOptions options, RuntimeHazardMode fallback)
+        {
+            if (options.TryGetValue(ConfigKeys.RuntimeHazardMode, out var value) && !string.IsNullOrWhiteSpace(value))
+            {
+                return ParseRuntimeHazardMode(value, fallback);
+            }
+
+            return fallback;
+        }
+
+        private static RuntimeHazardMode ParseRuntimeHazardMode(string value, RuntimeHazardMode fallback)
+        {
+            switch (value.Trim().ToLowerInvariant())
+            {
+                case "off":
+                case "none":
+                case "false":
+                case "disabled":
+                case "0":
+                    return RuntimeHazardMode.Off;
+                case "sites":
+                case "site":
+                case "checked":
+                case "checked-exceptions":
+                case "warnings":
+                case "warning":
+                case "true":
+                case "on":
+                case "yes":
+                case "1":
+                    return RuntimeHazardMode.Sites;
+                case "summaries":
+                case "summary":
+                case "method-summaries":
+                case "method-summary":
+                case "report":
+                    return RuntimeHazardMode.Summaries;
+                case "all":
+                case "both":
+                    return RuntimeHazardMode.All;
+            }
+
+            return fallback;
+        }
+
         private static SmtAnalysisOptions GetSmtOptions(AnalyzerOptions options)
         {
             var mode = GetSmtMode(options, SmtAnalysisOptions.Default.Mode);
@@ -482,6 +575,14 @@ namespace PurelySharp.Analyzer.Configuration
         Public,
         Internal,
         Off
+    }
+
+    internal enum RuntimeHazardMode
+    {
+        Off,
+        Sites,
+        Summaries,
+        All
     }
 
     internal sealed class MissingPuritySuggestionOptions

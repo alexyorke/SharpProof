@@ -172,6 +172,16 @@ public class TestClass
             return ImmutableDictionary<string, string>.Empty.Add("purelysharp_checked_exceptions", "true");
         }
 
+        private static ImmutableDictionary<string, string> RuntimeHazardSitesOptions()
+        {
+            return ImmutableDictionary<string, string>.Empty.Add("purelysharp_runtime_hazard_mode", "sites");
+        }
+
+        private static ImmutableDictionary<string, string> RuntimeHazardAllOptions()
+        {
+            return ImmutableDictionary<string, string>.Empty.Add("purelysharp_runtime_hazard_mode", "all");
+        }
+
         private static ImmutableDictionary<string, string> ReportAndCheckedExceptionsOptions()
         {
             return ReportExceptionsOptions().Add("purelysharp_checked_exceptions", "true");

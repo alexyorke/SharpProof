@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace PurelySharp.Analyzer
@@ -83,7 +83,7 @@ namespace PurelySharp.Analyzer
         public const string ExceptionEdgesProperty = "purelysharp.exceptions.edges";
         private static readonly LocalizableString ExceptionSummaryTitle = "Method May Throw Exceptions";
         private static readonly LocalizableString ExceptionSummaryMessageFormat = "Method '{0}' can throw: {1}";
-        private static readonly LocalizableString ExceptionSummaryDescription = "Reports exception types that can escape a method. Enable with purelysharp_report_exceptions = true.";
+        private static readonly LocalizableString ExceptionSummaryDescription = "Reports exception types that can escape a method. Enable with purelysharp_report_exceptions = true or purelysharp_runtime_hazard_mode = summaries/all.";
 
         public static readonly DiagnosticDescriptor ExceptionSummaryRule = new DiagnosticDescriptor(
             id: ExceptionSummaryId,
@@ -97,7 +97,7 @@ namespace PurelySharp.Analyzer
         public const string UncaughtExceptionSiteId = "PS0011";
         private static readonly LocalizableString UncaughtExceptionSiteTitle = "Operation May Throw Uncaught Exceptions";
         private static readonly LocalizableString UncaughtExceptionSiteMessageFormat = "Operation '{0}' may throw uncaught exceptions: {1}";
-        private static readonly LocalizableString UncaughtExceptionSiteDescription = "Reports uncaught exceptions at specific operations. Enable with purelysharp_checked_exceptions = true.";
+        private static readonly LocalizableString UncaughtExceptionSiteDescription = "Reports uncaught exceptions and proven runtime hazards at specific operations. Enable with purelysharp_checked_exceptions = true or purelysharp_runtime_hazard_mode = sites/all.";
 
         public static readonly DiagnosticDescriptor UncaughtExceptionSiteRule = new DiagnosticDescriptor(
             id: UncaughtExceptionSiteId,
