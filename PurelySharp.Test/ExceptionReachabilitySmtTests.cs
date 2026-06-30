@@ -1072,6 +1072,93 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_GuardedNegativeArrayLength_ReportsOverflowException()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int[] TestMethod(int length)
+    {
+        if (length < 0)
+        {
+            return new int[length];
+        }
+
+        return new int[0];
+    }
+}");
+
+            var diagnostic = SingleExceptionDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.OverflowException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_negative_array_length"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.OverflowException=definite_negative_array_length:array_length"));
+        }
+
+        [Test]
+        public async Task Ps0011_MultidimensionalNegativeArrayLength_ReportsOverflowExceptionAtSite()
+        {
+            var diagnostics = await GetCheckedExceptionSiteDiagnosticsAsync(@"
+public class TestClass
+{
+    public int[,] TestMethod()
+    {
+        var length = -1;
+        return new int[1, length];
+    }
+}");
+
+            var diagnostic = SingleUncaughtExceptionSiteDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("new int[1, length]"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.OverflowException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_negative_array_length"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.OverflowException=definite_negative_array_length:array_length"));
+        }
+
+        [Test]
+        public async Task Ps0010_NegativeArrayLengthCaught_DoesNotReport()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int[] TestMethod()
+    {
+        try
+        {
+            var length = -1;
+            return new int[length];
+        }
+        catch (System.OverflowException)
+        {
+            return new int[0];
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_UnknownArrayLength_DoesNotReportOverflowException()
+        {
+            var diagnostics = await GetExceptionDiagnosticsAsync(@"
+public class TestClass
+{
+    public int[] TestMethod(int length)
+    {
+        return new int[length];
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId &&
+                    diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty] == "definite_negative_array_length"),
+                Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_ConditionalExpressionUnreachableNullDerefArm_DoesNotReport()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"
@@ -1163,6 +1250,27 @@ public class TestClass
             var diagnostic = SingleUncaughtExceptionSiteDiagnostic(diagnostics);
 
             Assert.That(diagnostic.GetMessage(), Does.Contain("value.Missing()"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_dynamic_invocation_null_binding"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException=definite_dynamic_invocation_null_binding:dynamic_invocation"));
+        }
+
+        [Test]
+        public async Task Ps0011_DynamicDirectInvocationNullBinding_ReportsRuntimeBinderExceptionOnly()
+        {
+            var diagnostics = await GetCheckedExceptionSiteDiagnosticsAsync(@"
+public class TestClass
+{
+    public object TestMethod()
+    {
+        dynamic value = null;
+        return value();
+    }
+}");
+
+            var diagnostic = SingleUncaughtExceptionSiteDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.GetMessage(), Does.Contain("value()"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_dynamic_invocation_null_binding"));
             Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("Microsoft.CSharp.RuntimeBinder.RuntimeBinderException=definite_dynamic_invocation_null_binding:dynamic_invocation"));

@@ -602,7 +602,7 @@ Options:
   --implies <expr>    Use bounded SMT to prove whether invariants at the queried point imply expr. Can be repeated.
   --runtime-hazards   Query proven runtime hazards instead of invariant program points.
   --fail-on-hazard    Exit with code 1 when final runtime hazard output contains hazards.
-  --hazard-kind <k>   Keep only DirectThrow, Rethrow, DivideByZero, NullDereference, NullableValueWithoutValue, IndexOutOfRange, ArgumentOutOfRange, CheckedIntegralOverflow, ArrayTypeMismatch, UnboxNull, InvalidCast, or DynamicNullBinding hazards. Can be repeated.
+  --hazard-kind <k>   Keep only DirectThrow, Rethrow, DivideByZero, NullDereference, NullableValueWithoutValue, IndexOutOfRange, ArgumentOutOfRange, CheckedIntegralOverflow, ArrayTypeMismatch, UnboxNull, InvalidCast, DynamicNullBinding, or NegativeArrayLength hazards. Can be repeated.
   --hazard-status <s> Keep only Proven, Unreachable, Unknown, or Unsupported runtime hazards. Can be repeated.
   --hazard-exception-type <type>
                       Keep only runtime hazards with this exception type. Can be repeated.

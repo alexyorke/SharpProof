@@ -195,6 +195,34 @@ namespace PurelySharp.Analyzer
                         checkedOverflowNode is CastExpressionSyntax ? "checked_conversion" : "checked_operator"));
             }
 
+            foreach (var negativeArrayLengthNode in ExceptionFlowAnalyzer.GetDefiniteNegativeArrayLengthNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
+            {
+                if (IsInStaticallyUnreachableBranch(negativeArrayLengthNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                if (IsShadowedByThrowingFinally(negativeArrayLengthNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                var exceptionType = semanticModel.Compilation.GetTypeByMetadataName("System.OverflowException");
+                if (IsCaughtWithinMethod(negativeArrayLengthNode, exceptionType, methodNode, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    continue;
+                }
+
+                yield return new UncaughtExceptionSiteEntry(
+                    negativeArrayLengthNode,
+                    methodSymbol,
+                    new ExceptionCandidate(
+                        exceptionType,
+                        "System.OverflowException",
+                        "definite_negative_array_length",
+                        "array_length"));
+            }
+
             foreach (var nullDereferenceNode in ExceptionFlowAnalyzer.GetDefiniteNullDereferenceNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))
             {
                 if (IsInStaticallyUnreachableBranch(nullDereferenceNode, semanticModel, cancellationToken, smtAnalysis))
@@ -748,6 +776,7 @@ namespace PurelySharp.Analyzer
                 string.Equals(category, "definite_dynamic_member_null_binding", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_dynamic_invocation_null_binding", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_dynamic_index_null_binding", StringComparison.Ordinal) ||
+                string.Equals(category, "definite_negative_array_length", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_nullable_value_without_value", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_unbox_null", StringComparison.Ordinal) ||
                 string.Equals(category, "definite_invalid_cast", StringComparison.Ordinal) ||

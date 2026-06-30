@@ -90,6 +90,22 @@ namespace PurelySharp.Analyzer
             }
         }
 
+        internal static IEnumerable<ArrayCreationExpressionSyntax> GetDefiniteNegativeArrayLengthNodes(
+            SyntaxNode methodNode,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            foreach (var arrayCreation in GetRelevantDescendants<ArrayCreationExpressionSyntax>(methodNode))
+            {
+                if (IsDefinitelyNegativeArrayLength(arrayCreation, semanticModel, cancellationToken, smtAnalysis) &&
+                    IsExceptionPathReachable(arrayCreation, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    yield return arrayCreation;
+                }
+            }
+        }
+
         internal static IEnumerable<SyntaxNode> GetDefiniteNullDereferenceNodes(
             SyntaxNode methodNode,
             SemanticModel semanticModel,
@@ -113,8 +129,9 @@ namespace PurelySharp.Analyzer
                     yield return elementAccess;
                 }
                 else if (node is InvocationExpressionSyntax invocation &&
-                    IsDefinitelyNullExpression(invocation.Expression, invocation, semanticModel, cancellationToken, smtAnalysis) &&
-                    IsExceptionPathReachable(invocation, semanticModel, cancellationToken, smtAnalysis))
+                         !IsDynamicExpression(invocation.Expression, semanticModel, cancellationToken) &&
+                         IsDefinitelyNullExpression(invocation.Expression, invocation, semanticModel, cancellationToken, smtAnalysis) &&
+                         IsExceptionPathReachable(invocation, semanticModel, cancellationToken, smtAnalysis))
                 {
                     yield return invocation;
                 }
@@ -606,6 +623,32 @@ namespace PurelySharp.Analyzer
                 semanticModel,
                 cancellationToken,
                 smtAnalysis);
+        }
+
+        private static bool IsDefinitelyNegativeArrayLength(
+            ArrayCreationExpressionSyntax arrayCreation,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            foreach (var lengthExpression in GetArrayLengthExpressions(arrayCreation))
+            {
+                if (!TryTranslateIntExpression(lengthExpression, semanticModel, cancellationToken, out var lengthFormula))
+                {
+                    continue;
+                }
+
+                var negativeLength = new SmtBinaryFormula(
+                    SmtBinaryOperator.LessThan,
+                    lengthFormula,
+                    new SmtIntegerConstant(0));
+                if (IsDefinitelyTrueAtUse(arrayCreation, negativeLength, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool TryGetCheckedIntegralBinaryOperator(
@@ -1224,6 +1267,20 @@ namespace PurelySharp.Analyzer
         {
             var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
             return typeInfo.Type ?? typeInfo.ConvertedType;
+        }
+
+        private static IEnumerable<ExpressionSyntax> GetArrayLengthExpressions(ArrayCreationExpressionSyntax arrayCreation)
+        {
+            foreach (var rankSpecifier in arrayCreation.Type.RankSpecifiers)
+            {
+                foreach (var size in rankSpecifier.Sizes)
+                {
+                    if (!size.IsKind(SyntaxKind.OmittedArraySizeExpression))
+                    {
+                        yield return size;
+                    }
+                }
+            }
         }
 
         private static bool CanUnboxExactRuntimeTypeToValueType(ITypeSymbol exactRuntimeType, ITypeSymbol targetType)

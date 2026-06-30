@@ -503,6 +503,13 @@ namespace PurelySharp.Symbolic
                     }
 
                     break;
+                case ArrayCreationExpressionSyntax arrayCreation:
+                    if (TryCreateNegativeArrayLengthCandidate(arrayCreation, semanticModel, cancellationToken, out var negativeLengthCandidate))
+                    {
+                        yield return negativeLengthCandidate;
+                    }
+
+                    break;
                 case InvocationExpressionSyntax invocation:
                     if (TryCreateDynamicInvocationNullBindingCandidate(invocation, semanticModel, cancellationToken, out var invocationDynamicCandidate))
                     {
@@ -1027,6 +1034,40 @@ namespace PurelySharp.Symbolic
                 new SmtUnaryFormula(SmtUnaryOperator.Not, inRangeFormula),
                 isRange ? "System.ArgumentOutOfRangeException" : "System.IndexOutOfRangeException",
                 isRange ? "definite_range_out_of_range" : "definite_index_out_of_range");
+            return true;
+        }
+
+        private static bool TryCreateNegativeArrayLengthCandidate(
+            ArrayCreationExpressionSyntax arrayCreation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            var trigger = default(SmtFormula);
+            foreach (var lengthExpression in GetArrayLengthExpressions(arrayCreation))
+            {
+                if (!TryTranslateNegativeCondition(lengthExpression, semanticModel, cancellationToken, out var negativeLength))
+                {
+                    continue;
+                }
+
+                trigger = trigger == null
+                    ? negativeLength
+                    : new SmtBinaryFormula(SmtBinaryOperator.Or, trigger, negativeLength);
+            }
+
+            if (trigger == null)
+            {
+                return false;
+            }
+
+            candidate = new RuntimeHazardCandidate(
+                arrayCreation,
+                SymbolicRuntimeHazardKind.NegativeArrayLength,
+                trigger,
+                "System.OverflowException",
+                "definite_negative_array_length");
             return true;
         }
 
@@ -1856,6 +1897,28 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
+        private static bool TryTranslateNegativeCondition(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula trigger)
+        {
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var value,
+                    getSymbolVersion: null) ||
+                value is not { Kind: SmtValueKind.Int })
+            {
+                trigger = null!;
+                return false;
+            }
+
+            trigger = new SmtBinaryFormula(SmtBinaryOperator.LessThan, value, new SmtIntegerConstant(0));
+            return true;
+        }
+
         private static bool TryTranslateNullCondition(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
@@ -2103,6 +2166,20 @@ namespace PurelySharp.Symbolic
         {
             var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
             return typeInfo.ConvertedType ?? typeInfo.Type;
+        }
+
+        private static IEnumerable<ExpressionSyntax> GetArrayLengthExpressions(ArrayCreationExpressionSyntax arrayCreation)
+        {
+            foreach (var rankSpecifier in arrayCreation.Type.RankSpecifiers)
+            {
+                foreach (var size in rankSpecifier.Sizes)
+                {
+                    if (!size.IsKind(SyntaxKind.OmittedArraySizeExpression))
+                    {
+                        yield return size;
+                    }
+                }
+            }
         }
 
         private static ITypeSymbol? GetThrownExceptionType(
@@ -2501,6 +2578,7 @@ namespace PurelySharp.Symbolic
         UnboxNull,
         InvalidCast,
         DynamicNullBinding,
+        NegativeArrayLength,
     }
 
     public enum SymbolicRuntimeHazardStatus
