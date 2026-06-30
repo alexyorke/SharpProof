@@ -26,6 +26,7 @@ internal static class BclPurityFallbackHeuristics
             bool returnsByRef,
             bool hasRefOrOutParameter,
             bool hasValueLikeReturn,
+            bool hasValueTypeContainingType,
             bool hasOnlyValueLikeOrReadOnlyViewParameters,
             bool isSetterOnlyProperty,
             bool isReadOnlyField = false)
@@ -42,6 +43,7 @@ internal static class BclPurityFallbackHeuristics
             ReturnsByRef = returnsByRef;
             HasRefOrOutParameter = hasRefOrOutParameter;
             HasValueLikeReturn = hasValueLikeReturn;
+            HasValueTypeContainingType = hasValueTypeContainingType;
             HasOnlyValueLikeOrReadOnlyViewParameters = hasOnlyValueLikeOrReadOnlyViewParameters;
             IsSetterOnlyProperty = isSetterOnlyProperty;
             IsReadOnlyField = isReadOnlyField;
@@ -59,6 +61,7 @@ internal static class BclPurityFallbackHeuristics
         public bool ReturnsByRef { get; }
         public bool HasRefOrOutParameter { get; }
         public bool HasValueLikeReturn { get; }
+        public bool HasValueTypeContainingType { get; }
         public bool HasOnlyValueLikeOrReadOnlyViewParameters { get; }
         public bool IsSetterOnlyProperty { get; }
         public bool IsReadOnlyField { get; }
@@ -166,6 +169,13 @@ internal static class BclPurityFallbackHeuristics
             normalized.StartsWith("System.ReadOnlyMemory<", StringComparison.Ordinal);
     }
 
+    public static bool IsKnownValueTypeName(string typeName)
+    {
+        var normalized = NormalizeTypeName(typeName);
+        return IsKnownPrimitiveOrValueAlias(normalized) ||
+            IsLikelyFrameworkValueTypeName(normalized);
+    }
+
     public static string NormalizeTypeName(string typeName)
     {
         return typeName.Trim().TrimEnd('&');
@@ -175,7 +185,10 @@ internal static class BclPurityFallbackHeuristics
     {
         if (shape.IsConstructor)
         {
-            return UnknownBecause("metadata_constructor_without_body");
+            return shape.HasValueTypeContainingType &&
+                shape.HasOnlyValueLikeOrReadOnlyViewParameters
+                    ? ProbablyPureBecause("value_type_constructor_value_like_parameters")
+                    : UnknownBecause("metadata_constructor_without_body");
         }
 
         if (shape.ReturnsVoid)

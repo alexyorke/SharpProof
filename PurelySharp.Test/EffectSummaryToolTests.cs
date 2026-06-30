@@ -10376,6 +10376,8 @@ public readonly struct ConversionFixture
                 "System.GC.Collect",
                 "--symbol-prefix",
                 "System.Version..ctor",
+                "--symbol-prefix",
+                "System.TimeSpan..ctor",
                 "--bcl-fallback-inventory",
                 "--output",
                 outputPath);
@@ -10402,6 +10404,11 @@ public readonly struct ConversionFixture
                 "System.Version..ctor(int, int)",
                 "unknown",
                 "metadata_constructor_without_body");
+            AssertInventoryEntry(
+                inventory,
+                "System.TimeSpan..ctor(long)",
+                "probably_pure",
+                "value_type_constructor_value_like_parameters");
         }
 
         [Test]

@@ -6591,12 +6591,24 @@ namespace PurelySharp.Symbolic.Smt
 
         private static ExpressionSyntax UnwrapElementAccessIndexExpression(ExpressionSyntax expression)
         {
-            while (expression is ParenthesizedExpressionSyntax parenthesized)
+            while (true)
             {
-                expression = parenthesized.Expression;
-            }
+                if (expression is ParenthesizedExpressionSyntax parenthesized)
+                {
+                    expression = parenthesized.Expression;
+                    continue;
+                }
 
-            return expression;
+                if (expression is CheckedExpressionSyntax checkedExpression &&
+                    (checkedExpression.IsKind(SyntaxKind.CheckedExpression) ||
+                     checkedExpression.IsKind(SyntaxKind.UncheckedExpression)))
+                {
+                    expression = checkedExpression.Expression;
+                    continue;
+                }
+
+                return expression;
+            }
         }
 
         private static bool IsBuiltInNonNegativeLengthAccess(
@@ -8840,6 +8852,14 @@ namespace PurelySharp.Symbolic.Smt
                     postfixUnary.IsKind(SyntaxKind.SuppressNullableWarningExpression))
                 {
                     expression = postfixUnary.Operand;
+                    continue;
+                }
+
+                if (expression is CheckedExpressionSyntax checkedExpression &&
+                    (checkedExpression.IsKind(SyntaxKind.CheckedExpression) ||
+                     checkedExpression.IsKind(SyntaxKind.UncheckedExpression)))
+                {
+                    expression = checkedExpression.Expression;
                     continue;
                 }
 

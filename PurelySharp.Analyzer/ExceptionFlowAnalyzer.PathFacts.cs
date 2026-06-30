@@ -624,8 +624,7 @@ namespace PurelySharp.Analyzer
 
             foreach (var statement in finallyBlock.Statements)
             {
-                if (StatementDefinitelyExits(statement) ||
-                    IfStatementExitIsProven(statement, pathConditions, semanticModel, cancellationToken, smtAnalysis))
+                if (StatementExitIsProven(statement, pathConditions, semanticModel, cancellationToken, smtAnalysis))
                 {
                     return true;
                 }
@@ -640,39 +639,122 @@ namespace PurelySharp.Analyzer
             return false;
         }
 
-        private static bool IfStatementExitIsProven(
+        private static bool StatementExitIsProven(
             StatementSyntax statement,
             IReadOnlyCollection<SmtFormula> pathConditions,
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            if (statement is not IfStatementSyntax ifStatement)
-            {
-                return false;
-            }
-
-            if (StatementDefinitelyExits(ifStatement.Statement) &&
-                PathConditionsImplyBranch(
-                    pathConditions,
-                    ifStatement.Condition,
-                    branchWhenTrue: true,
-                    semanticModel,
-                    cancellationToken,
-                    smtAnalysis))
+            if (StatementDefinitelyExits(statement))
             {
                 return true;
             }
 
-            return ifStatement.Else?.Statement is { } elseStatement &&
-                StatementDefinitelyExits(elseStatement) &&
-                PathConditionsImplyBranch(
-                    pathConditions,
-                    ifStatement.Condition,
-                    branchWhenTrue: false,
+            switch (statement)
+            {
+                case BlockSyntax block:
+                    return BlockExitIsProven(block, pathConditions, semanticModel, cancellationToken, smtAnalysis);
+                case IfStatementSyntax ifStatement:
+                    return IfStatementExitIsProven(ifStatement, pathConditions, semanticModel, cancellationToken, smtAnalysis);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool BlockExitIsProven(
+            BlockSyntax block,
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            var blockConditions = pathConditions.ToList();
+            foreach (var statement in block.Statements)
+            {
+                if (StatementExitIsProven(statement, blockConditions, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    return true;
+                }
+
+                AddPriorStatementFacts(statement, semanticModel, cancellationToken, blockConditions);
+                if (!PathConditionsAreSatisfiable(blockConditions, smtAnalysis))
+                {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IfStatementExitIsProven(
+            IfStatementSyntax ifStatement,
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            SmtAnalysisService smtAnalysis)
+        {
+            var trueConditions = CreateBranchConditions(
+                pathConditions,
+                ifStatement.Condition,
+                branchWhenTrue: true,
+                semanticModel,
+                cancellationToken);
+            if (trueConditions == null)
+            {
+                return false;
+            }
+
+            var trueReachable = PathConditionsAreSatisfiable(trueConditions, smtAnalysis);
+            var trueExits = !trueReachable ||
+                StatementExitIsProven(ifStatement.Statement, trueConditions, semanticModel, cancellationToken, smtAnalysis);
+
+            if (ifStatement.Else?.Statement is not { } elseStatement)
+            {
+                return trueReachable && trueExits &&
+                    PathConditionsImplyBranch(
+                        pathConditions,
+                        ifStatement.Condition,
+                        branchWhenTrue: true,
+                        semanticModel,
+                        cancellationToken,
+                        smtAnalysis);
+            }
+
+            var falseConditions = CreateBranchConditions(
+                pathConditions,
+                ifStatement.Condition,
+                branchWhenTrue: false,
+                semanticModel,
+                cancellationToken);
+            if (falseConditions == null)
+            {
+                return false;
+            }
+
+            var falseReachable = PathConditionsAreSatisfiable(falseConditions, smtAnalysis);
+            var falseExits = !falseReachable ||
+                StatementExitIsProven(elseStatement, falseConditions, semanticModel, cancellationToken, smtAnalysis);
+
+            return trueExits && falseExits && (trueReachable || falseReachable);
+        }
+
+        private static List<SmtFormula>? CreateBranchConditions(
+            IReadOnlyCollection<SmtFormula> pathConditions,
+            ExpressionSyntax condition,
+            bool branchWhenTrue,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            var branchConditions = pathConditions.ToList();
+            return CSharpConditionToFormula.TryCollectBranchAssumptions(
+                    condition,
+                    branchWhenTrue,
                     semanticModel,
                     cancellationToken,
-                    smtAnalysis);
+                    branchConditions)
+                ? branchConditions
+                : null;
         }
 
         private static bool PathConditionsImplyBranch(

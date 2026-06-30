@@ -426,6 +426,78 @@ public class TestClass
             Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
         }
 
+        [Test]
+        public void SymbolicSourceQueryService_ProvesBranchDiscriminatorAssignmentRelationAfterJoin()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(bool choose)
+    {
+        var divisor = 0;
+        if (choose)
+        {
+            divisor = 1;
+        }
+        else
+        {
+            divisor = 2;
+        }
+
+        return 10 / divisor;
+    }
+}";
+
+            var marker = FindMarker(source, "return 10 / divisor;");
+            var query = AnalyzeAtPosition(source, marker.Position);
+            var proof = ProveAtMarker(
+                source,
+                marker,
+                "(choose && divisor == 1) || (!choose && divisor == 2)");
+
+            Assert.That(query.MergedInvariantText, Does.Contain("choose"));
+            Assert.That(query.MergedInvariantText, Does.Contain("divisor"));
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue), proof.Reason);
+        }
+
+        [Test]
+        public async Task Ps0002_BranchDiscriminatorValueJoinPrunesImpossibleImpureCall()
+        {
+            var diagnostics = await AnalyzerTestHost.GetDiagnosticsAsync(
+                @"
+using System;
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(bool choose)
+    {
+        var value = 0;
+        if (choose)
+        {
+            value = 1;
+        }
+        else
+        {
+            value = 2;
+        }
+
+        if (choose && value != 1)
+        {
+            Console.WriteLine(value);
+        }
+    }
+}");
+
+            Assert.That(
+                diagnostics.Any(diagnostic =>
+                    diagnostic.Id == PurelySharpDiagnostics.PurityNotVerifiedId &&
+                    diagnostic.Properties.TryGetValue(PurelySharpDiagnostics.ImpuritySymbolProperty, out var symbol) &&
+                    symbol?.Contains("System.Console.WriteLine", StringComparison.Ordinal) == true),
+                Is.False);
+        }
+
         private static SymbolicProgramPointQueryResult AnalyzeAtPosition(string source, int position)
         {
             return new SymbolicSourceQueryService().AnalyzeSourceAtPosition(

@@ -149,16 +149,7 @@ static void PrintFileResult(
             $"NotChecked={result.Reachability.NotCheckedCount}");
     }
 
-    foreach (var proof in result.ConditionProofs)
-    {
-        Console.WriteLine(
-            $"Implies '{proof.Condition}' summary: " +
-            $"ProvenTrue={proof.ProvenTrueCount}, " +
-            $"ProvenFalse={proof.ProvenFalseCount}, " +
-            $"Unreachable={proof.UnreachableCount}, " +
-            $"Unknown={proof.UnknownCount}");
-        PrintProofReasonSummary(proof.Reasons, indent: "  ");
-    }
+    PrintConditionProofSummaries(result.ConditionProofs);
 
     foreach (var lineResult in result.Lines)
     {
@@ -183,6 +174,7 @@ static void PrintLineResult(SymbolicLineQueryResult result, SymbolicCliOptions o
     Console.WriteLine($"Line invariant conditions: {result.MergedInvariant.ConditionCount}");
     PrintInvariantQuery("Line invariant query", result.InvariantQuery);
     PrintMergedPathFacts("Line merged path facts", result.MergedPathFacts);
+    PrintConditionProofSummaries(result.ConditionProofs);
     foreach (var point in result.ProgramPoints)
     {
         Console.WriteLine();
@@ -207,6 +199,7 @@ static void PrintSpanResult(SymbolicSpanQueryResult result, SymbolicCliOptions o
     Console.WriteLine($"Span invariant conditions: {result.MergedInvariant.ConditionCount}");
     PrintInvariantQuery("Span invariant query", result.InvariantQuery);
     PrintMergedPathFacts("Span merged path facts", result.MergedPathFacts);
+    PrintConditionProofSummaries(result.ConditionProofs);
     foreach (var point in result.ProgramPoints)
     {
         Console.WriteLine();
@@ -255,6 +248,7 @@ static void PrintInvariantQuery(
         $"CandidatePoints={query.CandidateProgramPointCount}, " +
         $"UnreachablePoints={query.UnreachableProgramPointCount}");
     Console.WriteLine(label + " status: " + query.Status);
+    Console.WriteLine(label + " status reason: " + query.StatusReason);
     Console.WriteLine(label + " summary: " + query.Summary);
     if (query.MustFacts.Count != 0)
     {
@@ -389,6 +383,25 @@ static void PrintProofOutcomeSummary(
         $"ProvenFalse={summary.ProvenFalseCount}, " +
         $"Unreachable={summary.UnreachableCount}, " +
         $"Unknown={summary.UnknownCount}");
+}
+
+static void PrintConditionProofSummaries(
+    IReadOnlyList<SymbolicConditionProofSummary> proofs)
+{
+    foreach (var proof in proofs)
+    {
+        Console.WriteLine(
+            $"Implies '{proof.Condition}' summary: " +
+            $"Status={proof.Status}, " +
+            $"ProvenTrue={proof.ProvenTrueCount}, " +
+            $"ProvenFalse={proof.ProvenFalseCount}, " +
+            $"Unreachable={proof.UnreachableCount}, " +
+            $"Unknown={proof.UnknownCount}, " +
+            $"Reachable={proof.ReachableCount}, " +
+            $"Resolved={proof.ResolvedCount}");
+        Console.WriteLine($"  Proof summary: {proof.Summary}");
+        PrintProofReasonSummary(proof.Reasons, indent: "  ");
+    }
 }
 
 static void PrintProofReasonSummary(

@@ -1941,6 +1941,7 @@ namespace PurelySharp.Symbolic
             ProofOutcomes = proofOutcomes ?? throw new ArgumentNullException(nameof(proofOutcomes));
             SmtDiagnostics = smtDiagnostics ?? SymbolicSmtDiagnostics.NotConfigured;
             Status = ResolveStatus();
+            StatusReason = ResolveStatusReason();
             Summary = CreateSummary();
             Diagnostics = CreateDiagnostics();
         }
@@ -1976,6 +1977,8 @@ namespace PurelySharp.Symbolic
         public SymbolicSmtDiagnostics SmtDiagnostics { get; }
 
         public SymbolicInvariantQueryStatus Status { get; }
+
+        public string StatusReason { get; }
 
         public string Summary { get; }
 
@@ -2072,6 +2075,41 @@ namespace PurelySharp.Symbolic
             }
 
             return SymbolicInvariantQueryStatus.Exact;
+        }
+
+        private string ResolveStatusReason()
+        {
+            if (IsUnreachable)
+            {
+                return "all_candidate_program_points_unreachable";
+            }
+
+            if (Reachability.UnknownCount != 0 || Reachability.NotCheckedCount != 0)
+            {
+                return "reachability_not_fully_resolved";
+            }
+
+            if (ProofOutcomes.UnknownCount != 0)
+            {
+                return "proofs_not_fully_resolved";
+            }
+
+            if (SmtDiagnostics.IsConfigured && !SmtDiagnostics.IsEnabled)
+            {
+                return "smt_disabled";
+            }
+
+            if (HasUnknowns)
+            {
+                return "path_varying_targets";
+            }
+
+            if (HasMaybeFacts)
+            {
+                return "path_specific_facts";
+            }
+
+            return "all_candidate_program_points_exact";
         }
 
         private string CreateSummary()
@@ -3274,6 +3312,7 @@ namespace PurelySharp.Symbolic
             int unreachableProgramPointCount,
             bool isUnreachable,
             string status,
+            string statusReason,
             string summary,
             bool hasMaybeFacts,
             bool hasUnknowns,
@@ -3299,6 +3338,7 @@ namespace PurelySharp.Symbolic
             UnreachableProgramPointCount = unreachableProgramPointCount;
             IsUnreachable = isUnreachable;
             Status = status ?? string.Empty;
+            StatusReason = statusReason ?? string.Empty;
             Summary = summary ?? string.Empty;
             HasMaybeFacts = hasMaybeFacts;
             HasUnknowns = hasUnknowns;
@@ -3339,6 +3379,8 @@ namespace PurelySharp.Symbolic
         public bool IsUnreachable { get; }
 
         public string Status { get; }
+
+        public string StatusReason { get; }
 
         public string Summary { get; }
 
@@ -3400,6 +3442,7 @@ namespace PurelySharp.Symbolic
                 query.UnreachableProgramPointCount,
                 query.IsUnreachable,
                 query.Status.ToString(),
+                query.StatusReason,
                 query.Summary,
                 query.HasMaybeFacts,
                 query.HasUnknowns,
@@ -3528,6 +3571,7 @@ namespace PurelySharp.Symbolic
             int maybeFactCount,
             int unknownFactCount,
             string invariantStatus,
+            string invariantStatusReason,
             string invariantSummary,
             int invariantDiagnosticCount,
             int totalPathConditionCount,
@@ -3555,6 +3599,7 @@ namespace PurelySharp.Symbolic
             MaybeFactCount = maybeFactCount;
             UnknownFactCount = unknownFactCount;
             InvariantStatus = invariantStatus ?? string.Empty;
+            InvariantStatusReason = invariantStatusReason ?? string.Empty;
             InvariantSummary = invariantSummary ?? string.Empty;
             InvariantDiagnosticCount = invariantDiagnosticCount;
             TotalPathConditionCount = totalPathConditionCount;
@@ -3589,6 +3634,8 @@ namespace PurelySharp.Symbolic
         public int UnknownFactCount { get; }
 
         public string InvariantStatus { get; }
+
+        public string InvariantStatusReason { get; }
 
         public string InvariantSummary { get; }
 
@@ -3676,6 +3723,7 @@ namespace PurelySharp.Symbolic
                 invariantQuery.MaybeFactCount,
                 invariantQuery.UnknownFactCount,
                 invariantQuery.Status,
+                invariantQuery.StatusReason,
                 invariantQuery.Summary,
                 invariantQuery.DiagnosticCount,
                 programPointSummary.TotalPathConditionCount,
@@ -4522,6 +4570,10 @@ namespace PurelySharp.Symbolic
             UnreachableCount = unreachableCount;
             TotalCount = totalCount ?? unknownCount + provenTrueCount + provenFalseCount + unreachableCount;
             Reasons = reasons ?? Array.Empty<SymbolicConditionProofReasonSummary>();
+            ReachableCount = TotalCount - UnreachableCount;
+            ResolvedCount = ProvenTrueCount + ProvenFalseCount + UnreachableCount;
+            Status = ResolveStatus(TotalCount, ReachableCount, UnknownCount, ProvenTrueCount, ProvenFalseCount, UnreachableCount);
+            Summary = CreateSummary(Status);
         }
 
         public string Condition { get; }
@@ -4535,6 +4587,20 @@ namespace PurelySharp.Symbolic
         public int ProvenFalseCount { get; }
 
         public int UnreachableCount { get; }
+
+        public int ReachableCount { get; }
+
+        public int ResolvedCount { get; }
+
+        public SymbolicConditionProofSummaryStatus Status { get; }
+
+        public string Summary { get; }
+
+        public bool HoldsOnAllReachablePoints => Status == SymbolicConditionProofSummaryStatus.AlwaysTrue;
+
+        public bool RefutedOnAllReachablePoints => Status == SymbolicConditionProofSummaryStatus.AlwaysFalse;
+
+        public bool HasMixedReachableOutcomes => Status == SymbolicConditionProofSummaryStatus.Mixed;
 
         public IReadOnlyList<SymbolicConditionProofReasonSummary> Reasons { get; }
 
@@ -4600,6 +4666,61 @@ namespace PurelySharp.Symbolic
                     .ToArray());
         }
 
+        private static SymbolicConditionProofSummaryStatus ResolveStatus(
+            int totalCount,
+            int reachableCount,
+            int unknownCount,
+            int provenTrueCount,
+            int provenFalseCount,
+            int unreachableCount)
+        {
+            if (totalCount == 0)
+            {
+                return SymbolicConditionProofSummaryStatus.None;
+            }
+
+            if (unreachableCount == totalCount)
+            {
+                return SymbolicConditionProofSummaryStatus.UnreachableOnly;
+            }
+
+            if (unknownCount != 0)
+            {
+                return SymbolicConditionProofSummaryStatus.Unknown;
+            }
+
+            if (provenFalseCount == 0 && provenTrueCount == reachableCount)
+            {
+                return SymbolicConditionProofSummaryStatus.AlwaysTrue;
+            }
+
+            if (provenTrueCount == 0 && provenFalseCount == reachableCount)
+            {
+                return SymbolicConditionProofSummaryStatus.AlwaysFalse;
+            }
+
+            return SymbolicConditionProofSummaryStatus.Mixed;
+        }
+
+        private static string CreateSummary(SymbolicConditionProofSummaryStatus status)
+        {
+            switch (status)
+            {
+                case SymbolicConditionProofSummaryStatus.None:
+                    return "No implication proof results were requested for this condition.";
+                case SymbolicConditionProofSummaryStatus.UnreachableOnly:
+                    return "Every candidate program point for this condition was unreachable.";
+                case SymbolicConditionProofSummaryStatus.AlwaysTrue:
+                    return "The condition is proven true at every reachable candidate program point.";
+                case SymbolicConditionProofSummaryStatus.AlwaysFalse:
+                    return "The condition is proven false at every reachable candidate program point.";
+                case SymbolicConditionProofSummaryStatus.Mixed:
+                    return "The condition has both true and false reachable proof outcomes.";
+                default:
+                    return "The condition has at least one unresolved reachable proof outcome.";
+            }
+        }
+
         private readonly struct ProofReasonKey
         {
             public ProofReasonKey(SymbolicTruthValue truthValue, string? reason)
@@ -4650,6 +4771,16 @@ namespace PurelySharp.Symbolic
         public string Reason { get; }
 
         public int Count { get; }
+    }
+
+    public enum SymbolicConditionProofSummaryStatus
+    {
+        None,
+        UnreachableOnly,
+        AlwaysTrue,
+        AlwaysFalse,
+        Mixed,
+        Unknown,
     }
 
     internal static class SymbolicFormulaDisplay

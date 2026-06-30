@@ -13,6 +13,8 @@ namespace SearchLib.Smt
     public sealed class SmtSolver : IDisposable
     {
         private static readonly TimeSpan ConcreteRegexValidationTimeout = TimeSpan.FromMilliseconds(50);
+        private const int MaxEqualitySubstitutionPasses = 4;
+        private const int MaxEqualitySubstitutionReplacementNodes = 32;
         private readonly Z3FormulaEncoder _encoder = new();
         private readonly Dictionary<RegexValidationKey, RegexValidationResult> _regexValidationCache = new();
 
@@ -97,7 +99,11 @@ namespace SearchLib.Smt
 
                 // A SAT path under regex approximation is only "may be feasible"; still check the
                 // combined query because UNSAT under the over-approximation remains a safe proof.
-                var combinedConditions = preparedPathConditions.Concat(new[] { impurityCondition }).ToArray();
+                //
+                // Use the original path facts for the combined query. The path-only preparation pass
+                // may remove equalities as already-satisfied facts, but those equalities can still be
+                // required to prove the hazard condition unreachable.
+                var combinedConditions = originalPathConditions.Concat(new[] { impurityCondition }).ToArray();
                 var combinedPreparationStatus = PrepareConcreteFacts(combinedConditions, out var preparedCombinedConditions);
                 if (combinedPreparationStatus != ConcreteFactPreparationStatus.Ready)
                 {
@@ -185,6 +191,8 @@ namespace SearchLib.Smt
             public HashSet<SmtFormula> IntegerNonZeroFacts { get; } = new();
 
             public Dictionary<SmtFormula, bool> BooleanEqualities { get; } = new();
+
+            public Dictionary<SmtFormula, bool> ReferenceNullEqualities { get; } = new();
         }
 
         private struct IntegerBounds
@@ -231,14 +239,18 @@ namespace SearchLib.Smt
                 normalizedConditions.Add(normalizedCondition);
             }
 
-            var facts = new ConcreteFactContext();
-            foreach (var condition in normalizedConditions)
+            var substitutionStatus = TryApplyEqualitySubstitutions(normalizedConditions, ref changed);
+            if (substitutionStatus != ConcreteFactPreparationStatus.Ready)
             {
-                if (!TryCollectBooleanFacts(condition, facts))
-                {
-                    preparedConditions = Array.Empty<SmtFormula>();
-                    return ConcreteFactPreparationStatus.Unsatisfiable;
-                }
+                preparedConditions = Array.Empty<SmtFormula>();
+                return substitutionStatus;
+            }
+
+            var facts = new ConcreteFactContext();
+            if (!TryCollectBooleanFacts(normalizedConditions, facts))
+            {
+                preparedConditions = Array.Empty<SmtFormula>();
+                return ConcreteFactPreparationStatus.Unsatisfiable;
             }
 
             var conditionalStatus = SimplifyKnownConditionalTerms(normalizedConditions, facts, ref changed);
@@ -248,22 +260,23 @@ namespace SearchLib.Smt
                 return conditionalStatus;
             }
 
-            foreach (var condition in normalizedConditions)
+            if (!TryCollectBooleanFacts(normalizedConditions, facts))
             {
-                if (!TryCollectBooleanFacts(condition, facts))
-                {
-                    preparedConditions = Array.Empty<SmtFormula>();
-                    return ConcreteFactPreparationStatus.Unsatisfiable;
-                }
+                preparedConditions = Array.Empty<SmtFormula>();
+                return ConcreteFactPreparationStatus.Unsatisfiable;
             }
 
-            foreach (var condition in normalizedConditions)
+            var referenceStatus = TryCollectReferenceFacts(normalizedConditions, facts);
+            if (referenceStatus != ConcreteFactPreparationStatus.Ready)
             {
-                if (!TryCollectStringEqualities(condition, facts))
-                {
-                    preparedConditions = Array.Empty<SmtFormula>();
-                    return ConcreteFactPreparationStatus.Unsatisfiable;
-                }
+                preparedConditions = Array.Empty<SmtFormula>();
+                return referenceStatus;
+            }
+
+            if (!TryCollectStringEqualities(normalizedConditions, facts))
+            {
+                preparedConditions = Array.Empty<SmtFormula>();
+                return ConcreteFactPreparationStatus.Unsatisfiable;
             }
 
             var integerStatus = TryCollectIntegerFacts(normalizedConditions, facts);
@@ -348,6 +361,405 @@ namespace SearchLib.Smt
 
             preparedConditions = changed ? builder.ToArray() : conditions;
             return ConcreteFactPreparationStatus.Ready;
+        }
+
+        private static ConcreteFactPreparationStatus TryApplyEqualitySubstitutions(
+            List<SmtFormula> conditions,
+            ref bool changed)
+        {
+            for (var pass = 0; pass < MaxEqualitySubstitutionPasses; pass++)
+            {
+                var substitutions = new Dictionary<SmtVariable, SmtFormula>();
+                foreach (var condition in conditions)
+                {
+                    TryCollectEqualitySubstitutions(condition, substitutions);
+                }
+
+                if (substitutions.Count == 0)
+                {
+                    return ConcreteFactPreparationStatus.Ready;
+                }
+
+                var passChanged = false;
+                for (var index = conditions.Count - 1; index >= 0; index--)
+                {
+                    var substituted = SubstituteEqualityAliases(
+                        conditions[index],
+                        substitutions,
+                        out var substitutedChanged);
+                    if (substitutedChanged)
+                    {
+                        substituted = SimplifyBooleanConstants(substituted, out _);
+                    }
+
+                    if (substituted is SmtBooleanConstant { Value: false })
+                    {
+                        return ConcreteFactPreparationStatus.Unsatisfiable;
+                    }
+
+                    if (substituted is SmtBooleanConstant { Value: true })
+                    {
+                        conditions.RemoveAt(index);
+                        passChanged = true;
+                        continue;
+                    }
+
+                    if (substitutedChanged)
+                    {
+                        conditions[index] = substituted;
+                        passChanged = true;
+                    }
+                }
+
+                changed |= passChanged;
+                if (!passChanged)
+                {
+                    return ConcreteFactPreparationStatus.Ready;
+                }
+            }
+
+            return ConcreteFactPreparationStatus.Ready;
+        }
+
+        private static void TryCollectEqualitySubstitutions(
+            SmtFormula formula,
+            Dictionary<SmtVariable, SmtFormula> substitutions)
+        {
+            switch (formula)
+            {
+                case SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula:
+                    TryCollectEqualitySubstitutions(andFormula.Left, substitutions);
+                    TryCollectEqualitySubstitutions(andFormula.Right, substitutions);
+                    break;
+                case SmtBinaryFormula { Operator: SmtBinaryOperator.Equal } equalityFormula
+                    when equalityFormula.Left.Kind == equalityFormula.Right.Kind:
+                    TryCollectEqualitySubstitution(equalityFormula.Left, equalityFormula.Right, substitutions);
+                    break;
+            }
+        }
+
+        private static void TryCollectEqualitySubstitution(
+            SmtFormula left,
+            SmtFormula right,
+            Dictionary<SmtVariable, SmtFormula> substitutions)
+        {
+            if (left is SmtVariable leftVariable && right is SmtVariable rightVariable)
+            {
+                var comparison = string.CompareOrdinal(leftVariable.Name, rightVariable.Name);
+                if (comparison < 0)
+                {
+                    TryAddEqualitySubstitution(rightVariable, leftVariable, substitutions);
+                }
+                else if (comparison > 0)
+                {
+                    TryAddEqualitySubstitution(leftVariable, rightVariable, substitutions);
+                }
+
+                return;
+            }
+
+            if (left is SmtVariable variableLeft)
+            {
+                TryAddEqualitySubstitution(variableLeft, right, substitutions);
+                return;
+            }
+
+            if (right is SmtVariable variableRight)
+            {
+                TryAddEqualitySubstitution(variableRight, left, substitutions);
+            }
+        }
+
+        private static void TryAddEqualitySubstitution(
+            SmtVariable source,
+            SmtFormula replacement,
+            Dictionary<SmtVariable, SmtFormula> substitutions)
+        {
+            if (source.Kind != replacement.Kind ||
+                EqualityComparer<SmtFormula>.Default.Equals(source, replacement) ||
+                CountFormulaNodes(replacement) > MaxEqualitySubstitutionReplacementNodes ||
+                WouldCreateSubstitutionCycle(source, replacement, substitutions, substitutions.Count + 1))
+            {
+                return;
+            }
+
+            if (substitutions.TryGetValue(source, out var existing))
+            {
+                return;
+            }
+
+            substitutions.Add(source, replacement);
+        }
+
+        private static bool WouldCreateSubstitutionCycle(
+            SmtVariable source,
+            SmtFormula replacement,
+            IReadOnlyDictionary<SmtVariable, SmtFormula> substitutions,
+            int remainingDepth)
+        {
+            if (remainingDepth < 0)
+            {
+                return true;
+            }
+
+            switch (replacement)
+            {
+                case SmtVariable variable:
+                    if (EqualityComparer<SmtFormula>.Default.Equals(variable, source))
+                    {
+                        return true;
+                    }
+
+                    return substitutions.TryGetValue(variable, out var nested) &&
+                        WouldCreateSubstitutionCycle(source, nested, substitutions, remainingDepth - 1);
+                case SmtUnaryFormula unaryFormula:
+                    return WouldCreateSubstitutionCycle(source, unaryFormula.Operand, substitutions, remainingDepth);
+                case SmtBinaryFormula binaryFormula:
+                    return WouldCreateSubstitutionCycle(source, binaryFormula.Left, substitutions, remainingDepth) ||
+                        WouldCreateSubstitutionCycle(source, binaryFormula.Right, substitutions, remainingDepth);
+                case SmtIntegerUnaryTerm integerUnaryTerm:
+                    return WouldCreateSubstitutionCycle(source, integerUnaryTerm.Operand, substitutions, remainingDepth);
+                case SmtIntegerBinaryTerm integerBinaryTerm:
+                    return WouldCreateSubstitutionCycle(source, integerBinaryTerm.Left, substitutions, remainingDepth) ||
+                        WouldCreateSubstitutionCycle(source, integerBinaryTerm.Right, substitutions, remainingDepth);
+                case SmtStringLengthTerm stringLengthTerm:
+                    return WouldCreateSubstitutionCycle(source, stringLengthTerm.Value, substitutions, remainingDepth);
+                case SmtStringConcatTerm stringConcatTerm:
+                    return WouldCreateSubstitutionCycle(source, stringConcatTerm.Left, substitutions, remainingDepth) ||
+                        WouldCreateSubstitutionCycle(source, stringConcatTerm.Right, substitutions, remainingDepth);
+                case SmtStringContainsFormula stringContains:
+                    return WouldCreateSubstitutionCycle(source, stringContains.Value, substitutions, remainingDepth) ||
+                        WouldCreateSubstitutionCycle(source, stringContains.Search, substitutions, remainingDepth);
+                case SmtStringStartsWithFormula stringStartsWith:
+                    return WouldCreateSubstitutionCycle(source, stringStartsWith.Value, substitutions, remainingDepth) ||
+                        WouldCreateSubstitutionCycle(source, stringStartsWith.Prefix, substitutions, remainingDepth);
+                case SmtStringEndsWithFormula stringEndsWith:
+                    return WouldCreateSubstitutionCycle(source, stringEndsWith.Value, substitutions, remainingDepth) ||
+                        WouldCreateSubstitutionCycle(source, stringEndsWith.Suffix, substitutions, remainingDepth);
+                case SmtRegexMatchFormula regexMatch:
+                    return WouldCreateSubstitutionCycle(source, regexMatch.Value, substitutions, remainingDepth);
+                case SmtConditionalFormula conditionalFormula:
+                    return WouldCreateSubstitutionCycle(source, conditionalFormula.Condition, substitutions, remainingDepth) ||
+                        WouldCreateSubstitutionCycle(source, conditionalFormula.WhenTrue, substitutions, remainingDepth) ||
+                        WouldCreateSubstitutionCycle(source, conditionalFormula.WhenFalse, substitutions, remainingDepth);
+                default:
+                    return false;
+            }
+        }
+
+        private static SmtFormula SubstituteEqualityAliases(
+            SmtFormula formula,
+            IReadOnlyDictionary<SmtVariable, SmtFormula> substitutions,
+            out bool changed)
+        {
+            return SubstituteEqualityAliases(formula, substitutions, substitutions.Count + 1, out changed);
+        }
+
+        private static SmtFormula SubstituteEqualityAliases(
+            SmtFormula formula,
+            IReadOnlyDictionary<SmtVariable, SmtFormula> substitutions,
+            int remainingDepth,
+            out bool changed)
+        {
+            changed = false;
+            if (remainingDepth < 0)
+            {
+                return formula;
+            }
+
+            switch (formula)
+            {
+                case SmtVariable variable when substitutions.TryGetValue(variable, out var replacement):
+                    changed = true;
+                    return SubstituteEqualityAliases(
+                        replacement,
+                        substitutions,
+                        remainingDepth - 1,
+                        out _);
+                case SmtUnaryFormula unaryFormula:
+                    {
+                        var operand = SubstituteEqualityAliases(
+                            unaryFormula.Operand,
+                            substitutions,
+                            remainingDepth,
+                            out var operandChanged);
+                        changed = operandChanged;
+                        return operandChanged
+                            ? new SmtUnaryFormula(unaryFormula.Operator, operand)
+                            : formula;
+                    }
+                case SmtBinaryFormula binaryFormula:
+                    {
+                        var left = SubstituteEqualityAliases(
+                            binaryFormula.Left,
+                            substitutions,
+                            remainingDepth,
+                            out var leftChanged);
+                        var right = SubstituteEqualityAliases(
+                            binaryFormula.Right,
+                            substitutions,
+                            remainingDepth,
+                            out var rightChanged);
+                        changed = leftChanged || rightChanged;
+                        return changed
+                            ? new SmtBinaryFormula(binaryFormula.Operator, left, right)
+                            : formula;
+                    }
+                case SmtIntegerUnaryTerm integerUnaryTerm:
+                    {
+                        var operand = SubstituteEqualityAliases(
+                            integerUnaryTerm.Operand,
+                            substitutions,
+                            remainingDepth,
+                            out var operandChanged);
+                        changed = operandChanged;
+                        return operandChanged
+                            ? new SmtIntegerUnaryTerm(integerUnaryTerm.Operator, operand)
+                            : formula;
+                    }
+                case SmtIntegerBinaryTerm integerBinaryTerm:
+                    {
+                        var left = SubstituteEqualityAliases(
+                            integerBinaryTerm.Left,
+                            substitutions,
+                            remainingDepth,
+                            out var leftChanged);
+                        var right = SubstituteEqualityAliases(
+                            integerBinaryTerm.Right,
+                            substitutions,
+                            remainingDepth,
+                            out var rightChanged);
+                        changed = leftChanged || rightChanged;
+                        return changed
+                            ? new SmtIntegerBinaryTerm(integerBinaryTerm.Operator, left, right)
+                            : formula;
+                    }
+                case SmtStringLengthTerm stringLengthTerm:
+                    {
+                        var value = SubstituteEqualityAliases(
+                            stringLengthTerm.Value,
+                            substitutions,
+                            remainingDepth,
+                            out var valueChanged);
+                        changed = valueChanged;
+                        return valueChanged ? new SmtStringLengthTerm(value) : formula;
+                    }
+                case SmtStringConcatTerm stringConcatTerm:
+                    {
+                        var left = SubstituteEqualityAliases(
+                            stringConcatTerm.Left,
+                            substitutions,
+                            remainingDepth,
+                            out var leftChanged);
+                        var right = SubstituteEqualityAliases(
+                            stringConcatTerm.Right,
+                            substitutions,
+                            remainingDepth,
+                            out var rightChanged);
+                        changed = leftChanged || rightChanged;
+                        return changed ? new SmtStringConcatTerm(left, right) : formula;
+                    }
+                case SmtStringContainsFormula stringContains:
+                    {
+                        var value = SubstituteEqualityAliases(
+                            stringContains.Value,
+                            substitutions,
+                            remainingDepth,
+                            out var valueChanged);
+                        var search = SubstituteEqualityAliases(
+                            stringContains.Search,
+                            substitutions,
+                            remainingDepth,
+                            out var searchChanged);
+                        changed = valueChanged || searchChanged;
+                        return changed ? new SmtStringContainsFormula(value, search) : formula;
+                    }
+                case SmtStringStartsWithFormula stringStartsWith:
+                    {
+                        var value = SubstituteEqualityAliases(
+                            stringStartsWith.Value,
+                            substitutions,
+                            remainingDepth,
+                            out var valueChanged);
+                        var prefix = SubstituteEqualityAliases(
+                            stringStartsWith.Prefix,
+                            substitutions,
+                            remainingDepth,
+                            out var prefixChanged);
+                        changed = valueChanged || prefixChanged;
+                        return changed ? new SmtStringStartsWithFormula(value, prefix) : formula;
+                    }
+                case SmtStringEndsWithFormula stringEndsWith:
+                    {
+                        var value = SubstituteEqualityAliases(
+                            stringEndsWith.Value,
+                            substitutions,
+                            remainingDepth,
+                            out var valueChanged);
+                        var suffix = SubstituteEqualityAliases(
+                            stringEndsWith.Suffix,
+                            substitutions,
+                            remainingDepth,
+                            out var suffixChanged);
+                        changed = valueChanged || suffixChanged;
+                        return changed ? new SmtStringEndsWithFormula(value, suffix) : formula;
+                    }
+                case SmtRegexMatchFormula regexMatch:
+                    {
+                        var value = SubstituteEqualityAliases(
+                            regexMatch.Value,
+                            substitutions,
+                            remainingDepth,
+                            out var valueChanged);
+                        changed = valueChanged;
+                        return valueChanged ? new SmtRegexMatchFormula(value, regexMatch.Pattern) : formula;
+                    }
+                case SmtConditionalFormula conditionalFormula:
+                    {
+                        var condition = SubstituteEqualityAliases(
+                            conditionalFormula.Condition,
+                            substitutions,
+                            remainingDepth,
+                            out var conditionChanged);
+                        var whenTrue = SubstituteEqualityAliases(
+                            conditionalFormula.WhenTrue,
+                            substitutions,
+                            remainingDepth,
+                            out var trueChanged);
+                        var whenFalse = SubstituteEqualityAliases(
+                            conditionalFormula.WhenFalse,
+                            substitutions,
+                            remainingDepth,
+                            out var falseChanged);
+                        changed = conditionChanged || trueChanged || falseChanged;
+                        return changed
+                            ? new SmtConditionalFormula(condition, whenTrue, whenFalse, conditionalFormula.ResultKind)
+                            : formula;
+                    }
+                default:
+                    return formula;
+            }
+        }
+
+        private static int CountFormulaNodes(SmtFormula formula)
+        {
+            return formula switch
+            {
+                SmtUnaryFormula unaryFormula => 1 + CountFormulaNodes(unaryFormula.Operand),
+                SmtBinaryFormula binaryFormula => 1 + CountFormulaNodes(binaryFormula.Left) + CountFormulaNodes(binaryFormula.Right),
+                SmtIntegerUnaryTerm integerUnaryTerm => 1 + CountFormulaNodes(integerUnaryTerm.Operand),
+                SmtIntegerBinaryTerm integerBinaryTerm => 1 + CountFormulaNodes(integerBinaryTerm.Left) + CountFormulaNodes(integerBinaryTerm.Right),
+                SmtStringLengthTerm stringLengthTerm => 1 + CountFormulaNodes(stringLengthTerm.Value),
+                SmtStringConcatTerm stringConcatTerm => 1 + CountFormulaNodes(stringConcatTerm.Left) + CountFormulaNodes(stringConcatTerm.Right),
+                SmtStringContainsFormula stringContains => 1 + CountFormulaNodes(stringContains.Value) + CountFormulaNodes(stringContains.Search),
+                SmtStringStartsWithFormula stringStartsWith => 1 + CountFormulaNodes(stringStartsWith.Value) + CountFormulaNodes(stringStartsWith.Prefix),
+                SmtStringEndsWithFormula stringEndsWith => 1 + CountFormulaNodes(stringEndsWith.Value) + CountFormulaNodes(stringEndsWith.Suffix),
+                SmtRegexMatchFormula regexMatch => 1 + CountFormulaNodes(regexMatch.Value),
+                SmtConditionalFormula conditionalFormula => 1 + CountFormulaNodes(conditionalFormula.Condition) +
+                    CountFormulaNodes(conditionalFormula.WhenTrue) +
+                    CountFormulaNodes(conditionalFormula.WhenFalse),
+                _ => 1,
+            };
         }
 
         private static ConcreteFactPreparationStatus SimplifyKnownConditionalTerms(
@@ -466,6 +878,17 @@ namespace SearchLib.Smt
                     }
                 case SmtConditionalFormula conditionalFormula:
                     {
+                        if (EqualityComparer<SmtFormula>.Default.Equals(
+                                conditionalFormula.WhenTrue,
+                                conditionalFormula.WhenFalse))
+                        {
+                            changed = true;
+                            return SimplifyKnownConditionalTerms(
+                                conditionalFormula.WhenTrue,
+                                facts,
+                                out _);
+                        }
+
                         if (TryEvaluateConcreteBoolean(conditionalFormula.Condition, facts, out var selectedBranch))
                         {
                             changed = true;
@@ -646,18 +1069,45 @@ namespace SearchLib.Smt
                     EqualityComparer<SmtFormula>.Default.Equals(rightNot.Operand, left);
         }
 
-        private static bool TryCollectBooleanFacts(SmtFormula formula, ConcreteFactContext facts)
+        private static bool TryCollectBooleanFacts(
+            IReadOnlyList<SmtFormula> conditions,
+            ConcreteFactContext facts)
+        {
+            var iterationLimit = Math.Max(1, conditions.Count * 4);
+            var changed = false;
+            do
+            {
+                changed = false;
+                foreach (var condition in conditions)
+                {
+                    if (!TryCollectBooleanFacts(condition, facts, ref changed))
+                    {
+                        return false;
+                    }
+                }
+
+                iterationLimit--;
+            }
+            while (changed && iterationLimit > 0);
+
+            return true;
+        }
+
+        private static bool TryCollectBooleanFacts(
+            SmtFormula formula,
+            ConcreteFactContext facts,
+            ref bool changed)
         {
             if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula)
             {
-                return TryCollectBooleanFacts(andFormula.Left, facts) &&
-                    TryCollectBooleanFacts(andFormula.Right, facts);
+                return TryCollectBooleanFacts(andFormula.Left, facts, ref changed) &&
+                    TryCollectBooleanFacts(andFormula.Right, facts, ref changed);
             }
 
             if (formula is SmtUnaryFormula { Operator: SmtUnaryOperator.Not } notFormula)
             {
                 return CanCacheBooleanFact(notFormula.Operand)
-                    ? TryAddBooleanEquality(facts, notFormula.Operand, false)
+                    ? TryAddBooleanEquality(facts, notFormula.Operand, false, ref changed)
                     : true;
             }
 
@@ -673,7 +1123,7 @@ namespace SearchLib.Smt
                     var expectedRight = equalityFormula.Operator == SmtBinaryOperator.Equal
                         ? leftValue
                         : !leftValue;
-                    return TryAddBooleanEquality(facts, equalityFormula.Right, expectedRight);
+                    return TryAddBooleanEquality(facts, equalityFormula.Right, expectedRight, ref changed);
                 }
 
                 if (TryEvaluateConcreteBoolean(equalityFormula.Right, facts, out var rightValue))
@@ -681,14 +1131,14 @@ namespace SearchLib.Smt
                     var expectedLeft = equalityFormula.Operator == SmtBinaryOperator.Equal
                         ? rightValue
                         : !rightValue;
-                    return TryAddBooleanEquality(facts, equalityFormula.Left, expectedLeft);
+                    return TryAddBooleanEquality(facts, equalityFormula.Left, expectedLeft, ref changed);
                 }
             }
 
             if (formula.Kind == SmtValueKind.Bool &&
                 CanCacheBooleanFact(formula))
             {
-                return TryAddBooleanEquality(facts, formula, true);
+                return TryAddBooleanEquality(facts, formula, true, ref changed);
             }
 
             return true;
@@ -697,7 +1147,8 @@ namespace SearchLib.Smt
         private static bool TryAddBooleanEquality(
             ConcreteFactContext facts,
             SmtFormula formula,
-            bool value)
+            bool value,
+            ref bool changed)
         {
             if (formula.Kind != SmtValueKind.Bool ||
                 !CanCacheBooleanFact(formula))
@@ -711,6 +1162,7 @@ namespace SearchLib.Smt
             }
 
             facts.BooleanEqualities.Add(formula, value);
+            changed = true;
             return true;
         }
 
@@ -763,6 +1215,137 @@ namespace SearchLib.Smt
                     ContainsRegexOrStringPredicate(conditionalFormula.WhenFalse),
                 _ => false,
             };
+        }
+
+        private static ConcreteFactPreparationStatus TryCollectReferenceFacts(
+            IReadOnlyList<SmtFormula> conditions,
+            ConcreteFactContext facts)
+        {
+            var iterationLimit = Math.Max(1, conditions.Count * 4);
+            var changed = false;
+            do
+            {
+                changed = false;
+                foreach (var condition in conditions)
+                {
+                    var status = TryCollectReferenceFacts(condition, facts, ref changed);
+                    if (status != ConcreteFactPreparationStatus.Ready)
+                    {
+                        return status;
+                    }
+                }
+
+                iterationLimit--;
+            }
+            while (changed && iterationLimit > 0);
+
+            return ConcreteFactPreparationStatus.Ready;
+        }
+
+        private static ConcreteFactPreparationStatus TryCollectReferenceFacts(
+            SmtFormula formula,
+            ConcreteFactContext facts,
+            ref bool changed)
+        {
+            if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula)
+            {
+                var leftStatus = TryCollectReferenceFacts(andFormula.Left, facts, ref changed);
+                if (leftStatus != ConcreteFactPreparationStatus.Ready)
+                {
+                    return leftStatus;
+                }
+
+                return TryCollectReferenceFacts(andFormula.Right, facts, ref changed);
+            }
+
+            if (formula is not SmtBinaryFormula
+                {
+                    Operator: SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual
+                } binaryFormula ||
+                binaryFormula.Left.Kind != SmtValueKind.Reference ||
+                binaryFormula.Right.Kind != SmtValueKind.Reference)
+            {
+                return ConcreteFactPreparationStatus.Ready;
+            }
+
+            var isEquality = binaryFormula.Operator == SmtBinaryOperator.Equal;
+            if (EqualityComparer<SmtFormula>.Default.Equals(binaryFormula.Left, binaryFormula.Right))
+            {
+                return isEquality
+                    ? ConcreteFactPreparationStatus.Ready
+                    : ConcreteFactPreparationStatus.Unsatisfiable;
+            }
+
+            if (binaryFormula.Left is SmtNullConstant)
+            {
+                return TryAddReferenceNullEquality(facts, binaryFormula.Right, isEquality, ref changed)
+                    ? ConcreteFactPreparationStatus.Ready
+                    : ConcreteFactPreparationStatus.Unsatisfiable;
+            }
+
+            if (binaryFormula.Right is SmtNullConstant)
+            {
+                return TryAddReferenceNullEquality(facts, binaryFormula.Left, isEquality, ref changed)
+                    ? ConcreteFactPreparationStatus.Ready
+                    : ConcreteFactPreparationStatus.Unsatisfiable;
+            }
+
+            var leftKnown = TryEvaluateReferenceNull(binaryFormula.Left, facts, out var leftIsNull);
+            var rightKnown = TryEvaluateReferenceNull(binaryFormula.Right, facts, out var rightIsNull);
+            if (leftKnown && rightKnown && (leftIsNull || rightIsNull))
+            {
+                var equal = leftIsNull && rightIsNull;
+                return CompareEquality(binaryFormula.Operator, equal)
+                    ? ConcreteFactPreparationStatus.Ready
+                    : ConcreteFactPreparationStatus.Unsatisfiable;
+            }
+
+            if (!isEquality)
+            {
+                return ConcreteFactPreparationStatus.Ready;
+            }
+
+            if (leftKnown)
+            {
+                return TryAddReferenceNullEquality(facts, binaryFormula.Right, leftIsNull, ref changed)
+                    ? ConcreteFactPreparationStatus.Ready
+                    : ConcreteFactPreparationStatus.Unsatisfiable;
+            }
+
+            if (rightKnown)
+            {
+                return TryAddReferenceNullEquality(facts, binaryFormula.Left, rightIsNull, ref changed)
+                    ? ConcreteFactPreparationStatus.Ready
+                    : ConcreteFactPreparationStatus.Unsatisfiable;
+            }
+
+            return ConcreteFactPreparationStatus.Ready;
+        }
+
+        private static bool TryAddReferenceNullEquality(
+            ConcreteFactContext facts,
+            SmtFormula formula,
+            bool isNull,
+            ref bool changed)
+        {
+            if (formula.Kind != SmtValueKind.Reference)
+            {
+                return true;
+            }
+
+            if (formula is SmtNullConstant)
+            {
+                return isNull;
+            }
+
+            if (facts.ReferenceNullEqualities.TryGetValue(formula, out var existing))
+            {
+                return existing == isNull;
+            }
+
+            facts.ReferenceNullEqualities.Add(formula, isNull);
+            changed = true;
+            return true;
         }
 
         private static ConcreteFactPreparationStatus TryCollectIntegerFacts(
@@ -1450,47 +2033,110 @@ namespace SearchLib.Smt
                 return true;
             }
 
+            var foundInterval = false;
             if (facts.IntegerBounds.TryGetValue(formula, out var bounds))
             {
                 lower = bounds.Lower;
                 upper = bounds.Upper;
-                return lower.HasValue || upper.HasValue;
+                foundInterval = lower.HasValue || upper.HasValue;
             }
 
+            long? structuralLower = null;
+            long? structuralUpper = null;
+            var foundStructuralInterval = false;
             switch (formula)
             {
+                case SmtStringLengthTerm stringLengthTerm:
+                    foundStructuralInterval = TryGetStringLengthInterval(
+                        stringLengthTerm.Value,
+                        facts,
+                        out structuralLower,
+                        out structuralUpper);
+                    break;
                 case SmtIntegerUnaryTerm { Operator: SmtIntegerUnaryOperator.Negate } unaryTerm:
                     if (!TryGetIntegerInterval(unaryTerm.Operand, facts, out var operandLower, out var operandUpper))
                     {
-                        return false;
+                        break;
                     }
 
                     if (operandUpper.HasValue)
                     {
                         if (!TryCheckedNegate(operandUpper.Value, out var negatedUpper))
                         {
-                            return false;
+                            break;
                         }
 
-                        lower = negatedUpper;
+                        structuralLower = negatedUpper;
                     }
 
                     if (operandLower.HasValue)
                     {
                         if (!TryCheckedNegate(operandLower.Value, out var negatedLower))
                         {
-                            return false;
+                            break;
                         }
 
-                        upper = negatedLower;
+                        structuralUpper = negatedLower;
                     }
 
-                    return true;
+                    foundStructuralInterval = true;
+                    break;
                 case SmtIntegerBinaryTerm binaryTerm:
-                    return TryGetIntegerBinaryInterval(binaryTerm, facts, out lower, out upper);
-                default:
-                    return false;
+                    foundStructuralInterval = TryGetIntegerBinaryInterval(
+                        binaryTerm,
+                        facts,
+                        out structuralLower,
+                        out structuralUpper);
+                    break;
             }
+
+            if (foundStructuralInterval)
+            {
+                if (structuralLower.HasValue && (!lower.HasValue || structuralLower.Value > lower.Value))
+                {
+                    lower = structuralLower.Value;
+                }
+
+                if (structuralUpper.HasValue && (!upper.HasValue || structuralUpper.Value < upper.Value))
+                {
+                    upper = structuralUpper.Value;
+                }
+
+                foundInterval = foundInterval || structuralLower.HasValue || structuralUpper.HasValue;
+            }
+
+            return foundInterval;
+        }
+
+        private static bool TryGetStringLengthInterval(
+            SmtFormula value,
+            ConcreteFactContext facts,
+            out long? lower,
+            out long? upper)
+        {
+            lower = 0;
+            upper = null;
+
+            if (TryGetConcreteString(value, facts, out var concrete))
+            {
+                lower = concrete.Length;
+                upper = concrete.Length;
+                return true;
+            }
+
+            if (value is SmtStringConcatTerm concat)
+            {
+                if (!TryGetStringLengthInterval(concat.Left, facts, out var leftLower, out var leftUpper) ||
+                    !TryGetStringLengthInterval(concat.Right, facts, out var rightLower, out var rightUpper))
+                {
+                    return false;
+                }
+
+                return TryCombineBounds(leftLower, rightLower, TryCheckedAdd, out lower) &&
+                    TryCombineBounds(leftUpper, rightUpper, TryCheckedAdd, out upper);
+            }
+
+            return value.Kind == SmtValueKind.String;
         }
 
         private static bool TryGetIntegerBinaryInterval(
@@ -1641,9 +2287,10 @@ namespace SearchLib.Smt
             return facts.BooleanEqualities.TryGetValue(formula, out value);
         }
 
-        private static bool ShouldPreserveSourceEqualityFact(SmtFormula formula)
+        private static bool ShouldPreserveSourceFact(SmtFormula formula)
         {
-            if (formula is not SmtBinaryFormula { Operator: SmtBinaryOperator.Equal } binaryFormula)
+            if (formula is not SmtBinaryFormula binaryFormula ||
+                !IsIntegerComparisonOperator(binaryFormula.Operator))
             {
                 return false;
             }
@@ -1719,6 +2366,13 @@ namespace SearchLib.Smt
 
             if (formula.Left.Kind == SmtValueKind.Int &&
                 formula.Right.Kind == SmtValueKind.Int &&
+                TryEvaluateIntegerIntervalComparison(formula, facts, out value))
+            {
+                return true;
+            }
+
+            if (formula.Left.Kind == SmtValueKind.Int &&
+                formula.Right.Kind == SmtValueKind.Int &&
                 TryEvaluateInteger(formula.Left, facts, out var leftInteger) &&
                 TryEvaluateInteger(formula.Right, facts, out var rightInteger))
             {
@@ -1733,6 +2387,25 @@ namespace SearchLib.Smt
             {
                 value = CompareEquality(formula.Operator, string.Equals(leftString, rightString, StringComparison.Ordinal));
                 return formula.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual;
+            }
+
+            if (formula.Left.Kind == SmtValueKind.Reference &&
+                formula.Right.Kind == SmtValueKind.Reference &&
+                formula.Operator is SmtBinaryOperator.Equal or SmtBinaryOperator.NotEqual)
+            {
+                if (TryEvaluateReferenceNull(formula.Left, facts, out var leftIsNull) &&
+                    TryEvaluateReferenceNull(formula.Right, facts, out var rightIsNull) &&
+                    (leftIsNull || rightIsNull))
+                {
+                    value = CompareEquality(formula.Operator, leftIsNull && rightIsNull);
+                    return true;
+                }
+
+                if (EqualityComparer<SmtFormula>.Default.Equals(formula.Left, formula.Right))
+                {
+                    value = formula.Operator == SmtBinaryOperator.Equal;
+                    return true;
+                }
             }
 
             if (formula.Left.Kind == SmtValueKind.Bool &&
@@ -1794,6 +2467,142 @@ namespace SearchLib.Smt
                 SmtBinaryOperator.GreaterThanOrEqual => constant <= 0,
                 _ => false,
             };
+        }
+
+        private static bool TryEvaluateIntegerIntervalComparison(
+            SmtBinaryFormula formula,
+            ConcreteFactContext facts,
+            out bool value)
+        {
+            value = false;
+            if (!IsIntegerComparisonOperator(formula.Operator) ||
+                !TryGetIntegerInterval(formula.Left, facts, out var leftLower, out var leftUpper) ||
+                !TryGetIntegerInterval(formula.Right, facts, out var rightLower, out var rightUpper))
+            {
+                return false;
+            }
+
+            if (IntervalIsInconsistent(leftLower, leftUpper) ||
+                IntervalIsInconsistent(rightLower, rightUpper))
+            {
+                value = false;
+                return true;
+            }
+
+            switch (formula.Operator)
+            {
+                case SmtBinaryOperator.Equal:
+                    if (leftLower.HasValue &&
+                        leftUpper.HasValue &&
+                        rightLower.HasValue &&
+                        rightUpper.HasValue &&
+                        leftLower.Value == leftUpper.Value &&
+                        rightLower.Value == rightUpper.Value)
+                    {
+                        value = leftLower.Value == rightLower.Value;
+                        return true;
+                    }
+
+                    if (IntervalsAreDisjoint(leftLower, leftUpper, rightLower, rightUpper))
+                    {
+                        value = false;
+                        return true;
+                    }
+
+                    return false;
+                case SmtBinaryOperator.NotEqual:
+                    if (IntervalsAreDisjoint(leftLower, leftUpper, rightLower, rightUpper))
+                    {
+                        value = true;
+                        return true;
+                    }
+
+                    if (leftLower.HasValue &&
+                        leftUpper.HasValue &&
+                        rightLower.HasValue &&
+                        rightUpper.HasValue &&
+                        leftLower.Value == leftUpper.Value &&
+                        rightLower.Value == rightUpper.Value)
+                    {
+                        value = leftLower.Value != rightLower.Value;
+                        return true;
+                    }
+
+                    return false;
+                case SmtBinaryOperator.LessThan:
+                    if (leftUpper.HasValue && rightLower.HasValue && leftUpper.Value < rightLower.Value)
+                    {
+                        value = true;
+                        return true;
+                    }
+
+                    if (leftLower.HasValue && rightUpper.HasValue && leftLower.Value >= rightUpper.Value)
+                    {
+                        value = false;
+                        return true;
+                    }
+
+                    return false;
+                case SmtBinaryOperator.LessThanOrEqual:
+                    if (leftUpper.HasValue && rightLower.HasValue && leftUpper.Value <= rightLower.Value)
+                    {
+                        value = true;
+                        return true;
+                    }
+
+                    if (leftLower.HasValue && rightUpper.HasValue && leftLower.Value > rightUpper.Value)
+                    {
+                        value = false;
+                        return true;
+                    }
+
+                    return false;
+                case SmtBinaryOperator.GreaterThan:
+                    if (leftLower.HasValue && rightUpper.HasValue && leftLower.Value > rightUpper.Value)
+                    {
+                        value = true;
+                        return true;
+                    }
+
+                    if (leftUpper.HasValue && rightLower.HasValue && leftUpper.Value <= rightLower.Value)
+                    {
+                        value = false;
+                        return true;
+                    }
+
+                    return false;
+                case SmtBinaryOperator.GreaterThanOrEqual:
+                    if (leftLower.HasValue && rightUpper.HasValue && leftLower.Value >= rightUpper.Value)
+                    {
+                        value = true;
+                        return true;
+                    }
+
+                    if (leftUpper.HasValue && rightLower.HasValue && leftUpper.Value < rightLower.Value)
+                    {
+                        value = false;
+                        return true;
+                    }
+
+                    return false;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool IntervalsAreDisjoint(
+            long? leftLower,
+            long? leftUpper,
+            long? rightLower,
+            long? rightUpper)
+        {
+            return leftUpper.HasValue && rightLower.HasValue && leftUpper.Value < rightLower.Value ||
+                rightUpper.HasValue && leftLower.HasValue && rightUpper.Value < leftLower.Value;
+        }
+
+        private static bool IntervalIsInconsistent(long? lower, long? upper)
+        {
+            return lower.HasValue && upper.HasValue && lower.Value > upper.Value;
         }
 
         private static bool TryNormalizeStringLengthComparison(
@@ -1928,14 +2737,68 @@ namespace SearchLib.Smt
             };
         }
 
+        private static bool TryEvaluateReferenceNull(
+            SmtFormula formula,
+            ConcreteFactContext facts,
+            out bool isNull)
+        {
+            if (formula is SmtNullConstant)
+            {
+                isNull = true;
+                return true;
+            }
+
+            if (facts.ReferenceNullEqualities.TryGetValue(formula, out isNull))
+            {
+                return true;
+            }
+
+            if (formula is SmtConditionalFormula { Kind: SmtValueKind.Reference } conditionalFormula &&
+                TryEvaluateConcreteBoolean(conditionalFormula.Condition, facts, out var selectedBranch))
+            {
+                return TryEvaluateReferenceNull(
+                    selectedBranch ? conditionalFormula.WhenTrue : conditionalFormula.WhenFalse,
+                    facts,
+                    out isNull);
+            }
+
+            isNull = false;
+            return false;
+        }
+
+        private static bool TryCollectStringEqualities(
+            IReadOnlyList<SmtFormula> conditions,
+            ConcreteFactContext facts)
+        {
+            var iterationLimit = Math.Max(1, conditions.Count * 4);
+            var changed = false;
+            do
+            {
+                changed = false;
+                foreach (var condition in conditions)
+                {
+                    if (!TryCollectStringEqualities(condition, facts, ref changed))
+                    {
+                        return false;
+                    }
+                }
+
+                iterationLimit--;
+            }
+            while (changed && iterationLimit > 0);
+
+            return true;
+        }
+
         private static bool TryCollectStringEqualities(
             SmtFormula formula,
-            ConcreteFactContext facts)
+            ConcreteFactContext facts,
+            ref bool changed)
         {
             if (formula is SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula)
             {
-                return TryCollectStringEqualities(andFormula.Left, facts) &&
-                    TryCollectStringEqualities(andFormula.Right, facts);
+                return TryCollectStringEqualities(andFormula.Left, facts, ref changed) &&
+                    TryCollectStringEqualities(andFormula.Right, facts, ref changed);
             }
 
             if (formula is not SmtBinaryFormula { Operator: SmtBinaryOperator.Equal } equalFormula)
@@ -1951,22 +2814,22 @@ namespace SearchLib.Smt
 
             if (equalFormula.Left is SmtStringConstant leftConstant)
             {
-                return TryAddStringEquality(facts, equalFormula.Right, leftConstant.Value);
+                return TryAddStringEquality(facts, equalFormula.Right, leftConstant.Value, ref changed);
             }
 
             if (equalFormula.Right is SmtStringConstant rightConstant)
             {
-                return TryAddStringEquality(facts, equalFormula.Left, rightConstant.Value);
+                return TryAddStringEquality(facts, equalFormula.Left, rightConstant.Value, ref changed);
             }
 
             if (TryGetConcreteString(equalFormula.Left, facts, out leftValue))
             {
-                return TryAddStringEquality(facts, equalFormula.Right, leftValue);
+                return TryAddStringEquality(facts, equalFormula.Right, leftValue, ref changed);
             }
 
             if (TryGetConcreteString(equalFormula.Right, facts, out rightValue))
             {
-                return TryAddStringEquality(facts, equalFormula.Left, rightValue);
+                return TryAddStringEquality(facts, equalFormula.Left, rightValue, ref changed);
             }
 
             return true;
@@ -1975,7 +2838,8 @@ namespace SearchLib.Smt
         private static bool TryAddStringEquality(
             ConcreteFactContext facts,
             SmtFormula formula,
-            string value)
+            string value,
+            ref bool changed)
         {
             if (facts.StringEqualities.TryGetValue(formula, out var existing))
             {
@@ -1983,7 +2847,17 @@ namespace SearchLib.Smt
             }
 
             facts.StringEqualities.Add(formula, value);
+            changed = true;
             return true;
+        }
+
+        private static bool TryAddStringEquality(
+            ConcreteFactContext facts,
+            SmtFormula formula,
+            string value)
+        {
+            var changed = false;
+            return TryAddStringEquality(facts, formula, value, ref changed);
         }
 
         private static bool TryCollectStringLengthEqualities(
@@ -2391,9 +3265,13 @@ namespace SearchLib.Smt
                 return ConcreteFactPreparationStatus.Ready;
             }
 
-            if (!ShouldPreserveSourceEqualityFact(formula) &&
-                TryEvaluateConcreteBoolean(formula, facts, out var concreteBoolean))
+            if (TryEvaluateConcreteBoolean(formula, facts, out var concreteBoolean))
             {
+                if (concreteBoolean && ShouldPreserveSourceFact(formula))
+                {
+                    return ConcreteFactPreparationStatus.Ready;
+                }
+
                 preparedFormula = new SmtBooleanConstant(concreteBoolean);
                 changed = true;
                 return ConcreteFactPreparationStatus.Ready;

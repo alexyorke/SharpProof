@@ -822,6 +822,8 @@ public class TestClass
             Assert.That(compact.AnalysisSummary.ProofResolvedCount, Is.EqualTo(1));
             Assert.That(compact.AnalysisSummary.SmtEnabled, Is.True);
             Assert.That(compact.AnalysisSummary.HasUnresolvedAnalysis, Is.False);
+            Assert.That(compact.InvariantQuery.StatusReason, Is.EqualTo("all_candidate_program_points_exact"));
+            Assert.That(compact.AnalysisSummary.InvariantStatusReason, Is.EqualTo(compact.InvariantQuery.StatusReason));
             Assert.That(compact.ProgramPoints, Is.Empty);
             Assert.That(compact.Truncation.ProgramPoints, Is.True);
             Assert.That(compact.Truncation.Facts, Is.EqualTo(result.Facts.Count > 0));
@@ -858,10 +860,12 @@ public class TestClass
             var analysisSummary = root.GetProperty("analysisSummary");
             Assert.That(analysisSummary.GetProperty("programPointCount").GetInt32(), Is.EqualTo(1));
             Assert.That(analysisSummary.GetProperty("invariantConditionCount").GetInt32(), Is.EqualTo(result.Invariant.ConditionCount));
+            Assert.That(analysisSummary.GetProperty("invariantStatusReason").GetString(), Is.EqualTo("all_candidate_program_points_exact"));
             Assert.That(analysisSummary.GetProperty("reachabilityKnownCount").GetInt32(), Is.EqualTo(1));
             Assert.That(analysisSummary.GetProperty("proofResolvedCount").GetInt32(), Is.EqualTo(1));
             Assert.That(analysisSummary.GetProperty("smtEnabled").GetBoolean(), Is.True);
             Assert.That(analysisSummary.GetProperty("hasUnresolvedAnalysis").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("invariantQuery").GetProperty("statusReason").GetString(), Is.EqualTo("all_candidate_program_points_exact"));
             Assert.That(root.GetProperty("programPoints").GetArrayLength(), Is.Zero);
             Assert.That(root.GetProperty("truncation").GetProperty("isTruncated").GetBoolean(), Is.True);
         }
@@ -1061,15 +1065,54 @@ public class TestClass
             Assert.That(compact.InvariantQuery.MaybeFacts, Is.EquivalentTo(result.InvariantQuery.MaybeFacts.Take(2)));
             Assert.That(compact.InvariantQuery.UnknownFacts, Does.Contain("unknown(copy)"));
             Assert.That(compact.InvariantQuery.HasUnresolvedAnalysis, Is.True);
+            Assert.That(compact.InvariantQuery.StatusReason, Is.EqualTo(result.InvariantQuery.StatusReason));
             Assert.That(compact.AnalysisSummary.MustFactCount, Is.EqualTo(result.InvariantQuery.MustFactCount));
             Assert.That(compact.AnalysisSummary.MaybeFactCount, Is.EqualTo(result.InvariantQuery.MaybeFactCount));
             Assert.That(compact.AnalysisSummary.UnknownFactCount, Is.EqualTo(result.InvariantQuery.UnknownFactCount));
+            Assert.That(compact.AnalysisSummary.InvariantStatusReason, Is.EqualTo(compact.InvariantQuery.StatusReason));
             Assert.That(compact.AnalysisSummary.SmtQueryTimeoutMs, Is.EqualTo(222));
             Assert.That(compact.AnalysisSummary.SmtMethodBudgetMs, Is.EqualTo(2222));
             Assert.That(compact.AnalysisSummary.SmtMaxPathConditions, Is.EqualTo(22));
             Assert.That(compact.AnalysisSummary.SmtMaxExpressionNodes, Is.EqualTo(222));
             Assert.That(compact.SmtDiagnostics.QueryTimeoutMs, Is.EqualTo(222));
             Assert.That(compact.ProgramPoints, Has.Count.EqualTo(2));
+        }
+
+        [Test]
+        public void SymbolicConditionProofSummary_DescribesReachableProofOutcomes()
+        {
+            var points = new[]
+            {
+                CreateSyntheticProofPoint("always", SymbolicTruthValue.ProvenTrue),
+                CreateSyntheticProofPoint("always", SymbolicTruthValue.Unreachable),
+                CreateSyntheticProofPoint("never", SymbolicTruthValue.ProvenFalse),
+                CreateSyntheticProofPoint("mixed", SymbolicTruthValue.ProvenTrue),
+                CreateSyntheticProofPoint("mixed", SymbolicTruthValue.ProvenFalse),
+                CreateSyntheticProofPoint("unknown", SymbolicTruthValue.Unknown),
+                CreateSyntheticProofPoint("unreachable", SymbolicTruthValue.Unreachable),
+            };
+
+            var summaries = SymbolicConditionProofSummary
+                .FromProgramPoints(points)
+                .ToDictionary(static summary => summary.Condition);
+
+            Assert.That(summaries["always"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.AlwaysTrue));
+            Assert.That(summaries["always"].ReachableCount, Is.EqualTo(1));
+            Assert.That(summaries["always"].ResolvedCount, Is.EqualTo(2));
+            Assert.That(summaries["always"].HoldsOnAllReachablePoints, Is.True);
+            Assert.That(summaries["always"].Summary, Does.Contain("proven true"));
+
+            Assert.That(summaries["never"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.AlwaysFalse));
+            Assert.That(summaries["never"].RefutedOnAllReachablePoints, Is.True);
+
+            Assert.That(summaries["mixed"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.Mixed));
+            Assert.That(summaries["mixed"].HasMixedReachableOutcomes, Is.True);
+
+            Assert.That(summaries["unknown"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.Unknown));
+            Assert.That(summaries["unknown"].ResolvedCount, Is.Zero);
+
+            Assert.That(summaries["unreachable"].Status, Is.EqualTo(SymbolicConditionProofSummaryStatus.UnreachableOnly));
+            Assert.That(summaries["unreachable"].ReachableCount, Is.Zero);
         }
 
         [Test]
@@ -1595,6 +1638,50 @@ public class TestClass
         }
 
         [Test]
+        public async Task SymbolicCli_TextOutput_EmitsInvariantStatusReasonAndProofSummary()
+        {
+            var source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value > 0)
+        {
+            return value;
+        }
+
+        return 0;
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliTextStatusReason-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--line",
+                    FindLine(source, "return value;").ToString(),
+                    "--line-invariants",
+                    "--check-reachability",
+                    "--implies",
+                    "value > 0");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                Assert.That(result.StandardOutput, Does.Contain("Line invariant query status reason: all_candidate_program_points_exact"));
+                Assert.That(result.StandardOutput, Does.Contain("Implies 'value > 0' summary: Status=AlwaysTrue"));
+                Assert.That(result.StandardOutput, Does.Contain("Proof summary: The condition is proven true at every reachable candidate program point."));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
         public async Task SymbolicCli_Json_EmitsEnumNames()
         {
             var sourcePath = Path.Combine(
@@ -1718,6 +1805,24 @@ public class TestClass
             }
 
             return position;
+        }
+
+        private static SymbolicSourceQueryResult CreateSyntheticProofPoint(
+            string condition,
+            SymbolicTruthValue truthValue)
+        {
+            return new SymbolicSourceQueryResult(
+                "Synthetic.cs",
+                1,
+                1,
+                0,
+                0,
+                "ReturnStatement",
+                Array.Empty<string>(),
+                conditionProofs: new[]
+                {
+                    new SymbolicConditionProofResult(condition, truthValue, "synthetic"),
+                });
         }
 
         private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunSymbolicCliAsync(params string[] arguments)

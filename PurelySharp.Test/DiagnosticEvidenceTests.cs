@@ -75,6 +75,16 @@ namespace System.Experimental
             MutableValue = value;
         }
     }
+
+    public struct NumericStruct
+    {
+        public readonly int Value;
+
+        public NumericStruct(int value)
+        {
+            Value = value;
+        }
+    }
 }
 ";
 
@@ -11453,6 +11463,38 @@ public class TestClass
 
             var fallbackDiagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.BclFallbackGuessId);
             Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("unknown"));
+        }
+
+        [Test]
+        public async Task Ps0002_MetadataBclFallback_ValueTypeConstructor_IncludesProbablyPureGuessEvidence()
+        {
+            using var fixture = CreateMetadataOnlyAssemblyFixture(
+                "System.FallbackSdk",
+                BclFallbackFixtureSource);
+
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using PurelySharp.Attributes;
+
+public class TestClass
+{
+    [EnforcePure]
+    public System.Experimental.NumericStruct TestMethod(int value)
+    {
+        return new System.Experimental.NumericStruct(value);
+    }
+}",
+                globalOptions: ImmutableDictionary<string, string>.Empty.Add("purelysharp_emit_explanations", "true"),
+                additionalMetadataReferences: ImmutableArray.Create(fixture.Reference));
+
+            var diagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.PurityNotVerifiedId);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCategoryProperty], Is.EqualTo("bcl_fallback_probably_pure"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ImpurityCatalogSourceProperty], Is.EqualTo("bcl_heuristic_fallback"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.BclFallbackGuessProperty], Is.EqualTo("probably_pure"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.BclFallbackReasonProperty], Is.EqualTo("value_type_constructor_value_like_parameters"));
+
+            var fallbackDiagnostic = SingleDiagnostic(diagnostics, PurelySharpDiagnostics.BclFallbackGuessId);
+            Assert.That(fallbackDiagnostic.GetMessage(), Does.Contain("probably_pure"));
         }
 
         [Test]

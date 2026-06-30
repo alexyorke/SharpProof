@@ -55,6 +55,31 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_CheckPathAndImpurity_PreservesPathEqualitiesForCombinedQuery()
+        {
+            using var solver = new SmtSolver();
+            var length = new SmtVariable("length", SmtValueKind.Int);
+            var arrayLength = new SmtVariable("values.Length", SmtValueKind.Int);
+            var conditions = new SmtFormula[]
+            {
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, length, new SmtIntegerConstant(4)),
+                new SmtBinaryFormula(SmtBinaryOperator.Equal, arrayLength, length),
+            };
+            var inRange = new SmtBinaryFormula(
+                SmtBinaryOperator.And,
+                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, length, new SmtIntegerConstant(0)),
+                new SmtBinaryFormula(SmtBinaryOperator.LessThan, length, arrayLength));
+
+            var result = solver.CheckPathAndImpurity(
+                conditions,
+                inRange,
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Satisfiable));
+            Assert.That(result.ImpurityFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void SmtSolver_AffineEqualityAndConflictingInequality_IsUnsatisfiable()
         {
             using var solver = new SmtSolver();
@@ -890,6 +915,154 @@ namespace PurelySharp.Test
                         new SmtStringStartsWithFormula(combined, new SmtStringConstant("AB"))),
                 },
                 TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_BooleanAliasChainContradiction_IsPreprocessedWithoutZ3()
+        {
+            using var solver = new SmtSolver();
+            var first = new SmtVariable("first", SmtValueKind.Bool);
+            var second = new SmtVariable("second", SmtValueKind.Bool);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, first, second),
+                    first,
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, second),
+                },
+                TimeSpan.Zero);
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_IntegerAliasIntervalContradiction_IsPreprocessedWithoutZ3()
+        {
+            using var solver = new SmtSolver();
+            var alias = new SmtVariable("alias", SmtValueKind.Int);
+            var source = new SmtVariable("source", SmtValueKind.Int);
+            var aliasPlusOne = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Add,
+                alias,
+                new SmtIntegerConstant(1));
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, alias, source),
+                    new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, source, new SmtIntegerConstant(5)),
+                    new SmtBinaryFormula(SmtBinaryOperator.LessThan, aliasPlusOne, new SmtIntegerConstant(5)),
+                },
+                TimeSpan.Zero);
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_StringAliasPredicateContradiction_IsPreprocessedWithoutZ3()
+        {
+            using var solver = new SmtSolver();
+            var copy = new SmtVariable("copy", SmtValueKind.String);
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, copy, text),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, text, new SmtStringConstant("ABC")),
+                    new SmtUnaryFormula(
+                        SmtUnaryOperator.Not,
+                        new SmtStringStartsWithFormula(copy, new SmtStringConstant("A"))),
+                },
+                TimeSpan.Zero);
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_ReferenceAliasNullContradiction_IsPreprocessedWithoutZ3()
+        {
+            using var solver = new SmtSolver();
+            var source = new SmtVariable("source", SmtValueKind.Reference);
+            var target = new SmtVariable("target", SmtValueKind.Reference);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, target, source),
+                    new SmtBinaryFormula(SmtBinaryOperator.Equal, source, new SmtNullConstant()),
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, target, new SmtNullConstant()),
+                },
+                TimeSpan.Zero);
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_DistinctNonNullReferencesRemainUnknownWithoutZ3()
+        {
+            using var solver = new SmtSolver();
+            var left = new SmtVariable("left", SmtValueKind.Reference);
+            var right = new SmtVariable("right", SmtValueKind.Reference);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, left, new SmtNullConstant()),
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, right, new SmtNullConstant()),
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, left, right),
+                },
+                TimeSpan.Zero);
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unknown));
+        }
+
+        [Test]
+        public void SmtSolver_IdenticalConditionalBranchesSimplifyWithoutZ3()
+        {
+            using var solver = new SmtSolver();
+            var flag = new SmtVariable("flag", SmtValueKind.Bool);
+            var value = new SmtVariable("value", SmtValueKind.Int);
+            var valuePlusOne = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Add,
+                value,
+                new SmtIntegerConstant(1));
+            var selected = new SmtConditionalFormula(
+                flag,
+                valuePlusOne,
+                valuePlusOne,
+                SmtValueKind.Int);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.NotEqual, selected, valuePlusOne),
+                },
+                TimeSpan.Zero);
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_ConcatLengthNegativeComparison_IsPreprocessedWithoutZ3()
+        {
+            using var solver = new SmtSolver();
+            var left = new SmtVariable("left", SmtValueKind.String);
+            var right = new SmtVariable("right", SmtValueKind.String);
+            var combined = new SmtStringConcatTerm(left, right);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.LessThan,
+                        new SmtStringLengthTerm(combined),
+                        new SmtIntegerConstant(0)),
+                },
+                TimeSpan.Zero);
 
             Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
         }

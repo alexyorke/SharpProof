@@ -95,6 +95,7 @@ internal static class BclFallbackInventoryBuilder
             returnsByRef: !string.Equals(normalizedReturnType, parsed.ReturnTypeName, StringComparison.Ordinal),
             hasRefOrOutParameter: hasRefOrOutParameter,
             hasValueLikeReturn: BclPurityFallbackHeuristics.IsValueLikeTypeName(parsed.ReturnTypeName),
+            hasValueTypeContainingType: BclPurityFallbackHeuristics.IsKnownValueTypeName(parsed.TypeName),
             hasOnlyValueLikeOrReadOnlyViewParameters: parsed.ParameterTypeNames.All(static parameter =>
                 BclPurityFallbackHeuristics.IsValueLikeTypeName(parameter) ||
                 BclPurityFallbackHeuristics.IsReadOnlyViewTypeName(parameter)),

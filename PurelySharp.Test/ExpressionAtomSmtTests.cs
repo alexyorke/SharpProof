@@ -208,6 +208,84 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesCheckedArithmeticAtomFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (checked(value + 1) == 5)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "value == 4");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesUncheckedEnumCastAtomFacts()
+        {
+            const string source = @"
+public enum Mode
+{
+    None = 0,
+    Ready = 1
+}
+
+public class TestClass
+{
+    public int TestMethod(Mode mode)
+    {
+        if (unchecked((int)mode) == 1)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "mode == Mode.Ready");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesCheckedIndexAtomFacts()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        if (values != null &&
+            index >= 0 &&
+            index < values.Length &&
+            values[checked(index)] == 7)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return 1;",
+                "values[index] == 7");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesConditionalTupleElementFacts()
         {
             const string source = @"

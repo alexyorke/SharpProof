@@ -4709,7 +4709,7 @@ public class TestClass
                 "MutatedIfElseMergedImplication.cs",
                 FindLine(source, "return 10 / divisor;"),
                 18,
-                "divisor != 0",
+                "divisor == 1",
                 new SmtAnalysisService(SmtAnalysisOptions.Default),
                 AnalyzerTestHost.GetTrustedPlatformReferences());
 
@@ -4768,7 +4768,7 @@ public class TestClass
                 "MutatedImplicitElseMergedImplication.cs",
                 FindLine(source, "return 10 / divisor;"),
                 15,
-                "divisor != 0",
+                "divisor == 1",
                 new SmtAnalysisService(SmtAnalysisOptions.Default),
                 AnalyzerTestHost.GetTrustedPlatformReferences());
 

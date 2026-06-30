@@ -1982,6 +1982,77 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0010_PathSensitiveFinallyNestedBlockThrow_ShadowsGuardedDivideByZero()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (divisor == 0)
+        {
+            try
+            {
+                return 10 / divisor;
+            }
+            finally
+            {
+                {
+                    if (divisor == 0)
+                    {
+                        throw new ApplicationException();
+                    }
+                }
+            }
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ApplicationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
+        public async Task Ps0010_PathSensitiveFinallyNestedAliasThrow_ShadowsGuardedDivideByZero()
+        {
+            var diagnostic = await SingleExceptionDiagnosticAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        if (divisor == 0)
+        {
+            try
+            {
+                return 10 / divisor;
+            }
+            finally
+            {
+                {
+                    var mustThrow = divisor == 0;
+                    if (mustThrow)
+                    {
+                        throw new ApplicationException();
+                    }
+                }
+            }
+        }
+
+        return 0;
+    }
+}");
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.ApplicationException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("direct_throw"));
+        }
+
+        [Test]
         public async Task Ps0010_FinallyUnknownThrowCondition_DoesNotShadowTryThrow()
         {
             var diagnostic = await SingleExceptionDiagnosticAsync(@"
@@ -2066,6 +2137,66 @@ public class TestClass
         catch (InvalidOperationException) when (divisor == 0)
         {
             return 0;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_CatchFilterBooleanAliasFromThrowSiteBranch_SuppressesException()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int divisor)
+    {
+        var shouldCatch = divisor == 0;
+        try
+        {
+            if (divisor == 0)
+            {
+                throw new InvalidOperationException();
+            }
+
+            return 1;
+        }
+        catch (InvalidOperationException) when (shouldCatch)
+        {
+            return 0;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(d => d.Id == PurelySharpDiagnostics.ExceptionSummaryId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0010_CatchFilterAliasPrunesContradictoryIndexUse_DoesNotReport()
+        {
+            var diagnostics = await GetAnalyzerDiagnosticsAsync(@"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        var inRange = index >= 0 && index < values.Length;
+        try
+        {
+            return 0;
+        }
+        catch (InvalidOperationException) when (inRange)
+        {
+            if (index < 0 || index >= values.Length)
+            {
+                return values[index];
+            }
+
+            return values[index];
         }
     }
 }");

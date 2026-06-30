@@ -104,6 +104,7 @@ namespace PurelySharp.Analyzer.Engine
                 hasRefOrOutParameter: method.Parameters.Any(static parameter =>
                     parameter.RefKind == RefKind.Ref || parameter.RefKind == RefKind.Out),
                 hasValueLikeReturn: IsValueLikeType(method.ReturnType),
+                hasValueTypeContainingType: method.ContainingType?.IsValueType == true,
                 hasOnlyValueLikeOrReadOnlyViewParameters: method.Parameters.All(static parameter =>
                     IsValueLikeType(parameter.Type) || IsReadOnlyViewType(parameter.Type)),
                 isSetterOnlyProperty: false);
@@ -125,6 +126,7 @@ namespace PurelySharp.Analyzer.Engine
                 hasRefOrOutParameter: property.Parameters.Any(static parameter =>
                     parameter.RefKind == RefKind.Ref || parameter.RefKind == RefKind.Out),
                 hasValueLikeReturn: IsValueLikeType(property.Type),
+                hasValueTypeContainingType: property.ContainingType?.IsValueType == true,
                 hasOnlyValueLikeOrReadOnlyViewParameters: property.Parameters.All(static parameter =>
                     IsValueLikeType(parameter.Type) || IsReadOnlyViewType(parameter.Type)),
                 isSetterOnlyProperty: property.SetMethod != null && property.GetMethod == null);
@@ -145,6 +147,7 @@ namespace PurelySharp.Analyzer.Engine
                 returnsByRef: false,
                 hasRefOrOutParameter: false,
                 hasValueLikeReturn: IsValueLikeType(field.Type),
+                hasValueTypeContainingType: field.ContainingType?.IsValueType == true,
                 hasOnlyValueLikeOrReadOnlyViewParameters: true,
                 isSetterOnlyProperty: false,
                 isReadOnlyField: field.IsReadOnly || field.IsConst);

@@ -1426,8 +1426,100 @@ namespace PurelySharp.Symbolic
                     facts);
             }
 
+            AddSingleSurvivingBranchFacts(ifStatement, factsBeforeStatement, semanticModel, cancellationToken, facts);
             AddCompletedIfElseMergedFacts(ifStatement, semanticModel, cancellationToken, facts);
             AddCompletedIfImplicitElseMergedFacts(ifStatement, factsBeforeStatement, semanticModel, cancellationToken, facts);
+        }
+
+        private static void AddSingleSurvivingBranchFacts(
+            IfStatementSyntax ifStatement,
+            IReadOnlyList<SmtFormula> factsBeforeStatement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            var trueBranchExits = StatementDefinitelyExits(ifStatement.Statement);
+            var falseBranch = ifStatement.Else?.Statement;
+            var falseBranchExits = falseBranch != null && StatementDefinitelyExits(falseBranch);
+
+            if (trueBranchExits &&
+                falseBranch is { } survivingFalseBranch &&
+                !falseBranchExits)
+            {
+                var branchFacts = CollectCompletedBranchFacts(
+                    factsBeforeStatement,
+                    ifStatement.Condition,
+                    branchWhenTrue: false,
+                    survivingFalseBranch,
+                    semanticModel,
+                    cancellationToken);
+                AddVisibleSingleBranchFacts(branchFacts, survivingFalseBranch, semanticModel, cancellationToken, facts);
+            }
+
+            if (falseBranchExits &&
+                !trueBranchExits)
+            {
+                var branchFacts = CollectCompletedBranchFacts(
+                    factsBeforeStatement,
+                    ifStatement.Condition,
+                    branchWhenTrue: true,
+                    ifStatement.Statement,
+                    semanticModel,
+                    cancellationToken);
+                AddVisibleSingleBranchFacts(branchFacts, ifStatement.Statement, semanticModel, cancellationToken, facts);
+            }
+        }
+
+        private static void AddVisibleSingleBranchFacts(
+            IReadOnlyCollection<SmtFormula> branchFacts,
+            StatementSyntax survivingBranch,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            var hiddenSymbols = GetLocalsDeclaredInside(survivingBranch, semanticModel, cancellationToken);
+            var existingKeys = new HashSet<string>(facts.Select(GetFormulaKey), StringComparer.Ordinal);
+            foreach (var branchFact in branchFacts)
+            {
+                if (hiddenSymbols.Any(symbol => ReferencesSmtVariable(branchFact, GetSmtVariableName(symbol))))
+                {
+                    continue;
+                }
+
+                var key = GetFormulaKey(branchFact);
+                if (existingKeys.Add(key))
+                {
+                    facts.Add(branchFact);
+                }
+            }
+        }
+
+        private static IReadOnlyList<ISymbol> GetLocalsDeclaredInside(
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            var symbols = new List<ISymbol>();
+            foreach (var node in statement.DescendantNodesAndSelf(
+                         descendIntoChildren: candidate => !CSharpSyntaxFacts.IsNestedCallableBoundary(candidate)))
+            {
+                ISymbol? symbol = node switch
+                {
+                    VariableDeclaratorSyntax declarator => semanticModel.GetDeclaredSymbol(declarator, cancellationToken),
+                    SingleVariableDesignationSyntax designation => semanticModel.GetDeclaredSymbol(designation, cancellationToken),
+                    ForEachStatementSyntax forEachStatement => semanticModel.GetDeclaredSymbol(forEachStatement, cancellationToken),
+                    CatchDeclarationSyntax catchDeclaration => semanticModel.GetDeclaredSymbol(catchDeclaration, cancellationToken),
+                    _ => null
+                };
+
+                if (symbol is ILocalSymbol &&
+                    symbols.All(existing => !SymbolEqualityComparer.Default.Equals(existing, symbol.OriginalDefinition)))
+                {
+                    symbols.Add(symbol.OriginalDefinition);
+                }
+            }
+
+            return symbols;
         }
 
         private static void AddCompletedIfImplicitElseMergedFacts(
@@ -3605,6 +3697,12 @@ namespace PurelySharp.Symbolic
                 facts.Add(fact);
             }
 
+            if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
+                TryCreateAssignedValueNonZeroFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var nonZeroFact))
+            {
+                facts.Add(nonZeroFact);
+            }
+
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken))
             {
                 AddAssignedSourceSymbolSnapshotFacts(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts);
@@ -4844,6 +4942,44 @@ namespace PurelySharp.Symbolic
 
             fact = CreateAssignedValueFact(targetFormula, valueFormula);
             return true;
+        }
+
+        private static bool TryCreateAssignedValueNonZeroFact(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula fact)
+        {
+            fact = null!;
+            if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) ||
+                targetFormula.Kind != SmtValueKind.Int ||
+                !TryTranslateAssignedValueExpression(
+                    valueExpression,
+                    semanticModel,
+                    cancellationToken,
+                    targetSymbol,
+                    out var valueFormula) ||
+                valueFormula == null ||
+                !ValueFormulaIsDefinitelyNonZero(valueFormula))
+            {
+                return false;
+            }
+
+            fact = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, targetFormula, new SmtIntegerConstant(0));
+            return true;
+        }
+
+        private static bool ValueFormulaIsDefinitelyNonZero(SmtFormula formula)
+        {
+            return formula switch
+            {
+                SmtIntegerConstant integerConstant => integerConstant.Value != 0,
+                SmtConditionalFormula { Kind: SmtValueKind.Int } conditional =>
+                    ValueFormulaIsDefinitelyNonZero(conditional.WhenTrue) &&
+                    ValueFormulaIsDefinitelyNonZero(conditional.WhenFalse),
+                _ => false,
+            };
         }
 
         private static bool TryCreateAssignedValueFact(

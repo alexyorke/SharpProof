@@ -13,6 +13,7 @@ namespace PurelySharp.Analyzer.Engine
         private const int MaxMergedStatePathConditions = 32;
         private const int MaxMergeableFactsPerTargetPerState = 4;
         private const int MaxMergedStateFactChoiceCombinationsPerTarget = 64;
+        private const int MaxMergedStateGuardFactsPerTargetPerState = 6;
 
         private static ImmutableDictionary<ISymbol, PotentialTargets> MergeDelegateTargetMapsFromBlockStates(
             IEnumerable<PurityAnalysisState> states)
@@ -507,11 +508,12 @@ namespace PurelySharp.Analyzer.Engine
             var branchTerms = new SmtFormula[stateFacts.Count];
             for (var index = 0; index < stateFacts.Count; index++)
             {
-                branchTerms[index] = stateFacts[index].Condition is SmtBooleanConstant { Value: true }
+                var branchCondition = stateFacts[index].CreateConditionForTarget(factChoices[index].TargetKey);
+                branchTerms[index] = branchCondition is SmtBooleanConstant { Value: true }
                     ? factChoices[index].Formula
                     : new SmtBinaryFormula(
                         SmtBinaryOperator.And,
-                        stateFacts[index].Condition,
+                        branchCondition,
                         factChoices[index].Formula);
             }
 
@@ -552,10 +554,14 @@ namespace PurelySharp.Analyzer.Engine
 
         private sealed class StatePathFacts
         {
+            private readonly ImmutableArray<SmtFormula> branchConditions;
+            private readonly ImmutableArray<MergeablePathFact> facts;
+
             public StatePathFacts(IEnumerable<SmtFormula> pathConditions, ISet<string> commonKeys)
             {
                 var factsByTarget = new Dictionary<string, List<MergeablePathFact>>(StringComparer.Ordinal);
-                var branchConditions = new List<SmtFormula>();
+                var localBranchConditions = new List<SmtFormula>();
+                var localFacts = ImmutableArray.CreateBuilder<MergeablePathFact>();
                 foreach (var condition in pathConditions)
                 {
                     var key = GetFormulaKey(condition);
@@ -573,13 +579,16 @@ namespace PurelySharp.Analyzer.Engine
                         }
 
                         facts.Add(mergeableFact);
+                        localFacts.Add(mergeableFact);
                         continue;
                     }
 
-                    branchConditions.Add(condition);
+                    localBranchConditions.Add(condition);
                 }
 
-                Condition = CreateConjunction(branchConditions);
+                this.branchConditions = localBranchConditions.ToImmutableArray();
+                this.facts = localFacts.ToImmutable();
+                Condition = CreateConjunction(this.branchConditions);
                 FactsByTarget = factsByTarget.ToDictionary(
                     static kvp => kvp.Key,
                     static kvp => kvp.Value.ToArray(),
@@ -589,6 +598,30 @@ namespace PurelySharp.Analyzer.Engine
             public SmtFormula Condition { get; }
 
             public IReadOnlyDictionary<string, MergeablePathFact[]> FactsByTarget { get; }
+
+            public SmtFormula CreateConditionForTarget(string targetKey)
+            {
+                var conditions = ImmutableArray.CreateBuilder<SmtFormula>();
+                conditions.AddRange(branchConditions);
+
+                var guardFactCount = 0;
+                foreach (var fact in facts)
+                {
+                    if (string.Equals(fact.TargetKey, targetKey, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    conditions.Add(fact.Formula);
+                    guardFactCount++;
+                    if (guardFactCount >= MaxMergedStateGuardFactsPerTargetPerState)
+                    {
+                        break;
+                    }
+                }
+
+                return CreateConjunction(conditions);
+            }
         }
 
         private sealed class MergeablePathFact
