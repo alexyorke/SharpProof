@@ -1757,6 +1757,16 @@ public class TestClass
                 Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.EqualTo(2));
                 Assert.That(root.GetProperty("statusCounts").GetProperty("Proven").GetInt32(), Is.EqualTo(2));
                 Assert.That(root.GetProperty("kindCounts").GetProperty("DirectThrow").GetInt32(), Is.EqualTo(2));
+                Assert.That(root.GetProperty("exceptionTypeCounts").GetProperty("System.InvalidOperationException").GetInt32(), Is.EqualTo(1));
+                Assert.That(root.GetProperty("exceptionTypeCounts").GetProperty("System.ArgumentException").GetInt32(), Is.EqualTo(1));
+                Assert.That(root.GetProperty("categoryCounts").GetProperty("direct_throw").GetInt32(), Is.EqualTo(2));
+                var analysisSummary = root.GetProperty("analysisSummary");
+                Assert.That(analysisSummary.GetProperty("hazardCount").GetInt32(), Is.EqualTo(2));
+                Assert.That(analysisSummary.GetProperty("provenCount").GetInt32(), Is.EqualTo(2));
+                Assert.That(analysisSummary.GetProperty("unknownCount").GetInt32(), Is.Zero);
+                Assert.That(analysisSummary.GetProperty("status").GetString(), Is.EqualTo("ProvenOnly"));
+                Assert.That(analysisSummary.GetProperty("hasUnprovenHazards").GetBoolean(), Is.False);
+                Assert.That(analysisSummary.GetProperty("summary").GetString(), Does.Contain("2 proven"));
                 Assert.That(root.GetProperty("hazards").GetArrayLength(), Is.EqualTo(1));
                 Assert.That(root.GetProperty("truncation").GetProperty("hazards").GetBoolean(), Is.True);
 
@@ -1771,6 +1781,96 @@ public class TestClass
                 Assert.That(hazard.GetProperty("reachability").GetString(), Is.EqualTo(SymbolicReachability.Reachable.ToString()));
                 Assert.That(hazard.GetProperty("pathConditionCount").GetInt32(), Is.GreaterThanOrEqualTo(0));
                 Assert.That(hazard.GetProperty("pathConditions").GetArrayLength(), Is.LessThanOrEqualTo(hazard.GetProperty("pathConditionCount").GetInt32()));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public async Task SymbolicCli_RuntimeHazards_ExceptionTypeAndCategoryFiltersNarrowTextCompactAndFullJson()
+        {
+            var source = @"
+public class TestClass
+{
+    public void First()
+    {
+        throw new System.InvalidOperationException(""one"");
+    }
+
+    public void Second()
+    {
+        throw new System.ArgumentException(""two"");
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliRuntimeHazardTypeCategory-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var compactResult = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--runtime-hazards",
+                    "--all-lines",
+                    "--hazard-exception-type",
+                    "system.argumentexception",
+                    "--hazard-category",
+                    "DIRECT_THROW",
+                    "--compact-json");
+
+                Assert.That(compactResult.ExitCode, Is.EqualTo(0), compactResult.StandardError);
+                using var compactDocument = JsonDocument.Parse(compactResult.StandardOutput);
+                var compactRoot = compactDocument.RootElement;
+                Assert.That(compactRoot.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(compactRoot.GetProperty("exceptionTypeCounts").GetProperty("System.ArgumentException").GetInt32(), Is.EqualTo(1));
+                Assert.That(compactRoot.GetProperty("exceptionTypeCounts").TryGetProperty("System.InvalidOperationException", out _), Is.False);
+                Assert.That(compactRoot.GetProperty("categoryCounts").GetProperty("direct_throw").GetInt32(), Is.EqualTo(1));
+                Assert.That(compactRoot.GetProperty("analysisSummary").GetProperty("status").GetString(), Is.EqualTo("ProvenOnly"));
+                Assert.That(compactRoot.GetProperty("analysisSummary").GetProperty("summary").GetString(), Does.Contain("1 proven"));
+                var compactHazard = compactRoot.GetProperty("hazards")[0];
+                Assert.That(compactHazard.GetProperty("exceptionType").GetString(), Is.EqualTo("System.ArgumentException"));
+                Assert.That(compactHazard.GetProperty("category").GetString(), Is.EqualTo("direct_throw"));
+
+                var fullJsonResult = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--runtime-hazards",
+                    "--all-lines",
+                    "--hazard-exception-type",
+                    "System.ArgumentException",
+                    "--hazard-category",
+                    "direct_throw",
+                    "--json");
+
+                Assert.That(fullJsonResult.ExitCode, Is.EqualTo(0), fullJsonResult.StandardError);
+                using var fullJsonDocument = JsonDocument.Parse(fullJsonResult.StandardOutput);
+                var fullJsonRoot = fullJsonDocument.RootElement;
+                Assert.That(fullJsonRoot.GetProperty("HazardCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(fullJsonRoot.TryGetProperty("hazardCount", out _), Is.False);
+                Assert.That(fullJsonRoot.GetProperty("Hazards")[0].GetProperty("ExceptionType").GetString(), Is.EqualTo("System.ArgumentException"));
+                Assert.That(fullJsonRoot.GetProperty("Hazards")[0].GetProperty("Category").GetString(), Is.EqualTo("direct_throw"));
+
+                var textResult = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--runtime-hazards",
+                    "--all-lines",
+                    "--hazard-exception-type",
+                    "System.InvalidOperationException",
+                    "--hazard-category",
+                    "direct_throw");
+
+                Assert.That(textResult.ExitCode, Is.EqualTo(0), textResult.StandardError);
+                Assert.That(textResult.StandardOutput, Does.Contain("Runtime hazards: 1"));
+                Assert.That(textResult.StandardOutput, Does.Contain("Hazard status summary: Proven=1"));
+                Assert.That(textResult.StandardOutput, Does.Contain("Hazard exception summary: System.InvalidOperationException=1"));
+                Assert.That(textResult.StandardOutput, Does.Contain("Hazard category summary: direct_throw=1"));
+                Assert.That(textResult.StandardOutput, Does.Contain("Exception: System.InvalidOperationException"));
+                Assert.That(textResult.StandardOutput, Does.Not.Contain("System.ArgumentException"));
             }
             finally
             {
@@ -1867,6 +1967,28 @@ public class TestClass
                 Assert.That(statusWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
                 Assert.That(statusWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-status"));
                 Assert.That(statusWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
+
+                var exceptionTypeWithoutRuntimeHazards = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--position",
+                    "0",
+                    "--hazard-exception-type",
+                    "System.Exception");
+                Assert.That(exceptionTypeWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
+                Assert.That(exceptionTypeWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-exception-type"));
+                Assert.That(exceptionTypeWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
+
+                var categoryWithoutRuntimeHazards = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--position",
+                    "0",
+                    "--hazard-category",
+                    "direct_throw");
+                Assert.That(categoryWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
+                Assert.That(categoryWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-category"));
+                Assert.That(categoryWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
 
                 var nonProvenStatusWithoutCandidates = await RunSymbolicCliAsync(
                     "--file",

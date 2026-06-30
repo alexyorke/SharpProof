@@ -249,6 +249,138 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedBytePreIncrementOverflow()
+        {
+            const string source = @"
+public class TestClass
+{
+    public byte TestMethod(byte value)
+    {
+        if (value == byte.MaxValue)
+        {
+            return checked(++value);
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(source, "return checked(++value);", smtAnalysis);
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
+            Assert.That(hazard.OperationText, Is.EqualTo("++value"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedLongPostDecrementOverflow()
+        {
+            const string source = @"
+public class TestClass
+{
+    public long TestMethod(long value)
+    {
+        if (value == long.MinValue)
+        {
+            return checked(value--);
+        }
+
+        return 0L;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(source, "return checked(value--);", smtAnalysis);
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.OverflowException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_checked_integral_overflow"));
+            Assert.That(hazard.OperationText, Is.EqualTo("value--"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownCheckedPostIncrementOverflowCandidate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public short TestMethod(short value)
+    {
+        return checked(value++);
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var defaultResult = QueryLine(
+                source,
+                "return checked(value++);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+            Assert.That(defaultResult.Hazards, Is.Empty);
+
+            var candidateResult = QueryLine(
+                source,
+                "return checked(value++);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+            var hazard = AssertSingleHazard(candidateResult);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unknown));
+            Assert.That(hazard.OperationText, Is.EqualTo("value++"));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazards_DefaultSuppressesUnreachableCheckedPreIncrementOverflowCandidate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int value)
+    {
+        if (value == int.MaxValue)
+        {
+            return 0;
+        }
+
+        if (value == int.MaxValue)
+        {
+            return checked(++value);
+        }
+
+        return 1;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var defaultResult = QueryLine(
+                source,
+                "return checked(++value);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+            Assert.That(defaultResult.Hazards, Is.Empty);
+
+            var candidateResult = QueryLine(
+                source,
+                "return checked(++value);",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.CheckedIntegralOverflow }));
+            var hazard = AssertSingleHazard(candidateResult);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.CheckedIntegralOverflow));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.OperationText, Is.EqualTo("++value"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesGuardedCheckedExplicitNumericConversionOverflow()
         {
             const string source = @"

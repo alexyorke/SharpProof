@@ -805,6 +805,82 @@ public class TestClass
         }
 
         [Test]
+        public async Task Ps0011_CheckedExplicitNumericConversionOverflow_ReportsSite()
+        {
+            var diagnostics = await GetCheckedExceptionSiteDiagnosticsAsync(@"
+public class TestClass
+{
+    public byte TestMethod(int value)
+    {
+        if (value > byte.MaxValue)
+        {
+            return checked((byte)value);
+        }
+
+        return 0;
+    }
+}");
+
+            var diagnostic = SingleUncaughtExceptionSiteDiagnostic(diagnostics);
+
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionTypesProperty], Is.EqualTo("System.OverflowException"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionCategoriesProperty], Is.EqualTo("definite_checked_integral_overflow"));
+            Assert.That(diagnostic.Properties[PurelySharpDiagnostics.ExceptionSourcesProperty], Is.EqualTo("System.OverflowException=definite_checked_integral_overflow:checked_conversion"));
+        }
+
+        [Test]
+        public async Task Ps0011_CheckedExplicitNumericConversionGuardedUnreachableOverflow_DoesNotReport()
+        {
+            var diagnostics = await GetCheckedExceptionSiteDiagnosticsAsync(@"
+public class TestClass
+{
+    public byte TestMethod(int value)
+    {
+        if (value > byte.MaxValue)
+        {
+            return 0;
+        }
+
+        if (value > byte.MaxValue)
+        {
+            return checked((byte)value);
+        }
+
+        return 1;
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+        }
+
+        [Test]
+        public async Task Ps0011_CheckedExplicitNumericConversionOverflowCaught_DoesNotReport()
+        {
+            var diagnostics = await GetCheckedExceptionSiteDiagnosticsAsync(@"
+public class TestClass
+{
+    public byte TestMethod(int value)
+    {
+        try
+        {
+            if (value > byte.MaxValue)
+            {
+                return checked((byte)value);
+            }
+
+            return 1;
+        }
+        catch (System.OverflowException)
+        {
+            return 0;
+        }
+    }
+}");
+
+            Assert.That(diagnostics.Any(diagnostic => diagnostic.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId), Is.False);
+        }
+
+        [Test]
         public async Task Ps0010_CheckedIntAdditionGuardedUnreachableOverflow_DoesNotReport()
         {
             var diagnostics = await GetExceptionDiagnosticsAsync(@"
@@ -1403,11 +1479,25 @@ public class TestClass
                 ImmutableDictionary<string, string>.Empty.Add("purelysharp_report_exceptions", "true"));
         }
 
+        private static Task<ImmutableArray<Diagnostic>> GetCheckedExceptionSiteDiagnosticsAsync(string source)
+        {
+            return AnalyzerTestHost.GetDiagnosticsAsync(
+                source,
+                ImmutableDictionary<string, string>.Empty.Add("purelysharp_checked_exceptions", "true"));
+        }
+
         private static Diagnostic SingleExceptionDiagnostic(ImmutableArray<Diagnostic> diagnostics)
         {
             return AnalyzerTestHost.SingleDiagnostic(
                 diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.ExceptionSummaryId).ToImmutableArray(),
                 PurelySharpDiagnostics.ExceptionSummaryId);
+        }
+
+        private static Diagnostic SingleUncaughtExceptionSiteDiagnostic(ImmutableArray<Diagnostic> diagnostics)
+        {
+            return AnalyzerTestHost.SingleDiagnostic(
+                diagnostics.Where(candidate => candidate.Id == PurelySharpDiagnostics.UncaughtExceptionSiteId).ToImmutableArray(),
+                PurelySharpDiagnostics.UncaughtExceptionSiteId);
         }
     }
 }

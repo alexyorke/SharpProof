@@ -350,6 +350,19 @@ function Add-SearchLibSmtTestClasses
         'StringLengthSmtTests')
 }
 
+function Add-RegexSmtTestClasses
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$Set
+    )
+
+    Add-SearchLibSmtTestClasses $Set
+    Add-TestClasses $Set @(
+        'RegexTests')
+}
+
 function Add-SymbolicSmtTestClasses
 {
     param(
@@ -508,9 +521,31 @@ function Add-PathMappedTests
 
     switch -Regex ($Path)
     {
+        '^SearchLib/(SmtFormula|SmtSolver|Z3FormulaEncoder)\.cs$' {
+            Add-RegexSmtTestClasses $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SearchLib SMT string-length and regex formula change' $before $Set
+            break
+        }
         '^SearchLib/' {
             Add-SearchLibSmtTestClasses $Set
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SearchLib SMT solver and proof-search change' $before $Set
+            break
+        }
+        '^PurelySharp\.Symbolic/SymbolicRuntimeHazardQueryService\.cs$' {
+            Add-SymbolicSmtTestClasses $Set
+            Add-TestClasses $Set @('DiagnosticEvidenceTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Symbolic runtime-hazard query change' $before $Set
+            break
+        }
+        '^PurelySharp\.Symbolic/SymbolicProgramPointFacts\.cs$' {
+            Add-SymbolicSmtTestClasses $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Symbolic program-point fact extraction change' $before $Set
+            break
+        }
+        '^PurelySharp\.Symbolic/Smt/(CSharpConditionToFormula|SmtAnalysisService|SwitchPathConditionBuilder)\.cs$' {
+            Add-SymbolicSmtTestClasses $Set
+            Add-TestClasses $Set @('RegexTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Symbolic SMT string-length and regex translation change' $before $Set
             break
         }
         '^PurelySharp\.Symbolic/' {
@@ -563,10 +598,21 @@ function Add-PathMappedTests
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Shared build/runtime support change' $before $Set
             break
         }
+        '^PurelySharp\.Analyzer/Configuration/(AnalyzerConfiguration|ConfigKeys)\.cs$' {
+            Add-TestClasses $Set @('DiagnosticEvidenceTests', 'SemanticOracleSmtTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer runtime-hazard configuration change' $before $Set
+            break
+        }
         '^PurelySharp\.Analyzer/ExceptionFlowAnalyzer(\.(ExceptionSites|PathFacts|PropertyFlow|ResourceCallSites|SpecialCases))?\.cs$' {
             Add-RuntimeHazardAnalyzerTestClasses $Set
             Add-TestClasses $Set @('ExceptionSummaryCatalogValidationTests')
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Exception flow and runtime-hazard analyzer change' $before $Set
+            break
+        }
+        '^PurelySharp\.Analyzer/Engine/PurityAnalysisEngine\.StateMerge\.cs$' {
+            Add-SymbolicSmtTestClasses $Set
+            Add-TestClasses $Set @('DiagnosticEvidenceTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer symbolic state-merge and path-fact change' $before $Set
             break
         }
         '^PurelySharp\.Analyzer/Engine/ExecutionVisibility\.cs$' {
@@ -588,7 +634,8 @@ function Add-PathMappedTests
         }
         '^PurelySharp\.Analyzer/.*(Smt|SemanticOracle|PathFact|Regex|String|Invariant)' {
             Add-SymbolicSmtTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer SMT/path-fact change' $before $Set
+            Add-TestClasses $Set @('RegexTests')
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer SMT/path-fact/string/regex change' $before $Set
             break
         }
         '^PurelySharp\.Analyzer/.*(EffectSummary|GeneratedPurity|Catalog|Summary)' {

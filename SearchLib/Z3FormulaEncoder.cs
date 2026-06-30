@@ -877,6 +877,17 @@ namespace SearchLib.Smt
                     return true;
                 }
 
+                if (escaped == 'c')
+                {
+                    if (!TryReadControlCharacterEscape(out var controlChar))
+                    {
+                        return false;
+                    }
+
+                    regex = CreateLiteralRegex(controlChar.ToString());
+                    return true;
+                }
+
                 var literal = escaped switch
                 {
                     'a' => "\a",
@@ -1071,6 +1082,17 @@ namespace SearchLib.Smt
                     }
 
                     part = CreateClassCharacterPart(unicodeChar);
+                    return true;
+                }
+
+                if (escaped == 'c')
+                {
+                    if (!TryReadControlCharacterEscape(out var controlChar))
+                    {
+                        return false;
+                    }
+
+                    part = CreateClassCharacterPart(controlChar);
                     return true;
                 }
 
@@ -1444,6 +1466,29 @@ namespace SearchLib.Smt
 
                 _position += digitCount;
                 value = (char)parsed;
+                return true;
+            }
+
+            private bool TryReadControlCharacterEscape(out char value)
+            {
+                value = default;
+                if (_position >= _pattern.Length)
+                {
+                    return false;
+                }
+
+                var control = _pattern[_position];
+                if (control is >= 'a' and <= 'z')
+                {
+                    control = (char)(control - ('a' - 'A'));
+                }
+                else if (control is not (>= 'A' and <= 'Z'))
+                {
+                    return false;
+                }
+
+                _position++;
+                value = (char)(control - '@');
                 return true;
             }
 

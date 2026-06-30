@@ -2303,6 +2303,30 @@ namespace PurelySharp.Symbolic.Smt
                 return true;
             }
 
+            if (expression is InvocationExpressionSyntax invocationExpression &&
+                TryTranslateStringConcatInvocation(
+                    invocationExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
+            if (expression is InterpolatedStringExpressionSyntax interpolatedStringExpression &&
+                TryTranslateInterpolatedStringValue(
+                    interpolatedStringExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out formula,
+                    getSymbolVersion,
+                    inlineDepth))
+            {
+                return true;
+            }
+
             var typeInfo = semanticModel.GetTypeInfo(expression, cancellationToken);
             var type = typeInfo.ConvertedType ?? typeInfo.Type;
             if (type?.SpecialType != SpecialType.System_String)
@@ -2327,6 +2351,144 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return false;
+        }
+
+        private static bool TryTranslateStringConcatInvocation(
+            InvocationExpressionSyntax invocationExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (semanticModel.GetOperation(invocationExpression, cancellationToken) is not IInvocationOperation invocationOperation ||
+                !IsSupportedStringConcatInvocation(invocationOperation.TargetMethod))
+            {
+                return false;
+            }
+
+            var arguments = invocationExpression.ArgumentList.Arguments;
+            if (arguments.Count == 0)
+            {
+                return false;
+            }
+
+            var parts = new List<SmtFormula>(arguments.Count);
+            foreach (var argument in arguments)
+            {
+                if (argument.NameColon != null ||
+                    !TryTranslateStringConcatOperand(
+                        argument.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        out var part,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    part == null)
+                {
+                    return false;
+                }
+
+                parts.Add(part);
+            }
+
+            formula = CreateStringConcatTerm(parts);
+            return true;
+        }
+
+        private static bool IsSupportedStringConcatInvocation(IMethodSymbol method)
+        {
+            if (!method.IsStatic ||
+                method.Name != "Concat" ||
+                method.ContainingType?.SpecialType != SpecialType.System_String ||
+                method.ReturnType.SpecialType != SpecialType.System_String ||
+                method.Parameters.Length == 0)
+            {
+                return false;
+            }
+
+            foreach (var parameter in method.Parameters)
+            {
+                if (parameter.Type.SpecialType == SpecialType.System_String)
+                {
+                    continue;
+                }
+
+                if (parameter.IsParams &&
+                    parameter.Type is IArrayTypeSymbol
+                    {
+                        ElementType.SpecialType: SpecialType.System_String
+                    })
+                {
+                    continue;
+                }
+
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool TryTranslateInterpolatedStringValue(
+            InterpolatedStringExpressionSyntax interpolatedStringExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion,
+            int inlineDepth)
+        {
+            formula = null;
+            if (!IsStringExpression(interpolatedStringExpression, semanticModel, cancellationToken))
+            {
+                return false;
+            }
+
+            var parts = new List<SmtFormula>(interpolatedStringExpression.Contents.Count);
+            foreach (var content in interpolatedStringExpression.Contents)
+            {
+                if (content is InterpolatedStringTextSyntax text)
+                {
+                    parts.Add(new SmtStringConstant(text.TextToken.ValueText));
+                    continue;
+                }
+
+                if (content is not InterpolationSyntax interpolation ||
+                    interpolation.AlignmentClause != null ||
+                    interpolation.FormatClause != null ||
+                    !TryTranslateStringConcatOperand(
+                        interpolation.Expression,
+                        semanticModel,
+                        cancellationToken,
+                        out var part,
+                        getSymbolVersion,
+                        inlineDepth) ||
+                    part == null)
+                {
+                    return false;
+                }
+
+                parts.Add(part);
+            }
+
+            formula = CreateStringConcatTerm(parts);
+            return true;
+        }
+
+        private static SmtFormula CreateStringConcatTerm(IReadOnlyList<SmtFormula> parts)
+        {
+            if (parts.Count == 0)
+            {
+                return new SmtStringConstant(string.Empty);
+            }
+
+            var formula = parts[0];
+            for (var index = 1; index < parts.Count; index++)
+            {
+                formula = new SmtStringConcatTerm(formula, parts[index]);
+            }
+
+            return formula;
         }
 
         private static bool TryTranslateConditionalAccessStringValue(

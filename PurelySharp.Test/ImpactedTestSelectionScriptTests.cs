@@ -51,6 +51,7 @@ namespace PurelySharp.Test
                 "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.cs");
             var root = recommendation.RootElement;
             var fixtures = GetStringArray(root, "selectedTestFixtures");
+            var evidence = GetEvidenceEntry(root, "PurelySharp.Symbolic/Smt/CSharpConditionToFormula.cs", "path-map");
 
             Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
             Assert.That(root.GetProperty("filterTooLong").GetBoolean(), Is.False);
@@ -60,7 +61,28 @@ namespace PurelySharp.Test
             Assert.That(fixtures, Does.Contain("StringLengthSmtTests"));
             Assert.That(fixtures, Does.Contain("ElementAccessSmtTests"));
             Assert.That(fixtures, Does.Contain("ReferenceReachabilitySmtTests"));
+            Assert.That(fixtures, Does.Contain("RegexTests"));
             Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("Symbolic SMT string-length and regex translation change"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_SelectsRegexFixtureForSearchLibStringRegexFormulaChange()
+        {
+            const string changedFile = "SearchLib/Z3FormulaEncoder.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+            var evidence = GetEvidenceEntry(root, changedFile, "path-map");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(fixtures, Does.Contain("RegexTests"));
+            Assert.That(fixtures, Does.Contain("SearchLibZ3SmokeTests"));
+            Assert.That(fixtures, Does.Contain("SmtAnalysisServiceTests"));
+            Assert.That(fixtures, Does.Contain("StringLengthSmtTests"));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("SearchLib SMT string-length and regex formula change"));
+            Assert.That(GetStringArray(evidence, "selectedTestFixtures"), Does.Contain("RegexTests"));
         }
 
         [Test]
@@ -85,6 +107,41 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public async Task ListOnlyJson_SelectsRuntimeHazardFixturesForSymbolicQueryService()
+        {
+            const string changedFile = "PurelySharp.Symbolic/SymbolicRuntimeHazardQueryService.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+            var evidence = GetEvidenceEntry(root, changedFile, "path-map");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
+            Assert.That(fixtures, Does.Contain("SymbolicSourceQueryLineTests"));
+            Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("Symbolic runtime-hazard query change"));
+            Assert.That(GetStringArray(evidence, "selectedTestFixtures"), Does.Contain("DiagnosticEvidenceTests"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_SelectsRuntimeHazardDiagnosticsForAnalyzerConfigKeys()
+        {
+            const string changedFile = "PurelySharp.Analyzer/Configuration/ConfigKeys.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+            var evidence = GetEvidenceEntry(root, changedFile, "path-map");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(GetStringArray(root, "fullSuiteFallbackReasons"), Is.Empty);
+            Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
+            Assert.That(fixtures, Does.Contain("SemanticOracleSmtTests"));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("Analyzer runtime-hazard configuration change"));
+        }
+
+        [Test]
         public async Task ListOnlyJson_SelectsAnalyzerSmtFixturesForPathFactRule()
         {
             const string changedFile = "PurelySharp.Analyzer/Engine/Rules/BinaryOperationPurityRule.cs";
@@ -101,6 +158,40 @@ namespace PurelySharp.Test
             Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
             Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("SMT path-fact analyzer rule change"));
             Assert.That(GetStringArray(evidence, "selectedTestFixtures"), Does.Contain("DiagnosticEvidenceTests"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_SelectsSymbolicFactsForAnalyzerStateMerge()
+        {
+            const string changedFile = "PurelySharp.Analyzer/Engine/PurityAnalysisEngine.StateMerge.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+            var evidence = GetEvidenceEntry(root, changedFile, "path-map");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(fixtures, Does.Contain("SymbolicProgramPointFactTests"));
+            Assert.That(fixtures, Does.Contain("PathFactExpressionReachabilityTests"));
+            Assert.That(fixtures, Does.Contain("StringLengthSmtTests"));
+            Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("Analyzer symbolic state-merge and path-fact change"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_SelectsSpecificEvidenceForSymbolicProgramPointFacts()
+        {
+            const string changedFile = "PurelySharp.Symbolic/SymbolicProgramPointFacts.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+            var evidence = GetEvidenceEntry(root, changedFile, "path-map");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(fixtures, Does.Contain("SymbolicProgramPointFactTests"));
+            Assert.That(fixtures, Does.Contain("StringLengthSmtTests"));
+            Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("Symbolic program-point fact extraction change"));
         }
 
         [Test]
@@ -138,6 +229,24 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public async Task ListOnlyJson_PreservesTwentyWorkerCommandForSymbolicCliChange()
+        {
+            const string changedFile = "Tools/PurelySharp.SymbolicCli/Program.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(20, changedFile);
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+            var command = root.GetProperty("suggestedCommand").GetString();
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(fixtures, Does.Contain("SymbolicSourceQueryLineTests"));
+            Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
+            Assert.That(fixtures, Does.Contain("AnalyzerPackagingTests"));
+            Assert.That(command, Does.Contain("-Workers 20"));
+            Assert.That(command, Does.Contain("-Filter"));
+        }
+
+        [Test]
         public async Task ListOnlyJson_IgnoresDocumentationOnlyChanges()
         {
             using var recommendation = await RunImpactedSelectorJsonAsync(
@@ -153,7 +262,12 @@ namespace PurelySharp.Test
             Assert.That(root.GetProperty("testFilter").GetString(), Is.Empty);
         }
 
-        private static async Task<JsonDocument> RunImpactedSelectorJsonAsync(params string[] changedFiles)
+        private static Task<JsonDocument> RunImpactedSelectorJsonAsync(params string[] changedFiles)
+        {
+            return RunImpactedSelectorJsonAsync(0, changedFiles);
+        }
+
+        private static async Task<JsonDocument> RunImpactedSelectorJsonAsync(int workers, params string[] changedFiles)
         {
             var repositoryRoot = FindRepositoryRoot();
             var startInfo = new ProcessStartInfo
@@ -177,6 +291,12 @@ namespace PurelySharp.Test
             startInfo.ArgumentList.Add(Path.Combine(repositoryRoot, "scripts", "Invoke-PurelySharpImpactedTests.ps1"));
             startInfo.ArgumentList.Add("-ListOnly");
             startInfo.ArgumentList.Add("-Json");
+            if (workers > 0)
+            {
+                startInfo.ArgumentList.Add("-Workers");
+                startInfo.ArgumentList.Add(workers.ToString());
+            }
+
             startInfo.ArgumentList.Add("-ChangedFile");
             foreach (var changedFile in changedFiles)
             {

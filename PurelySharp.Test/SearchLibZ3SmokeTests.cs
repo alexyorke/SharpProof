@@ -222,6 +222,48 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_ControlCharacterEscapeAllowsExpectedCharacter()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A\cA\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("\u0001")),
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.Equal,
+                        new SmtStringLengthTerm(text),
+                        new SmtIntegerConstant(1)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Satisfiable));
+        }
+
+        [Test]
+        public void SmtSolver_ControlCharacterClassEscapeContradictsDifferentCharacter()
+        {
+            using var solver = new SmtSolver();
+            var text = new SmtVariable("text", SmtValueKind.String);
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtRegexMatchFormula(text, @"\A[\cA]\z"),
+                    new SmtStringStartsWithFormula(text, new SmtStringConstant("\u0002")),
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.Equal,
+                        new SmtStringLengthTerm(text),
+                        new SmtIntegerConstant(1)),
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void SmtSolver_AtomicGroupRegexContradictsWrongPrefix()
         {
             using var solver = new SmtSolver();

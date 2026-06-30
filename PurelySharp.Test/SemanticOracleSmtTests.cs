@@ -3046,6 +3046,133 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesThrowExpressionGuardedNullBranchUnreachable()
+        {
+            const string source = @"
+using System;
+
+public class TestClass
+{
+    public int TestMethod(string value)
+    {
+        _ = value ?? throw new InvalidOperationException();
+
+        if (value == null)
+        {
+            return 1;
+        }
+
+        return value.Length;
+    }
+}";
+            var result = new SymbolicSourceQueryService().AnalyzeSource(
+                source,
+                "ThrowExpressionGuardedNullBranch.cs",
+                FindLine(source, "return 1;"),
+                17,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(result.PathConditions, Is.Not.Empty);
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+            Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesCompletedReceiverNullBranchUnreachable()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(object value)
+    {
+        var hash = value.GetHashCode();
+
+        if (value == null)
+        {
+            return 1;
+        }
+
+        return hash;
+    }
+}";
+            var result = new SymbolicSourceQueryService().AnalyzeSource(
+                source,
+                "CompletedReceiverNullBranch.cs",
+                FindLine(source, "return 1;"),
+                17,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(result.PathConditions, Is.Not.Empty);
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+            Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_RefMutatedCompletedReceiverDoesNotKeepNonNullFact()
+        {
+            const string source = @"
+public sealed class Box
+{
+    public void Clear(ref Box value)
+    {
+        value = null;
+    }
+}
+
+public class TestClass
+{
+    public int TestMethod(Box box)
+    {
+        box.Clear(ref box);
+        return box.GetHashCode();
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "RefMutatedCompletedReceiver.cs",
+                FindLine(source, "return box.GetHashCode();"),
+                16,
+                "box != null",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.Unknown));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_AnalyzeSource_WithSmt_ClassifiesCompletedElementAccessOutOfRangeBranchUnreachable()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int index)
+    {
+        _ = values[index];
+
+        if (index < 0 || index >= values.Length)
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+}";
+            var result = new SymbolicSourceQueryService().AnalyzeSource(
+                source,
+                "CompletedElementAccessOutOfRangeBranch.cs",
+                FindLine(source, "return 1;"),
+                17,
+                AnalyzerTestHost.GetTrustedPlatformReferences(),
+                smtAnalysis: new SmtAnalysisService(SmtAnalysisOptions.Default));
+
+            Assert.That(result.PathConditions, Is.Not.Empty);
+            Assert.That(result.Reachability, Is.EqualTo(SymbolicReachability.Unreachable));
+            Assert.That(result.ReachabilityReason, Is.EqualTo("path_unsatisfiable"));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesCatchExceptionVariableNonNull()
         {
             const string source = @"

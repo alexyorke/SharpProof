@@ -292,6 +292,103 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesStringConcatResultLengths()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int FixedConcat(string first, string second)
+    {
+        if (first != null && second != null)
+        {
+            return string.Concat(first, ""-"", second).Length;
+        }
+
+        return 0;
+    }
+
+    public int ParamsConcat(string first, string second, string third)
+    {
+        if (first != null && second != null && third != null)
+        {
+            return string.Concat(first, ""-"", second, ""-"", third).Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return string.Concat(first, \"-\", second).Length;",
+                "string.Concat(first, \"-\", second).Length == first.Length + 1 + second.Length");
+            AssertConditionProven(
+                source,
+                "return string.Concat(first, \"-\", second, \"-\", third).Length;",
+                "string.Concat(first, \"-\", second, \"-\", third).Length == first.Length + 1 + second.Length + 1 + third.Length");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProvesStringInterpolationResultLengthWhenPartsAreStrings()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(string first, string second)
+    {
+        if (first != null && second != null)
+        {
+            return $""{first}-{second}"".Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return $\"{first}-{second}\".Length;",
+                "$\"{first}-{second}\".Length == first.Length + 1 + second.Length");
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_UnsupportedFormattedStringConstructionLengthsRemainUnknown()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int InterpolationWithNonStringHole(string text, int value)
+    {
+        if (text != null)
+        {
+            return $""{text}:{value}"".Length;
+        }
+
+        return 0;
+    }
+
+    public int ObjectConcat(string text, object value)
+    {
+        if (text != null)
+        {
+            return string.Concat(text, value).Length;
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionUnknown(
+                source,
+                "return $\"{text}:{value}\".Length;",
+                "$\"{text}:{value}\".Length == text.Length + 1");
+            AssertConditionUnknown(
+                source,
+                "return string.Concat(text, value).Length;",
+                "string.Concat(text, value).Length == text.Length");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_UnsupportedStringTransformLengthsRemainUnknown()
         {
             const string source = @"

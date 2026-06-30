@@ -527,7 +527,7 @@ namespace PurelySharp.Analyzer
             System.Threading.CancellationToken cancellationToken,
             SmtAnalysisService smtAnalysis)
         {
-            if (!TryGetCheckedIntegralConversionRange(castExpression, semanticModel, cancellationToken, out var minValue, out var maxValue) ||
+            if (!TryGetCheckedExplicitNumericConversionRange(castExpression, semanticModel, cancellationToken, out var minValue, out var maxValue) ||
                 !CSharpConditionToFormula.TryTranslateValue(castExpression.Expression, semanticModel, cancellationToken, out var operandFormula, getSymbolVersion: null) ||
                 operandFormula is not { Kind: SmtValueKind.Int })
             {
@@ -637,7 +637,7 @@ namespace PurelySharp.Analyzer
             }
         }
 
-        private static bool TryGetCheckedIntegralConversionRange(
+        private static bool TryGetCheckedExplicitNumericConversionRange(
             CastExpressionSyntax castExpression,
             SemanticModel semanticModel,
             System.Threading.CancellationToken cancellationToken,
@@ -649,20 +649,31 @@ namespace PurelySharp.Analyzer
 
             if (!TryGetConversionOperation(castExpression, semanticModel, cancellationToken, out var conversionOperation) ||
                 !conversionOperation.IsChecked ||
+                !conversionOperation.Conversion.Exists ||
+                conversionOperation.Conversion.IsIdentity ||
+                conversionOperation.Conversion.IsImplicit ||
+                !conversionOperation.Conversion.IsNumeric ||
                 conversionOperation.Conversion.IsUserDefined ||
-                conversionOperation.Type is not { } targetType ||
-                !TryGetBoundedIntegralRange(targetType, out minValue, out maxValue))
+                conversionOperation.Conversion.MethodSymbol != null ||
+                !TryGetCheckedNumericConversionRange(
+                    GetNaturalExpressionType(castExpression, semanticModel, cancellationToken),
+                    out minValue,
+                    out maxValue))
             {
                 return false;
             }
 
-            var sourceType = semanticModel.GetTypeInfo(castExpression.Expression, cancellationToken).Type;
-            if (!TryGetBoundedIntegralRange(sourceType, out var sourceMinValue, out var sourceMaxValue))
+            if (TryGetCheckedNumericConversionRange(
+                    GetNaturalExpressionType(castExpression.Expression, semanticModel, cancellationToken),
+                    out var sourceMinValue,
+                    out var sourceMaxValue) &&
+                sourceMinValue >= minValue &&
+                sourceMaxValue <= maxValue)
             {
                 return false;
             }
 
-            return sourceMinValue < minValue || sourceMaxValue > maxValue;
+            return true;
         }
 
         private static bool TryGetCheckedIntegralRange(
@@ -699,6 +710,14 @@ namespace PurelySharp.Analyzer
         }
 
         private static bool TryGetBoundedIntegralRange(
+            ITypeSymbol? typeSymbol,
+            out long minValue,
+            out long maxValue)
+        {
+            return TryGetCheckedNumericConversionRange(typeSymbol, out minValue, out maxValue);
+        }
+
+        private static bool TryGetCheckedNumericConversionRange(
             ITypeSymbol? typeSymbol,
             out long minValue,
             out long maxValue)

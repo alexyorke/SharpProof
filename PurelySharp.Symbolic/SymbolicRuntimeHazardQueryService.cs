@@ -422,6 +422,13 @@ namespace PurelySharp.Symbolic
                     }
 
                     break;
+                case PostfixUnaryExpressionSyntax postfixUnaryExpression:
+                    if (TryCreateCheckedIntegralOverflowCandidate(postfixUnaryExpression, semanticModel, cancellationToken, out var postfixOverflowCandidate))
+                    {
+                        yield return postfixOverflowCandidate;
+                    }
+
+                    break;
                 case CastExpressionSyntax castExpression:
                     if (TryCreateCheckedExplicitNumericConversionOverflowCandidate(castExpression, semanticModel, cancellationToken, out var conversionOverflowCandidate))
                     {
@@ -560,6 +567,29 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out RuntimeHazardCandidate candidate)
         {
+            if (TryCreateCheckedIntegralUnaryMinusOverflowCandidate(
+                    unaryExpression,
+                    semanticModel,
+                    cancellationToken,
+                    out candidate))
+            {
+                return true;
+            }
+
+            return TryCreateCheckedIntegralUpdateOverflowCandidate(
+                unaryExpression,
+                unaryExpression.Operand,
+                semanticModel,
+                cancellationToken,
+                out candidate);
+        }
+
+        private static bool TryCreateCheckedIntegralUnaryMinusOverflowCandidate(
+            PrefixUnaryExpressionSyntax unaryExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
             candidate = default;
             if (!TryGetCheckedIntegralUnaryOperator(
                     unaryExpression,
@@ -583,6 +613,60 @@ namespace PurelySharp.Symbolic
 
             candidate = new RuntimeHazardCandidate(
                 unaryExpression,
+                SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
+                trigger,
+                "System.OverflowException",
+                "definite_checked_integral_overflow");
+            return true;
+        }
+
+        private static bool TryCreateCheckedIntegralOverflowCandidate(
+            PostfixUnaryExpressionSyntax unaryExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            return TryCreateCheckedIntegralUpdateOverflowCandidate(
+                unaryExpression,
+                unaryExpression.Operand,
+                semanticModel,
+                cancellationToken,
+                out candidate);
+        }
+
+        private static bool TryCreateCheckedIntegralUpdateOverflowCandidate(
+            ExpressionSyntax updateExpression,
+            ExpressionSyntax operand,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            candidate = default;
+            if (!TryGetCheckedIntegralIncrementOrDecrementOperator(
+                    updateExpression,
+                    operand,
+                    semanticModel,
+                    cancellationToken,
+                    out var smtOperator,
+                    out var minValue,
+                    out var maxValue))
+            {
+                return false;
+            }
+
+            var trigger = TryCreateCheckedIntegralUpdateOverflowTrigger(
+                operand,
+                smtOperator,
+                minValue,
+                maxValue,
+                semanticModel,
+                cancellationToken,
+                out var overflowTrigger)
+                ? overflowTrigger
+                : CreateUnknownTrigger(updateExpression, "checked_integral_overflow");
+
+            candidate = new RuntimeHazardCandidate(
+                updateExpression,
                 SymbolicRuntimeHazardKind.CheckedIntegralOverflow,
                 trigger,
                 "System.OverflowException",
@@ -806,6 +890,32 @@ namespace PurelySharp.Symbolic
             return true;
         }
 
+        private static bool TryCreateCheckedIntegralUpdateOverflowTrigger(
+            ExpressionSyntax operand,
+            SmtIntegerBinaryOperator smtOperator,
+            long minValue,
+            long maxValue,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula trigger)
+        {
+            trigger = null!;
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    operand,
+                    semanticModel,
+                    cancellationToken,
+                    out var operandFormula,
+                    getSymbolVersion: null) ||
+                operandFormula is not { Kind: SmtValueKind.Int })
+            {
+                return false;
+            }
+
+            var resultFormula = new SmtIntegerBinaryTerm(smtOperator, operandFormula, new SmtIntegerConstant(1));
+            trigger = CreateIntegralOutOfRangeFormula(resultFormula, minValue, maxValue);
+            return true;
+        }
+
         private static bool TryCreateCheckedExplicitNumericConversionOverflowTrigger(
             CastExpressionSyntax castExpression,
             long minValue,
@@ -886,6 +996,49 @@ namespace PurelySharp.Symbolic
                 };
         }
 
+        private static bool TryGetCheckedIntegralIncrementOrDecrementOperator(
+            ExpressionSyntax updateExpression,
+            ExpressionSyntax operand,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtIntegerBinaryOperator smtOperator,
+            out long minValue,
+            out long maxValue)
+        {
+            smtOperator = default;
+            minValue = default;
+            maxValue = default;
+
+            if (semanticModel.GetOperation(updateExpression, cancellationToken) is not IIncrementOrDecrementOperation
+                {
+                    IsChecked: true,
+                    OperatorMethod: null
+                } operation)
+            {
+                return false;
+            }
+
+            var operandType = operation.Target.Type ?? semanticModel.GetTypeInfo(operand, cancellationToken).Type;
+            if (!TryGetBoundedIntegralRange(operandType, out minValue, out maxValue))
+            {
+                return false;
+            }
+
+            switch (updateExpression.Kind())
+            {
+                case SyntaxKind.PreIncrementExpression:
+                case SyntaxKind.PostIncrementExpression:
+                    smtOperator = SmtIntegerBinaryOperator.Add;
+                    return true;
+                case SyntaxKind.PreDecrementExpression:
+                case SyntaxKind.PostDecrementExpression:
+                    smtOperator = SmtIntegerBinaryOperator.Subtract;
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         private static bool TryGetCheckedExplicitNumericConversionRange(
             CastExpressionSyntax castExpression,
             SemanticModel semanticModel,
@@ -947,6 +1100,52 @@ namespace PurelySharp.Symbolic
         {
             switch (typeSymbol?.SpecialType)
             {
+                case SpecialType.System_Int32:
+                    minValue = int.MinValue;
+                    maxValue = int.MaxValue;
+                    return true;
+                case SpecialType.System_UInt32:
+                    minValue = uint.MinValue;
+                    maxValue = uint.MaxValue;
+                    return true;
+                case SpecialType.System_Int64:
+                    minValue = long.MinValue;
+                    maxValue = long.MaxValue;
+                    return true;
+                default:
+                    minValue = default;
+                    maxValue = default;
+                    return false;
+            }
+        }
+
+        private static bool TryGetBoundedIntegralRange(
+            ITypeSymbol? typeSymbol,
+            out long minValue,
+            out long maxValue)
+        {
+            switch (typeSymbol?.SpecialType)
+            {
+                case SpecialType.System_Char:
+                    minValue = char.MinValue;
+                    maxValue = char.MaxValue;
+                    return true;
+                case SpecialType.System_SByte:
+                    minValue = sbyte.MinValue;
+                    maxValue = sbyte.MaxValue;
+                    return true;
+                case SpecialType.System_Byte:
+                    minValue = byte.MinValue;
+                    maxValue = byte.MaxValue;
+                    return true;
+                case SpecialType.System_Int16:
+                    minValue = short.MinValue;
+                    maxValue = short.MaxValue;
+                    return true;
+                case SpecialType.System_UInt16:
+                    minValue = ushort.MinValue;
+                    maxValue = ushort.MaxValue;
+                    return true;
                 case SpecialType.System_Int32:
                     minValue = int.MinValue;
                     maxValue = int.MaxValue;

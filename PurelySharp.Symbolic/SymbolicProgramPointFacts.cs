@@ -6,6 +6,7 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Operations;
 using PurelySharp.Symbolic.Smt;
 using SearchLib.Smt;
 
@@ -1365,6 +1366,14 @@ namespace PurelySharp.Symbolic
                     {
                         AddAssignedValueFacts(localSymbol, declarator.Initializer.Value, semanticModel, cancellationToken, facts);
                     }
+
+                    AddNormalCompletionFacts(
+                        declarator.Initializer.Value,
+                        localDeclaration,
+                        false,
+                        semanticModel,
+                        cancellationToken,
+                        facts);
                 }
 
                 return;
@@ -1438,6 +1447,13 @@ namespace PurelySharp.Symbolic
                 }
 
                 AddElementAssignmentFact(assignment, semanticModel, cancellationToken, facts);
+                AddNormalCompletionFacts(
+                    assignment.Right,
+                    expressionStatement,
+                    assignedSymbol is not ILocalSymbol and not IParameterSymbol,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
                 return;
             }
 
@@ -1469,10 +1485,166 @@ namespace PurelySharp.Symbolic
             {
                 AddCompletedSwitchStatementFacts(switchStatement, factsBeforeStatement, semanticModel, cancellationToken, facts);
             }
+            else if (statement is ExpressionStatementSyntax completedExpressionStatement)
+            {
+                AddNormalCompletionFacts(
+                    completedExpressionStatement.Expression,
+                    completedExpressionStatement,
+                    true,
+                    semanticModel,
+                    cancellationToken,
+                    facts);
+            }
             else
             {
                 AddCompletedLoopStatementFacts(statement, semanticModel, cancellationToken, facts);
             }
+        }
+
+        private static void AddNormalCompletionFacts(
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            bool includeThrowGuardFacts,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (includeThrowGuardFacts)
+            {
+                AddTopLevelThrowGuardNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
+            }
+
+            AddTopLevelDereferenceNormalCompletionFacts(expression, statement, semanticModel, cancellationToken, facts);
+        }
+
+        private static void AddTopLevelThrowGuardNormalCompletionFacts(
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            if (!TryGetThrowGuardedValue(
+                    expression,
+                    out var effectiveValueExpression,
+                    out var guardExpression,
+                    out var guardBranchWhenTrue,
+                    out var requiresNonNullValue))
+            {
+                return;
+            }
+
+            if (guardExpression != null)
+            {
+                if (!AnyConditionSymbolInvalidatedInStatement(guardExpression, statement, semanticModel, cancellationToken))
+                {
+                    AddBranchConditionFacts(
+                        guardExpression,
+                        guardBranchWhenTrue,
+                        semanticModel,
+                        cancellationToken,
+                        facts);
+                }
+
+                return;
+            }
+
+            if (requiresNonNullValue &&
+                !AnyConditionSymbolInvalidatedInStatement(effectiveValueExpression, statement, semanticModel, cancellationToken))
+            {
+                AddReferenceNonNullFact(effectiveValueExpression, semanticModel, cancellationToken, facts);
+            }
+        }
+
+        private static void AddTopLevelDereferenceNormalCompletionFacts(
+            ExpressionSyntax expression,
+            StatementSyntax statement,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            ICollection<SmtFormula> facts)
+        {
+            expression = UnwrapExpression(expression);
+            if (expression is ElementAccessExpressionSyntax elementAccess &&
+                !AnyConditionSymbolInvalidatedInStatement(elementAccess, statement, semanticModel, cancellationToken) &&
+                CSharpConditionToFormula.TryTranslateBuiltInElementAccessInRange(
+                    elementAccess,
+                    semanticModel,
+                    cancellationToken,
+                    out var inRangeFact))
+            {
+                AddUniqueFact(facts, inRangeFact);
+            }
+
+            if (!TryGetTopLevelDereferenceReceiver(expression, semanticModel, cancellationToken, out var receiver) ||
+                !IsLocalOrParameterReference(receiver, semanticModel, cancellationToken) ||
+                AnyConditionSymbolMutatedInStatement(receiver, statement, semanticModel, cancellationToken))
+            {
+                return;
+            }
+
+            if (CSharpConditionToFormula.TryTranslateValue(
+                    receiver,
+                    semanticModel,
+                    cancellationToken,
+                    out var receiverFormula,
+                    getSymbolVersion: null) &&
+                receiverFormula is { Kind: SmtValueKind.Reference })
+            {
+                AddUniqueFact(
+                    facts,
+                    new SmtBinaryFormula(
+                        SmtBinaryOperator.NotEqual,
+                        receiverFormula,
+                        new SmtNullConstant()));
+            }
+        }
+
+        private static bool TryGetTopLevelDereferenceReceiver(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ExpressionSyntax receiver)
+        {
+            expression = UnwrapExpression(expression);
+            switch (expression)
+            {
+                case InvocationExpressionSyntax invocation
+                    when UnwrapExpression(invocation.Expression) is MemberAccessExpressionSyntax memberAccess &&
+                         !IsReducedExtensionMethodInvocation(invocation, semanticModel, cancellationToken):
+                    receiver = memberAccess.Expression;
+                    return true;
+                case MemberAccessExpressionSyntax memberAccess:
+                    receiver = memberAccess.Expression;
+                    return true;
+                case ElementAccessExpressionSyntax elementAccess:
+                    receiver = elementAccess.Expression;
+                    return true;
+                default:
+                    receiver = null!;
+                    return false;
+            }
+        }
+
+        private static bool IsReducedExtensionMethodInvocation(
+            InvocationExpressionSyntax invocation,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken)
+        {
+            return semanticModel.GetOperation(invocation, cancellationToken) is IInvocationOperation invocationOperation &&
+                invocationOperation.TargetMethod.ReducedFrom != null;
+        }
+
+        private static void AddUniqueFact(
+            ICollection<SmtFormula> facts,
+            SmtFormula fact)
+        {
+            var key = GetFormulaKey(fact);
+            if (facts.Any(existing => string.Equals(GetFormulaKey(existing), key, StringComparison.Ordinal)))
+            {
+                return;
+            }
+
+            facts.Add(fact);
         }
 
         private static void AddCompletedIfStatementFacts(
@@ -5005,7 +5177,7 @@ namespace PurelySharp.Symbolic
             ExpressionSyntax expression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
-            List<SmtFormula> facts)
+            ICollection<SmtFormula> facts)
         {
             if (!CSharpConditionToFormula.TryTranslateValue(
                     expression,

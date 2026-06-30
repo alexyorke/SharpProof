@@ -87,7 +87,7 @@ try
                 smtAnalysis: smtAnalysis);
     }
 
-    if (options.HasRuntimeHazardStatusFilter && result is SymbolicRuntimeHazardQueryResult runtimeHazardResult)
+    if (options.HasRuntimeHazardFilter && result is SymbolicRuntimeHazardQueryResult runtimeHazardResult)
     {
         result = options.FilterRuntimeHazards(runtimeHazardResult);
     }
@@ -271,6 +271,9 @@ static void PrintRuntimeHazardResult(SymbolicRuntimeHazardQueryResult result)
     }
 
     Console.WriteLine($"Runtime hazards: {result.HazardCount}");
+    Console.WriteLine("Hazard status summary: " + FormatCountSummary(CountBy(result.Hazards, static hazard => hazard.Status.ToString())));
+    Console.WriteLine("Hazard exception summary: " + FormatCountSummary(CountBy(result.Hazards, static hazard => hazard.ExceptionType)));
+    Console.WriteLine("Hazard category summary: " + FormatCountSummary(CountBy(result.Hazards, static hazard => hazard.Category)));
     foreach (var hazard in result.Hazards)
     {
         Console.WriteLine();
@@ -288,6 +291,23 @@ static void PrintRuntimeHazardResult(SymbolicRuntimeHazardQueryResult result)
     {
         PrintSmtDiagnostics(result.SmtDiagnostics);
     }
+}
+
+static string FormatCountSummary(IReadOnlyDictionary<string, int> counts)
+{
+    return counts.Count == 0
+        ? "<none>"
+        : string.Join(", ", counts.Select(static pair => $"{pair.Key}={pair.Value}"));
+}
+
+static IReadOnlyDictionary<string, int> CountBy<T>(
+    IEnumerable<T> values,
+    Func<T, string> keySelector)
+{
+    return values
+        .GroupBy(keySelector, StringComparer.Ordinal)
+        .OrderBy(static group => group.Key, StringComparer.Ordinal)
+        .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 }
 
 static void PrintMergedPathFacts(
@@ -574,6 +594,10 @@ Options:
   --runtime-hazards   Query proven runtime hazards instead of invariant program points.
   --hazard-kind <k>   Keep only DirectThrow, Rethrow, DivideByZero, NullDereference, NullableValueWithoutValue, IndexOutOfRange, ArgumentOutOfRange, CheckedIntegralOverflow, or ArrayTypeMismatch hazards. Can be repeated.
   --hazard-status <s> Keep only Proven, Unreachable, Unknown, or Unsupported runtime hazards. Can be repeated.
+  --hazard-exception-type <type>
+                      Keep only runtime hazards with this exception type. Can be repeated.
+  --hazard-category <category>
+                      Keep only runtime hazards with this category. Can be repeated.
   --include-unproven-hazards
                       Include unknown, unreachable, and unsupported hazard candidates in runtime hazard output.
   --smt-mode <mode>   SMT mode: off, bounded, or deep. Default: bounded.
@@ -667,6 +691,10 @@ Options:
 
     public List<SymbolicRuntimeHazardStatus> HazardStatuses { get; } = new();
 
+    public List<string> HazardExceptionTypes { get; } = new();
+
+    public List<string> HazardCategories { get; } = new();
+
     public bool ShowHelp { get; private set; }
 
     public SmtAnalysisMode SmtMode { get; private set; } = SmtAnalysisOptions.Default.Mode;
@@ -701,7 +729,10 @@ Options:
 
     public bool IsSpanQuery => SpanStart.HasValue || SpanEnd.HasValue;
 
-    public bool HasRuntimeHazardStatusFilter => HazardStatuses.Count != 0;
+    public bool HasRuntimeHazardFilter =>
+        HazardStatuses.Count != 0 ||
+        HazardExceptionTypes.Count != 0 ||
+        HazardCategories.Count != 0;
 
     public bool HasResultFilter =>
         NodeKinds.Count != 0 ||
@@ -872,6 +903,13 @@ Options:
                 case "--hazard-status":
                     options.HazardStatuses.Add(ReadHazardStatus(args, ref index, arg));
                     break;
+                case "--hazard-exception-type":
+                case "--exception-type":
+                    options.HazardExceptionTypes.Add(ReadString(args, ref index, arg));
+                    break;
+                case "--hazard-category":
+                    options.HazardCategories.Add(ReadString(args, ref index, arg));
+                    break;
                 case "--include-unproven-hazards":
                     options.IncludeUnprovenHazards = true;
                     break;
@@ -920,9 +958,13 @@ Options:
             }
 
             if (!options.RuntimeHazards &&
-                (options.IncludeUnprovenHazards || options.HazardKinds.Count != 0 || options.HazardStatuses.Count != 0))
+                (options.IncludeUnprovenHazards ||
+                 options.HazardKinds.Count != 0 ||
+                 options.HazardStatuses.Count != 0 ||
+                 options.HazardExceptionTypes.Count != 0 ||
+                 options.HazardCategories.Count != 0))
             {
-                throw new ArgumentException("--hazard-kind, --hazard-status, and --include-unproven-hazards require --runtime-hazards.");
+                throw new ArgumentException("--hazard-kind, --hazard-status, --hazard-exception-type, --hazard-category, and --include-unproven-hazards require --runtime-hazards.");
             }
 
             if (options.HazardStatuses.Any(static status => status != SymbolicRuntimeHazardStatus.Proven) &&
@@ -1100,13 +1142,17 @@ Options:
 
     public SymbolicRuntimeHazardQueryResult FilterRuntimeHazards(SymbolicRuntimeHazardQueryResult result)
     {
-        if (HazardStatuses.Count == 0)
+        if (!HasRuntimeHazardFilter)
         {
             return result;
         }
 
         var hazards = result.Hazards
-            .Where(hazard => HazardStatuses.Contains(hazard.Status))
+            .Where(
+                hazard =>
+                    (HazardStatuses.Count == 0 || HazardStatuses.Contains(hazard.Status)) &&
+                    (HazardExceptionTypes.Count == 0 || HazardExceptionTypes.Contains(hazard.ExceptionType, StringComparer.OrdinalIgnoreCase)) &&
+                    (HazardCategories.Count == 0 || HazardCategories.Contains(hazard.Category, StringComparer.OrdinalIgnoreCase)))
             .ToArray();
 
         return new SymbolicRuntimeHazardQueryResult(
@@ -1297,6 +1343,9 @@ internal sealed class CompactRuntimeHazardQueryResult
         int hazardCount,
         IReadOnlyDictionary<string, int> statusCounts,
         IReadOnlyDictionary<string, int> kindCounts,
+        IReadOnlyDictionary<string, int> exceptionTypeCounts,
+        IReadOnlyDictionary<string, int> categoryCounts,
+        CompactRuntimeHazardStatusSummary analysisSummary,
         IReadOnlyList<CompactRuntimeHazardResult> hazards,
         CompactRuntimeHazardOutputTruncation truncation,
         CompactRuntimeHazardSmtDiagnostics smtDiagnostics)
@@ -1309,6 +1358,9 @@ internal sealed class CompactRuntimeHazardQueryResult
         HazardCount = hazardCount;
         StatusCounts = statusCounts;
         KindCounts = kindCounts;
+        ExceptionTypeCounts = exceptionTypeCounts;
+        CategoryCounts = categoryCounts;
+        AnalysisSummary = analysisSummary;
         Hazards = hazards;
         Truncation = truncation;
         SmtDiagnostics = smtDiagnostics;
@@ -1344,6 +1396,12 @@ internal sealed class CompactRuntimeHazardQueryResult
 
     public IReadOnlyDictionary<string, int> KindCounts { get; }
 
+    public IReadOnlyDictionary<string, int> ExceptionTypeCounts { get; }
+
+    public IReadOnlyDictionary<string, int> CategoryCounts { get; }
+
+    public CompactRuntimeHazardStatusSummary AnalysisSummary { get; }
+
     public IReadOnlyList<CompactRuntimeHazardResult> Hazards { get; }
 
     public CompactRuntimeHazardOutputTruncation Truncation { get; }
@@ -1368,6 +1426,9 @@ internal sealed class CompactRuntimeHazardQueryResult
             result.HazardCount,
             CountBy(result.Hazards, static hazard => hazard.Status.ToString()),
             CountBy(result.Hazards, static hazard => hazard.Kind.ToString()),
+            CountBy(result.Hazards, static hazard => hazard.ExceptionType),
+            CountBy(result.Hazards, static hazard => hazard.Category),
+            CompactRuntimeHazardStatusSummary.FromHazards(result.Hazards, result.SmtDiagnostics),
             hazards,
             new CompactRuntimeHazardOutputTruncation(
                 result.Hazards.Count > hazards.Length,
@@ -1383,6 +1444,84 @@ internal sealed class CompactRuntimeHazardQueryResult
             .GroupBy(keySelector, StringComparer.Ordinal)
             .OrderBy(static group => group.Key, StringComparer.Ordinal)
             .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
+    }
+}
+
+internal sealed class CompactRuntimeHazardStatusSummary
+{
+    private CompactRuntimeHazardStatusSummary(
+        int hazardCount,
+        int provenCount,
+        int unknownCount,
+        int unreachableCount,
+        int unsupportedCount,
+        string status,
+        string summary,
+        bool hasUnprovenHazards,
+        bool smtConfigured,
+        bool smtEnabled)
+    {
+        HazardCount = hazardCount;
+        ProvenCount = provenCount;
+        UnknownCount = unknownCount;
+        UnreachableCount = unreachableCount;
+        UnsupportedCount = unsupportedCount;
+        Status = status;
+        Summary = summary;
+        HasUnprovenHazards = hasUnprovenHazards;
+        SmtConfigured = smtConfigured;
+        SmtEnabled = smtEnabled;
+    }
+
+    public int HazardCount { get; }
+
+    public int ProvenCount { get; }
+
+    public int UnknownCount { get; }
+
+    public int UnreachableCount { get; }
+
+    public int UnsupportedCount { get; }
+
+    public string Status { get; }
+
+    public string Summary { get; }
+
+    public bool HasUnprovenHazards { get; }
+
+    public bool SmtConfigured { get; }
+
+    public bool SmtEnabled { get; }
+
+    public static CompactRuntimeHazardStatusSummary FromHazards(
+        IReadOnlyList<SymbolicRuntimeHazard> hazards,
+        SymbolicSmtDiagnostics smtDiagnostics)
+    {
+        var provenCount = hazards.Count(static hazard => hazard.Status == SymbolicRuntimeHazardStatus.Proven);
+        var unknownCount = hazards.Count(static hazard => hazard.Status == SymbolicRuntimeHazardStatus.Unknown);
+        var unreachableCount = hazards.Count(static hazard => hazard.Status == SymbolicRuntimeHazardStatus.Unreachable);
+        var unsupportedCount = hazards.Count(static hazard => hazard.Status == SymbolicRuntimeHazardStatus.Unsupported);
+        var hasUnprovenHazards = unknownCount != 0 || unreachableCount != 0 || unsupportedCount != 0;
+        var status = hazards.Count == 0
+            ? "NoHazards"
+            : hasUnprovenHazards
+                ? "ContainsUnproven"
+                : "ProvenOnly";
+        var summary = hazards.Count == 0
+            ? "No runtime hazards matched the query."
+            : $"{provenCount} proven, {unknownCount} unknown, {unreachableCount} unreachable, {unsupportedCount} unsupported runtime hazards matched the query.";
+
+        return new CompactRuntimeHazardStatusSummary(
+            hazards.Count,
+            provenCount,
+            unknownCount,
+            unreachableCount,
+            unsupportedCount,
+            status,
+            summary,
+            hasUnprovenHazards,
+            smtDiagnostics.IsConfigured,
+            smtDiagnostics.IsEnabled);
     }
 }
 
