@@ -56,6 +56,23 @@ public class TestClass
 
             yield return new TestCaseData(
                 @"
+using System.Threading.Tasks;
+
+public class TestClass
+{
+    public async Task<int> AwaitNullDereference()
+    {
+        Task<int> task = null!;
+        return await task;
+    }
+}",
+                "await task",
+                "System.NullReferenceException",
+                "definite_await_null")
+                .SetName("Ps0011_AuthoringRuntimeHazards_ReportAwaitNullWithoutEnforcePure");
+
+            yield return new TestCaseData(
+                @"
 public class TestClass
 {
     public void LockNullReceiver(object gate)

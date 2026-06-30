@@ -258,8 +258,8 @@ namespace PurelySharp.Analyzer
                     new ExceptionCandidate(
                         exceptionType,
                         "System.NullReferenceException",
-                        "definite_null_dereference",
-                        "null_receiver"));
+                        nullDereferenceNode is AwaitExpressionSyntax ? "definite_await_null" : "definite_null_dereference",
+                        nullDereferenceNode is AwaitExpressionSyntax ? "await_expression" : "null_receiver"));
             }
 
             foreach (var lockNullNode in ExceptionFlowAnalyzer.GetDefiniteLockNullNodes(methodNode, semanticModel, cancellationToken, smtAnalysis))

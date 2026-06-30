@@ -135,6 +135,13 @@ namespace PurelySharp.Analyzer
                 {
                     yield return invocation;
                 }
+                else if (node is AwaitExpressionSyntax awaitExpression &&
+                         IsReferenceDereferenceReceiver(awaitExpression.Expression, semanticModel, cancellationToken) &&
+                         IsDefinitelyNullExpression(awaitExpression.Expression, awaitExpression, semanticModel, cancellationToken, smtAnalysis) &&
+                         IsExceptionPathReachable(awaitExpression, semanticModel, cancellationToken, smtAnalysis))
+                {
+                    yield return awaitExpression;
+                }
             }
         }
 

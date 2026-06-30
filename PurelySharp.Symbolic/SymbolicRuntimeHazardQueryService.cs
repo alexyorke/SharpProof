@@ -688,6 +688,13 @@ namespace PurelySharp.Symbolic
                     }
 
                     break;
+                case AwaitExpressionSyntax awaitExpression:
+                    if (TryCreateAwaitNullDereferenceCandidate(awaitExpression, semanticModel, cancellationToken, out var awaitNullCandidate))
+                    {
+                        yield return awaitNullCandidate;
+                    }
+
+                    break;
             }
         }
 
@@ -1088,6 +1095,38 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out RuntimeHazardCandidate candidate)
         {
+            return TryCreateNullDereferenceCandidate(
+                site,
+                receiver,
+                "definite_null_dereference",
+                semanticModel,
+                cancellationToken,
+                out candidate);
+        }
+
+        private static bool TryCreateAwaitNullDereferenceCandidate(
+            AwaitExpressionSyntax awaitExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
+            return TryCreateNullDereferenceCandidate(
+                awaitExpression,
+                awaitExpression.Expression,
+                "definite_await_null",
+                semanticModel,
+                cancellationToken,
+                out candidate);
+        }
+
+        private static bool TryCreateNullDereferenceCandidate(
+            SyntaxNode site,
+            ExpressionSyntax receiver,
+            string category,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out RuntimeHazardCandidate candidate)
+        {
             candidate = default;
             var receiverType = GetExpressionType(receiver, semanticModel, cancellationToken);
             if (IsDynamicExpression(receiver, semanticModel, cancellationToken) ||
@@ -1102,7 +1141,7 @@ namespace PurelySharp.Symbolic
                 SymbolicRuntimeHazardKind.NullDereference,
                 trigger,
                 "System.NullReferenceException",
-                "definite_null_dereference");
+                category);
             return true;
         }
 

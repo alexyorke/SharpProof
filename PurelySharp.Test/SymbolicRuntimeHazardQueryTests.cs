@@ -349,6 +349,100 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesAwaitNullDereference()
+        {
+            const string source = @"
+using System.Threading.Tasks;
+
+public class TestClass
+{
+    public async Task<int> TestMethod()
+    {
+        Task<int> task = null!;
+        return await task;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return await task;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.NullReferenceException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_await_null"));
+            Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.AwaitExpression.ToString()));
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_PrunesAwaitNullDereferenceAfterNonNullGuard()
+        {
+            const string source = @"
+using System.Threading.Tasks;
+
+public class TestClass
+{
+    public async Task<int> TestMethod(Task<int> task)
+    {
+        if (task is not null)
+        {
+            return await task;
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return await task;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+            Assert.That(result.Hazards, Is.Empty);
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ClassifiesAwaitNullDereferenceAfterNonNullGuardAsUnreachableCandidate()
+        {
+            const string source = @"
+using System.Threading.Tasks;
+
+public class TestClass
+{
+    public async Task<int> TestMethod(Task<int> task)
+    {
+        if (task is not null)
+        {
+            return await task;
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return await task;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.NullDereference }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.NullDereference));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.Category, Is.EqualTo("definite_await_null"));
+            Assert.That(hazard.NodeKind, Is.EqualTo(SyntaxKind.AwaitExpression.ToString()));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesLockNullSourceArgumentNull()
         {
             const string source = @"
