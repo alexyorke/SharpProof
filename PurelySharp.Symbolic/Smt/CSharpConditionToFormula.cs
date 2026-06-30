@@ -616,14 +616,25 @@ namespace PurelySharp.Symbolic.Smt
             int inlineDepth)
         {
             formula = null;
-            if (!IsTypeTestEquivalentToNonNull(expression, typeSyntax, semanticModel, cancellationToken) ||
-                !TryTranslateValue(expression, semanticModel, cancellationToken, out var value, getSymbolVersion, inlineDepth) ||
+            if (!TryTranslateValue(expression, semanticModel, cancellationToken, out var value, getSymbolVersion, inlineDepth) ||
                 value is not { Kind: SmtValueKind.Reference })
             {
                 return false;
             }
 
-            formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtNullConstant());
+            var testedType = semanticModel.GetTypeInfo(typeSyntax, cancellationToken).Type;
+            if (IsTypeTestEquivalentToNonNull(expression, typeSyntax, semanticModel, cancellationToken))
+            {
+                formula = CreateNonNullFormula(value);
+                return true;
+            }
+
+            if (!TryCreateRuntimeTypeTestFormula(value, testedType, out var runtimeTypeTest))
+            {
+                return false;
+            }
+
+            formula = Conjoin(CreateNonNullFormula(value), runtimeTypeTest);
             return true;
         }
 
@@ -671,6 +682,46 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             return sourceType.AllInterfaces.Any(candidate => SymbolEqualityComparer.Default.Equals(candidate, targetType));
+        }
+
+        public static bool TryCreateRuntimeTypeTestFormula(
+            SmtFormula value,
+            ITypeSymbol? targetType,
+            out SmtFormula formula)
+        {
+            formula = null!;
+            if (value.Kind != SmtValueKind.Reference ||
+                !CanUseRuntimeTypeTest(targetType))
+            {
+                return false;
+            }
+
+            formula = new SmtRuntimeTypeTestFormula(value, GetRuntimeTypeTestKey(targetType!));
+            return true;
+        }
+
+        private static bool CanUseRuntimeTypeTest(ITypeSymbol? targetType)
+        {
+            if (targetType == null ||
+                targetType.TypeKind is TypeKind.Dynamic or TypeKind.Error or TypeKind.TypeParameter)
+            {
+                return false;
+            }
+
+            return targetType.IsReferenceType;
+        }
+
+        private static string GetRuntimeTypeTestKey(ITypeSymbol targetType)
+        {
+            return targetType
+                .WithNullableAnnotation(NullableAnnotation.None)
+                .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                .Replace("global::", string.Empty);
+        }
+
+        private static SmtFormula CreateNonNullFormula(SmtFormula value)
+        {
+            return new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtNullConstant());
         }
 
         private static bool IsNullLikeNullableComparisonOperand(
@@ -2147,7 +2198,7 @@ namespace PurelySharp.Symbolic.Smt
             substitutions.Add(new SmtVariableSubstitution(
                 localVariable.Name,
                 localVariable.Name + ".",
-                localVariable + ".",
+                GetFormulaMemberName(localVariable) + ".",
                 replacement));
         }
 
@@ -2253,7 +2304,7 @@ namespace PurelySharp.Symbolic.Smt
                 builder.Add(new SmtVariableSubstitution(
                     formalVariable.Name,
                     formalVariable.Name + ".",
-                    formalVariable + ".",
+                    GetFormulaMemberName(formalVariable) + ".",
                     argumentFormula));
 
                 if (parameter.Type.SpecialType == SpecialType.System_String &&
@@ -2264,7 +2315,7 @@ namespace PurelySharp.Symbolic.Smt
                     builder.Add(new SmtVariableSubstitution(
                         formalStringVariable.Name,
                         formalStringVariable.Name + ".",
-                        formalStringVariable + ".",
+                        GetFormulaMemberName(formalStringVariable) + ".",
                         argumentStringFormula));
                 }
             }
@@ -2278,7 +2329,7 @@ namespace PurelySharp.Symbolic.Smt
             return new SmtVariableSubstitution(
                 ImplicitThisVariableName,
                 ImplicitThisVariableName + ".",
-                new SmtVariable(ImplicitThisVariableName, SmtValueKind.Reference) + ".",
+                GetFormulaMemberName(new SmtVariable(ImplicitThisVariableName, SmtValueKind.Reference)) + ".",
                 receiver);
         }
 
@@ -2327,6 +2378,10 @@ namespace PurelySharp.Symbolic.Smt
                         SubstituteVariables(regexMatch.Value, substitutions),
                         regexMatch.Pattern,
                         regexMatch.Options);
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    return new SmtRuntimeTypeTestFormula(
+                        SubstituteVariables(runtimeTypeTest.Value, substitutions),
+                        runtimeTypeTest.TypeKey);
                 case SmtConditionalFormula conditional:
                     return new SmtConditionalFormula(
                         SubstituteVariables(conditional.Condition, substitutions),
@@ -2384,8 +2439,15 @@ namespace PurelySharp.Symbolic.Smt
             }
 
             var suffix = variable.Name.Substring(memberPrefix.Length - 1);
-            substituted = new SmtVariable(replacement + suffix, variable.Kind);
+            substituted = new SmtVariable(GetFormulaMemberName(replacement) + suffix, variable.Kind);
             return true;
+        }
+
+        private static string GetFormulaMemberName(SmtFormula formula)
+        {
+            return formula is SmtVariable variable
+                ? variable.Name
+                : formula.ToString() ?? string.Empty;
         }
 
         private static bool FormulaReferencesAnyVariableName(
@@ -2429,6 +2491,8 @@ namespace PurelySharp.Symbolic.Smt
                         FormulaReferencesAnyVariableName(stringEndsWith.Suffix, variableNames);
                 case SmtRegexMatchFormula regexMatch:
                     return FormulaReferencesAnyVariableName(regexMatch.Value, variableNames);
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    return FormulaReferencesAnyVariableName(runtimeTypeTest.Value, variableNames);
                 case SmtConditionalFormula conditional:
                     return FormulaReferencesAnyVariableName(conditional.Condition, variableNames) ||
                         FormulaReferencesAnyVariableName(conditional.WhenTrue, variableNames) ||
@@ -2651,15 +2715,15 @@ namespace PurelySharp.Symbolic.Smt
                 TryTranslateValue(memberAccess.Expression, semanticModel, cancellationToken, out var receiver, getSymbolVersion, inlineDepth) &&
                 receiver != null)
             {
+                var receiverName = receiver is SmtVariable receiverVariable ? receiverVariable.Name : receiver.ToString();
                 if (semanticModel.GetSymbolInfo(memberAccess.Name, cancellationToken).Symbol is IFieldSymbol fieldSymbol &&
                     TryGetTupleElementStorageName(memberAccess, fieldSymbol, semanticModel, cancellationToken, out var storageName))
                 {
-                    var receiverName = receiver is SmtVariable receiverVariable ? receiverVariable.Name : receiver.ToString();
                     formula = new SmtVariable(receiverName + "." + storageName + ".String", SmtValueKind.String);
                     return true;
                 }
 
-                formula = new SmtVariable(receiver + "." + memberAccess.Name.Identifier.ValueText + ".String", SmtValueKind.String);
+                formula = new SmtVariable(receiverName + "." + memberAccess.Name.Identifier.ValueText + ".String", SmtValueKind.String);
                 return true;
             }
 
@@ -2908,8 +2972,9 @@ namespace PurelySharp.Symbolic.Smt
                 return false;
             }
 
+            var receiverName = GetFormulaMemberName(new SmtVariable(ImplicitThisVariableName, SmtValueKind.Reference));
             formula = new SmtVariable(
-                new SmtVariable(ImplicitThisVariableName, SmtValueKind.Reference) + "." + memberSymbol.Name + ".String",
+                receiverName + "." + memberSymbol.Name + ".String",
                 SmtValueKind.String);
             return true;
         }
@@ -4147,6 +4212,8 @@ namespace PurelySharp.Symbolic.Smt
                         ReferencesVariable(stringEndsWith.Suffix, variableName);
                 case SmtRegexMatchFormula regexMatch:
                     return ReferencesVariable(regexMatch.Value, variableName);
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    return ReferencesVariable(runtimeTypeTest.Value, variableName);
                 case SmtConditionalFormula conditional:
                     return ReferencesVariable(conditional.Condition, variableName) ||
                         ReferencesVariable(conditional.WhenTrue, variableName) ||
@@ -4674,7 +4741,7 @@ namespace PurelySharp.Symbolic.Smt
                 new SmtVariableSubstitution(
                     matchedVariable.Name,
                     matchedVariable.Name + ".",
-                    matchedVariable + ".",
+                    GetFormulaMemberName(matchedVariable) + ".",
                     designationValue)
             };
             formulas.Add(SubstituteVariables(patternFormula, substitutions));
@@ -5318,39 +5385,67 @@ namespace PurelySharp.Symbolic.Smt
 
             if (pattern is DeclarationPatternSyntax declarationPattern)
             {
-                if (value.Kind != SmtValueKind.Reference ||
-                    !IsPatternTypeTestEquivalentToNonNull(valueType, declarationPattern.Type, semanticModel, cancellationToken))
+                if (!TryTranslateReferenceTypePattern(
+                        value,
+                        valueType,
+                        declarationPattern.Type,
+                        semanticModel,
+                        cancellationToken,
+                        out formula))
                 {
                     return false;
                 }
 
-                formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtNullConstant());
                 return true;
             }
 
             if (pattern is TypePatternSyntax typePattern)
             {
-                if (value.Kind != SmtValueKind.Reference ||
-                    !IsPatternTypeTestEquivalentToNonNull(valueType, typePattern.Type, semanticModel, cancellationToken))
+                if (!TryTranslateReferenceTypePattern(
+                        value,
+                        valueType,
+                        typePattern.Type,
+                        semanticModel,
+                        cancellationToken,
+                        out formula))
                 {
                     return false;
                 }
 
-                formula = new SmtBinaryFormula(SmtBinaryOperator.NotEqual, value, new SmtNullConstant());
                 return true;
             }
 
             return false;
         }
 
-        private static bool IsPatternTypeTestEquivalentToNonNull(
+        private static bool TryTranslateReferenceTypePattern(
+            SmtFormula value,
             ITypeSymbol? valueType,
             TypeSyntax patternTypeSyntax,
             SemanticModel semanticModel,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            out SmtFormula? formula)
         {
+            formula = null;
+            if (value.Kind != SmtValueKind.Reference)
+            {
+                return false;
+            }
+
             var patternType = semanticModel.GetTypeInfo(patternTypeSyntax, cancellationToken).Type;
-            return IsTypeKnownAssignableTo(valueType, patternType);
+            if (IsTypeKnownAssignableTo(valueType, patternType))
+            {
+                formula = CreateNonNullFormula(value);
+                return true;
+            }
+
+            if (!TryCreateRuntimeTypeTestFormula(value, patternType, out var runtimeTypeTest))
+            {
+                return false;
+            }
+
+            formula = Conjoin(CreateNonNullFormula(value), runtimeTypeTest);
+            return true;
         }
 
         private static bool TryTranslateRecursivePattern(

@@ -35,6 +35,8 @@ If SMT is disabled, times out, exceeds budget, or cannot load its native solver,
 
 Length and index facts include arrays, strings, `Span<T>`, `ReadOnlySpan<T>`, `Memory<T>`, and `ReadOnlyMemory<T>` when Roslyn syntax and semantic-model lowering can prove them. Direct local and parameter copies preserve known length facts, and supported span/memory `Slice` results expose derived `Length` invariants.
 
+Runtime type tests are represented as Z3-backed reference predicates. That lets `is`, declaration/type patterns, switch pattern exclusions, and guarded casts share the same path facts without hard-coded method or branch special cases.
+
 The CLI mirrors the same API:
 
 ```powershell
@@ -89,7 +91,7 @@ The same CLI can query runtime hazards instead of invariant program points. Runt
 
 By default, `--runtime-hazards` returns only hazards with `Status = Proven`. Add `--include-unproven-hazards` when a tool wants to inspect `Unknown`, `Unreachable`, or `Unsupported` candidates.
 
-Known remaining runtime-hazard gaps: failed `as` conversions do not yet become reusable negative type facts, negative type-test branches do not fully prove invalid-cast hazards, dynamic binder modeling is limited to null receivers, array covariance stores can be missed through aliases or merged array identities, and richer throw-expression flow remains limited to currently proven `throw null` cases.
+Known remaining runtime-hazard gaps: failed `as` conversions do not yet become reusable negative type facts, dynamic binder modeling is limited to null receivers, array covariance stores can be missed through aliases or merged array identities, and richer throw-expression flow remains limited to currently proven `throw null` cases.
 
 Query proven hazards on one line:
 

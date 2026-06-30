@@ -244,6 +244,10 @@ constraints and then self-validates concrete examples with .NET regex when a
 concrete string is available. Unsupported options, invalid patterns, and regex
 features outside the translator remain unknown rather than proven.
 
+Runtime type tests are represented as Z3-backed reference predicates. That lets
+`is`, declaration/type patterns, switch pattern exclusions, and guarded casts
+share the same path facts without hard-coded method or branch special cases.
+
 The same CLI can query runtime hazards instead of invariant program points:
 
 ```powershell
@@ -322,6 +326,7 @@ keeps only the product-facing summary.
 - [x] Symbolic invariant library and CLI.
 - [~] Broader SMT path facts for branch pruning, exception hazards, string, and regex conditions.
 - [~] Standalone symbolic runtime-hazard query API and CLI.
+- [x] Runtime type-test atoms for Z3-backed invariants and invalid-cast pruning.
 - [~] Deeper exception-flow summaries and metadata/library effect-summary consumption.
 - [~] Better dispatch, delegate, LINQ, and enumerator precision.
 - [~] Better fresh-object, fresh-array, alias, escape, and local ownership modeling.
@@ -334,8 +339,7 @@ keeps only the product-facing summary.
 - [ ] Performance and profiling work that preserves analysis quality while reducing test/build cost.
 
 Known remaining SMT runtime-hazard gaps are intentionally narrow: failed `as`
-conversions do not yet become reusable negative type facts, negative type-test
-branches are still conservative for proving invalid-cast hazards, dynamic binder
+conversions do not yet become reusable negative type facts, dynamic binder
 hazards beyond null receivers are not modeled, array covariance stores through
 aliases can stay unknown, and richer throw-expression flow remains limited to
 the currently proven `throw null` cases.

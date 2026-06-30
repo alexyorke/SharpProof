@@ -538,6 +538,8 @@ namespace SearchLib.Smt
                         WouldCreateSubstitutionCycle(source, stringEndsWith.Suffix, substitutions, remainingDepth);
                 case SmtRegexMatchFormula regexMatch:
                     return WouldCreateSubstitutionCycle(source, regexMatch.Value, substitutions, remainingDepth);
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    return WouldCreateSubstitutionCycle(source, runtimeTypeTest.Value, substitutions, remainingDepth);
                 case SmtConditionalFormula conditionalFormula:
                     return WouldCreateSubstitutionCycle(source, conditionalFormula.Condition, substitutions, remainingDepth) ||
                         WouldCreateSubstitutionCycle(source, conditionalFormula.WhenTrue, substitutions, remainingDepth) ||
@@ -716,6 +718,18 @@ namespace SearchLib.Smt
                             ? new SmtRegexMatchFormula(value, regexMatch.Pattern, regexMatch.Options)
                             : formula;
                     }
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    {
+                        var value = SubstituteEqualityAliases(
+                            runtimeTypeTest.Value,
+                            substitutions,
+                            remainingDepth,
+                            out var valueChanged);
+                        changed = valueChanged;
+                        return valueChanged
+                            ? new SmtRuntimeTypeTestFormula(value, runtimeTypeTest.TypeKey)
+                            : formula;
+                    }
                 case SmtConditionalFormula conditionalFormula:
                     {
                         var condition = SubstituteEqualityAliases(
@@ -757,6 +771,7 @@ namespace SearchLib.Smt
                 SmtStringStartsWithFormula stringStartsWith => 1 + CountFormulaNodes(stringStartsWith.Value) + CountFormulaNodes(stringStartsWith.Prefix),
                 SmtStringEndsWithFormula stringEndsWith => 1 + CountFormulaNodes(stringEndsWith.Value) + CountFormulaNodes(stringEndsWith.Suffix),
                 SmtRegexMatchFormula regexMatch => 1 + CountFormulaNodes(regexMatch.Value),
+                SmtRuntimeTypeTestFormula runtimeTypeTest => 1 + CountFormulaNodes(runtimeTypeTest.Value),
                 SmtConditionalFormula conditionalFormula => 1 + CountFormulaNodes(conditionalFormula.Condition) +
                     CountFormulaNodes(conditionalFormula.WhenTrue) +
                     CountFormulaNodes(conditionalFormula.WhenFalse),
@@ -876,6 +891,14 @@ namespace SearchLib.Smt
                         changed = valueChanged;
                         return valueChanged
                             ? new SmtRegexMatchFormula(value, regexMatch.Pattern, regexMatch.Options)
+                            : formula;
+                    }
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    {
+                        var value = SimplifyKnownConditionalTerms(runtimeTypeTest.Value, facts, out var valueChanged);
+                        changed = valueChanged;
+                        return valueChanged
+                            ? new SmtRuntimeTypeTestFormula(value, runtimeTypeTest.TypeKey)
                             : formula;
                     }
                 case SmtConditionalFormula conditionalFormula:
@@ -1215,6 +1238,7 @@ namespace SearchLib.Smt
                 SmtConditionalFormula conditionalFormula => ContainsRegexOrStringPredicate(conditionalFormula.Condition) ||
                     ContainsRegexOrStringPredicate(conditionalFormula.WhenTrue) ||
                     ContainsRegexOrStringPredicate(conditionalFormula.WhenFalse),
+                SmtRuntimeTypeTestFormula runtimeTypeTest => ContainsRegexOrStringPredicate(runtimeTypeTest.Value),
                 _ => false,
             };
         }
@@ -1972,6 +1996,8 @@ namespace SearchLib.Smt
                     return ValidateIntegerTermSafety(stringEndsWithFormula.Suffix, facts);
                 case SmtRegexMatchFormula regexMatchFormula:
                     return ValidateIntegerTermSafety(regexMatchFormula.Value, facts);
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    return ValidateIntegerTermSafety(runtimeTypeTest.Value, facts);
                 case SmtConditionalFormula conditionalFormula:
                     var conditionStatus = ValidateIntegerTermSafety(conditionalFormula.Condition, facts);
                     if (conditionStatus != ConcreteFactPreparationStatus.Ready)

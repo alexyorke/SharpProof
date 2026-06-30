@@ -296,6 +296,10 @@ namespace PurelySharp.Analyzer.Engine
                         RewriteSmtSymbolVersions(regexMatch.Value, rewrites),
                         regexMatch.Pattern,
                         regexMatch.Options);
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    return new SmtRuntimeTypeTestFormula(
+                        RewriteSmtSymbolVersions(runtimeTypeTest.Value, rewrites),
+                        runtimeTypeTest.TypeKey);
                 case SmtConditionalFormula conditional:
                     return new SmtConditionalFormula(
                         RewriteSmtSymbolVersions(conditional.Condition, rewrites),

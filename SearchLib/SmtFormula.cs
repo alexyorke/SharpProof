@@ -76,5 +76,7 @@ namespace SearchLib.Smt
         string Pattern,
         RegexOptions Options = RegexOptions.None) : SmtFormula(SmtValueKind.Bool);
 
+    public sealed record SmtRuntimeTypeTestFormula(SmtFormula Value, string TypeKey) : SmtFormula(SmtValueKind.Bool);
+
     public sealed record SmtConditionalFormula(SmtFormula Condition, SmtFormula WhenTrue, SmtFormula WhenFalse, SmtValueKind ResultKind) : SmtFormula(ResultKind);
 }

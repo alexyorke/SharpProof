@@ -10,6 +10,7 @@ namespace SearchLib.Smt
         private readonly Sort _referenceSort;
         private readonly Expr _nullReference;
         private readonly Dictionary<(string Name, SmtValueKind Kind), Expr> _variables = new();
+        private readonly Dictionary<string, FuncDecl> _runtimeTypeTests = new(StringComparer.Ordinal);
         private readonly Dictionary<string, RegexTranslationPrecision> _regexPrecisionCache = new(StringComparer.Ordinal);
         private const RegexOptions Z3SupportedRegexOptions =
             RegexOptions.ExplicitCapture |
@@ -55,6 +56,7 @@ namespace SearchLib.Smt
             {
                 SmtRegexMatchFormula regexMatch => GetRegexTranslationPrecision(regexMatch.Pattern) == RegexTranslationPrecision.Approximate ||
                     ContainsApproximateRegex(regexMatch.Value),
+                SmtRuntimeTypeTestFormula runtimeTypeTestFormula => ContainsApproximateRegex(runtimeTypeTestFormula.Value),
                 SmtUnaryFormula unaryFormula => ContainsApproximateRegex(unaryFormula.Operand),
                 SmtBinaryFormula binaryFormula => ContainsApproximateRegex(binaryFormula.Left) ||
                     ContainsApproximateRegex(binaryFormula.Right),
@@ -109,6 +111,7 @@ namespace SearchLib.Smt
                     EncodeString(stringEndsWithFormula.Suffix),
                     EncodeString(stringEndsWithFormula.Value)),
                 SmtRegexMatchFormula regexMatchFormula => EncodeRegexMatch(regexMatchFormula),
+                SmtRuntimeTypeTestFormula runtimeTypeTestFormula => EncodeRuntimeTypeTest(runtimeTypeTestFormula),
                 SmtConditionalFormula conditionalFormula => EncodeConditional(conditionalFormula),
                 _ => throw new InvalidOperationException("Unsupported SMT formula node."),
             };
@@ -204,6 +207,35 @@ namespace SearchLib.Smt
             return _context.MkInRe(EncodeString(formula.Value), regex);
         }
 
+        private BoolExpr EncodeRuntimeTypeTest(SmtRuntimeTypeTestFormula formula)
+        {
+            if (formula.Value.Kind != SmtValueKind.Reference)
+            {
+                throw new InvalidOperationException("Only reference SMT formulas can be used in runtime type tests.");
+            }
+
+            if (!_runtimeTypeTests.TryGetValue(formula.TypeKey, out var predicate))
+            {
+                predicate = _context.MkFuncDecl(
+                    "runtime_type_test:" + SanitizeSymbolName(formula.TypeKey),
+                    new[] { _referenceSort },
+                    _context.BoolSort);
+                _runtimeTypeTests.Add(formula.TypeKey, predicate);
+            }
+
+            return (BoolExpr)_context.MkApp(predicate, EncodeReference(formula.Value));
+        }
+
+        private Expr EncodeReference(SmtFormula formula)
+        {
+            if (formula.Kind != SmtValueKind.Reference)
+            {
+                throw new InvalidOperationException("Only reference SMT formulas can be encoded as reference expressions.");
+            }
+
+            return Encode(formula);
+        }
+
         private void EnsureSafeRegexPolarity(SmtFormula formula, bool isNegativeContext)
         {
             switch (formula)
@@ -220,6 +252,9 @@ namespace SearchLib.Smt
                     }
 
                     EnsureSafeRegexInTerm(regexMatch.Value);
+                    return;
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    EnsureSafeRegexInTerm(runtimeTypeTest.Value);
                     return;
                 case SmtUnaryFormula { Operator: SmtUnaryOperator.Not } unaryFormula:
                     EnsureSafeRegexPolarity(unaryFormula.Operand, !isNegativeContext);
@@ -310,6 +345,9 @@ namespace SearchLib.Smt
                     EnsureSafeRegexInTerm(stringConcatTerm.Left);
                     EnsureSafeRegexInTerm(stringConcatTerm.Right);
                     return;
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    EnsureSafeRegexInTerm(runtimeTypeTest.Value);
+                    return;
                 case SmtConditionalFormula conditionalFormula:
                     EnsureExactRegexUse(conditionalFormula.Condition);
                     EnsureSafeRegexInTerm(conditionalFormula.WhenTrue);
@@ -334,6 +372,9 @@ namespace SearchLib.Smt
                     }
 
                     EnsureSafeRegexInTerm(regexMatch.Value);
+                    return;
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    EnsureExactRegexUse(runtimeTypeTest.Value);
                     return;
                 case SmtUnaryFormula unaryFormula:
                     EnsureExactRegexUse(unaryFormula.Operand);
@@ -422,6 +463,25 @@ namespace SearchLib.Smt
             }
 
             return (uint)Math.Max(1, totalMilliseconds);
+        }
+
+        private static string SanitizeSymbolName(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return "unknown";
+            }
+
+            var buffer = new char[value.Length];
+            for (var index = 0; index < value.Length; index++)
+            {
+                var ch = value[index];
+                buffer[index] = char.IsLetterOrDigit(ch) || ch == '_' || ch == '.'
+                    ? ch
+                    : '_';
+            }
+
+            return new string(buffer);
         }
 
         private Expr GetOrCreateVariable(SmtVariable variable)

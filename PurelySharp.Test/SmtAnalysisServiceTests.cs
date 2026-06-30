@@ -924,6 +924,40 @@ namespace PurelySharp.Test
             Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
         }
 
+        [Test]
+        public void ClassifyImplication_RuntimeTypeTestPredicateIsCongruentUnderReferenceEquality()
+        {
+            var x = new SmtVariable("runtime_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+            var y = new SmtVariable("runtime_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+            var xEqualsY = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, y);
+            var xIsString = new SmtRuntimeTypeTestFormula(x, "System.String");
+            var yIsString = new SmtRuntimeTypeTestFormula(y, "System.String");
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = service.ClassifyImplication(new SmtFormula[] { xEqualsY, xIsString }, yIsString);
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+        }
+
+        [Test]
+        public void ClassifyPathFeasibility_RuntimeTypeTestPredicateContradictsItsNegationThroughReferenceEquality()
+        {
+            var x = new SmtVariable("runtime_x_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+            var y = new SmtVariable("runtime_y_" + Guid.NewGuid().ToString("N"), SmtValueKind.Reference);
+            var xEqualsY = new SmtBinaryFormula(SmtBinaryOperator.Equal, x, y);
+            var xIsString = new SmtRuntimeTypeTestFormula(x, "System.String");
+            var yIsNotString = new SmtUnaryFormula(
+                SmtUnaryOperator.Not,
+                new SmtRuntimeTypeTestFormula(y, "System.String"));
+            var service = new SmtAnalysisService(SmtAnalysisOptions.Default);
+
+            var result = service.ClassifyPathFeasibility(new SmtFormula[] { xEqualsY, xIsString, yIsNotString });
+
+            Assert.That(result.Outcome, Is.EqualTo(PurityProofOutcome.ProvablyPure));
+            Assert.That(result.PathFeasibility, Is.EqualTo(Feasibility.Unsatisfiable));
+            Assert.That(result.Reason, Is.EqualTo("path_unsatisfiable"));
+        }
+
         private static PurityProofQuery CreateQuery(
             IReadOnlyList<SmtFormula> pathConditions,
             SmtFormula triggerCondition)

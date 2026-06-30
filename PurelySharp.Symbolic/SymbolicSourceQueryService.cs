@@ -4963,6 +4963,8 @@ namespace PurelySharp.Symbolic
                     return FormatTerm(endsWith.Value) + ".EndsWith(" + Format(endsWith.Suffix) + ")";
                 case SmtRegexMatchFormula regex:
                     return "Regex.IsMatch(" + FormatTerm(regex.Value) + ", \"" + EscapeString(regex.Pattern) + "\")";
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    return FormatTerm(runtimeTypeTest.Value) + " is " + runtimeTypeTest.TypeKey;
                 case SmtConditionalFormula conditional:
                     return "(" +
                         Format(conditional.Condition) +
@@ -4997,6 +4999,8 @@ namespace PurelySharp.Symbolic
                     return FormatTerm(endsWith.Value);
                 case SmtRegexMatchFormula regex:
                     return FormatTerm(regex.Value);
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    return FormatTerm(runtimeTypeTest.Value);
                 case SmtVariable variable:
                     return FormatVariableName(variable.Name);
                 default:

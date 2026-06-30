@@ -1344,6 +1344,7 @@ namespace PurelySharp.Symbolic.Smt
                 SmtStringStartsWithFormula stringStartsWith => 1 + CountFormulaNodes(stringStartsWith.Value) + CountFormulaNodes(stringStartsWith.Prefix),
                 SmtStringEndsWithFormula stringEndsWith => 1 + CountFormulaNodes(stringEndsWith.Value) + CountFormulaNodes(stringEndsWith.Suffix),
                 SmtRegexMatchFormula regexMatch => 1 + CountFormulaNodes(regexMatch.Value) + Math.Max(1, regexMatch.Pattern.Length / 8),
+                SmtRuntimeTypeTestFormula runtimeTypeTest => 1 + CountFormulaNodes(runtimeTypeTest.Value),
                 SmtConditionalFormula conditional => 1 + CountFormulaNodes(conditional.Condition) + CountFormulaNodes(conditional.WhenTrue) + CountFormulaNodes(conditional.WhenFalse),
                 _ => 1,
             };

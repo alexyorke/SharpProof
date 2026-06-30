@@ -363,6 +363,20 @@ function Add-RegexSmtTestClasses
         'RegexTests')
 }
 
+function Add-SearchLibFormulaEncoderTestClasses
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.Collections.Generic.HashSet[string]]$Set
+    )
+
+    Add-RegexSmtTestClasses $Set
+    Add-TestClasses $Set @(
+        'ExceptionReachabilitySmtTests',
+        'SymbolicRuntimeHazardQueryTests')
+}
+
 function Add-SymbolicSmtTestClasses
 {
     param(
@@ -559,9 +573,14 @@ function Add-PathMappedTests
 
     switch -Regex ($Path)
     {
-        '^SearchLib/(SmtFormula|SmtSolver|Z3FormulaEncoder)\.cs$' {
+        '^SearchLib/(SmtFormula|Z3FormulaEncoder)\.cs$' {
+            Add-SearchLibFormulaEncoderTestClasses $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SearchLib SMT formula or encoder change' $before $Set
+            break
+        }
+        '^SearchLib/SmtSolver\.cs$' {
             Add-RegexSmtTestClasses $Set
-            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SearchLib SMT string-length and regex formula change' $before $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SearchLib SMT solver change' $before $Set
             break
         }
         '^SearchLib/' {
@@ -931,6 +950,11 @@ try
         }
         elseif ($path -match '^(PurelySharp\.Symbolic|SearchLib|Tools|PurelySharp\.CodeFixes|PurelySharp\.Attributes|PurelySharp\.Package|PurelySharp\.Vsix|Shared)/')
         {
+            if ($path -match '^SearchLib/(SmtFormula|Z3FormulaEncoder)\.cs$')
+            {
+                continue
+            }
+
             $tokens = @(Get-TypeSearchTokens $path)
             $beforeTokenReferences = @($testClasses | Sort-Object)
             Add-TestFilesReferencingTokens $testClasses $tokens

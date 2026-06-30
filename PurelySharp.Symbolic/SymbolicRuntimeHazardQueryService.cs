@@ -1022,7 +1022,14 @@ namespace PurelySharp.Symbolic
                         exactRuntimeType,
                         targetType,
                         semanticModel.Compilation))
-                    : CreateUnknownTrigger(castExpression, "invalid_reference_cast");
+                    : TryCreateRuntimeReferenceCastMismatchTrigger(
+                        castExpression.Expression,
+                        targetType,
+                        semanticModel,
+                        cancellationToken,
+                        out var runtimeMismatchTrigger)
+                        ? runtimeMismatchTrigger
+                        : CreateUnknownTrigger(castExpression, "invalid_reference_cast");
             }
 
             if (mismatchTrigger is SmtBooleanConstant { Value: false })
@@ -1988,6 +1995,30 @@ namespace PurelySharp.Symbolic
             return TryTranslateNullCondition(expression, semanticModel, cancellationToken, out var nullTrigger)
                 ? new SmtUnaryFormula(SmtUnaryOperator.Not, nullTrigger)
                 : CreateUnknownTrigger(site, "cast_operand_not_null");
+        }
+
+        private static bool TryCreateRuntimeReferenceCastMismatchTrigger(
+            ExpressionSyntax expression,
+            ITypeSymbol targetType,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out SmtFormula trigger)
+        {
+            if (!CSharpConditionToFormula.TryTranslateValue(
+                    expression,
+                    semanticModel,
+                    cancellationToken,
+                    out var value,
+                    getSymbolVersion: null) ||
+                value is not { Kind: SmtValueKind.Reference } ||
+                !CSharpConditionToFormula.TryCreateRuntimeTypeTestFormula(value, targetType, out var runtimeTypeTest))
+            {
+                trigger = null!;
+                return false;
+            }
+
+            trigger = new SmtUnaryFormula(SmtUnaryOperator.Not, runtimeTypeTest);
+            return true;
         }
 
         private static SmtFormula CreateUnknownTrigger(SyntaxNode site, string name)

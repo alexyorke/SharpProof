@@ -896,6 +896,8 @@ namespace PurelySharp.Analyzer.Engine
                             ReferencesSmtVariable(stringEndsWith.Suffix, variablePrefix);
                     case SmtRegexMatchFormula regexMatch:
                         return ReferencesSmtVariable(regexMatch.Value, variablePrefix);
+                    case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                        return ReferencesSmtVariable(runtimeTypeTest.Value, variablePrefix);
                     case SmtConditionalFormula conditional:
                         return ReferencesSmtVariable(conditional.Condition, variablePrefix) ||
                             ReferencesSmtVariable(conditional.WhenTrue, variablePrefix) ||

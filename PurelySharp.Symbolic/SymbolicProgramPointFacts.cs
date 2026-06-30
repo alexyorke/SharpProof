@@ -5083,6 +5083,14 @@ namespace PurelySharp.Symbolic
                     }
 
                     break;
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    if (TrySubstituteFormula(runtimeTypeTest.Value, sourceFormula, targetFormula, out var runtimeTypeValue))
+                    {
+                        substituted = new SmtRuntimeTypeTestFormula(runtimeTypeValue, runtimeTypeTest.TypeKey);
+                        return true;
+                    }
+
+                    break;
                 case SmtConditionalFormula conditional:
                     var conditionChanged = TrySubstituteFormula(conditional.Condition, sourceFormula, targetFormula, out var condition);
                     var whenTrueChanged = TrySubstituteFormula(conditional.WhenTrue, sourceFormula, targetFormula, out var whenTrue);
@@ -7514,6 +7522,8 @@ namespace PurelySharp.Symbolic
                         ReferencesSmtVariable(stringEndsWith.Suffix, variablePrefix);
                 case SmtRegexMatchFormula regexMatch:
                     return ReferencesSmtVariable(regexMatch.Value, variablePrefix);
+                case SmtRuntimeTypeTestFormula runtimeTypeTest:
+                    return ReferencesSmtVariable(runtimeTypeTest.Value, variablePrefix);
                 case SmtConditionalFormula conditional:
                     return ReferencesSmtVariable(conditional.Condition, variablePrefix) ||
                         ReferencesSmtVariable(conditional.WhenTrue, variablePrefix) ||
