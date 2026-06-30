@@ -151,6 +151,86 @@ public sealed class TestClass
         }
 
         [Test]
+        public async Task TypeTestTrueBranch_FeedsNonNullAndTypeFacts()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(object value)
+    {
+        if (value is string)
+        {
+            if (value == null || value is not string)
+            {
+                Console.WriteLine(value);
+            }
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task TypeTestTrueBranch_ProvesNegatedTypeAndNonNullConjunctionUnreachable()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(object value)
+    {
+        if (value is string)
+        {
+            if (value is not string && value is not null)
+            {
+                Console.WriteLine(value);
+            }
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
+        public async Task SwitchStatementDefault_AfterStringPatternExcludesStringType()
+        {
+            var test = @"
+using System;
+using PurelySharp.Attributes;
+
+public sealed class TestClass
+{
+    [EnforcePure]
+    public void TestMethod(object value)
+    {
+        switch (value)
+        {
+            case string:
+                break;
+            default:
+                if (value is string)
+                {
+                    Console.WriteLine(value);
+                }
+
+                break;
+        }
+    }
+}";
+
+            await VerifyCS.VerifyAnalyzerAsync(test);
+        }
+
+        [Test]
         public async Task SwitchStatementCustomListPatternWithCount_FeedsLengthFact()
         {
             var test = @"

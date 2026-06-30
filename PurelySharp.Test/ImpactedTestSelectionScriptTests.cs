@@ -81,8 +81,26 @@ namespace PurelySharp.Test
             Assert.That(fixtures, Does.Contain("SearchLibZ3SmokeTests"));
             Assert.That(fixtures, Does.Contain("SmtAnalysisServiceTests"));
             Assert.That(fixtures, Does.Contain("StringLengthSmtTests"));
-            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("SearchLib SMT string-length and regex formula change"));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("SearchLib SMT formula or encoder change"));
             Assert.That(GetStringArray(evidence, "selectedTestFixtures"), Does.Contain("RegexTests"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_SelectsRuntimeHazardFixturesForSearchLibSolverChange()
+        {
+            const string changedFile = "SearchLib/SmtSolver.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+            var evidence = GetEvidenceEntry(root, changedFile, "path-map");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(fixtures, Does.Contain("RegexTests"));
+            Assert.That(fixtures, Does.Contain("SemanticOracleSmtTests"));
+            Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
+            Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("SearchLib SMT solver change"));
         }
 
         [Test]
@@ -158,6 +176,24 @@ namespace PurelySharp.Test
             Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
             Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("SMT path-fact analyzer rule change"));
             Assert.That(GetStringArray(evidence, "selectedTestFixtures"), Does.Contain("DiagnosticEvidenceTests"));
+        }
+
+        [Test]
+        public async Task ListOnlyJson_SelectsRuntimeTypeTestFixturesForMethodInvocationRule()
+        {
+            const string changedFile = "PurelySharp.Analyzer/Engine/Rules/MethodInvocationPurityRule.cs";
+            using var recommendation = await RunImpactedSelectorJsonAsync(changedFile);
+            var root = recommendation.RootElement;
+            var fixtures = GetStringArray(root, "selectedTestFixtures");
+            var evidence = GetEvidenceEntry(root, changedFile, "path-map");
+
+            Assert.That(root.GetProperty("requiresFullSuite").GetBoolean(), Is.False);
+            Assert.That(root.GetProperty("suggestedAction").GetString(), Is.EqualTo("RunPartial"));
+            Assert.That(fixtures, Does.Contain("PatternSmtInvariantTests"));
+            Assert.That(fixtures, Does.Contain("ReferenceReachabilitySmtTests"));
+            Assert.That(fixtures, Does.Contain("SymbolicRuntimeHazardQueryTests"));
+            Assert.That(fixtures, Does.Contain("DiagnosticEvidenceTests"));
+            Assert.That(evidence.GetProperty("reason").GetString(), Is.EqualTo("Analyzer as-conversion and runtime type-test SMT change"));
         }
 
         [Test]

@@ -4461,6 +4461,18 @@ namespace PurelySharp.Analyzer.Engine
                     new SmtBinaryFormula(SmtBinaryOperator.Equal, targetStringFormula, valueStringFormula)));
             }
 
+            if (targetFormula is { Kind: SmtValueKind.Reference } &&
+                CSharpConditionToFormula.TryCreateAsExpressionAssignmentFacts(
+                    valueExpression,
+                    targetFormula,
+                    semanticModel,
+                    CancellationToken.None,
+                    out var asExpressionFacts,
+                    valueState.GetSmtSymbolVersion))
+            {
+                nextState = nextState.WithPathConditions(nextState.PathConditions.AddRange(asExpressionFacts));
+            }
+
             if (TryCreateReferenceBackedStringContentFact(
                     targetSymbol,
                     valueExpression,

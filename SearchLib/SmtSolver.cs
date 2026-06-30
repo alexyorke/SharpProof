@@ -1198,6 +1198,11 @@ namespace SearchLib.Smt
                 return true;
             }
 
+            if (formula is SmtRuntimeTypeTestFormula)
+            {
+                return true;
+            }
+
             if (formula is not SmtBinaryFormula binaryFormula)
             {
                 return false;

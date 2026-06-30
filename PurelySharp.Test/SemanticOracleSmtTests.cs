@@ -6128,6 +6128,64 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesAsExpressionNonNullResultImpliesRuntimeTypePredicate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public string TestMethod(object value)
+    {
+        var text = value as string;
+        if (text != null)
+        {
+            return text;
+        }
+
+        return string.Empty;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "AsExpressionNonNullResultImpliesRuntimeTypePredicate.cs",
+                FindLine(source, "return text;"),
+                20,
+                "value is string",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
+        public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesAsExpressionNullResultAndSourceNonNullImpliesNegativeRuntimeTypePredicate()
+        {
+            const string source = @"
+public class TestClass
+{
+    public string TestMethod(object value)
+    {
+        var text = value as string;
+        if (text == null && value != null)
+        {
+            return string.Empty;
+        }
+
+        return text;
+    }
+}";
+            var proof = new SymbolicSourceQueryService().ProveConditionAtSource(
+                source,
+                "AsExpressionNullResultAndSourceNonNullImpliesNegativeRuntimeTypePredicate.cs",
+                FindLine(source, "return string.Empty;"),
+                20,
+                "value is not string",
+                new SmtAnalysisService(SmtAnalysisOptions.Default),
+                AnalyzerTestHost.GetTrustedPlatformReferences());
+
+            Assert.That(proof.TruthValue, Is.EqualTo(SymbolicTruthValue.ProvenTrue));
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProveConditionAtSource_ProvesConditionalAccessNullSourceNullableResultHasNoValue()
         {
             const string source = @"

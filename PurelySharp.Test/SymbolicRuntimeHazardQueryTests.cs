@@ -556,6 +556,66 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazards_SuppressesInvalidCastAfterAsCastNonNullGuard()
+        {
+            const string source = @"
+public class TestClass
+{
+    public string TestMethod(object value)
+    {
+        var text = value as string;
+        if (text != null)
+        {
+            return (string)value;
+        }
+
+        return string.Empty;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return (string)value;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.InvalidCast }));
+
+            Assert.That(result.Hazards, Is.Empty);
+        }
+
+        [Test]
+        public void QuerySourceRuntimeHazardsLine_ProvesInvalidCastAfterAsCastNullAndSourceNonNull()
+        {
+            const string source = @"
+public class TestClass
+{
+    public string TestMethod(object value)
+    {
+        var text = value as string;
+        if (text == null && value != null)
+        {
+            return (string)value;
+        }
+
+        return string.Empty;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return (string)value;",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(kinds: new[] { SymbolicRuntimeHazardKind.InvalidCast }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.InvalidCast));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Proven));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.InvalidCastException"));
+            Assert.That(hazard.Category, Is.EqualTo("definite_invalid_cast"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazards_DefaultSuppressesUnknownInvalidCastAfterNegativeTypeTest()
         {
             const string source = @"

@@ -580,6 +580,7 @@ function Add-PathMappedTests
         }
         '^SearchLib/SmtSolver\.cs$' {
             Add-RegexSmtTestClasses $Set
+            Add-RuntimeHazardSmtTestClasses $Set
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SearchLib SMT solver change' $before $Set
             break
         }
@@ -690,6 +691,12 @@ function Add-PathMappedTests
             Add-SymbolicSmtTestClasses $Set
             Add-TestClasses $Set @('DiagnosticEvidenceTests')
             Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'SMT path-fact analyzer rule change' $before $Set
+            break
+        }
+        '^PurelySharp\.Analyzer/Engine/Rules/MethodInvocationPurityRule\.cs$' {
+            Add-SymbolicSmtTestClasses $Set
+            Add-RuntimeHazardSmtTestClasses $Set
+            Add-SelectionEvidenceForAddedTests $Evidence $Path 'path-map' 'Analyzer as-conversion and runtime type-test SMT change' $before $Set
             break
         }
         '^PurelySharp\.Analyzer/.*Hazard.*\.cs$' {

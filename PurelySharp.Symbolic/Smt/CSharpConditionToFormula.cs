@@ -700,6 +700,68 @@ namespace PurelySharp.Symbolic.Smt
             return true;
         }
 
+        public static bool TryCreateAsExpressionAssignmentFacts(
+            ExpressionSyntax valueExpression,
+            SmtFormula targetFormula,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            out ImmutableArray<SmtFormula> facts,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            facts = ImmutableArray<SmtFormula>.Empty;
+            valueExpression = UnwrapExpression(valueExpression);
+            if (valueExpression is not BinaryExpressionSyntax asExpression ||
+                !asExpression.IsKind(SyntaxKind.AsExpression) ||
+                asExpression.Right is not TypeSyntax typeSyntax ||
+                targetFormula.Kind != SmtValueKind.Reference ||
+                !TryTranslateValue(
+                    asExpression.Left,
+                    semanticModel,
+                    cancellationToken,
+                    out var sourceFormula,
+                    getSymbolVersion,
+                    inlineDepth) ||
+                sourceFormula is not { Kind: SmtValueKind.Reference })
+            {
+                return false;
+            }
+
+            var targetType = semanticModel.GetTypeInfo(typeSyntax, cancellationToken).Type;
+            if (!TryCreateRuntimeTypeTestFormula(sourceFormula, targetType, out var runtimeTypeTest))
+            {
+                return false;
+            }
+
+            var targetIsNull = new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, new SmtNullConstant());
+            var targetNonNull = CreateNonNullFormula(targetFormula);
+            var sourceNonNull = CreateNonNullFormula(sourceFormula);
+            var builder = ImmutableArray.CreateBuilder<SmtFormula>(4);
+
+            builder.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                targetIsNull,
+                sourceNonNull));
+            builder.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                targetIsNull,
+                runtimeTypeTest));
+            builder.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, new SmtBinaryFormula(SmtBinaryOperator.And, sourceNonNull, runtimeTypeTest)),
+                targetNonNull));
+            builder.Add(new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                new SmtUnaryFormula(SmtUnaryOperator.Not, new SmtBinaryFormula(
+                    SmtBinaryOperator.And,
+                    sourceNonNull,
+                    new SmtUnaryFormula(SmtUnaryOperator.Not, runtimeTypeTest))),
+                targetIsNull));
+
+            facts = builder.MoveToImmutable();
+            return true;
+        }
+
         private static bool CanUseRuntimeTypeTest(ITypeSymbol? targetType)
         {
             if (targetType == null ||

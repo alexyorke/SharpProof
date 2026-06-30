@@ -6369,23 +6369,23 @@ namespace PurelySharp.Symbolic
             if (valueExpression is not BinaryExpressionSyntax asExpression ||
                 !asExpression.IsKind(SyntaxKind.AsExpression) ||
                 !TryCreateSymbolSmtValue(assignedSymbol, out var targetFormula) ||
-                targetFormula is not { Kind: SmtValueKind.Reference } ||
-                !CSharpConditionToFormula.TryTranslateValue(
-                    asExpression.Left,
-                    semanticModel,
-                    cancellationToken,
-                    out var sourceFormula,
-                    getSymbolVersion: null,
-                    inlineDepth: 0) ||
-                sourceFormula is not { Kind: SmtValueKind.Reference })
+                targetFormula is not { Kind: SmtValueKind.Reference })
             {
                 return;
             }
 
-            facts.Add(new SmtBinaryFormula(
-                SmtBinaryOperator.Or,
-                new SmtBinaryFormula(SmtBinaryOperator.Equal, targetFormula, new SmtNullConstant()),
-                new SmtBinaryFormula(SmtBinaryOperator.NotEqual, sourceFormula, new SmtNullConstant())));
+            if (CSharpConditionToFormula.TryCreateAsExpressionAssignmentFacts(
+                    asExpression,
+                    targetFormula,
+                    semanticModel,
+                    cancellationToken,
+                    out var asFacts))
+            {
+                foreach (var fact in asFacts)
+                {
+                    AddUniqueFact(facts, fact);
+                }
+            }
         }
 
         private static void AddNullableAssignedValueFacts(
