@@ -1949,6 +1949,125 @@ public class TestClass
         }
 
         [Test]
+        public async Task SymbolicCli_RuntimeHazards_FailOnHazardReturnsOneAfterEmittingCompactJson()
+        {
+            var source = @"
+public class TestClass
+{
+    public void TestMethod()
+    {
+        throw new System.InvalidOperationException(""boom"");
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliRuntimeHazardFail-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--runtime-hazards",
+                    "--all-lines",
+                    "--fail-on-hazard",
+                    "--compact-json");
+
+                Assert.That(result.ExitCode, Is.EqualTo(1), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
+                Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(root.GetProperty("analysisSummary").GetProperty("provenCount").GetInt32(), Is.EqualTo(1));
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public async Task SymbolicCli_RuntimeHazards_FailOnHazardReturnsZeroWhenFiltersRemoveAllHazards()
+        {
+            var source = @"
+public class TestClass
+{
+    public void TestMethod()
+    {
+        throw new System.InvalidOperationException(""boom"");
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliRuntimeHazardFailFiltered-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--runtime-hazards",
+                    "--all-lines",
+                    "--fail-on-hazard",
+                    "--hazard-exception-type",
+                    "System.ArgumentException",
+                    "--compact-json");
+
+                Assert.That(result.ExitCode, Is.EqualTo(0), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("kind").GetString(), Is.EqualTo("runtimeHazards"));
+                Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.Zero);
+                Assert.That(root.GetProperty("analysisSummary").GetProperty("hazardCount").GetInt32(), Is.Zero);
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
+        public async Task SymbolicCli_RuntimeHazards_FailOnHazardUsesFullFilteredCountWhenSummaryOnly()
+        {
+            var source = @"
+public class TestClass
+{
+    public void TestMethod()
+    {
+        throw new System.InvalidOperationException(""boom"");
+    }
+}
+";
+            var sourcePath = Path.Combine(
+                TestContext.CurrentContext.WorkDirectory,
+                "SymbolicCliRuntimeHazardFailSummary-" + Guid.NewGuid().ToString("N") + ".cs");
+            File.WriteAllText(sourcePath, source);
+            try
+            {
+                var result = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--runtime-hazards",
+                    "--all-lines",
+                    "--fail-on-hazard",
+                    "--summary-only");
+
+                Assert.That(result.ExitCode, Is.EqualTo(1), result.StandardError);
+                using var document = JsonDocument.Parse(result.StandardOutput);
+                var root = document.RootElement;
+                Assert.That(root.GetProperty("hazardCount").GetInt32(), Is.EqualTo(1));
+                Assert.That(root.GetProperty("hazards").GetArrayLength(), Is.Zero);
+                Assert.That(root.GetProperty("truncation").GetProperty("hazards").GetBoolean(), Is.True);
+            }
+            finally
+            {
+                File.Delete(sourcePath);
+            }
+        }
+
+        [Test]
         public async Task SymbolicCli_RuntimeHazards_RejectsInvalidHazardStatusCombinations()
         {
             var sourcePath = Path.Combine(
@@ -1989,6 +2108,16 @@ public class TestClass
                 Assert.That(categoryWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
                 Assert.That(categoryWithoutRuntimeHazards.StandardError, Does.Contain("--hazard-category"));
                 Assert.That(categoryWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
+
+                var failOnHazardWithoutRuntimeHazards = await RunSymbolicCliAsync(
+                    "--file",
+                    sourcePath,
+                    "--position",
+                    "0",
+                    "--fail-on-hazard");
+                Assert.That(failOnHazardWithoutRuntimeHazards.ExitCode, Is.EqualTo(64));
+                Assert.That(failOnHazardWithoutRuntimeHazards.StandardError, Does.Contain("--fail-on-hazard"));
+                Assert.That(failOnHazardWithoutRuntimeHazards.StandardError, Does.Contain("--runtime-hazards"));
 
                 var nonProvenStatusWithoutCandidates = await RunSymbolicCliAsync(
                     "--file",

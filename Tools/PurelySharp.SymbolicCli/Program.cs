@@ -155,7 +155,11 @@ try
         PrintPointResult((SymbolicSourceQueryResult)result, options, includeLocation: true);
     }
 
-    return 0;
+    return options.FailOnHazard &&
+        result is SymbolicRuntimeHazardQueryResult finalHazardResult &&
+        finalHazardResult.HazardCount > 0
+            ? 1
+            : 0;
 }
 catch (ArgumentException ex)
 {
@@ -592,6 +596,7 @@ Options:
                       Use bounded SMT to classify whether the queried program point is reachable.
   --implies <expr>    Use bounded SMT to prove whether invariants at the queried point imply expr. Can be repeated.
   --runtime-hazards   Query proven runtime hazards instead of invariant program points.
+  --fail-on-hazard    Exit with code 1 when final runtime hazard output contains hazards.
   --hazard-kind <k>   Keep only DirectThrow, Rethrow, DivideByZero, NullDereference, NullableValueWithoutValue, IndexOutOfRange, ArgumentOutOfRange, CheckedIntegralOverflow, or ArrayTypeMismatch hazards. Can be repeated.
   --hazard-status <s> Keep only Proven, Unreachable, Unknown, or Unsupported runtime hazards. Can be repeated.
   --hazard-exception-type <type>
@@ -684,6 +689,8 @@ Options:
     public List<string> ImpliedConditions { get; } = new();
 
     public bool RuntimeHazards { get; private set; }
+
+    public bool FailOnHazard { get; private set; }
 
     public bool IncludeUnprovenHazards { get; private set; }
 
@@ -897,6 +904,9 @@ Options:
                 case "--runtime-hazards":
                     options.RuntimeHazards = true;
                     break;
+                case "--fail-on-hazard":
+                    options.FailOnHazard = true;
+                    break;
                 case "--hazard-kind":
                     options.HazardKinds.Add(ReadHazardKind(args, ref index, arg));
                     break;
@@ -959,12 +969,13 @@ Options:
 
             if (!options.RuntimeHazards &&
                 (options.IncludeUnprovenHazards ||
+                 options.FailOnHazard ||
                  options.HazardKinds.Count != 0 ||
                  options.HazardStatuses.Count != 0 ||
                  options.HazardExceptionTypes.Count != 0 ||
                  options.HazardCategories.Count != 0))
             {
-                throw new ArgumentException("--hazard-kind, --hazard-status, --hazard-exception-type, --hazard-category, and --include-unproven-hazards require --runtime-hazards.");
+                throw new ArgumentException("--fail-on-hazard, --hazard-kind, --hazard-status, --hazard-exception-type, --hazard-category, and --include-unproven-hazards require --runtime-hazards.");
             }
 
             if (options.HazardStatuses.Any(static status => status != SymbolicRuntimeHazardStatus.Proven) &&
