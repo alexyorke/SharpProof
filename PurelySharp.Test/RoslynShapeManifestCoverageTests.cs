@@ -13,6 +13,9 @@ namespace PurelySharp.Test
     [TestFixture]
     public class RoslynShapeManifestCoverageTests
     {
+        private static readonly Lazy<Task<ImmutableDictionary<string, FuzzCaseAnalysis>>> RegistryEntryAnalyses =
+            new(CreateRegistryEntryAnalysesAsync);
+
         [Test]
         public void AllSyntaxKindsHaveCoverageDecision()
         {
@@ -152,6 +155,11 @@ namespace PurelySharp.Test
         }
 
         private static async Task<ImmutableDictionary<string, FuzzCaseAnalysis>> AnalyzeRegistryEntriesAsync()
+        {
+            return await RegistryEntryAnalyses.Value;
+        }
+
+        private static async Task<ImmutableDictionary<string, FuzzCaseAnalysis>> CreateRegistryEntryAnalysesAsync()
         {
             var generator = new FuzzCaseGenerator(20260614);
             var analyses = await Task.WhenAll(

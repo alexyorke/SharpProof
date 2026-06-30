@@ -305,7 +305,16 @@ expected Windows Job Object:
 
 ```powershell
 .\scripts\Invoke-PurelySharpDotnet.ps1 build PurelySharp.sln --configuration Release
-.\scripts\Invoke-PurelySharpDotnet.ps1 test PurelySharp.Test\PurelySharp.Test.csproj --configuration Release --no-build
+.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild
+```
+
+For red-suite loops, the test wrapper can stop after the first NUnit failure.
+It can also emit a TRX slow-test profile and test bounded worker counts:
+
+```powershell
+.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -FailFast
+.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -Profile -Top 30
+.\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild -Workers 8
 ```
 
 Representative evidence suites:

@@ -26,7 +26,8 @@ jobs:
         run: dotnet build PurelySharp.sln --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test PurelySharp.Test/PurelySharp.Test.csproj --configuration Release --verbosity normal
+        shell: pwsh
+        run: .\scripts\Invoke-PurelySharpTests.ps1 -Configuration Release -NoBuild
 
       - name: Build VSIX project
         run: |

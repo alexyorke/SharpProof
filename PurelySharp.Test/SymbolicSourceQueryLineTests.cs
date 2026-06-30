@@ -1827,18 +1827,17 @@ public class TestClass
 
         private static async Task<(int ExitCode, string StandardOutput, string StandardError)> RunSymbolicCliAsync(params string[] arguments)
         {
+            var repositoryRoot = FindRepositoryRoot();
+            var cliAssemblyPath = FindSymbolicCliAssemblyPath(repositoryRoot);
             var startInfo = new ProcessStartInfo
             {
                 FileName = "dotnet",
-                WorkingDirectory = FindRepositoryRoot(),
+                WorkingDirectory = repositoryRoot,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
             };
-            startInfo.ArgumentList.Add("run");
-            startInfo.ArgumentList.Add("--project");
-            startInfo.ArgumentList.Add(Path.Combine("Tools", "PurelySharp.SymbolicCli", "PurelySharp.SymbolicCli.csproj"));
-            startInfo.ArgumentList.Add("--");
+            startInfo.ArgumentList.Add(cliAssemblyPath);
             foreach (var argument in arguments)
             {
                 startInfo.ArgumentList.Add(argument);
@@ -1858,6 +1857,56 @@ public class TestClass
             }
 
             return (process.ExitCode, await outputTask, await errorTask);
+        }
+
+        private static string FindSymbolicCliAssemblyPath(string repositoryRoot)
+        {
+            var targetFramework = Path.GetFileName(TestContext.CurrentContext.TestDirectory);
+            var configurations = new[]
+            {
+                FindBuildConfiguration(),
+                "Release",
+                "Debug",
+            }
+            .Where(static configuration => !string.IsNullOrWhiteSpace(configuration))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var configuration in configurations)
+            {
+                var candidate = Path.Combine(
+                    repositoryRoot,
+                    "Tools",
+                    "PurelySharp.SymbolicCli",
+                    "bin",
+                    configuration,
+                    targetFramework,
+                    "PurelySharp.SymbolicCli.dll");
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+
+            throw new FileNotFoundException(
+                "Could not find built PurelySharp.SymbolicCli.dll. Build PurelySharp.Test first so its test dependency builds the CLI once.",
+                Path.Combine(repositoryRoot, "Tools", "PurelySharp.SymbolicCli"));
+        }
+
+        private static string FindBuildConfiguration()
+        {
+            var directory = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
+            while (directory != null)
+            {
+                if (string.Equals(directory.Name, "Release", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(directory.Name, "Debug", StringComparison.OrdinalIgnoreCase))
+                {
+                    return directory.Name;
+                }
+
+                directory = directory.Parent;
+            }
+
+            return "Debug";
         }
 
         private static string FindRepositoryRoot()
