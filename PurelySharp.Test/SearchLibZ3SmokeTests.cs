@@ -954,6 +954,34 @@ namespace PurelySharp.Test
         }
 
         [Test]
+        public void SmtSolver_NonNegativeRemainderWithPositiveDivisor_ProvesRange()
+        {
+            using var solver = new SmtSolver();
+            var dividend = new SmtVariable("dividend", SmtValueKind.Int);
+            var divisor = new SmtVariable("divisor", SmtValueKind.Int);
+            var remainder = new SmtIntegerBinaryTerm(
+                SmtIntegerBinaryOperator.Remainder,
+                dividend,
+                divisor);
+
+            var outOfRange = new SmtBinaryFormula(
+                SmtBinaryOperator.Or,
+                new SmtBinaryFormula(SmtBinaryOperator.LessThan, remainder, new SmtIntegerConstant(0)),
+                new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, remainder, divisor));
+
+            var result = solver.IsSatisfiable(
+                new SmtFormula[]
+                {
+                    new SmtBinaryFormula(SmtBinaryOperator.GreaterThanOrEqual, dividend, new SmtIntegerConstant(0)),
+                    new SmtBinaryFormula(SmtBinaryOperator.GreaterThan, divisor, new SmtIntegerConstant(0)),
+                    outOfRange,
+                },
+                TimeSpan.FromMilliseconds(50));
+
+            Assert.That(result, Is.EqualTo(Feasibility.Unsatisfiable));
+        }
+
+        [Test]
         public void SmtSolver_SelectedConditionalSkipsUnsafeUnselectedIntegerBranch()
         {
             using var solver = new SmtSolver();

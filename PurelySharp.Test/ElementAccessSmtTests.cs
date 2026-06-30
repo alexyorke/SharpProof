@@ -36,6 +36,30 @@ public class TestClass
         }
 
         [Test]
+        public void SymbolicSourceQueryService_ProvesAssignedModuloIndexRange()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int hash)
+    {
+        if (values != null && values.Length > 0 && hash >= 0)
+        {
+            var index = hash % values.Length;
+            return values[index];
+        }
+
+        return 0;
+    }
+}";
+
+            AssertConditionProven(
+                source,
+                "return values[index];",
+                "index >= 0 && index < values.Length");
+        }
+
+        [Test]
         public void SymbolicSourceQueryService_ProvesMultidimensionalArrayElementAccess()
         {
             const string source = @"

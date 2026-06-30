@@ -4440,13 +4440,13 @@ namespace PurelySharp.Symbolic
                 : valueExpression;
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
-                TryCreateAssignedValueFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var fact))
+                TryCreateAssignedValueFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts, out var fact))
             {
                 facts.Add(fact);
             }
 
             if (!ExpressionReferencesSymbol(effectiveValueExpression, assignedSymbol, semanticModel, cancellationToken) &&
-                TryCreateAssignedValueNonZeroFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, out var nonZeroFact))
+                TryCreateAssignedValueNonZeroFact(assignedSymbol, effectiveValueExpression, semanticModel, cancellationToken, facts, out var nonZeroFact))
             {
                 facts.Add(nonZeroFact);
             }
@@ -5341,7 +5341,8 @@ namespace PurelySharp.Symbolic
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
             ISymbol? assignedSymbol,
-            out SmtFormula? formula)
+            out SmtFormula? formula,
+            IEnumerable<SmtFormula>? pathFacts = null)
         {
             valueExpression = UnwrapExpression(valueExpression);
             if (TryTranslateFiniteElementAccessValue(
@@ -5368,14 +5369,16 @@ namespace PurelySharp.Symbolic
                     semanticModel,
                     cancellationToken,
                     assignedSymbol,
-                    out var whenTrueFormula) &&
+                    out var whenTrueFormula,
+                    pathFacts) &&
                 whenTrueFormula != null &&
                 TryTranslateAssignedValueExpression(
                     conditionalExpression.WhenFalse,
                     semanticModel,
                     cancellationToken,
                     assignedSymbol,
-                    out var whenFalseFormula) &&
+                    out var whenFalseFormula,
+                    pathFacts) &&
                 whenFalseFormula != null &&
                 whenTrueFormula.Kind == whenFalseFormula.Kind)
             {
@@ -5383,10 +5386,11 @@ namespace PurelySharp.Symbolic
                 return true;
             }
 
-            if (CSharpConditionToFormula.TryTranslateValue(
+            if (CSharpConditionToFormula.TryTranslateValueWithPathFacts(
                     valueExpression,
                     semanticModel,
                     cancellationToken,
+                    pathFacts,
                     out formula,
                     getSymbolVersion: null,
                     inlineDepth: 0) &&
@@ -6153,6 +6157,23 @@ namespace PurelySharp.Symbolic
             CancellationToken cancellationToken,
             out SmtFormula fact)
         {
+            return TryCreateAssignedValueFact(
+                targetSymbol,
+                valueExpression,
+                semanticModel,
+                cancellationToken,
+                pathFacts: null,
+                out fact);
+        }
+
+        private static bool TryCreateAssignedValueFact(
+            ISymbol targetSymbol,
+            ExpressionSyntax valueExpression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            IEnumerable<SmtFormula>? pathFacts,
+            out SmtFormula fact)
+        {
             fact = null!;
             if (!TryCreateSymbolSmtValue(targetSymbol, out var targetFormula) ||
                 !TryTranslateAssignedValueExpression(
@@ -6160,7 +6181,8 @@ namespace PurelySharp.Symbolic
                     semanticModel,
                     cancellationToken,
                     targetSymbol,
-                    out var valueFormula) ||
+                    out var valueFormula,
+                    pathFacts) ||
                 valueFormula == null ||
                 !CanCompareSmtValues(targetFormula, valueFormula))
             {
@@ -6176,6 +6198,7 @@ namespace PurelySharp.Symbolic
             ExpressionSyntax valueExpression,
             SemanticModel semanticModel,
             CancellationToken cancellationToken,
+            IEnumerable<SmtFormula>? pathFacts,
             out SmtFormula fact)
         {
             fact = null!;
@@ -6186,7 +6209,8 @@ namespace PurelySharp.Symbolic
                     semanticModel,
                     cancellationToken,
                     targetSymbol,
-                    out var valueFormula) ||
+                    out var valueFormula,
+                    pathFacts) ||
                 valueFormula == null ||
                 !ValueFormulaIsDefinitelyNonZero(valueFormula))
             {

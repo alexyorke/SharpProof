@@ -1043,6 +1043,39 @@ public class TestClass
         }
 
         [Test]
+        public void QuerySourceRuntimeHazards_AssignedModuloIndexUnderPositiveLengthGuardIsUnreachable()
+        {
+            const string source = @"
+public class TestClass
+{
+    public int TestMethod(int[] values, int hash)
+    {
+        if (values.Length > 0 && hash >= 0)
+        {
+            var index = hash % values.Length;
+            return values[index];
+        }
+
+        return 0;
+    }
+}";
+
+            using var smtAnalysis = new SmtAnalysisService(SmtAnalysisOptions.Default);
+            var result = QueryLine(
+                source,
+                "return values[index];",
+                smtAnalysis,
+                new SymbolicRuntimeHazardQueryOptions(
+                    includeUnprovenCandidates: true,
+                    kinds: new[] { SymbolicRuntimeHazardKind.IndexOutOfRange }));
+
+            var hazard = AssertSingleHazard(result);
+            Assert.That(hazard.Kind, Is.EqualTo(SymbolicRuntimeHazardKind.IndexOutOfRange));
+            Assert.That(hazard.Status, Is.EqualTo(SymbolicRuntimeHazardStatus.Unreachable));
+            Assert.That(hazard.ExceptionType, Is.EqualTo("System.IndexOutOfRangeException"));
+        }
+
+        [Test]
         public void QuerySourceRuntimeHazardsLine_ProvesObjectErasedArrayCastAliasIndexOutOfRange()
         {
             const string source = @"

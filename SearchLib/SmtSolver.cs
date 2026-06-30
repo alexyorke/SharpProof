@@ -2206,9 +2206,31 @@ namespace SearchLib.Smt
                     }
 
                     return false;
+                case SmtIntegerBinaryOperator.Remainder:
+                    if (!RemainderHasNonNegativeDividendAndPositiveDivisor(leftLower, rightLower))
+                    {
+                        return false;
+                    }
+
+                    lower = 0;
+                    if (rightUpper.HasValue &&
+                        TryCheckedAdd(rightUpper.Value, -1, out var remainderUpper))
+                    {
+                        upper = remainderUpper;
+                    }
+
+                    return true;
                 default:
                     return false;
             }
+        }
+
+        private static bool RemainderHasNonNegativeDividendAndPositiveDivisor(long? dividendLower, long? divisorLower)
+        {
+            return dividendLower.HasValue &&
+                dividendLower.Value >= 0 &&
+                divisorLower.HasValue &&
+                divisorLower.Value > 0;
         }
 
         private delegate bool CheckedLongBinaryOperation(long left, long right, out long value);
@@ -2508,8 +2530,17 @@ namespace SearchLib.Smt
             out bool value)
         {
             value = false;
-            if (!IsIntegerComparisonOperator(formula.Operator) ||
-                !TryGetIntegerInterval(formula.Left, facts, out var leftLower, out var leftUpper) ||
+            if (!IsIntegerComparisonOperator(formula.Operator))
+            {
+                return false;
+            }
+
+            if (TryEvaluateRemainderRangeComparison(formula, facts, out value))
+            {
+                return true;
+            }
+
+            if (!TryGetIntegerInterval(formula.Left, facts, out var leftLower, out var leftUpper) ||
                 !TryGetIntegerInterval(formula.Right, facts, out var rightLower, out var rightUpper))
             {
                 return false;
@@ -2618,6 +2649,66 @@ namespace SearchLib.Smt
                     }
 
                     return false;
+                default:
+                    return false;
+            }
+        }
+
+        private static bool TryEvaluateRemainderRangeComparison(
+            SmtBinaryFormula formula,
+            ConcreteFactContext facts,
+            out bool value)
+        {
+            if (formula.Left is SmtIntegerBinaryTerm leftRemainder &&
+                TryEvaluateRemainderComparison(leftRemainder, formula.Operator, formula.Right, facts, out value))
+            {
+                return true;
+            }
+
+            if (formula.Right is SmtIntegerBinaryTerm rightRemainder &&
+                TryEvaluateRemainderComparison(
+                    rightRemainder,
+                    SwapComparisonOperator(formula.Operator),
+                    formula.Left,
+                    facts,
+                    out value))
+            {
+                return true;
+            }
+
+            value = false;
+            return false;
+        }
+
+        private static bool TryEvaluateRemainderComparison(
+            SmtIntegerBinaryTerm remainder,
+            SmtBinaryOperator op,
+            SmtFormula other,
+            ConcreteFactContext facts,
+            out bool value)
+        {
+            value = false;
+            if (remainder.Operator != SmtIntegerBinaryOperator.Remainder ||
+                !TryGetIntegerInterval(remainder.Left, facts, out var dividendLower, out _) ||
+                !TryGetIntegerInterval(remainder.Right, facts, out var divisorLower, out _) ||
+                !RemainderHasNonNegativeDividendAndPositiveDivisor(dividendLower, divisorLower) ||
+                !EqualityComparer<SmtFormula>.Default.Equals(other, remainder.Right))
+            {
+                return false;
+            }
+
+            switch (op)
+            {
+                case SmtBinaryOperator.LessThan:
+                case SmtBinaryOperator.LessThanOrEqual:
+                case SmtBinaryOperator.NotEqual:
+                    value = true;
+                    return true;
+                case SmtBinaryOperator.Equal:
+                case SmtBinaryOperator.GreaterThan:
+                case SmtBinaryOperator.GreaterThanOrEqual:
+                    value = false;
+                    return true;
                 default:
                     return false;
             }

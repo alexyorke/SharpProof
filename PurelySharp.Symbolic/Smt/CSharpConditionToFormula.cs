@@ -8967,6 +8967,25 @@ namespace PurelySharp.Symbolic.Smt
                 TryTranslateValueCore);
         }
 
+        public static bool TryTranslateValueWithPathFacts(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            CancellationToken cancellationToken,
+            IEnumerable<SmtFormula>? pathFacts,
+            out SmtFormula? formula,
+            Func<ISymbol, int>? getSymbolVersion = null,
+            int inlineDepth = 0)
+        {
+            return TryTranslateValueWithSafeDivisors(
+                expression,
+                semanticModel,
+                cancellationToken,
+                out formula,
+                getSymbolVersion,
+                inlineDepth,
+                CollectNonZeroDivisorFacts(pathFacts));
+        }
+
         private static bool TryTranslateValueWithSafeDivisors(
             ExpressionSyntax expression,
             SemanticModel semanticModel,
@@ -8995,6 +9014,160 @@ namespace PurelySharp.Symbolic.Smt
                 getSymbolVersion,
                 inlineDepth,
                 nonZeroDivisors);
+        }
+
+        private static ISet<string>? CollectNonZeroDivisorFacts(IEnumerable<SmtFormula>? pathFacts)
+        {
+            if (pathFacts == null)
+            {
+                return null;
+            }
+
+            HashSet<string>? facts = null;
+            foreach (var pathFact in pathFacts)
+            {
+                CollectNonZeroDivisorFacts(pathFact, ref facts);
+            }
+
+            return facts;
+        }
+
+        private static void CollectNonZeroDivisorFacts(SmtFormula formula, ref HashSet<string>? facts)
+        {
+            switch (formula)
+            {
+                case SmtBinaryFormula { Operator: SmtBinaryOperator.And } andFormula:
+                    CollectNonZeroDivisorFacts(andFormula.Left, ref facts);
+                    CollectNonZeroDivisorFacts(andFormula.Right, ref facts);
+                    return;
+                case SmtUnaryFormula { Operator: SmtUnaryOperator.Not, Operand: SmtBinaryFormula negatedComparison }
+                    when TryNormalizeIntegerComparisonToConstant(
+                        negatedComparison,
+                        out var negatedExpression,
+                        out var negatedOperator,
+                        out var negatedConstant) &&
+                        TryNegateIntegerComparison(negatedOperator, out var inverseOperator) &&
+                        IntegerComparisonExcludesZero(inverseOperator, negatedConstant):
+                    AddNonZeroDivisorFact(negatedExpression, ref facts);
+                    return;
+                case SmtBinaryFormula comparison
+                    when TryNormalizeIntegerComparisonToConstant(
+                        comparison,
+                        out var expression,
+                        out var comparisonOperator,
+                        out var constant) &&
+                        IntegerComparisonExcludesZero(comparisonOperator, constant):
+                    AddNonZeroDivisorFact(expression, ref facts);
+                    return;
+            }
+        }
+
+        private static void AddNonZeroDivisorFact(SmtFormula expression, ref HashSet<string>? facts)
+        {
+            if (expression.Kind != SmtValueKind.Int)
+            {
+                return;
+            }
+
+            facts ??= new HashSet<string>(StringComparer.Ordinal);
+            facts.Add(CreateDivisorKey(expression));
+        }
+
+        private static bool TryNormalizeIntegerComparisonToConstant(
+            SmtBinaryFormula formula,
+            out SmtFormula expression,
+            out SmtBinaryOperator op,
+            out long constant)
+        {
+            if (formula.Left is SmtIntegerConstant leftConstant && formula.Right.Kind == SmtValueKind.Int)
+            {
+                expression = formula.Right;
+                op = SwapIntegerComparisonOperator(formula.Operator);
+                constant = leftConstant.Value;
+                return IsIntegerComparisonOperator(op);
+            }
+
+            if (formula.Right is SmtIntegerConstant rightConstant && formula.Left.Kind == SmtValueKind.Int)
+            {
+                expression = formula.Left;
+                op = formula.Operator;
+                constant = rightConstant.Value;
+                return IsIntegerComparisonOperator(op);
+            }
+
+            expression = null!;
+            op = default;
+            constant = default;
+            return false;
+        }
+
+        private static bool IsIntegerComparisonOperator(SmtBinaryOperator op)
+        {
+            return op is SmtBinaryOperator.Equal or
+                SmtBinaryOperator.NotEqual or
+                SmtBinaryOperator.LessThan or
+                SmtBinaryOperator.LessThanOrEqual or
+                SmtBinaryOperator.GreaterThan or
+                SmtBinaryOperator.GreaterThanOrEqual;
+        }
+
+        private static SmtBinaryOperator SwapIntegerComparisonOperator(SmtBinaryOperator op)
+        {
+            return op switch
+            {
+                SmtBinaryOperator.LessThan => SmtBinaryOperator.GreaterThan,
+                SmtBinaryOperator.LessThanOrEqual => SmtBinaryOperator.GreaterThanOrEqual,
+                SmtBinaryOperator.GreaterThan => SmtBinaryOperator.LessThan,
+                SmtBinaryOperator.GreaterThanOrEqual => SmtBinaryOperator.LessThanOrEqual,
+                _ => op,
+            };
+        }
+
+        private static bool TryNegateIntegerComparison(SmtBinaryOperator op, out SmtBinaryOperator negated)
+        {
+            switch (op)
+            {
+                case SmtBinaryOperator.Equal:
+                    negated = SmtBinaryOperator.NotEqual;
+                    return true;
+                case SmtBinaryOperator.NotEqual:
+                    negated = SmtBinaryOperator.Equal;
+                    return true;
+                case SmtBinaryOperator.LessThan:
+                    negated = SmtBinaryOperator.GreaterThanOrEqual;
+                    return true;
+                case SmtBinaryOperator.LessThanOrEqual:
+                    negated = SmtBinaryOperator.GreaterThan;
+                    return true;
+                case SmtBinaryOperator.GreaterThan:
+                    negated = SmtBinaryOperator.LessThanOrEqual;
+                    return true;
+                case SmtBinaryOperator.GreaterThanOrEqual:
+                    negated = SmtBinaryOperator.LessThan;
+                    return true;
+                default:
+                    negated = default;
+                    return false;
+            }
+        }
+
+        private static bool IntegerComparisonExcludesZero(SmtBinaryOperator op, long constant)
+        {
+            return !EvaluateIntegerComparison(op, 0, constant);
+        }
+
+        private static bool EvaluateIntegerComparison(SmtBinaryOperator op, long left, long right)
+        {
+            return op switch
+            {
+                SmtBinaryOperator.Equal => left == right,
+                SmtBinaryOperator.NotEqual => left != right,
+                SmtBinaryOperator.LessThan => left < right,
+                SmtBinaryOperator.LessThanOrEqual => left <= right,
+                SmtBinaryOperator.GreaterThan => left > right,
+                SmtBinaryOperator.GreaterThanOrEqual => left >= right,
+                _ => false,
+            };
         }
 
         private static bool TryTranslateValueCore(
